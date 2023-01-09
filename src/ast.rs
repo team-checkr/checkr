@@ -1,0 +1,56 @@
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Variable(pub String);
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Array(pub String, pub Box<AExpr>);
+
+type BoxStmt = Box<Command>;
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Command {
+    Assignment(Variable, AExpr),
+    Skip,
+    If(Vec<Guard>),
+    Loop(Vec<Guard>),
+    /// **Extension**
+    ArrayAssignment(Array, AExpr),
+    /// **Extension**
+    Break,
+    /// **Extension**
+    Continue,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Guard(pub BExpr, pub Vec<Command>);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AExpr {
+    Number(i64),
+    Variable(String),
+    Binary(Box<AExpr>, AOp, Box<AExpr>),
+    /// **Extension**
+    Array(Array),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum AOp {
+    Plus,
+    Minus,
+    Times,
+    Pow,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum BExpr {
+    Bool(bool),
+    Rel(AExpr, RelOp, AExpr),
+    And(Box<BExpr>, Box<BExpr>),
+    Land(Box<BExpr>, Box<BExpr>),
+    Not(Box<BExpr>),
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum RelOp {
+    Eq,
+    Gt,
+    Ge,
+}
