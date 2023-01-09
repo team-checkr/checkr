@@ -1,0 +1,9 @@
+bin/
+obj/
+
+Lexer.fs
+Parser.fs
+Parser.fsi
+
+.fake
+.ionide

@@ -1,0 +1,57 @@
+// Open the file that defines the type "expr" we shall use as AST
+%{
+open CalculatorTypesAST
+%}
+
+// Declare the tokens (terminal symbols)
+%token <float> NUM
+%token TIMES DIV PLUS MINUS POW LPAR RPAR EOF
+// NOTE: the actual formats of these tokens are defined in the lexer file
+//       as regular expressions
+
+// Specify precedence and associativity of operators
+// Precedence is given by the order (from low to high)
+%left PLUS MINUS
+%left TIMES DIV
+%right POW
+
+
+// We declare the initial non-terminal symbol
+%start start
+
+// We specify the return type of each of then non-terminal symbols
+%type <CalculatorTypesAST.expr> start
+%type <expr> expression
+
+// Grammar productions
+%%
+
+// The first production in "formal" notation is
+// start -> expression
+// here written:
+start: expression EOF             { $1 }
+
+// Note that we need to insert an End-Of-File (EOF)
+// The code annotation { $1 } specifies that parsing with this production
+// returns whatever parsing the expression returns: $1 is the result of parsing
+// the first component of the production (i.e. expression)
+
+// The productions for expressions are like in the grammar we saw in class
+// written in the yacc format:
+expression:
+  | expression TIMES expression   { TimesExpr($1,$3) }
+  | expression DIV expression     { DivExpr($1,$3) }
+  | expression PLUS expression    { PlusExpr($1,$3) }
+  | expression MINUS expression   { MinusExpr($1,$3) }
+  | expression POW expression     { PowExpr($1,$3) }
+  | PLUS expression               { UPlusExpr($2) }
+  | MINUS expression              { UMinusExpr($2) }
+  | NUM                           { Num($1) }
+  | LPAR expression RPAR          { $2 }
+
+// Again, the code annotation specifies the result of parsing
+// For example { TimesExpr($1,$3) } specifies that parsing with the production
+// returns the value TimesExpr($1,$3), where $i is the result of parsing
+// component i in the production (in this case the lhs and rhs operands)
+
+%%
