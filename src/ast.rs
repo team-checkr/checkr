@@ -27,8 +27,9 @@ pub enum AExpr {
     Number(i64),
     Variable(String),
     Binary(Box<AExpr>, AOp, Box<AExpr>),
-    /// **Extension**
+    /// **Extension**z
     Array(Array),
+    Minus(Box<AExpr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -36,6 +37,7 @@ pub enum AOp {
     Plus,
     Minus,
     Times,
+    Divide,
     Pow,
 }
 
@@ -43,14 +45,24 @@ pub enum AOp {
 pub enum BExpr {
     Bool(bool),
     Rel(AExpr, RelOp, AExpr),
-    And(Box<BExpr>, Box<BExpr>),
-    Land(Box<BExpr>, Box<BExpr>),
+    Logic(Box<BExpr>, LogicOp, Box<BExpr>),
     Not(Box<BExpr>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum RelOp {
     Eq,
+    Ne,
     Gt,
     Ge,
+    Lt,
+    Le,
+}
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum LogicOp {
+    And,
+    Land,
+    Or,
+    Lor,
 }

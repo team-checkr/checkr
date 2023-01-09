@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Command, Guard, RelOp, Variable};
+use crate::ast::{AExpr, AOp, Array, BExpr, Command, Guard, LogicOp, RelOp, Variable};
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -20,40 +20,8 @@ impl Display for Command {
         match self {
             Command::Assignment(target, expr) => write!(f, "{target} := {expr}"),
             Command::ArrayAssignment(arr, expr) => write!(f, "{arr} := {expr}"),
-            Command::If(guards) => write!(
-                f,
-                "if {}\nfi",
-                guards
-                    .iter()
-                    .map(|g| g
-                        .to_string()
-                        .lines()
-                        .enumerate()
-                        .map(|(idx, l)| if idx == 0 {
-                            l.to_string()
-                        } else {
-                            format!("  {l}")
-                        })
-                        .join("\n"))
-                    .format("\n[] ")
-            ),
-            Command::Loop(guards) => write!(
-                f,
-                "do {}\nod",
-                guards
-                    .iter()
-                    .map(|g| g
-                        .to_string()
-                        .lines()
-                        .enumerate()
-                        .map(|(idx, l)| if idx == 0 {
-                            l.to_string()
-                        } else {
-                            format!("  {l}")
-                        })
-                        .join("\n"))
-                    .format("\n[] ")
-            ),
+            Command::If(guards) => write!(f, "if {}\nfi", guards.iter().format("\n[] ")),
+            Command::Loop(guards) => write!(f, "do {}\nod", guards.iter().format("\n[] ")),
             Command::Break => write!(f, "break"),
             Command::Continue => write!(f, "continue"),
             Command::Skip => write!(f, "skip"),
@@ -81,6 +49,7 @@ impl Display for AExpr {
             AExpr::Variable(x) => write!(f, "{x}"),
             AExpr::Binary(l, op, r) => write!(f, "{l} {op} {r}"),
             AExpr::Array(a) => write!(f, "{a}"),
+            AExpr::Minus(m) => write!(f, "-({m})"),
         }
     }
 }
@@ -91,6 +60,7 @@ impl Display for AOp {
             AOp::Minus => write!(f, "-"),
             AOp::Times => write!(f, "*"),
             AOp::Pow => write!(f, "^"),
+            AOp::Divide => write!(f, "/"),
         }
     }
 }
@@ -99,8 +69,7 @@ impl Display for BExpr {
         match self {
             BExpr::Bool(b) => write!(f, "{b}"),
             BExpr::Rel(l, op, r) => write!(f, "{l} {op} {r}"),
-            BExpr::And(l, r) => write!(f, "{l} ∧ {r}"),
-            BExpr::Land(l, r) => write!(f, "{l} && {r}"),
+            BExpr::Logic(l, op, r) => write!(f, "{l} {op} {r}"),
             BExpr::Not(b) => write!(f, "¬({b})"),
         }
     }
@@ -108,9 +77,22 @@ impl Display for BExpr {
 impl Display for RelOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RelOp::Eq => write!(f, "="),
+            RelOp::Eq => write!(f, "=="),
             RelOp::Gt => write!(f, ">"),
             RelOp::Ge => write!(f, ">="),
+            RelOp::Ne => write!(f, "!="),
+            RelOp::Lt => write!(f, "<"),
+            RelOp::Le => write!(f, "<="),
+        }
+    }
+}
+impl Display for LogicOp {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LogicOp::And => write!(f, "&"),
+            LogicOp::Land => write!(f, "&&"),
+            LogicOp::Or => write!(f, "|"),
+            LogicOp::Lor => write!(f, "||"),
         }
     }
 }
