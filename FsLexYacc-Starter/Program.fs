@@ -61,5 +61,7 @@ let rec compute n =
         with
         | err -> compute (n - 1)
 
+// Console.WriteLine("Hello JSON: {0}", Newtonsoft.Json.JsonConvert.SerializeObject exp)
+
 // Start interacting with the user
 compute 3
