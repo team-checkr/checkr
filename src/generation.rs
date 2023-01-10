@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, Rng};
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Command, Guard, LogicOp, RelOp, Variable};
+use crate::ast::{AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Variable};
 
 pub struct Context {
     fuel: u32,
@@ -58,6 +58,14 @@ pub trait Generate {
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self;
 }
 
+impl Generate for Commands {
+    type Context = Context;
+
+    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        Commands(cx.many(1, 10, rng))
+    }
+}
+
 impl Generate for Command {
     type Context = Context;
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
@@ -85,7 +93,7 @@ impl Generate for Guard {
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.recursion_limit = 5;
         cx.negation_limit = 3;
-        Guard(Generate::gen(cx, rng), cx.many(1, 10, rng))
+        Guard(Generate::gen(cx, rng), Commands::gen(cx, rng))
     }
 }
 

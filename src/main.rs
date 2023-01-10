@@ -5,11 +5,16 @@ use std::time::Duration;
 use clap::Parser;
 use rand::prelude::*;
 
-use crate::{ast::Command, generation::Context};
+use crate::{
+    ast::{Command, Commands},
+    generation::Context,
+    pg::{Determinism, ProgramGraph},
+};
 
 pub mod ast;
 pub mod fmt;
 pub mod generation;
+pub mod pg;
 
 #[derive(Debug, Parser)]
 enum Cli {
@@ -46,7 +51,7 @@ fn main() -> anyhow::Result<()> {
 
                 let mut cx = Context::new(fuel, &mut rng);
 
-                let cmds: Vec<Command> = cx.many(5, 10, &mut rng);
+                let cmds = Commands(cx.many(5, 10, &mut rng));
 
                 print!("{esc}c", esc = 27 as char);
                 // println!("{}", crate::fmt::fmt_commands(&cmds));
@@ -65,14 +70,17 @@ fn main() -> anyhow::Result<()> {
 
                     let syntax = ps.find_syntax_by_extension("py").unwrap();
                     let mut h = HighlightLines::new(syntax, &ts.themes["base16-eighties.dark"]);
-                    let s = crate::fmt::fmt_commands(&cmds).to_string();
+                    let s = cmds.to_string();
                     for line in LinesWithEndings::from(&s) {
                         let ranges: Vec<(Style, &str)> = h.highlight_line(line, &ps).unwrap();
                         let escaped = as_24_bit_terminal_escaped(&ranges[..], true);
-                        print!("{}", escaped);
+                        print!("{escaped}");
                     }
                     println!();
                 }
+
+                let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
+                println!("{}", pg.dot());
 
                 std::thread::sleep(Duration::from_secs(2));
 

@@ -2,7 +2,7 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Command, Guard, LogicOp, RelOp, Variable};
+use crate::ast::{AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Variable};
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -29,16 +29,22 @@ impl Display for Command {
     }
 }
 
-pub fn fmt_commands(cmds: &[Command]) -> String {
-    cmds.iter()
-        .map(|l| l.to_string().lines().map(|l| format!("   {l}")).join("\n"))
-        .format(" ;\n")
-        .to_string()
+impl Display for Commands {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.0
+                .iter()
+                .map(|l| l.to_string().lines().map(|l| format!("   {l}")).join("\n"))
+                .format(" ;\n")
+        )
+    }
 }
 
 impl Display for Guard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ->\n{}", self.0, fmt_commands(&self.1))
+        write!(f, "{} ->\n{}", self.0, self.1)
     }
 }
 

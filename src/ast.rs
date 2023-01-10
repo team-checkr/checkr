@@ -3,7 +3,8 @@ pub struct Variable(pub String);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Array(pub String, pub Box<AExpr>);
 
-type BoxStmt = Box<Command>;
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Commands(pub Vec<Command>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Command {
@@ -20,7 +21,7 @@ pub enum Command {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Guard(pub BExpr, pub Vec<Command>);
+pub struct Guard(pub BExpr, pub Commands);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AExpr {
