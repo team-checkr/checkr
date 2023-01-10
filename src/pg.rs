@@ -1,11 +1,16 @@
-use std::sync::atomic::AtomicU64;
+use std::{
+    collections::{HashMap, HashSet},
+    sync::atomic::AtomicU64,
+};
 
 use itertools::Itertools;
 
-use crate::ast::{AExpr, Array, BExpr, Command, Commands, Guard, LogicOp};
+use crate::ast::{AExpr, Array, BExpr, Command, Commands, Guard, LogicOp, Variable};
 
 pub struct ProgramGraph {
-    edges: Vec<(Node, Edge, Node)>,
+    edges: Vec<Edge>,
+    nodes: HashSet<Node>,
+    outgoing: HashMap<Node, Vec<Edge>>,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -15,10 +20,10 @@ pub enum Determinism {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-struct NodeId(u64);
+pub struct NodeId(u64);
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Node {
+pub enum Node {
     Start,
     Node(NodeId),
     End,
@@ -44,26 +49,53 @@ impl Node {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-enum Edge {
-    Assignment(String, AExpr),
+pub enum Action {
+    Assignment(Variable, AExpr),
     ArrayAssignment(String, AExpr, AExpr),
     Skip,
     Condition(BExpr),
 }
+impl Action {
+    fn fv(&self) -> HashSet<Variable> {
+        match self {
+            Action::Assignment(x, a) => [x.clone()].into_iter().chain(a.fv()).collect(),
+            // TODO
+            Action::ArrayAssignment(_, _, a) => a.fv(),
+            Action::Skip => Default::default(),
+            Action::Condition(b) => b.fv(),
+        }
+    }
+}
 
-impl std::fmt::Display for Edge {
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Edge(pub Node, pub Action, pub Node);
+
+impl Edge {
+    pub fn action(&self) -> &Action {
+        &self.1
+    }
+
+    pub fn from(&self) -> Node {
+        self.0
+    }
+    pub fn to(&self) -> Node {
+        self.2
+    }
+}
+
+impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Edge::Assignment(v, x) => write!(f, "{v} := {x}"),
-            Edge::ArrayAssignment(arr, idx, x) => write!(f, "{arr}[{idx}] := {x}"),
-            Edge::Skip => write!(f, "skip"),
-            Edge::Condition(b) => write!(f, "{b}"),
+            Action::Assignment(v, x) => write!(f, "{v} := {x}"),
+            Action::ArrayAssignment(arr, idx, x) => write!(f, "{arr}[{idx}] := {x}"),
+            Action::Skip => write!(f, "skip"),
+            Action::Condition(b) => write!(f, "{b}"),
         }
     }
 }
 
 impl Commands {
-    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<(Node, Edge, Node)> {
+    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         let mut edges = vec![];
 
         let mut prev = s;
@@ -78,7 +110,7 @@ impl Commands {
     }
 }
 
-fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<(Node, Edge, Node)> {
+fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
     match det {
         Determinism::Deterministic => {
             let mut prev: Option<BExpr> = None;
@@ -101,7 +133,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<(Nod
                     g.0.clone()
                 };
 
-                edges.push((s, Edge::Condition(cond), q));
+                edges.push(Edge(s, Action::Condition(cond), q));
             }
 
             edges
@@ -111,7 +143,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<(Nod
             .flat_map(|g| {
                 let q = Node::fresh();
                 let mut edges = g.1.edges(det, q, t);
-                edges.push((s, Edge::Condition(g.0.clone()), q));
+                edges.push(Edge(s, Action::Condition(g.0.clone()), q));
                 edges
             })
             .collect(),
@@ -119,23 +151,23 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<(Nod
 }
 
 impl Command {
-    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<(Node, Edge, Node)> {
+    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         match self {
             Command::Assignment(v, expr) => {
-                vec![(s, Edge::Assignment(v.0.clone(), expr.clone()), t)]
+                vec![Edge(s, Action::Assignment(v.clone(), expr.clone()), t)]
             }
-            Command::Skip => vec![(s, Edge::Skip, t)],
+            Command::Skip => vec![Edge(s, Action::Skip, t)],
             Command::If(guards) => guard_edges(det, guards, s, t),
             Command::Loop(guards) => {
                 let b = done(guards);
                 let mut edges = guard_edges(det, guards, s, s);
-                edges.push((s, Edge::Condition(b), t));
+                edges.push(Edge(s, Action::Condition(b), t));
                 edges
             }
             Command::ArrayAssignment(Array(arr, idx), expr) => {
-                vec![(
+                vec![Edge(
                     s,
-                    Edge::ArrayAssignment(arr.clone(), *idx.clone(), expr.clone()),
+                    Action::ArrayAssignment(arr.clone(), *idx.clone(), expr.clone()),
                     t,
                 )]
             }
@@ -155,9 +187,37 @@ fn done(guards: &[Guard]) -> BExpr {
 
 impl ProgramGraph {
     pub fn new(det: Determinism, cmds: &Commands) -> Self {
-        Self {
-            edges: cmds.edges(det, Node::Start, Node::End),
+        let edges = cmds.edges(det, Node::Start, Node::End);
+        let mut outgoing: HashMap<Node, Vec<Edge>> = HashMap::new();
+        let mut nodes: HashSet<Node> = Default::default();
+
+        for e in &edges {
+            outgoing.entry(e.0).or_default().push(e.clone());
+            nodes.insert(e.0);
+            nodes.insert(e.2);
         }
+
+        Self {
+            outgoing,
+            edges,
+            nodes,
+        }
+    }
+    pub fn edges(&self) -> &[Edge] {
+        &self.edges
+    }
+    pub fn nodes(&self) -> &HashSet<Node> {
+        &self.nodes
+    }
+    pub fn outgoing(&self, node: Node) -> &[Edge] {
+        self.outgoing
+            .get(&node)
+            .map(|s| s.as_slice())
+            .unwrap_or_default()
+    }
+
+    pub fn fv(&self) -> HashSet<Variable> {
+        self.edges.iter().flat_map(|e| e.action().fv()).collect()
     }
 
     pub fn dot(&self) -> String {

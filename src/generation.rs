@@ -23,8 +23,8 @@ impl Context {
         self.names.choose(rng).cloned().unwrap().to_uppercase()
     }
 
-    fn var_name<R: Rng>(&self, rng: &mut R) -> String {
-        self.names.choose(rng).cloned().unwrap()
+    fn var_name<R: Rng>(&self, rng: &mut R) -> Variable {
+        Variable(self.names.choose(rng).cloned().unwrap())
     }
 
     fn sample<G: Generate<Context = Self>, R: Rng>(
@@ -77,9 +77,9 @@ impl Generate for Command {
                 (0.7, box |cx, rng| {
                     Command::Assignment(Variable::gen(cx, rng), AExpr::gen(cx, rng))
                 }),
-                (0.3, box |cx, rng| {
-                    Command::ArrayAssignment(Array::gen(cx, rng), AExpr::gen(cx, rng))
-                }),
+                // (0.3, box |cx, rng| {
+                //     Command::ArrayAssignment(Array::gen(cx, rng), AExpr::gen(cx, rng))
+                // }),
                 (0.3, box |cx, rng| Command::If(cx.many(1, 10, rng))),
                 (0.3, box |cx, rng| Command::Loop(cx.many(1, 10, rng))),
             ],
@@ -107,7 +107,7 @@ impl Generate for Array {
 impl Generate for Variable {
     type Context = Context;
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        Variable(cx.var_name(rng))
+        cx.var_name(rng)
     }
 }
 
@@ -119,12 +119,12 @@ impl Generate for AExpr {
             vec![
                 (0.4, box |_, rng| AExpr::Number(rng.gen_range(-100..=100))),
                 (0.7, box |cx, rng| AExpr::Variable(cx.var_name(rng))),
-                (0.1, box |cx, rng| AExpr::Array(Array::gen(cx, rng))),
+                // (0.1, box |cx, rng| AExpr::Array(Array::gen(cx, rng))),
                 (
                     if cx.recursion_limit == 0 || cx.fuel == 0 {
                         0.0
                     } else {
-                        0.5
+                        0.9
                     },
                     box |cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();

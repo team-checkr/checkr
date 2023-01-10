@@ -1,0 +1,121 @@
+use std::str::FromStr;
+use crate::ast::*;
+use crate::security::{Flow, SecurityClass};
+
+grammar;
+
+match {
+    // Skip whitespace and comments
+    r"\s*" => { },
+    r"//[^\n\r]*[\n\r]*" => { }, // `// comment`
+    r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => { }, // `/* comment */`
+    _
+}
+
+Sep<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+SepNonEmpty<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T> S? =>{
+        v.push(e);
+        v
+    }
+};
+
+pub Commands: Commands = {
+    Sep<Command, ";"> => Commands(<>),
+};
+
+Command: Command = {
+    <Variable> ":=" <AExpr> =>
+        Command::Assignment(<>),
+    <Array>  ":=" <AExpr> =>
+        Command::ArrayAssignment(<>),
+    "if" <Guards> "fi" =>
+        Command::If(<>),
+    "do" <Guards> "od" =>
+        Command::Loop(<>),
+    "skip"=>
+        Command::Skip,
+    "continue" =>
+        Command::Continue,
+    "break" =>
+        Command::Break,
+};
+
+#[inline]
+Variable: Variable = Ident => Variable(<>);
+#[inline]
+Array: Array = <arr:Ident> "[" <idx:AExpr> "]" => Array(arr, box idx);
+
+Guards: Vec<Guard> = Sep<Guard, "[]">;
+
+Guard: Guard = {
+    <BExpr> "->" <Commands> => Guard(<>),
+};
+
+AExpr_ = AExpr;
+AExpr: AExpr = {
+    #[precedence(level="1")]
+    Int => AExpr::Number(<>),
+    Variable => AExpr::Variable(<>),
+    Array => AExpr::Array(<>),
+    "-" <AExpr> => AExpr::Minus(box <>),
+    "(" <AExpr_> ")",
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:AExpr> "^" <r:AExpr> => AExpr::Binary(box l, AOp::Pow, box r),
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:AExpr> "*" <r:AExpr> => AExpr::Binary(box l, AOp::Times, box r),
+    <l:AExpr> "/" <r:AExpr> => AExpr::Binary(box l, AOp::Divide, box r),
+
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:AExpr> "+" <r:AExpr> => AExpr::Binary(box l, AOp::Plus, box r),
+    <l:AExpr> "-" <r:AExpr> => AExpr::Binary(box l, AOp::Minus, box r),
+};
+
+BExpr: BExpr = {
+    #[precedence(level="0")]
+    <l:AExpr_> <op:RelOp> <r:AExpr_> => BExpr::Rel(l, op, r),
+    "true" => BExpr::Bool(true),
+    "false" => BExpr::Bool(false),
+    "!" <BExpr> => BExpr::Not(box <>),
+    "(" <BExpr_> ")",
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <l:BExpr> "&" <r:BExpr> => BExpr::Logic(box l, LogicOp::And, box r),
+    <l:BExpr> "&&" <r:BExpr> => BExpr::Logic(box l, LogicOp::And, box r),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:BExpr> "|" <r:BExpr> => BExpr::Logic(box l, LogicOp::Or, box r),
+    <l:BExpr> "||" <r:BExpr> => BExpr::Logic(box l, LogicOp::Or, box r),
+};
+BExpr_: BExpr = BExpr;
+
+RelOp: RelOp = {
+    "<" => RelOp::Lt,
+    ">" => RelOp::Gt,
+    "<=" => RelOp::Le,
+    ">=" => RelOp::Ge,
+    "=" => RelOp::Eq,
+    "!=" => RelOp::Ne,
+};
+
+Ident: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+
+Int: i64 = r"[0-9]+" => i64::from_str(<>).unwrap();
+
+
+// Security lattice
+
+pub SecurityLattice: Vec<Flow<SecurityClass>> = Sep<SecurityLatticeFlow, ",">;
+SecurityLatticeFlow: Flow<SecurityClass> = <SecurityClass> "<" <SecurityClass> => Flow(<>);
+SecurityClass: SecurityClass = Ident => SecurityClass(<>);

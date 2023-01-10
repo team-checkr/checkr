@@ -76,14 +76,14 @@ impl Display for BExpr {
             BExpr::Bool(b) => write!(f, "{b}"),
             BExpr::Rel(l, op, r) => write!(f, "{l} {op} {r}"),
             BExpr::Logic(l, op, r) => write!(f, "{l} {op} {r}"),
-            BExpr::Not(b) => write!(f, "¬({b})"),
+            BExpr::Not(b) => write!(f, "!({b})"),
         }
     }
 }
 impl Display for RelOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            RelOp::Eq => write!(f, "=="),
+            RelOp::Eq => write!(f, "="),
             RelOp::Gt => write!(f, ">"),
             RelOp::Ge => write!(f, ">="),
             RelOp::Ne => write!(f, "!="),
