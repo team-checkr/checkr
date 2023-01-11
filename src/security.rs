@@ -134,13 +134,13 @@ impl SecurityLattice {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SecurityAnalysis {
+pub struct SecurityAnalysisResult {
     pub actual: Vec<Flow<Variable>>,
     pub allowed: Vec<Flow<Variable>>,
     pub violations: Vec<Flow<Variable>>,
 }
 
-impl SecurityAnalysis {
+impl SecurityAnalysisResult {
     pub fn run(
         mapping: &HashMap<Variable, SecurityClass>,
         lattice: &SecurityLattice,

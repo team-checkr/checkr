@@ -1,6 +1,6 @@
 #![feature(box_patterns, box_syntax)]
 
-use std::{collections::HashMap, path::PathBuf, time::Duration};
+use std::{collections::HashMap, time::Duration};
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
@@ -8,21 +8,15 @@ use itertools::Itertools;
 use rand::prelude::*;
 use tracing::info;
 
-use crate::{
-    ast::{Commands, Variable},
-    interpreter::Interpreter,
+use verification_lawyer::{
+    ast::Variable,
+    environment::{Application, SecurityAnalysis, StepWise},
+    generate_program,
+    interpreter::{Interpreter, Memory},
+    parse,
     pg::{Determinism, ProgramGraph},
-    security::{SecurityAnalysis, SecurityClass, SecurityLattice},
+    security::{SecurityAnalysisResult, SecurityClass, SecurityLattice},
 };
-
-pub mod analysis;
-pub mod ast;
-pub mod fmt;
-pub mod generation;
-pub mod interpreter;
-pub mod parse;
-pub mod pg;
-pub mod security;
 
 #[derive(Debug, Parser)]
 enum Cli {
@@ -73,28 +67,14 @@ enum Reference {
     },
 }
 
-fn generate_program(fuel: Option<u32>, seed: Option<u64>) -> (Commands, SmallRng) {
-    let seed = match seed {
-        Some(seed) => seed,
-        None => rand::random(),
-    };
-    let mut rng = SmallRng::seed_from_u64(seed);
-
-    let fuel = match fuel {
-        Some(fuel) => fuel,
-        None => rng.gen_range(10..100),
-    };
-
-    let mut cx = generation::Context::new(fuel, &mut rng);
-
-    (Commands(cx.many(5, 10, &mut rng)), rng)
-}
-
 fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::fmt()
         .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
         .without_time()
         .init();
+
+    let mut app = Application::new();
+    app.add_env(SecurityAnalysis).add_env(StepWise);
 
     match Cli::parse() {
         Cli::Generate { fuel, seed } => {
@@ -130,7 +110,7 @@ fn main() -> anyhow::Result<()> {
                 let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
                 println!("{}", pg.dot());
 
-                info!("{:?}", Interpreter::evaluate(&pg));
+                info!("{:?}", Interpreter::evaluate(1000, Memory::zero(&pg), &pg));
 
                 std::thread::sleep(Duration::from_secs(2));
 
@@ -198,7 +178,10 @@ fn main() -> anyhow::Result<()> {
                     .output()
                     .with_context(|| format!("spawning {program:?}"))?;
 
-                let result: SecurityAnalysis = serde_json::from_slice(&output.stdout)?;
+                let result: SecurityAnalysisResult = serde_json::from_slice(&output.stdout)?;
+
+                println!("Classification: {classification:?}");
+                println!("Lattice: {lattice:?}");
 
                 info!("Actual:     {}", result.actual.iter().sorted().format(", "));
                 info!(
@@ -219,7 +202,7 @@ fn main() -> anyhow::Result<()> {
 
                 let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
 
-                println!("{:?}", Interpreter::evaluate(&pg));
+                println!("{:?}", Interpreter::evaluate(100, Memory::zero(&pg), &pg));
 
                 Ok(())
             }
@@ -233,7 +216,7 @@ fn main() -> anyhow::Result<()> {
                 let classification = serde_json::from_str(&classification)?;
                 let lattice = serde_json::from_str(&lattice)?;
 
-                let result = SecurityAnalysis::run(&classification, &lattice, &cmds);
+                let result = SecurityAnalysisResult::run(&classification, &lattice, &cmds);
 
                 println!("{}", serde_json::to_string(&result)?);
 

@@ -1,5 +1,7 @@
 use std::collections::HashMap;
 
+use serde::{Deserialize, Serialize};
+
 use crate::{
     ast::{AExpr, AOp, Array, BExpr, LogicOp, RelOp, Variable},
     pg::{Action, Node, ProgramGraph},
@@ -7,13 +9,22 @@ use crate::{
 
 pub struct Interpreter {}
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Memory {
-    variables: HashMap<Variable, i64>,
-    arrays: HashMap<(String, i64), i64>,
+    pub variables: HashMap<Variable, i64>,
+    pub arrays: HashMap<(String, i64), i64>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+impl Memory {
+    pub fn zero(pg: &ProgramGraph) -> Memory {
+        Memory {
+            variables: pg.fv().into_iter().map(|k| (k, 0)).collect(),
+            arrays: Default::default(),
+        }
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProgramState {
     Running(Node, Memory),
     Terminated(Memory),
@@ -21,14 +32,9 @@ pub enum ProgramState {
 }
 
 impl Interpreter {
-    pub fn evaluate(pg: &ProgramGraph) -> ProgramState {
-        let mut state = ProgramState::Running(
-            Node::Start,
-            Memory {
-                variables: pg.fv().into_iter().map(|k| (k, 0)).collect(),
-                arrays: Default::default(),
-            },
-        );
+    pub fn evaluate(mut steps: usize, memory: Memory, pg: &ProgramGraph) -> Vec<ProgramState> {
+        let mut state = ProgramState::Running(Node::Start, memory);
+        let mut trace = vec![state.clone()];
 
         while let ProgramState::Running(n, m) = state {
             let next = pg
@@ -39,10 +45,16 @@ impl Interpreter {
                 Some(s) => s,
                 None if n == Node::End => ProgramState::Terminated(m),
                 None => ProgramState::Stuck(n, m),
+            };
+            trace.push(state.clone());
+
+            if steps == 0 {
+                break;
             }
+            steps -= 1;
         }
 
-        state
+        trace
     }
 }
 
