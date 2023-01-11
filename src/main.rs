@@ -12,7 +12,7 @@ use verification_lawyer::{
     ast::Variable,
     environment::{Application, SecurityAnalysis, StepWise},
     generate_program,
-    interpreter::{Interpreter, Memory},
+    interpreter::{Interpreter, InterpreterMemory},
     parse,
     pg::{Determinism, ProgramGraph},
     security::{SecurityAnalysisResult, SecurityClass, SecurityLattice},
@@ -110,7 +110,10 @@ fn main() -> anyhow::Result<()> {
                 let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
                 println!("{}", pg.dot());
 
-                info!("{:?}", Interpreter::evaluate(1000, Memory::zero(&pg), &pg));
+                info!(
+                    "{:?}",
+                    Interpreter::evaluate(1000, InterpreterMemory::zero(&pg), &pg)
+                );
 
                 std::thread::sleep(Duration::from_secs(2));
 
@@ -202,7 +205,10 @@ fn main() -> anyhow::Result<()> {
 
                 let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
 
-                println!("{:?}", Interpreter::evaluate(100, Memory::zero(&pg), &pg));
+                println!(
+                    "{:?}",
+                    Interpreter::evaluate(100, InterpreterMemory::zero(&pg), &pg)
+                );
 
                 Ok(())
             }

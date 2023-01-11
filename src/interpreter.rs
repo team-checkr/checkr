@@ -10,14 +10,14 @@ use crate::{
 pub struct Interpreter {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Memory {
+pub struct InterpreterMemory {
     pub variables: HashMap<Variable, i64>,
     pub arrays: HashMap<(String, i64), i64>,
 }
 
-impl Memory {
-    pub fn zero(pg: &ProgramGraph) -> Memory {
-        Memory {
+impl InterpreterMemory {
+    pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
+        InterpreterMemory {
             variables: pg.fv().into_iter().map(|k| (k, 0)).collect(),
             arrays: Default::default(),
         }
@@ -26,13 +26,17 @@ impl Memory {
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub enum ProgramState {
-    Running(Node, Memory),
-    Terminated(Memory),
-    Stuck(Node, Memory),
+    Running(Node, InterpreterMemory),
+    Terminated(InterpreterMemory),
+    Stuck(Node, InterpreterMemory),
 }
 
 impl Interpreter {
-    pub fn evaluate(mut steps: usize, memory: Memory, pg: &ProgramGraph) -> Vec<ProgramState> {
+    pub fn evaluate(
+        mut steps: usize,
+        memory: InterpreterMemory,
+        pg: &ProgramGraph,
+    ) -> Vec<ProgramState> {
         let mut state = ProgramState::Running(Node::Start, memory);
         let mut trace = vec![state.clone()];
 
@@ -59,7 +63,7 @@ impl Interpreter {
 }
 
 impl Action {
-    pub fn semantics(&self, m: &Memory) -> Option<Memory> {
+    pub fn semantics(&self, m: &InterpreterMemory) -> Option<InterpreterMemory> {
         match self {
             Action::Assignment(x, a) => {
                 if m.variables.contains_key(x) {
@@ -93,7 +97,7 @@ impl Action {
 }
 
 impl AExpr {
-    pub fn semantics(&self, m: &Memory) -> i64 {
+    pub fn semantics(&self, m: &InterpreterMemory) -> i64 {
         match self {
             AExpr::Number(n) => *n,
             AExpr::Variable(x) => {
@@ -103,25 +107,7 @@ impl AExpr {
                     todo!("not in memory")
                 }
             }
-            AExpr::Binary(l, op, r) => match op {
-                AOp::Plus => l.semantics(m) + r.semantics(m),
-                AOp::Minus => l.semantics(m) - r.semantics(m),
-                AOp::Times => l.semantics(m) * r.semantics(m),
-                AOp::Divide => {
-                    if r.semantics(m) != 0 {
-                        l.semantics(m) / r.semantics(m)
-                    } else {
-                        todo!("cannot divide by 0")
-                    }
-                }
-                AOp::Pow => {
-                    if r.semantics(m) >= 0 {
-                        l.semantics(m).pow(r.semantics(m) as _)
-                    } else {
-                        todo!("cannot take negative power")
-                    }
-                }
-            },
+            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
             AExpr::Array(Array(arr, idx)) => {
                 if let Some(x) = m.arrays.get(&(arr.clone(), idx.semantics(m))) {
                     *x
@@ -134,25 +120,61 @@ impl AExpr {
     }
 }
 
+impl AOp {
+    pub fn semantic(&self, l: i64, r: i64) -> i64 {
+        match self {
+            AOp::Plus => l + r,
+            AOp::Minus => l - r,
+            AOp::Times => l * r,
+            AOp::Divide => {
+                if r != 0 {
+                    l / r
+                } else {
+                    todo!("cannot divide by 0")
+                }
+            }
+            AOp::Pow => {
+                if r >= 0 {
+                    l.pow(r as _)
+                } else {
+                    todo!("cannot take negative power")
+                }
+            }
+        }
+    }
+}
+
 impl BExpr {
-    pub fn semantics(&self, m: &Memory) -> bool {
+    pub fn semantics(&self, m: &InterpreterMemory) -> bool {
         match self {
             BExpr::Bool(b) => *b,
-            BExpr::Rel(l, op, r) => match op {
-                RelOp::Eq => l.semantics(m) == r.semantics(m),
-                RelOp::Ne => l.semantics(m) != r.semantics(m),
-                RelOp::Gt => l.semantics(m) > r.semantics(m),
-                RelOp::Ge => l.semantics(m) >= r.semantics(m),
-                RelOp::Lt => l.semantics(m) < r.semantics(m),
-                RelOp::Le => l.semantics(m) <= r.semantics(m),
-            },
-            BExpr::Logic(l, op, r) => match op {
-                LogicOp::And => l.semantics(m) && r.semantics(m),
-                LogicOp::Land => l.semantics(m) && r.semantics(m),
-                LogicOp::Or => l.semantics(m) || r.semantics(m),
-                LogicOp::Lor => l.semantics(m) || r.semantics(m),
-            },
+            BExpr::Rel(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
+            BExpr::Logic(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
             BExpr::Not(b) => !b.semantics(m),
+        }
+    }
+}
+
+impl RelOp {
+    pub fn semantic(&self, l: i64, r: i64) -> bool {
+        match self {
+            RelOp::Eq => l == r,
+            RelOp::Ne => l != r,
+            RelOp::Gt => l > r,
+            RelOp::Ge => l >= r,
+            RelOp::Lt => l < r,
+            RelOp::Le => l <= r,
+        }
+    }
+}
+
+impl LogicOp {
+    pub fn semantic(&self, l: bool, r: bool) -> bool {
+        match self {
+            LogicOp::And => l && r,
+            LogicOp::Land => l && r,
+            LogicOp::Or => l || r,
+            LogicOp::Lor => l || r,
         }
     }
 }

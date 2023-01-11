@@ -13,6 +13,7 @@ pub mod interpreter;
 pub mod parse;
 pub mod pg;
 pub mod security;
+pub mod sign;
 
 pub fn generate_program(fuel: Option<u32>, seed: Option<u64>) -> (Commands, SmallRng) {
     let seed = match seed {

@@ -1,5 +1,8 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
+use serde::{Deserialize, Serialize};
+use serde_json_any_key::any_key_map;
+
 use crate::pg::{Edge, Node, ProgramGraph};
 
 pub enum Direction {
@@ -8,7 +11,7 @@ pub enum Direction {
 }
 
 pub trait MonotoneFramework {
-    type Domain: Lattice;
+    type Domain: Lattice + Serialize + for<'a> Deserialize<'a>;
     fn semantic(&self, _pg: &ProgramGraph, e: &Edge, prev: &Self::Domain) -> Self::Domain;
     fn direction() -> Direction;
     fn initial(&self, pg: &ProgramGraph) -> Self::Domain;
@@ -87,7 +90,10 @@ impl Worklist for LiFo {
 //     }
 // }
 
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct AnalysisResults<A: MonotoneFramework> {
+    #[serde(with = "any_key_map")]
+    #[serde(bound(deserialize = "A::Domain: 'de + serde::Deserialize<'de>"))]
     pub facts: HashMap<Node, A::Domain>,
     pub semantic_calls: usize,
 }
