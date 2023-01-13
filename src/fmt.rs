@@ -53,9 +53,9 @@ impl Display for AExpr {
         match self {
             AExpr::Number(n) => write!(f, "{n}"),
             AExpr::Variable(x) => write!(f, "{x}"),
-            AExpr::Binary(l, op, r) => write!(f, "{l} {op} {r}"),
+            AExpr::Binary(l, op, r) => write!(f, "({l} {op} {r})"),
             AExpr::Array(a) => write!(f, "{a}"),
-            AExpr::Minus(m) => write!(f, "-({m})"),
+            AExpr::Minus(m) => write!(f, "-{m}"),
         }
     }
 }
@@ -74,9 +74,9 @@ impl Display for BExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             BExpr::Bool(b) => write!(f, "{b}"),
-            BExpr::Rel(l, op, r) => write!(f, "{l} {op} {r}"),
-            BExpr::Logic(l, op, r) => write!(f, "{l} {op} {r}"),
-            BExpr::Not(b) => write!(f, "!({b})"),
+            BExpr::Rel(l, op, r) => write!(f, "({l} {op} {r})"),
+            BExpr::Logic(l, op, r) => write!(f, "({l} {op} {r})"),
+            BExpr::Not(b) => write!(f, "!{b}"),
         }
     }
 }

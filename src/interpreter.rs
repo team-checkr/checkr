@@ -1,9 +1,7 @@
-use std::collections::HashMap;
-
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{AExpr, AOp, Array, BExpr, LogicOp, RelOp, Variable},
+    ast::{AExpr, AOp, Array, BExpr, LogicOp, RelOp},
     pg::{Action, Node, ProgramGraph},
     sign::Memory,
 };

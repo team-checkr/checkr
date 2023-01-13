@@ -1,15 +1,16 @@
-use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeSet, HashMap, HashSet};
 
 use itertools::Itertools;
-use rand::{rngs::SmallRng, seq::SliceRandom, Rng};
+use rand::{rngs::SmallRng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{
-    analysis::{mono_analysis, AnalysisResults, FiFo},
+    analysis::{mono_analysis, FiFo},
     ast::{Commands, Variable},
     generation::Generate,
     interpreter::{Interpreter, InterpreterMemory, ProgramTrace},
-    pg::{Determinism, ProgramGraph},
+    pg::{Determinism, Node, ProgramGraph},
     security::{Flow, SecurityAnalysisResult, SecurityClass, SecurityLattice},
     sign::{Memory, Sign, SignAnalysis, SignMemory},
 };
@@ -36,17 +37,18 @@ pub trait Environment {
         if &reference == output {
             ValidationResult::CorrectTerminated
         } else {
-            println!("{reference:#?} != {output:#?}");
-            ValidationResult::Mismatch
+            ValidationResult::Mismatch {
+                reason: format!("{reference:#?} != {output:#?}"),
+            }
         }
     }
 }
 
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone)]
 pub enum ValidationResult {
     CorrectTerminated,
     CorrectNonTerminated,
-    Mismatch,
+    Mismatch { reason: String },
     TimeOut,
 }
 
@@ -136,10 +138,9 @@ impl Environment for SecurityAnalysis {
         if reference == output {
             ValidationResult::CorrectTerminated
         } else {
-            println!("{input:?}");
-            println!("{cmds}");
-            println!("{reference:#?} != {output:#?}");
-            ValidationResult::Mismatch
+            ValidationResult::Mismatch {
+                reason: format!("{input:?}\n{cmds}\n{reference:#?} != {output:#?}"),
+            }
         }
     }
 }
@@ -198,24 +199,40 @@ impl Environment for StepWise {
     where
         Self::Output: PartialEq,
     {
-        todo!("{output:#?}")
-        // let reference = self.run(cmds, input);
+        let pg = ProgramGraph::new(input.determinism, cmds);
+        let mut mem = vec![(Node::Start, input.assignment.clone())];
 
-        // if &reference != output {
-        //     return ValidationResult::Mismatch;
-        // }
+        for (idx, trace) in output.iter().skip(1).enumerate() {
+            let mut next_mem = vec![];
 
-        // if let Some(last) = output.last() {
-        //     match last {
-        //         ProgramState::Running { node: _, memory: _ } => {
-        //             ValidationResult::CorrectNonTerminated
-        //         }
-        //         ProgramState::Terminated { memory: _ }
-        //         | ProgramState::Stuck { node: _, memory: _ } => ValidationResult::CorrectTerminated,
-        //     }
-        // } else {
-        //     ValidationResult::Mismatch
-        // }
+            for (current_node, current_mem) in mem {
+                for edge in pg.outgoing(current_node) {
+                    if let Some(m) = edge.action().semantics(&current_mem) {
+                        // TODO: check state
+                        if m == trace.memory {
+                            next_mem.push((edge.to(), m));
+                        } else {
+                            eprintln!("{cmds}");
+                            debug!("Initial: {:?}", input.assignment);
+                            debug!("Ref:     {m:?}");
+                            debug!("Their:   {:?}", trace.memory);
+                        }
+                    }
+                }
+            }
+            if next_mem.is_empty() {
+                return ValidationResult::Mismatch {
+                    reason: format!("The traces do not match after {idx} iterations"),
+                };
+            }
+            mem = next_mem;
+        }
+
+        if output.len() < input.trace_count {
+            ValidationResult::CorrectTerminated
+        } else {
+            ValidationResult::CorrectNonTerminated
+        }
     }
 }
 
@@ -376,16 +393,18 @@ impl Environment for SignEnv {
             if let Some(idx) = pool.iter().position(|r| *r == o) {
                 pool.remove(idx);
             } else {
-                eprintln!("Produced world which did not exist in reference");
-                return ValidationResult::Mismatch;
+                return ValidationResult::Mismatch {
+                    reason: "Produced world which did not exist in reference".to_string(),
+                };
             }
         }
 
         if pool.is_empty() {
             ValidationResult::CorrectTerminated
         } else {
-            eprintln!("Reference had world which was not present");
-            ValidationResult::Mismatch
+            ValidationResult::Mismatch {
+                reason: "Reference had world which was not present".to_string(),
+            }
         }
     }
 }
