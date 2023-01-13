@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{Direction, MonotoneFramework},
-    ast::{AExpr, BExpr, Variable},
+    ast::{AExpr, Array, BExpr, Variable},
     pg::{Action, Edge, ProgramGraph},
 };
 
@@ -73,7 +73,43 @@ impl MonotoneFramework for SignAnalysis {
                 .flat_map(|mem| x.semantics_sign(mem).into_iter().map(move |s| (mem, s)))
                 .map(|(mem, s)| mem.clone().with_var(var, s))
                 .collect(),
-            Action::ArrayAssignment(_, _, _) => todo!(),
+            Action::ArrayAssignment(arr, idx, expr) => prev
+                .iter()
+                .flat_map(|mem| {
+                    let idx_signs = idx.semantics_sign(mem);
+                    if idx_signs.contains(&Sign::Zero) || idx_signs.contains(&Sign::Positive) {
+                        let asdf = mem
+                            .arrays
+                            .get(arr)
+                            .unwrap_or_else(|| panic!("could not get sign of array '{arr}'"))
+                            .iter()
+                            .copied()
+                            .collect_vec();
+
+                        let mut new_possible = HashSet::new();
+
+                        let signs: BTreeSet<Sign> = asdf.iter().copied().collect();
+
+                        for s in std::iter::once(None).chain(asdf.iter().map(Some)) {
+                            let mut signs = signs.clone();
+                            if let Some(s) = s {
+                                signs.remove(s);
+                            }
+                            for new_sign in expr.semantics_sign(mem) {
+                                let mut signs = signs.clone();
+                                signs.insert(new_sign);
+                                let mut new_mem = mem.clone();
+                                new_mem.arrays.insert(arr.clone(), signs);
+                                new_possible.insert(new_mem);
+                            }
+                        }
+
+                        new_possible
+                    } else {
+                        Default::default()
+                    }
+                })
+                .collect(),
             Action::Skip => prev.clone(),
             Action::Condition(b) => prev
                 .iter()
@@ -176,7 +212,19 @@ impl AExpr {
             )
             .map(sign_of)
             .collect(),
-            AExpr::Array(_) => todo!(),
+            AExpr::Array(Array(arr, idx)) => {
+                let idx_signs = idx.semantics_sign(mem);
+                if idx_signs.contains(&Sign::Zero) || idx_signs.contains(&Sign::Positive) {
+                    mem.arrays
+                        .get(arr)
+                        .unwrap_or_else(|| panic!("could not get sign of array '{arr}'"))
+                        .iter()
+                        .copied()
+                        .collect()
+                } else {
+                    Default::default()
+                }
+            }
             AExpr::Minus(n) => n.semantics_sign(mem).into_iter().map(|x| -x).collect(),
         }
     }
