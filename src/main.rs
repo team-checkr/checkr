@@ -124,8 +124,8 @@ fn main() -> anyhow::Result<()> {
 
                 let mut cmd = std::process::Command::new(args.next().unwrap());
                 cmd.args(args);
-                cmd.args(["--src", &src.to_string()]);
                 cmd.arg("interpreter");
+                cmd.arg(src.to_string());
 
                 let env = StepWise;
                 let input = <StepWise as Environment>::Input::gen(&mut src.clone(), &mut rng);
@@ -134,7 +134,11 @@ fn main() -> anyhow::Result<()> {
                 let output = cmd
                     .output()
                     .with_context(|| format!("spawning {program:?}"))?;
-                let output = serde_json::from_slice(&output.stdout)?;
+                eprintln!("{output:?}");
+                eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
+
+                let output =
+                    serde_json::from_slice(&output.stdout).with_context(|| "parsing output")?;
 
                 let result = env.validate(&src, &input, &output);
 

@@ -5,15 +5,12 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ast::{AExpr, AOp, Array, BExpr, LogicOp, RelOp, Variable},
     pg::{Action, Node, ProgramGraph},
+    sign::Memory,
 };
 
 pub struct Interpreter {}
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct InterpreterMemory {
-    pub variables: HashMap<Variable, i64>,
-    pub arrays: HashMap<(String, i64), i64>,
-}
+pub type InterpreterMemory = Memory<i64, Vec<i64>>;
 
 impl InterpreterMemory {
     pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
@@ -24,11 +21,29 @@ impl InterpreterMemory {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(tag = "Case")]
 pub enum ProgramState {
-    Running(Node, InterpreterMemory),
-    Terminated(InterpreterMemory),
-    Stuck(Node, InterpreterMemory),
+    Running,
+    Stuck,
+    Terminated,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct ProgramTrace<N = Node> {
+    pub state: ProgramState,
+    pub node: N,
+    pub memory: InterpreterMemory,
+}
+
+impl<A> ProgramTrace<A> {
+    pub fn map_node<B>(self, f: impl FnOnce(A) -> B) -> ProgramTrace<B> {
+        ProgramTrace {
+            state: self.state,
+            node: f(self.node),
+            memory: self.memory,
+        }
+    }
 }
 
 impl Interpreter {
@@ -36,19 +51,34 @@ impl Interpreter {
         mut steps: usize,
         memory: InterpreterMemory,
         pg: &ProgramGraph,
-    ) -> Vec<ProgramState> {
-        let mut state = ProgramState::Running(Node::Start, memory);
+    ) -> Vec<ProgramTrace> {
+        let mut state = ProgramTrace {
+            state: ProgramState::Running,
+            node: Node::Start,
+            memory,
+        };
         let mut trace = vec![state.clone()];
 
-        while let ProgramState::Running(n, m) = state {
-            let next = pg
-                .outgoing(n)
-                .iter()
-                .find_map(|e| e.1.semantics(&m).map(|m| ProgramState::Running(e.2, m)));
+        while let ProgramState::Running = state.state {
+            let next = pg.outgoing(state.node).iter().find_map(|e| {
+                e.1.semantics(&state.memory).map(|m| ProgramTrace {
+                    state: ProgramState::Running,
+                    node: e.2,
+                    memory: m,
+                })
+            });
             state = match next {
                 Some(s) => s,
-                None if n == Node::End => ProgramState::Terminated(m),
-                None => ProgramState::Stuck(n, m),
+                None if state.node == Node::End => ProgramTrace {
+                    state: ProgramState::Terminated,
+                    node: state.node,
+                    memory: state.memory,
+                },
+                None => ProgramTrace {
+                    state: ProgramState::Stuck,
+                    node: state.node,
+                    memory: state.memory,
+                },
             };
             trace.push(state.clone());
 
@@ -76,12 +106,14 @@ impl Action {
             }
             Action::ArrayAssignment(arr, idx, a) => {
                 let idx = idx.semantics(m);
-                if m.arrays.contains_key(&(arr.clone(), idx)) {
-                    let mut m2 = m.clone();
-                    m2.arrays.insert((arr.clone(), idx), a.semantics(m));
-                    Some(m2)
-                } else {
-                    todo!("array '{arr}[{idx}]' is not in memory")
+                match m.arrays.get(arr) {
+                    Some(data) if 0 <= idx && idx < data.len() as _ => {
+                        let mut m2 = m.clone();
+                        let data = m2.arrays.get_mut(arr).unwrap();
+                        data[idx as usize] = a.semantics(m);
+                        Some(m2)
+                    }
+                    _ => todo!("array '{arr}[{idx}]' is not in memory"),
                 }
             }
             Action::Skip => Some(m.clone()),
@@ -109,7 +141,11 @@ impl AExpr {
             }
             AExpr::Binary(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
             AExpr::Array(Array(arr, idx)) => {
-                if let Some(x) = m.arrays.get(&(arr.clone(), idx.semantics(m))) {
+                if let Some(x) = m
+                    .arrays
+                    .get(arr)
+                    .and_then(|data| data.get(idx.semantics(m) as usize))
+                {
                     *x
                 } else {
                     todo!("not in memory")

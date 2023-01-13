@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{BTreeMap, BTreeSet, HashMap, HashSet};
 
 use itertools::Itertools;
 use rand::{rngs::SmallRng, seq::SliceRandom, Rng};
@@ -8,7 +8,7 @@ use crate::{
     analysis::{mono_analysis, AnalysisResults, FiFo},
     ast::{Commands, Variable},
     generation::Generate,
-    interpreter::{Interpreter, InterpreterMemory, ProgramState},
+    interpreter::{Interpreter, InterpreterMemory, ProgramTrace},
     pg::{Determinism, ProgramGraph},
     security::{Flow, SecurityAnalysisResult, SecurityClass, SecurityLattice},
     sign::{Memory, Sign, SignAnalysis, SignMemory},
@@ -149,7 +149,7 @@ pub struct StepWise;
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct StepWiseInput {
     pub determinism: Determinism,
-    pub initialization: HashMap<Variable, i64>,
+    pub assignment: InterpreterMemory,
     pub trace_count: usize,
 }
 
@@ -159,11 +159,14 @@ impl Generate for StepWiseInput {
     fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         StepWiseInput {
             determinism: Determinism::Deterministic,
-            initialization: cx
-                .fv()
-                .into_iter()
-                .map(|v| (v, rng.gen_range(-10..=10)))
-                .collect(),
+            assignment: Memory {
+                variables: cx
+                    .fv()
+                    .into_iter()
+                    .map(|v| (v, rng.gen_range(-10..=10)))
+                    .collect(),
+                arrays: Default::default(),
+            },
             trace_count: rng.gen_range(10..=15),
         }
     }
@@ -172,7 +175,7 @@ impl Generate for StepWiseInput {
 impl Environment for StepWise {
     type Input = StepWiseInput;
 
-    type Output = Vec<ProgramState>;
+    type Output = Vec<ProgramTrace<String>>;
 
     fn name(&self) -> String {
         "Step-wise Execution".to_string()
@@ -180,15 +183,10 @@ impl Environment for StepWise {
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);
-
-        Interpreter::evaluate(
-            input.trace_count,
-            InterpreterMemory {
-                variables: input.initialization.clone(),
-                arrays: Default::default(),
-            },
-            &pg,
-        )
+        Interpreter::evaluate(input.trace_count, input.assignment.clone(), &pg)
+            .into_iter()
+            .map(|t| t.map_node(|n| n.to_string()))
+            .collect()
     }
 
     fn validate(
@@ -200,22 +198,24 @@ impl Environment for StepWise {
     where
         Self::Output: PartialEq,
     {
-        let reference = self.run(cmds, input);
+        todo!("{output:#?}")
+        // let reference = self.run(cmds, input);
 
-        if &reference != output {
-            return ValidationResult::Mismatch;
-        }
+        // if &reference != output {
+        //     return ValidationResult::Mismatch;
+        // }
 
-        if let Some(last) = output.last() {
-            match last {
-                ProgramState::Running(_, _) => ValidationResult::CorrectNonTerminated,
-                ProgramState::Terminated(_) | ProgramState::Stuck(_, _) => {
-                    ValidationResult::CorrectTerminated
-                }
-            }
-        } else {
-            ValidationResult::Mismatch
-        }
+        // if let Some(last) = output.last() {
+        //     match last {
+        //         ProgramState::Running { node: _, memory: _ } => {
+        //             ValidationResult::CorrectNonTerminated
+        //         }
+        //         ProgramState::Terminated { memory: _ }
+        //         | ProgramState::Stuck { node: _, memory: _ } => ValidationResult::CorrectTerminated,
+        //     }
+        // } else {
+        //     ValidationResult::Mismatch
+        // }
     }
 }
 
