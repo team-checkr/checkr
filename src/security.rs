@@ -3,6 +3,7 @@ use std::{
     fmt::Display,
 };
 
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -11,10 +12,16 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Flow<T>(pub T, pub T);
+pub struct Flow<T> {
+    pub from: T,
+    pub into: T,
+}
 impl<T> Flow<T> {
     fn map<S>(&self, f: impl Fn(&T) -> S) -> Flow<S> {
-        Flow(f(&self.0), f(&self.1))
+        Flow {
+            from: f(&self.from),
+            into: f(&self.into),
+        }
     }
 }
 
@@ -23,7 +30,7 @@ where
     T: Display,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} -> {}", self.0, self.1)
+        write!(f, "{} -> {}", self.from, self.into)
     }
 }
 
@@ -43,7 +50,10 @@ impl Command {
                 .iter()
                 .cloned()
                 .chain(a.fv())
-                .map(|i| Flow(i, Variable(x.clone())))
+                .map(|i| Flow {
+                    from: i,
+                    into: Variable(x.clone()),
+                })
                 .collect(),
             Command::Skip => HashSet::default(),
             Command::If(c) | Command::Loop(c) => {
@@ -67,7 +77,10 @@ impl Command {
                 .chain(a.fv())
                 .chain(idx.fv())
                 // TODO: Should this really be variable?
-                .map(|i| Flow(i, Variable(arr.clone())))
+                .map(|i| Flow {
+                    from: i,
+                    into: Variable(arr.clone()),
+                })
                 .collect(),
             Command::Break => HashSet::default(),
             Command::Continue => HashSet::default(),
@@ -102,8 +115,11 @@ impl SecurityLattice {
                     // a -> b, b -> c
                     // --------------
                     //     a -> c
-                    let new_flow = Flow(f.0.clone(), a.1.clone());
-                    if f.1 == a.0 && !allowed.contains(&new_flow) {
+                    let new_flow = Flow {
+                        from: f.from.clone(),
+                        into: a.into.clone(),
+                    };
+                    if f.into == a.from && !allowed.contains(&new_flow) {
                         to_add.insert(new_flow);
                     }
                 }
@@ -129,7 +145,29 @@ impl SecurityLattice {
         Ok(Self::new(&flows))
     }
     pub fn allows(&self, f: &Flow<SecurityClass>) -> bool {
-        f.0 == f.1 || self.allowed.contains(f)
+        f.from == f.into || self.allowed.contains(f)
+    }
+
+    fn all_allowed<'a>(
+        &'a self,
+        classification: &'a HashMap<Variable, SecurityClass>,
+    ) -> impl Iterator<Item = Flow<Variable>> + 'a {
+        classification
+            .iter()
+            .cartesian_product(classification.iter())
+            .filter_map(|((a, a_class), (b, b_class))| {
+                if self.allows(&Flow {
+                    from: a_class.clone(),
+                    into: b_class.clone(),
+                }) {
+                    Some(Flow {
+                        from: a.clone(),
+                        into: b.clone(),
+                    })
+                } else {
+                    None
+                }
+            })
     }
 }
 
@@ -146,11 +184,13 @@ impl SecurityAnalysisResult {
         lattice: &SecurityLattice,
         cmds: &Commands,
     ) -> Self {
+        let allowed = lattice.all_allowed(mapping).collect();
         let actual = cmds.flows();
-        let (allowed, violations) = actual
+        let violations = actual
             .iter()
             .cloned()
-            .partition(|flow| lattice.allows(&flow.map(|f| mapping[f].clone())));
+            .filter(|flow| !lattice.allows(&flow.map(|f| mapping[f].clone())))
+            .collect();
 
         Self {
             actual: actual.into_iter().collect(),

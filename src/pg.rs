@@ -15,6 +15,7 @@ pub struct ProgramGraph {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(tag = "Case")]
 pub enum Determinism {
     Deterministic,
     NonDeterministic,

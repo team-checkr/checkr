@@ -9,3 +9,6 @@ build-wasm:
 
 build-ui: build-wasm
     cd ui; npm i && npm run build
+
+serve-api:
+    cargo run -p api

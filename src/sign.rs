@@ -13,9 +13,12 @@ use crate::{
 };
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
-pub struct SignAnalysis;
+pub struct SignAnalysis {
+    pub assignment: SignMemory,
+}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[serde(tag = "Case")]
 pub enum Sign {
     Positive,
     Zero,
@@ -85,16 +88,7 @@ impl MonotoneFramework for SignAnalysis {
     }
 
     fn initial(&self, pg: &ProgramGraph) -> Self::Domain {
-        [Memory {
-            variables: pg
-                .fv()
-                .iter()
-                .map(|v| (v.clone(), Sign::default()))
-                .collect(),
-            arrays: Default::default(),
-        }]
-        .into_iter()
-        .collect()
+        [self.assignment.clone()].into_iter().collect()
     }
 }
 

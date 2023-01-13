@@ -117,5 +117,5 @@ Int: i64 = r"[0-9]+" => i64::from_str(<>).unwrap();
 // Security lattice
 
 pub SecurityLattice: Vec<Flow<SecurityClass>> = Sep<SecurityLatticeFlow, ",">;
-SecurityLatticeFlow: Flow<SecurityClass> = <SecurityClass> "<" <SecurityClass> => Flow(<>);
+SecurityLatticeFlow: Flow<SecurityClass> = <from:SecurityClass> "<" <into:SecurityClass> => Flow { <> };
 SecurityClass: SecurityClass = Ident => SecurityClass(<>);

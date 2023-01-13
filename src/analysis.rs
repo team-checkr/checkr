@@ -91,10 +91,12 @@ impl Worklist for LiFo {
 // }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[serde(transparent)]
 pub struct AnalysisResults<A: MonotoneFramework> {
     #[serde(with = "any_key_map")]
     #[serde(bound(deserialize = "A::Domain: 'de + serde::Deserialize<'de>"))]
     pub facts: HashMap<Node, A::Domain>,
+    #[serde(skip)]
     pub semantic_calls: usize,
 }
 

@@ -130,6 +130,7 @@ impl AOp {
                 if r != 0 {
                     l / r
                 } else {
+                    // TODO: Return an error instead of crashing
                     todo!("cannot divide by 0")
                 }
             }
@@ -137,6 +138,7 @@ impl AOp {
                 if r >= 0 {
                     l.pow(r as _)
                 } else {
+                    // TODO: Return an error instead of crashing
                     todo!("cannot take negative power")
                 }
             }

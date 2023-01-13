@@ -61,7 +61,51 @@ let rec compute n =
         with
         | err -> compute (n - 1)
 
+type Flow = { from: string; into: string }
+let flow a b : Flow = { from = a; into = b }
+
+type SecurityInput =
+    { lattice: Flow list
+      classification: Map<String, String> }
+
+type SecurityOutput =
+    { actual: Flow list
+      allowed: Flow list
+      violations: Flow list }
+
+[<EntryPoint>]
+let main (args) =
+    match args[0] with
+    | "security" ->
+        let src = args[1]
+        let input = Newtonsoft.Json.JsonConvert.DeserializeObject<SecurityInput> args[2]
+        Console.Error.WriteLine("{0}\n{1}", src, input)
+
+        let output: SecurityOutput =
+            { actual =
+                [ flow "a" "b"
+                  flow "b" "b"
+                  flow "b" "d" ]
+              allowed =
+                [ flow "a" "b"
+                  flow "b" "b"
+                  flow "b" "d" ]
+              violations =
+                [ flow "a" "b"
+                  flow "b" "b"
+                  flow "b" "d" ] }
+
+        Console.WriteLine("{0}", Newtonsoft.Json.JsonConvert.SerializeObject output)
+
+        0
+
+    | unknown ->
+        Console.WriteLine("Unknown analysis {0}", unknown)
+        1
+
+// dotnet run security "if true -> x := 2 fi" "{ \"lattice\": [{\"from\": \"A\", \"into\": \"B\"}, {\"from\": \"C\", \"into\": \"D\"}], \"classification\": {\"a\": \"A\", \"b\": \"B\"} }"
+
 // Console.WriteLine("Hello JSON: {0}", Newtonsoft.Json.JsonConvert.SerializeObject exp)
 
 // Start interacting with the user
-compute 3
+// compute 3

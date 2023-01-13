@@ -1,21 +1,18 @@
 #![feature(box_patterns, box_syntax)]
 
-use std::{collections::HashMap, time::Duration};
+use std::time::Duration;
 
 use anyhow::Context;
 use clap::{Parser, Subcommand};
-use itertools::Itertools;
-use rand::prelude::*;
 use tracing::info;
 
 use verification_lawyer::{
-    ast::Variable,
-    environment::{Application, SecurityAnalysis, StepWise},
+    environment::{Application, Environment, SecurityAnalysis, SignEnv, StepWise},
     generate_program,
+    generation::Generate,
     interpreter::{Interpreter, InterpreterMemory},
     parse,
     pg::{Determinism, ProgramGraph},
-    security::{SecurityAnalysisResult, SecurityClass, SecurityLattice},
 };
 
 #[derive(Debug, Parser)]
@@ -49,22 +46,14 @@ enum Cli {
 enum Test {
     Interpreter {},
     Security {},
+    Sign {},
 }
 
 #[derive(Debug, Subcommand)]
 enum Reference {
-    Interpreter {
-        #[clap(short, long)]
-        src: String,
-    },
-    Security {
-        #[clap(short, long)]
-        src: String,
-        #[clap(short, long)]
-        classification: String,
-        #[clap(short, long)]
-        lattice: String,
-    },
+    Interpreter { src: String, input: String },
+    Security { src: String, input: String },
+    Sign { src: String, input: String },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -129,102 +118,114 @@ fn main() -> anyhow::Result<()> {
             command,
         } => match command {
             Test::Interpreter {} => {
+                let (src, mut rng) = generate_program(fuel, seed);
+
                 let mut args = program.split(' ');
 
                 let mut cmd = std::process::Command::new(args.next().unwrap());
                 cmd.args(args);
+                cmd.args(["--src", &src.to_string()]);
                 cmd.arg("interpreter");
 
-                let (src, _) = generate_program(fuel, seed);
-                cmd.args(["--src", &src.to_string()]);
+                let env = StepWise;
+                let input = <StepWise as Environment>::Input::gen(&mut src.clone(), &mut rng);
+                cmd.arg(serde_json::to_string(&input)?);
 
                 let output = cmd
                     .output()
                     .with_context(|| format!("spawning {program:?}"))?;
+                let output = serde_json::from_slice(&output.stdout)?;
 
-                todo!("{:?}", output);
+                let result = env.validate(&src, &input, &output);
+
+                println!("{result:?}");
+
+                Ok(())
             }
             Test::Security {} => {
+                let (src, mut rng) = generate_program(fuel, seed);
+
                 let mut args = program.split(' ');
 
                 let mut cmd = std::process::Command::new(args.next().unwrap());
                 cmd.args(args);
                 cmd.arg("security");
+                cmd.arg(src.to_string());
 
-                let (src, mut rng) = generate_program(fuel, seed);
-                println!("{src}");
-                let classification: HashMap<Variable, SecurityClass> = src
-                    .fv()
-                    .into_iter()
-                    .map(|v| {
-                        (
-                            v,
-                            [
-                                SecurityClass("A".to_string()),
-                                SecurityClass("B".to_string()),
-                                SecurityClass("C".to_string()),
-                                SecurityClass("D".to_string()),
-                            ]
-                            .choose(&mut rng)
-                            .unwrap()
-                            .clone(),
-                        )
-                    })
-                    .collect();
-                let lattice: SecurityLattice = SecurityLattice::parse("A < B, C < D")?;
-
-                cmd.args(["--src", &src.to_string()]);
-                cmd.args(["--lattice", &serde_json::to_string(&lattice)?]);
-                cmd.args(["--classification", &serde_json::to_string(&classification)?]);
+                let env = SecurityAnalysis;
+                let input =
+                    <SecurityAnalysis as Environment>::Input::gen(&mut src.clone(), &mut rng);
+                cmd.arg(serde_json::to_string(&input)?);
 
                 let output = cmd
                     .output()
                     .with_context(|| format!("spawning {program:?}"))?;
+                let output = serde_json::from_slice(&output.stdout)?;
 
-                let result: SecurityAnalysisResult = serde_json::from_slice(&output.stdout)?;
+                let result = env.validate(&src, &input, &output);
 
-                println!("Classification: {classification:?}");
-                println!("Lattice: {lattice:?}");
+                println!("{result:?}");
 
-                info!("Actual:     {}", result.actual.iter().sorted().format(", "));
-                info!(
-                    "Allowed:    {}",
-                    result.allowed.iter().sorted().format(", ")
-                );
-                info!(
-                    "Violations: {}",
-                    result.violations.iter().sorted().format(", ")
-                );
+                Ok(())
+            }
+            Test::Sign {} => {
+                let (src, mut rng) = generate_program(fuel, seed);
+
+                let mut args = program.split(' ');
+
+                let mut cmd = std::process::Command::new(args.next().unwrap());
+                cmd.args(args);
+                cmd.arg("sign");
+                cmd.arg(src.to_string());
+
+                let env = SignEnv;
+                let input = <SignEnv as Environment>::Input::gen(&mut src.clone(), &mut rng);
+                cmd.arg(serde_json::to_string(&input)?);
+
+                let output = cmd
+                    .output()
+                    .with_context(|| format!("spawning {program:?}"))?;
+                eprintln!("{output:?}");
+                eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
+
+                let output =
+                    serde_json::from_slice(&output.stdout).with_context(|| "parsing output")?;
+
+                let result = env.validate(&src, &input, &output);
+
+                println!("{result:?}");
 
                 Ok(())
             }
         },
         Cli::Reference { command } => match command {
-            Reference::Interpreter { src } => {
+            Reference::Interpreter { src, input } => {
                 let cmds = parse::parse_commands(&src)?;
 
-                let pg = ProgramGraph::new(Determinism::Deterministic, &cmds);
+                let env = StepWise;
+                let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
-                println!(
-                    "{:?}",
-                    Interpreter::evaluate(100, InterpreterMemory::zero(&pg), &pg)
-                );
+                println!("{}", serde_json::to_string(&output)?);
 
                 Ok(())
             }
-            Reference::Security {
-                src,
-                classification,
-                lattice,
-            } => {
+            Reference::Security { src, input } => {
                 let cmds = parse::parse_commands(&src)?;
 
-                let classification = serde_json::from_str(&classification)?;
-                let lattice = serde_json::from_str(&lattice)?;
+                let env = SecurityAnalysis;
+                let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
-                let result = SecurityAnalysisResult::run(&classification, &lattice, &cmds);
+                println!("{}", serde_json::to_string(&output)?);
 
-                println!("{}", serde_json::to_string(&result)?);
+                Ok(())
+            }
+            Reference::Sign { src, input } => {
+                let cmds = parse::parse_commands(&src)?;
+
+                let env = SignEnv;
+                let output = env.run(&cmds, &serde_json::from_str(&input)?);
+
+                println!("{}", serde_json::to_string(&output)?);
 
                 Ok(())
             }
