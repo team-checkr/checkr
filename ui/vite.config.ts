@@ -7,5 +7,6 @@ export default defineConfig({
   server: {
     fs: { strict: false },
   },
+  build: { target: "esnext" },
   plugins: [react(), wasm()],
 });

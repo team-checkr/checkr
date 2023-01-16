@@ -31,20 +31,22 @@ impl Display for Command {
 
 impl Display for Commands {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(
-            f,
-            "{}",
-            self.0
-                .iter()
-                .map(|l| l.to_string().lines().map(|l| format!("   {l}")).join("\n"))
-                .format(" ;\n")
-        )
+        write!(f, "{}", self.0.iter().format(" ;\n"))
     }
 }
 
 impl Display for Guard {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} ->\n{}", self.0, self.1)
+        write!(
+            f,
+            "{} ->\n{}",
+            self.0,
+            self.1
+                .to_string()
+                .lines()
+                .map(|l| format!("   {l}"))
+                .format("\n")
+        )
     }
 }
 

@@ -1,0 +1,3 @@
+default:
+    # rm -rf example
+    cargo run -- test example-config.toml --base example

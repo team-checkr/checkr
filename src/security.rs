@@ -8,13 +8,23 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ast::{Array, Command, Commands, Guard, Variable},
-    parse::{self, ParseError},
+    gcl,
+    parse::ParseError,
 };
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Flow<T> {
     pub from: T,
     pub into: T,
+}
+
+impl<T> std::fmt::Debug for Flow<T>
+where
+    T: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Flow({:?} -> {:?})", self.from, self.into)
+    }
 }
 impl<T> Flow<T> {
     fn map<S>(&self, f: impl Fn(&T) -> S) -> Flow<S> {
@@ -96,8 +106,14 @@ impl Guard {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SecurityClass(pub String);
+
+impl std::fmt::Debug for SecurityClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecurityClass({})", self.0)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecurityLattice {
@@ -138,7 +154,7 @@ impl SecurityLattice {
         SecurityLattice { allowed }
     }
     pub fn parse(src: &str) -> anyhow::Result<SecurityLattice> {
-        let flows = parse::gcl::SecurityLatticeParser::new()
+        let flows = gcl::SecurityLatticeParser::new()
             .parse(src)
             .map_err(|e| ParseError::new(src, e))?;
 

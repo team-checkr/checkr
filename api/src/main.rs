@@ -2,13 +2,47 @@ use std::net::SocketAddr;
 
 use axum::{
     http::{header::CONTENT_TYPE, HeaderValue, Method, StatusCode},
-    routing::{get, get_service, post},
+    response::{Html, IntoResponse},
+    routing::get,
     Router,
 };
-use tower_http::{cors::CorsLayer, services::ServeDir};
+use tower_http::cors::CorsLayer;
 
 async fn hello() -> String {
     "Hello, world!".to_string()
+}
+
+#[axum::debug_handler]
+async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
+    static UI_DIR: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/../ui/dist/");
+
+    if uri.path() == "/" {
+        return Html(
+            UI_DIR
+                .get_file("index.html")
+                .unwrap()
+                .contents_utf8()
+                .unwrap(),
+        )
+        .into_response();
+    }
+
+    match UI_DIR.get_file(&uri.path()[1..]) {
+        Some(file) => {
+            let mime_type = mime_guess::from_path(uri.path())
+                .first_raw()
+                .map(HeaderValue::from_static)
+                .unwrap_or_else(|| {
+                    HeaderValue::from_str(mime::APPLICATION_OCTET_STREAM.as_ref()).unwrap()
+                });
+            (
+                [(axum::http::header::CONTENT_TYPE, mime_type)],
+                file.contents(),
+            )
+                .into_response()
+        }
+        None => StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 #[tokio::main]
@@ -23,7 +57,7 @@ async fn main() {
     //     }),
     // );
     // NOTE: Use the files compiled into the binary
-    // let app = app.fallback(static_dir.into_service());
+    let app = app.fallback(static_dir);
     let app = app.layer(
         CorsLayer::new()
             .allow_origin("*".parse::<HeaderValue>().unwrap())

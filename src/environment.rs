@@ -28,23 +28,10 @@ pub trait Environment {
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ValidationResult
-    where
-        Self::Output: PartialEq + std::fmt::Debug,
-    {
-        let reference = self.run(cmds, input);
-
-        if &reference == output {
-            ValidationResult::CorrectTerminated
-        } else {
-            ValidationResult::Mismatch {
-                reason: format!("{reference:#?} != {output:#?}"),
-            }
-        }
-    }
+    ) -> ValidationResult;
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValidationResult {
     CorrectTerminated,
     CorrectNonTerminated,
@@ -239,35 +226,24 @@ impl Environment for StepWise {
 pub trait AnyEnvironment {
     fn name(&self) -> String;
 
-    fn gen_input(
-        &self,
-        cmds: &Commands,
-        rng: &mut SmallRng,
-    ) -> (serde_json::Value, serde_json::Value);
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> (String, String);
 }
 
 impl<E> AnyEnvironment for E
 where
     E: Environment,
+    E::Input: std::fmt::Debug,
+    E::Output: std::fmt::Debug,
 {
     fn name(&self) -> String {
         self.name()
     }
 
-    fn gen_input(
-        &self,
-        cmds: &Commands,
-        rng: &mut SmallRng,
-    ) -> (serde_json::Value, serde_json::Value) {
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> (String, String) {
         let input = E::Input::gen(&mut cmds.clone(), rng);
         let output = self.run(cmds, &input);
 
-        (
-            serde_json::to_value(input)
-                .unwrap_or_else(|e| panic!("serializing input for '{}'\n{e}", self.name())),
-            serde_json::to_value(output)
-                .unwrap_or_else(|e| panic!("serializing output for '{}'\n{e}", self.name())),
-        )
+        (format!("{input:#?}"), format!("{output:#?}"))
     }
 }
 
@@ -282,6 +258,8 @@ impl Application {
     pub fn add_env<E>(&mut self, env: E) -> &mut Self
     where
         E: Environment + 'static,
+        E::Input: std::fmt::Debug,
+        E::Output: std::fmt::Debug,
     {
         self.envs.push(box env);
         self

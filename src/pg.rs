@@ -41,12 +41,15 @@ impl std::fmt::Display for Node {
     }
 }
 
+static NODE_ID: AtomicU64 = AtomicU64::new(0);
 impl Node {
     fn fresh() -> Node {
-        static NODE_ID: AtomicU64 = AtomicU64::new(0);
         Node::Node(NodeId(
             NODE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
         ))
+    }
+    fn reset() {
+        NODE_ID.store(0, std::sync::atomic::Ordering::Relaxed);
     }
 }
 
@@ -189,6 +192,7 @@ fn done(guards: &[Guard]) -> BExpr {
 
 impl ProgramGraph {
     pub fn new(det: Determinism, cmds: &Commands) -> Self {
+        Node::reset();
         let edges = cmds.edges(det, Node::Start, Node::End);
         let mut outgoing: HashMap<Node, Vec<Edge>> = HashMap::new();
         let mut nodes: HashSet<Node> = Default::default();

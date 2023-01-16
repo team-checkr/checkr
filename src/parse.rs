@@ -3,9 +3,7 @@ use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;
 
-use crate::ast::Commands;
-
-lalrpop_mod!(pub gcl);
+use crate::{ast::Commands, gcl};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceSpan {

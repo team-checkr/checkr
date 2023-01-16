@@ -1,0 +1,26 @@
+[package]
+name = "infra"
+version = "0.1.0"
+edition = "2021"
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+anyhow = "1.0.68"
+axum = "0.6.2"
+axum-macros = "0.3.1"
+clap = { version = "4.0.32", features = ["derive"] }
+git2 = "0.16.0"
+gitlab = "0.1507.0"
+indexmap = { version = "1.9.2", features = ["serde"] }
+itertools = "0.10.5"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
+tokio = { version = "1.24.1", features = ["full"] }
+toml = { version = "0.5.10", features = ["indexmap"] }
+tower = { version = "0.4.13", features = ["tracing"] }
+tower-http = { version = "0.3.5", features = ["cors", "fs", "tracing", "trace"] }
+tracing = "0.1.37"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+verification-lawyer = { version = "0.1.0", path = ".." }
+xshell = "0.2.3"

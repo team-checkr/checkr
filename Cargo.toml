@@ -27,4 +27,4 @@ tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 lalrpop = { version = "0.19.8", features = ["lexer"] }
 
 [workspace]
-members = ["wasm", "api"]
+members = ["wasm", "api", "infra"]

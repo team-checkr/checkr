@@ -1,0 +1,7 @@
+[[groups]]
+name = "01"
+git = "git@gitlab.gbar.dtu.dk:verification-lawyer-dev-env/demo-group-01.git"
+
+[[groups]]
+name = "02"
+git = "git@github.com:CamillaFaerch/gcmd.git"
