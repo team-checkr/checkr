@@ -9,6 +9,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     analysis::{Direction, MonotoneFramework},
     ast::{AExpr, Array, BExpr, Variable},
+    interpreter::InterpreterError,
     pg::{Action, Edge, ProgramGraph},
 };
 
@@ -28,6 +29,16 @@ pub enum Sign {
 impl Default for Sign {
     fn default() -> Self {
         Sign::Positive
+    }
+}
+
+impl std::fmt::Display for Sign {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Sign::Positive => write!(f, "+"),
+            Sign::Zero => write!(f, "0"),
+            Sign::Negative => write!(f, "-"),
+        }
     }
 }
 
@@ -138,7 +149,6 @@ where
     L::IntoIter: Clone,
     R: IntoIterator<Item = T> + Clone,
     R::IntoIter: Clone,
-    Q: Hash + Eq,
 {
     l.into_iter()
         .cartesian_product(r.into_iter())
@@ -163,8 +173,9 @@ impl BExpr {
                 l.semantics_sign(mem).iter().copied(),
                 r.semantics_sign(mem).iter().copied(),
                 // TODO: Follow definition with weird $S \cap {ff}$
-                |l, r| op.semantic(l, r),
+                |l, r| op.semantic(l, || Ok(r)),
             )
+            .map(|res| res.expect("this could not error"))
             .collect(),
             BExpr::Not(b) => b.semantics_sign(mem).into_iter().map(|i| !i).collect(),
         }
@@ -210,6 +221,17 @@ impl AExpr {
                     .flat_map(|x| x.representative()),
                 |l, r| op.semantic(l, r),
             )
+            .filter_map(|res| match res {
+                Ok(mem) => Some(mem),
+                Err(err) => match err {
+                    InterpreterError::DivisionByZero | InterpreterError::NegativeExponent => None,
+                    InterpreterError::VariableNotFound { .. }
+                    | InterpreterError::ArrayNotFound { .. }
+                    | InterpreterError::IndexOutOfBound { .. }
+                    | InterpreterError::NoProgression
+                    | InterpreterError::ArithmeticOverflow => unreachable!(),
+                },
+            })
             .map(sign_of)
             .collect(),
             AExpr::Array(Array(arr, idx)) => {

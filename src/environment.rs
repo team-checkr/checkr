@@ -3,7 +3,6 @@ use std::collections::{BTreeSet, HashMap, HashSet};
 use itertools::Itertools;
 use rand::{rngs::SmallRng, seq::SliceRandom};
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 use crate::{
     analysis::{mono_analysis, FiFo},
@@ -14,6 +13,10 @@ use crate::{
     security::{Flow, SecurityAnalysisResult, SecurityClass, SecurityLattice},
     sign::{Memory, Sign, SignAnalysis, SignMemory},
 };
+
+pub trait ToMarkdown {
+    fn to_markdown(&self) -> String;
+}
 
 pub trait Environment {
     type Input: Generate<Context = Commands> + Serialize + for<'a> Deserialize<'a>;
@@ -34,11 +37,12 @@ pub trait Environment {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValidationResult {
     CorrectTerminated,
-    CorrectNonTerminated,
+    CorrectNonTerminated { iterations: usize },
     Mismatch { reason: String },
     TimeOut,
 }
 
+#[derive(Debug)]
 pub struct SecurityAnalysis;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -90,6 +94,23 @@ impl Generate for SecurityAnalysisInput {
     }
 }
 
+impl ToMarkdown for SecurityAnalysisInput {
+    fn to_markdown(&self) -> String {
+        format!(
+            "Lattice: {}\n\nClassification: [{}]",
+            self.lattice
+                .0
+                .iter()
+                .map(|f| format!("{} < {}", f.from, f.into))
+                .format(", "),
+            self.classification
+                .iter()
+                .map(|(a, c)| format!("{a} = {c}"))
+                .format(", ")
+        )
+    }
+}
+
 impl Environment for SecurityAnalysis {
     type Input = SecurityAnalysisInput;
 
@@ -132,6 +153,7 @@ impl Environment for SecurityAnalysis {
     }
 }
 
+#[derive(Debug)]
 pub struct StepWise;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -151,6 +173,7 @@ impl Generate for StepWiseInput {
                 variables: cx
                     .fv()
                     .into_iter()
+                    .sorted()
                     .map(|v| (v, rng.gen_range(-10..=10)))
                     .collect(),
                 arrays: Default::default(),
@@ -160,10 +183,39 @@ impl Generate for StepWiseInput {
     }
 }
 
+impl ToMarkdown for StepWiseInput {
+    fn to_markdown(&self) -> String {
+        format!(
+            "#### Determinism:\n\n{:?}\n\n#### Memory:\n\n`[{}]`",
+            self.determinism,
+            self.assignment
+                .variables
+                .iter()
+                .map(|(v, x)| format!("{v} = {x}"))
+                .chain(
+                    self.assignment
+                        .arrays
+                        .iter()
+                        .map(|(v, x)| format!("{v} = {x:?}"))
+                )
+                .format(", ")
+        )
+    }
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct StepWiseOutput(Vec<ProgramTrace<String>>);
+
+impl ToMarkdown for StepWiseOutput {
+    fn to_markdown(&self) -> String {
+        format!("```\n{self:#?}\n```")
+    }
+}
+
 impl Environment for StepWise {
     type Input = StepWiseInput;
 
-    type Output = Vec<ProgramTrace<String>>;
+    type Output = StepWiseOutput;
 
     fn name(&self) -> String {
         "Step-wise Execution".to_string()
@@ -171,10 +223,12 @@ impl Environment for StepWise {
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);
-        Interpreter::evaluate(input.trace_count, input.assignment.clone(), &pg)
-            .into_iter()
-            .map(|t| t.map_node(|n| n.to_string()))
-            .collect()
+        StepWiseOutput(
+            Interpreter::evaluate(input.trace_count, input.assignment.clone(), &pg)
+                .into_iter()
+                .map(|t| t.map_node(|n| n.to_string()))
+                .collect(),
+        )
     }
 
     fn validate(
@@ -189,20 +243,20 @@ impl Environment for StepWise {
         let pg = ProgramGraph::new(input.determinism, cmds);
         let mut mem = vec![(Node::Start, input.assignment.clone())];
 
-        for (idx, trace) in output.iter().skip(1).enumerate() {
+        for (idx, trace) in output.0.iter().skip(1).enumerate() {
             let mut next_mem = vec![];
 
             for (current_node, current_mem) in mem {
                 for edge in pg.outgoing(current_node) {
-                    if let Some(m) = edge.action().semantics(&current_mem) {
+                    if let Ok(m) = edge.action().semantics(&current_mem) {
                         // TODO: check state
                         if m == trace.memory {
                             next_mem.push((edge.to(), m));
                         } else {
-                            eprintln!("{cmds}");
-                            debug!("Initial: {:?}", input.assignment);
-                            debug!("Ref:     {m:?}");
-                            debug!("Their:   {:?}", trace.memory);
+                            // eprintln!("{cmds}");
+                            // debug!("Initial: {:?}", input.assignment);
+                            // debug!("Ref:     {m:?}");
+                            // debug!("Their:   {:?}", trace.memory);
                         }
                     }
                 }
@@ -215,10 +269,12 @@ impl Environment for StepWise {
             mem = next_mem;
         }
 
-        if output.len() < input.trace_count {
+        if output.0.len() < input.trace_count {
             ValidationResult::CorrectTerminated
         } else {
-            ValidationResult::CorrectNonTerminated
+            ValidationResult::CorrectNonTerminated {
+                iterations: input.trace_count,
+            }
         }
     }
 }
@@ -232,8 +288,8 @@ pub trait AnyEnvironment {
 impl<E> AnyEnvironment for E
 where
     E: Environment,
-    E::Input: std::fmt::Debug,
-    E::Output: std::fmt::Debug,
+    E::Input: std::fmt::Debug + ToMarkdown,
+    E::Output: std::fmt::Debug + ToMarkdown,
 {
     fn name(&self) -> String {
         self.name()
@@ -243,7 +299,7 @@ where
         let input = E::Input::gen(&mut cmds.clone(), rng);
         let output = self.run(cmds, &input);
 
-        (format!("{input:#?}"), format!("{output:#?}"))
+        (input.to_markdown(), output.to_markdown())
     }
 }
 
@@ -258,8 +314,8 @@ impl Application {
     pub fn add_env<E>(&mut self, env: E) -> &mut Self
     where
         E: Environment + 'static,
-        E::Input: std::fmt::Debug,
-        E::Output: std::fmt::Debug,
+        E::Input: std::fmt::Debug + ToMarkdown,
+        E::Output: std::fmt::Debug + ToMarkdown,
     {
         self.envs.push(box env);
         self
@@ -272,6 +328,7 @@ impl Default for Application {
     }
 }
 
+#[derive(Debug)]
 pub struct SignEnv;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -291,6 +348,26 @@ impl Generate for SignAnalysisInput {
                 .unwrap(),
             assignment: Memory::gen(cx, rng),
         }
+    }
+}
+
+impl ToMarkdown for SignAnalysisInput {
+    fn to_markdown(&self) -> String {
+        format!(
+            "Determinism: {:?}\n\nMemory: [{}]",
+            self.determinism,
+            self.assignment
+                .variables
+                .iter()
+                .map(|(v, x)| format!("{v} = {x}"))
+                .chain(
+                    self.assignment
+                        .arrays
+                        .iter()
+                        .map(|(v, x)| format!("{v} = {{{}}}", x.iter().format(", ")))
+                )
+                .format(", ")
+        )
     }
 }
 
@@ -328,6 +405,62 @@ where
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignAnalysisOutput(HashMap<String, HashSet<SignMemory>>);
+
+impl ToMarkdown for SignAnalysisOutput {
+    fn to_markdown(&self) -> String {
+        let idents: HashSet<_> = self
+            .0
+            .iter()
+            .flat_map(|(_, worlds)| {
+                worlds.iter().flat_map(|w| {
+                    w.variables
+                        .keys()
+                        .map(|v| v.to_string())
+                        .chain(w.arrays.keys().cloned())
+                })
+            })
+            .collect();
+        let idents = idents.into_iter().sorted().collect_vec();
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(std::iter::once("Node".to_string()).chain(idents.iter().cloned()));
+
+        for (n, worlds) in self.0.iter().sorted_by_key(|(n, _)| {
+            if *n == "qStart" {
+                "".to_string()
+            } else {
+                n.to_string()
+            }
+        }) {
+            let mut first = true;
+            for w in worlds {
+                let is_first = first;
+                first = false;
+
+                table.add_row(
+                    std::iter::once(if is_first {
+                        n.to_string()
+                    } else {
+                        "".to_string()
+                    })
+                    .chain(idents.iter().map(|var| {
+                        w.variables
+                            .get(&Variable(var.clone()))
+                            .cloned()
+                            .unwrap_or_default()
+                            .to_string()
+                    })),
+                );
+            }
+            if worlds.is_empty() {
+                table.add_row([n.to_string()]);
+            }
+        }
+        format!("{table}")
+    }
+}
 
 impl Environment for SignEnv {
     type Input = SignAnalysisInput;

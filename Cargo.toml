@@ -8,6 +8,7 @@ edition = "2021"
 [dependencies]
 anyhow = "1.0.68"
 clap = { version = "4.0.32", features = ["derive"] }
+comfy-table = { version = "6.1.4", default-features = false }
 itertools = "0.10.5"
 lalrpop-util = { version = "0.19.8", features = ["lexer"] }
 miette = { version = "5.5.0", features = ["fancy"] }

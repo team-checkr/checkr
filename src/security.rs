@@ -8,6 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ast::{Array, Command, Commands, Guard, Variable},
+    environment::ToMarkdown,
     gcl,
     parse::ParseError,
 };
@@ -114,6 +115,11 @@ impl std::fmt::Debug for SecurityClass {
         write!(f, "SecurityClass({})", self.0)
     }
 }
+impl std::fmt::Display for SecurityClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecurityLattice {
@@ -192,6 +198,12 @@ pub struct SecurityAnalysisResult {
     pub actual: Vec<Flow<Variable>>,
     pub allowed: Vec<Flow<Variable>>,
     pub violations: Vec<Flow<Variable>>,
+}
+
+impl ToMarkdown for SecurityAnalysisResult {
+    fn to_markdown(&self) -> String {
+        format!("```\n{self:#?}\n```")
+    }
 }
 
 impl SecurityAnalysisResult {

@@ -10,6 +10,7 @@ anyhow = "1.0.68"
 axum = "0.6.2"
 axum-macros = "0.3.1"
 clap = { version = "4.0.32", features = ["derive"] }
+comfy-table = "6.1.4"
 git2 = "0.16.0"
 gitlab = "0.1507.0"
 indexmap = { version = "1.9.2", features = ["serde"] }

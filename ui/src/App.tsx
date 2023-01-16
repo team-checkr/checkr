@@ -1,9 +1,9 @@
 import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import { WebApplication, WasmZ3 } from "verification-lawyer";
-import { network } from "vis-network";
-import { parseDOTNetwork } from "vis-network/esnext";
 import { StretchEditor } from "./StretchEditor";
+import ReactMarkdown from "react-markdown";
+import remarkGfm from "remark-gfm";
 import "./z3";
 
 export const App = () => {
@@ -76,9 +76,13 @@ export const App = () => {
                   Input
                 </h2>
                 <div className="relative">
-                  <pre className="absolute inset-0 overflow-y-auto text-xs">
-                    {input}
-                  </pre>
+                  <div className="prose prose-invert absolute inset-0 overflow-y-auto text-xs">
+                    {/* {input} */}
+                    <ReactMarkdown
+                      children={input}
+                      remarkPlugins={[remarkGfm]}
+                    />
+                  </div>
                 </div>
               </div>
               <div className="grid grid-rows-[auto_1fr]">
@@ -86,9 +90,13 @@ export const App = () => {
                   Output
                 </h2>
                 <div className="relative">
-                  <pre className="absolute inset-0 overflow-y-auto text-xs">
-                    {output}
-                  </pre>
+                  <div className="prose prose-invert absolute inset-0 overflow-y-auto text-xs">
+                    {/* {output} */}
+                    <ReactMarkdown
+                      children={output}
+                      remarkPlugins={[remarkGfm]}
+                    />
+                  </div>
                 </div>
               </div>
             </div>
@@ -102,14 +110,14 @@ export const App = () => {
 export const Network = React.memo(({ dot }: { dot: string }) => {
   const [container, setContainer] = React.useState<null | HTMLDivElement>();
 
-  const data = React.useMemo(() => parseDOTNetwork(dot), [dot]);
-
   React.useEffect(() => {
     if (!container) return;
 
     const run = async () => {
       const visPromise = import("vis-network/esnext");
       const vis = await visPromise;
+
+      const data = vis.parseDOTNetwork(dot);
 
       const network = new vis.Network(container, data, {
         interaction: { zoomView: false },
@@ -142,7 +150,7 @@ export const Network = React.memo(({ dot }: { dot: string }) => {
 
     // const debounce = requestIdleCallback(() => run().catch(console.error));
     // return () => cancelIdleCallback(debounce);
-  }, [container, data]);
+  }, [container, dot]);
 
   return <div className="h-full w-full" ref={setContainer}></div>;
 });

@@ -59,11 +59,13 @@ impl Interpreter {
 
         while let ProgramState::Running = state.state {
             let next = pg.outgoing(state.node).iter().find_map(|e| {
-                e.1.semantics(&state.memory).map(|m| ProgramTrace {
-                    state: ProgramState::Running,
-                    node: e.2,
-                    memory: m,
-                })
+                e.1.semantics(&state.memory)
+                    .map(|m| ProgramTrace {
+                        state: ProgramState::Running,
+                        node: e.2,
+                        memory: m,
+                    })
+                    .ok()
             });
             state = match next {
                 Some(s) => s,
@@ -91,35 +93,39 @@ impl Interpreter {
 }
 
 impl Action {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Option<InterpreterMemory> {
+    pub fn semantics(&self, m: &InterpreterMemory) -> Result<InterpreterMemory, InterpreterError> {
         match self {
             Action::Assignment(x, a) => {
                 if m.variables.contains_key(x) {
                     let mut m2 = m.clone();
-                    m2.variables.insert(x.clone(), a.semantics(m));
-                    Some(m2)
+                    m2.variables.insert(x.clone(), a.semantics(m)?);
+                    Ok(m2)
                 } else {
                     todo!("variable '{x}' is not in memory")
                 }
             }
             Action::ArrayAssignment(arr, idx, a) => {
-                let idx = idx.semantics(m);
+                let idx = idx.semantics(m)?;
                 match m.arrays.get(arr) {
                     Some(data) if 0 <= idx && idx < data.len() as _ => {
                         let mut m2 = m.clone();
                         let data = m2.arrays.get_mut(arr).unwrap();
-                        data[idx as usize] = a.semantics(m);
-                        Some(m2)
+                        data[idx as usize] = a.semantics(m)?;
+                        Ok(m2)
                     }
-                    _ => todo!("array '{arr}[{idx}]' is not in memory"),
+                    Some(_) => Err(InterpreterError::ArrayNotFound { name: arr.clone() }),
+                    None => Err(InterpreterError::IndexOutOfBound {
+                        name: arr.clone(),
+                        index: idx,
+                    }),
                 }
             }
-            Action::Skip => Some(m.clone()),
+            Action::Skip => Ok(m.clone()),
             Action::Condition(b) => {
-                if b.semantics(m) {
-                    Some(m.clone())
+                if b.semantics(m)? {
+                    Ok(m.clone())
                 } else {
-                    None
+                    Err(InterpreterError::NoProgression)
                 }
             }
         }
@@ -127,67 +133,93 @@ impl Action {
 }
 
 impl AExpr {
-    pub fn semantics(&self, m: &InterpreterMemory) -> i64 {
-        match self {
+    pub fn semantics(&self, m: &InterpreterMemory) -> Result<i64, InterpreterError> {
+        Ok(match self {
             AExpr::Number(n) => *n,
             AExpr::Variable(x) => {
                 if let Some(x) = m.variables.get(x) {
                     *x
                 } else {
-                    todo!("not in memory")
+                    return Err(InterpreterError::VariableNotFound {
+                        name: x.to_string(),
+                    });
                 }
             }
-            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
+            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
             AExpr::Array(Array(arr, idx)) => {
-                if let Some(x) = m
-                    .arrays
-                    .get(arr)
-                    .and_then(|data| data.get(idx.semantics(m) as usize))
-                {
+                let data = if let Some(data) = m.arrays.get(arr) {
+                    data
+                } else {
+                    return Err(InterpreterError::ArrayNotFound { name: arr.clone() });
+                };
+                let idx = idx.semantics(m)?;
+                if let Some(x) = data.get(idx as usize) {
                     *x
                 } else {
-                    todo!("not in memory")
+                    return Err(InterpreterError::IndexOutOfBound {
+                        name: arr.clone(),
+                        index: idx,
+                    });
                 }
             }
-            AExpr::Minus(n) => -n.semantics(m),
-        }
+            AExpr::Minus(n) => -n.semantics(m)?,
+        })
     }
 }
 
+#[derive(Debug, PartialEq, Eq, thiserror::Error)]
+pub enum InterpreterError {
+    #[error("division by zero")]
+    DivisionByZero,
+    #[error("negative exponent")]
+    NegativeExponent,
+    #[error("variable '{name}' not found")]
+    VariableNotFound { name: String },
+    #[error("array '{name}' not found")]
+    ArrayNotFound { name: String },
+    #[error("index {index} in '{name}' is out-of-bounds")]
+    IndexOutOfBound { name: String, index: i64 },
+    #[error("no progression")]
+    NoProgression,
+    #[error("an arithmetic operation overflowed")]
+    ArithmeticOverflow,
+}
+
 impl AOp {
-    pub fn semantic(&self, l: i64, r: i64) -> i64 {
-        match self {
+    pub fn semantic(&self, l: i64, r: i64) -> Result<i64, InterpreterError> {
+        Ok(match self {
             AOp::Plus => l + r,
             AOp::Minus => l - r,
-            AOp::Times => l * r,
+            AOp::Times => l
+                .checked_mul(r)
+                .ok_or(InterpreterError::ArithmeticOverflow)?,
             AOp::Divide => {
                 if r != 0 {
                     l / r
                 } else {
-                    // TODO: Return an error instead of crashing
-                    todo!("cannot divide by 0")
+                    return Err(InterpreterError::DivisionByZero);
                 }
             }
             AOp::Pow => {
                 if r >= 0 {
-                    l.pow(r as _)
+                    l.checked_pow(r as _)
+                        .ok_or(InterpreterError::ArithmeticOverflow)?
                 } else {
-                    // TODO: Return an error instead of crashing
-                    todo!("cannot take negative power")
+                    return Err(InterpreterError::NegativeExponent);
                 }
             }
-        }
+        })
     }
 }
 
 impl BExpr {
-    pub fn semantics(&self, m: &InterpreterMemory) -> bool {
-        match self {
+    pub fn semantics(&self, m: &InterpreterMemory) -> Result<bool, InterpreterError> {
+        Ok(match self {
             BExpr::Bool(b) => *b,
-            BExpr::Rel(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
-            BExpr::Logic(l, op, r) => op.semantic(l.semantics(m), r.semantics(m)),
-            BExpr::Not(b) => !b.semantics(m),
-        }
+            BExpr::Rel(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?),
+            BExpr::Logic(l, op, r) => op.semantic(l.semantics(m)?, || r.semantics(m))?,
+            BExpr::Not(b) => !b.semantics(m)?,
+        })
     }
 }
 
@@ -205,12 +237,22 @@ impl RelOp {
 }
 
 impl LogicOp {
-    pub fn semantic(&self, l: bool, r: bool) -> bool {
-        match self {
-            LogicOp::And => l && r,
-            LogicOp::Land => l && r,
-            LogicOp::Or => l || r,
-            LogicOp::Lor => l || r,
-        }
+    pub fn semantic(
+        &self,
+        l: bool,
+        r: impl FnOnce() -> Result<bool, InterpreterError>,
+    ) -> Result<bool, InterpreterError> {
+        Ok(match self {
+            LogicOp::And => l && r()?,
+            LogicOp::Land => {
+                let r = r()?;
+                l && r
+            }
+            LogicOp::Or => l || r()?,
+            LogicOp::Lor => {
+                let r = r()?;
+                l || r
+            }
+        })
     }
 }

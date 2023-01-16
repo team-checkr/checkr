@@ -43,7 +43,7 @@ impl WebApplication {
     }
 
     pub fn generate(&self) -> String {
-        let (cmds, mut rng) = verification_lawyer::generate_program(None, None);
+        let (cmds, _, _, mut rng) = verification_lawyer::generate_program(None, None);
 
         let g = Generation {
             program: cmds.to_string(),

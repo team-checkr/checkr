@@ -67,7 +67,7 @@ fn main() -> anyhow::Result<()> {
     match Cli::parse() {
         Cli::Generate { fuel, seed } => {
             for _ in 0.. {
-                let (cmds, _) = generate_program(fuel, seed);
+                let (cmds, _, _, _) = generate_program(fuel, seed);
 
                 print!("{esc}c", esc = 27 as char);
                 // println!("{}", crate::fmt::fmt_commands(&cmds));
@@ -117,17 +117,18 @@ fn main() -> anyhow::Result<()> {
             command,
         } => match command {
             Test::Interpreter {} => {
-                let result = run_analysis(StepWise, ".", fuel, seed, &program, "interpreter")?;
+                let result = run_analysis(&StepWise, ".", fuel, seed, &program, "interpreter")?;
                 println!("{result:?}");
                 Ok(())
             }
             Test::Security {} => {
-                let result = run_analysis(SecurityAnalysis, ".", fuel, seed, &program, "security")?;
+                let result =
+                    run_analysis(&SecurityAnalysis, ".", fuel, seed, &program, "security")?;
                 println!("{result:?}");
                 Ok(())
             }
             Test::Sign {} => {
-                let result = run_analysis(SignEnv, ".", fuel, seed, &program, "sign")?;
+                let result = run_analysis(&SignEnv, ".", fuel, seed, &program, "sign")?;
                 println!("{result:?}");
                 Ok(())
             }
