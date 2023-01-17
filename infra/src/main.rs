@@ -7,11 +7,12 @@ use std::{
 
 use axum::{http::StatusCode, routing::post, Json, Router};
 use clap::Parser;
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tracing::debug;
 use verification_lawyer::{
-    environment::{Environment, SecurityAnalysis, SignEnv, StepWise, ToMarkdown, ValidationResult},
+    env::{Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown, ValidationResult},
     AnalysisSummary,
 };
 use xshell::{cmd, Shell};
@@ -179,7 +180,7 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
 
     writeln!(output, "# Group {group_nr}")?;
 
-    let env = StepWise;
+    let env = StepWiseEnv;
     let summaries = (0..samples)
         .map(|idx| {
             verification_lawyer::run_analysis(
@@ -188,10 +189,9 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
                 None,
                 Some(base_seed + idx),
                 &run_command,
-                "interpreter",
             )
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect_vec();
     generate_markdown(&env, &mut output, &summaries)?;
 
     let env = SignEnv;
@@ -203,13 +203,12 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
                 None,
                 Some(base_seed + idx),
                 &run_command,
-                "sign",
             )
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect_vec();
     generate_markdown(&env, &mut output, &summaries)?;
 
-    let env = SecurityAnalysis;
+    let env = SecurityEnv;
     let summaries = (0..samples)
         .map(|idx| {
             verification_lawyer::run_analysis(
@@ -218,10 +217,9 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
                 None,
                 Some(base_seed + idx),
                 &run_command,
-                "security",
             )
         })
-        .collect::<anyhow::Result<Vec<_>>>()?;
+        .collect_vec();
     generate_markdown(&env, &mut output, &summaries)?;
 
     let mut table = comfy_table::Table::new();

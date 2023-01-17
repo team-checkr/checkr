@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use smtlib::{SatResultWithModel, Sort};
 use tracing::{info, warn};
 use verification_lawyer::{
-    environment::{Application, SecurityAnalysis, SignEnv, StepWise},
+    env::{Application, SecurityEnv, SignEnv, StepWiseEnv},
     pg::{Determinism, ProgramGraph},
 };
 use wasm_bindgen::prelude::*;
@@ -52,7 +52,7 @@ impl WebApplication {
                 .app
                 .envs
                 .iter()
-                .map(|env| (env.name(), env.gen_input(&cmds, &mut rng)))
+                .map(|env| (env.name(), env.gen_sample(&cmds, &mut rng)))
                 .collect(),
         };
 
@@ -70,8 +70,8 @@ struct Generation {
 impl Default for WebApplication {
     fn default() -> Self {
         let mut app = Application::new();
-        app.add_env(StepWise)
-            .add_env(SecurityAnalysis)
+        app.add_env(StepWiseEnv)
+            .add_env(SecurityEnv)
             .add_env(SignEnv);
         WebApplication { app }
     }

@@ -1,17 +1,19 @@
 #![feature(box_patterns, box_syntax)]
 
-use std::path::Path;
+use std::{path::Path, time::Duration};
 
-use anyhow::Context;
-use environment::{Environment, ValidationResult};
+use driver::Driver;
+use env::{Environment, ValidationResult};
 use generation::Generate;
 use rand::prelude::*;
+use tracing::debug;
 
 use crate::ast::Commands;
 
 pub mod analysis;
 pub mod ast;
-pub mod environment;
+pub mod driver;
+pub mod env;
 pub mod fmt;
 mod gcl;
 pub mod generation;
@@ -54,49 +56,84 @@ pub fn run_analysis<E: Environment>(
     fuel: Option<u32>,
     seed: Option<u64>,
     program: &str,
-    command: &str,
-) -> anyhow::Result<AnalysisSummary<E>> {
-    let (src, fuel, seed, mut rng) = generate_program(fuel, seed);
+) -> AnalysisSummary<E> {
+    debug!(name = env.name(), "running analysis");
 
-    let mut args = program.split(' ');
+    let (cmds, fuel, seed, mut rng) = generate_program(fuel, seed);
 
-    let mut cmd = std::process::Command::new(args.next().unwrap());
-    cmd.args(args);
-    cmd.arg(command);
-    cmd.arg(src.to_string());
-
-    let current_dir = current_dir.as_ref();
-    cmd.current_dir(current_dir);
-
-    let input = <E as Environment>::Input::gen(&mut src.clone(), &mut rng);
-    cmd.arg(serde_json::to_string(&input)?);
-
-    let before = std::time::Instant::now();
-    let cmd_output = cmd
-        .output()
-        .with_context(|| format!("spawning {program:?}"))?;
-    let took = before.elapsed();
-    let stdout = std::str::from_utf8(&cmd_output.stdout).unwrap().to_string();
-    let stderr = std::str::from_utf8(&cmd_output.stderr).unwrap().to_string();
-
-    let (output, result) =
-        match serde_json::from_slice(&cmd_output.stdout).with_context(|| "parsing output") {
-            Ok(output) => {
-                let result = env.validate(&src, &input, &output);
-                (Some(output), Ok(result))
+    let input = <E as Environment>::Input::gen(&mut cmds.clone(), &mut rng);
+    let exec_result =
+        Driver::new(current_dir.as_ref().to_owned(), program.to_string()).exec::<E>(&cmds, &input);
+    match exec_result {
+        Ok(exec_result) => {
+            let validation_result = env.validate(&cmds, &input, &exec_result.parsed);
+            AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                time: exec_result.took,
+                input,
+                output: Some(exec_result.parsed),
+                stdout: String::from_utf8(exec_result.output.stdout)
+                    .expect("failed to parse stdout"),
+                stderr: String::from_utf8(exec_result.output.stderr)
+                    .expect("failed to parse stderr"),
+                result: Ok(validation_result),
             }
-            Err(err) => (None, Err(err)),
-        };
-
-    Ok(AnalysisSummary {
-        fuel,
-        seed,
-        cmds: src,
-        time: took,
-        input,
-        output,
-        stdout,
-        stderr,
-        result,
-    })
+        }
+        Err(err) => match err {
+            driver::ExecError::Serialize(err) => AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                input,
+                output: None,
+                time: Duration::ZERO,
+                stdout: String::new(),
+                stderr: String::new(),
+                result: Err(err.into()),
+            },
+            driver::ExecError::RunExec(err) => AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                input,
+                output: None,
+                time: Duration::ZERO,
+                stdout: String::new(),
+                stderr: String::new(),
+                result: Err(err.into()),
+            },
+            driver::ExecError::CommandFailed(output, time) => AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                input,
+                output: None,
+                time,
+                stdout: String::from_utf8(output.stdout.clone())
+                    .expect("stdout should be valid utf8"),
+                stderr: String::from_utf8(output.stderr.clone())
+                    .expect("stderr should be valid utf8"),
+                result: Err(driver::ExecError::CommandFailed(output, time).into()),
+            },
+            driver::ExecError::Parse {
+                inner,
+                run_output,
+                time,
+            } => AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                input,
+                output: None,
+                time,
+                stdout: String::from_utf8(run_output.stdout.clone())
+                    .expect("stdout should be valid utf8"),
+                stderr: String::from_utf8(run_output.stderr.clone())
+                    .expect("stderr should be valid utf8"),
+                result: Err(inner.into()),
+            },
+        },
+    }
 }

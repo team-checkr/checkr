@@ -6,7 +6,7 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 
 use verification_lawyer::{
-    environment::{Application, Environment, SecurityAnalysis, SignEnv, StepWise},
+    env::{Application, Environment, SecurityEnv, SignEnv, StepWiseEnv},
     generate_program,
     interpreter::{Interpreter, InterpreterMemory},
     parse,
@@ -62,7 +62,7 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     let mut app = Application::new();
-    app.add_env(SecurityAnalysis).add_env(StepWise);
+    app.add_env(SecurityEnv).add_env(StepWiseEnv);
 
     match Cli::parse() {
         Cli::Generate { fuel, seed } => {
@@ -117,18 +117,17 @@ fn main() -> anyhow::Result<()> {
             command,
         } => match command {
             Test::Interpreter {} => {
-                let result = run_analysis(&StepWise, ".", fuel, seed, &program, "interpreter")?;
+                let result = run_analysis(&StepWiseEnv, ".", fuel, seed, &program);
                 println!("{result:?}");
                 Ok(())
             }
             Test::Security {} => {
-                let result =
-                    run_analysis(&SecurityAnalysis, ".", fuel, seed, &program, "security")?;
+                let result = run_analysis(&SecurityEnv, ".", fuel, seed, &program);
                 println!("{result:?}");
                 Ok(())
             }
             Test::Sign {} => {
-                let result = run_analysis(&SignEnv, ".", fuel, seed, &program, "sign")?;
+                let result = run_analysis(&SignEnv, ".", fuel, seed, &program);
                 println!("{result:?}");
                 Ok(())
             }
@@ -137,7 +136,7 @@ fn main() -> anyhow::Result<()> {
             Reference::Interpreter { src, input } => {
                 let cmds = parse::parse_commands(&src)?;
 
-                let env = StepWise;
+                let env = StepWiseEnv;
                 let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
                 println!("{}", serde_json::to_string(&output)?);
@@ -147,7 +146,7 @@ fn main() -> anyhow::Result<()> {
             Reference::Security { src, input } => {
                 let cmds = parse::parse_commands(&src)?;
 
-                let env = SecurityAnalysis;
+                let env = SecurityEnv;
                 let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
                 println!("{}", serde_json::to_string(&output)?);
