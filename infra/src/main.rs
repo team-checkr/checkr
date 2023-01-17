@@ -10,7 +10,7 @@ use clap::Parser;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
-use tracing::debug;
+use tracing::{debug, error};
 use verification_lawyer::{
     env::{Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown, ValidationResult},
     AnalysisSummary,
@@ -26,7 +26,7 @@ enum Cli {
     },
     Server {
         #[clap(long, short, default_value = "25565")]
-        port: String,
+        port: u16,
     },
     GenerateReport {
         dir: PathBuf,
@@ -61,7 +61,7 @@ async fn run() -> anyhow::Result<()> {
 
             for g in &config.groups {
                 if let Err(e) = test_group(&base, g) {
-                    eprintln!("Group {} errored: {e:?}", g.name)
+                    error!(group = g.name, error = format!("{:?}", e), "Group errored")
                 }
             }
 
@@ -122,7 +122,7 @@ async fn run() -> anyhow::Result<()> {
                     }),
                 )
                 .layer(ServiceBuilder::new().layer(tower_http::trace::TraceLayer::new_for_http()));
-            axum::Server::bind(&SocketAddr::from(([0; 4], 25565)))
+            axum::Server::bind(&SocketAddr::from(([0; 4], port)))
                 .serve(app.into_make_service())
                 .await?;
             Ok(())
@@ -239,59 +239,51 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
     Ok(output)
 }
 
+fn details(summary: impl std::fmt::Display, body: impl std::fmt::Display) -> String {
+    format!("<details><summary>{summary}</summary>\n\n{body}\n\n</details>")
+}
+fn code_block(lang: impl std::fmt::Display, code: impl std::fmt::Display) -> String {
+    format!("\n```{lang}\n{code}\n```\n\n")
+}
+
 fn generate_markdown<E: Environment>(
     env: &E,
     mut f: impl std::fmt::Write,
     summaries: &[AnalysisSummary<E>],
 ) -> anyhow::Result<()>
 where
-    E::Input: std::fmt::Debug + ToMarkdown,
+    E::Input: ToMarkdown,
     E::Output: ToMarkdown,
 {
     writeln!(f, "## {}", env.name())?;
     for (idx, summary) in summaries.iter().enumerate().take(2) {
-        writeln!(f, "<details><summary>")?;
-        writeln!(f, "<strong>Program {}</strong> – ", idx + 1)?;
-        match &summary.result {
-            Ok(ValidationResult::CorrectTerminated) => {
-                writeln!(f, "Correct")?;
-            }
-            Ok(ValidationResult::CorrectNonTerminated { iterations }) => {
-                writeln!(f, "Correct<sup>*</sup>",)?;
-            }
-            Ok(ValidationResult::Mismatch { reason }) => {
-                writeln!(
-                    f,
-                    "{:?}",
-                    ValidationResult::Mismatch {
-                        reason: reason.to_string(),
-                        // reason: "...".to_string(),
-                    }
-                )?;
-            }
-            Ok(ValidationResult::TimeOut) => {
-                writeln!(f, "{:?}", ValidationResult::TimeOut)?;
-            }
-            Err(e) => {
-                writeln!(f, "{e:?}")?;
-            }
-        }
-        writeln!(f, "</summary>")?;
-        writeln!(f)?;
-
-        writeln!(f, "\n\n```py\n{}\n```\n\n", summary.cmds)?;
-        writeln!(f, "### Input\n\n{}\n\n", summary.input.to_markdown())?;
-        if let Some(output) = &summary.output {
-            writeln!(f, "### Output \n\n{}\n\n", output.to_markdown())?;
-        } else {
-            writeln!(
-                f,
-                "<details><summary>`stdout`</summary><p>\n\n```json\n{}\n```\n\n</p></details>\n",
-                summary.stdout
-            )?;
-        }
-
-        writeln!(f, "</details>")?;
+        let program_nr = idx + 1;
+        let program_summary = match &summary.result {
+            Ok(ValidationResult::CorrectTerminated) => "Correct".to_string(),
+            Ok(ValidationResult::CorrectNonTerminated { .. }) => "Correct<sup>*</sup>".to_string(),
+            Ok(e @ ValidationResult::Mismatch { .. }) => format!("{e:?}"),
+            Ok(e @ ValidationResult::TimeOut) => format!("{e:?}"),
+            Err(e) => format!("{e:?}"),
+        };
+        let body = [
+            code_block("py", &summary.cmds),
+            format!("### Input\n\n{}\n\n", summary.input.to_markdown()),
+            if let Some(output) = &summary.output {
+                format!("### Output \n\n{}\n\n", output.to_markdown())
+            } else {
+                details("`stdout`", code_block("json", &summary.stdout))
+            },
+        ]
+        .into_iter()
+        .format("\n\n");
+        writeln!(
+            f,
+            "{}",
+            details(
+                format!("<strong>Program {program_nr}</strong> – {program_summary}"),
+                body
+            )
+        )?;
     }
 
     let mut table = comfy_table::Table::new();
@@ -303,14 +295,13 @@ where
         table.add_row([
             format!("Program {}", idx + 1),
             match &summary.result {
-                Ok(ValidationResult::CorrectTerminated) => "Correct".to_string(),
-                Ok(ValidationResult::CorrectNonTerminated { .. }) => {
-                    "Correct<sup>*</sup>".to_string()
-                }
-                Ok(ValidationResult::Mismatch { .. }) => "Mismatch".to_string(),
-                Ok(ValidationResult::TimeOut) => "Time out".to_string(),
-                Err(_) => "Error".to_string(),
-            },
+                Ok(ValidationResult::CorrectTerminated) => "Correct",
+                Ok(ValidationResult::CorrectNonTerminated { .. }) => "Correct<sup>*</sup>",
+                Ok(ValidationResult::Mismatch { .. }) => "Mismatch",
+                Ok(ValidationResult::TimeOut) => "Time out",
+                Err(_) => "Error",
+            }
+            .to_string(),
             format!("{:?}", summary.time),
         ]);
     }
