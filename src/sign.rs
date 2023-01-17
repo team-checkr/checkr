@@ -1,5 +1,5 @@
 use std::{
-    collections::{BTreeMap, BTreeSet, HashSet},
+    collections::{BTreeMap, HashSet},
     hash::Hash,
 };
 
@@ -53,13 +53,68 @@ impl Sign {
     }
 }
 
+bitflags::bitflags! {
+    #[derive(Serialize, Deserialize)]
+    #[serde(into = "Vec<Sign>", try_from = "Vec<Sign>")]
+    pub struct Signs: u8 {
+        const NONE = 0b000;
+        const POSITIVE = 0b001;
+        const ZERO = 0b010;
+        const NEGATIVE = 0b100;
+        const ALL = Self::POSITIVE.bits | Self::ZERO.bits | Self::NEGATIVE.bits;
+    }
+}
+
+impl From<Signs> for Vec<Sign> {
+    fn from(value: Signs) -> Self {
+        value.iter().collect()
+    }
+}
+impl From<Vec<Sign>> for Signs {
+    fn from(value: Vec<Sign>) -> Self {
+        value.into_iter().collect()
+    }
+}
+
+#[test]
+fn signs_as_json() {
+    use std::collections::BTreeSet;
+    assert_eq!(
+        serde_json::to_string(&Signs::ALL).unwrap(),
+        serde_json::to_string(&Signs::ALL.iter().collect::<BTreeSet<_>>()).unwrap()
+    );
+}
+
+impl From<Sign> for Signs {
+    fn from(value: Sign) -> Self {
+        match value {
+            Sign::Positive => Signs::POSITIVE,
+            Sign::Zero => Signs::ZERO,
+            Sign::Negative => Signs::NEGATIVE,
+        }
+    }
+}
+
+impl Signs {
+    pub fn iter(self) -> impl Iterator<Item = Sign> {
+        [Sign::Positive, Sign::Zero, Sign::Negative]
+            .into_iter()
+            .filter(move |&s| self.contains(s.into()))
+    }
+}
+impl FromIterator<Sign> for Signs {
+    fn from_iter<T: IntoIterator<Item = Sign>>(iter: T) -> Self {
+        iter.into_iter().fold(Signs::NONE, |acc, s| acc | s.into())
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Memory<T, A = T> {
     pub variables: BTreeMap<Variable, T>,
     pub arrays: BTreeMap<String, A>,
 }
 
-pub type SignMemory = Memory<Sign, BTreeSet<Sign>>;
+pub type SignMemory = Memory<Sign, Signs>;
 
 impl<T, A> Memory<T, A> {
     pub fn with_var(mut self, var: &Variable, value: T) -> Self {
@@ -89,26 +144,25 @@ impl MonotoneFramework for SignAnalysis {
                 .flat_map(|mem| {
                     let idx_signs = idx.semantics_sign(mem);
                     if idx_signs.contains(&Sign::Zero) || idx_signs.contains(&Sign::Positive) {
-                        let asdf = mem
+                        let asdf: Signs = mem
                             .arrays
                             .get(arr)
                             .unwrap_or_else(|| panic!("could not get sign of array '{arr}'"))
                             .iter()
-                            .copied()
-                            .collect_vec();
+                            .collect();
 
                         let mut new_possible = HashSet::new();
 
-                        let signs: BTreeSet<Sign> = asdf.iter().copied().collect();
+                        let signs: Signs = asdf.iter().collect();
 
                         for s in std::iter::once(None).chain(asdf.iter().map(Some)) {
                             let mut signs = signs.clone();
                             if let Some(s) = s {
-                                signs.remove(s);
+                                signs.remove(s.into());
                             }
                             for new_sign in expr.semantics_sign(mem) {
                                 let mut signs = signs.clone();
-                                signs.insert(new_sign);
+                                signs.insert(new_sign.into());
                                 let mut new_mem = mem.clone();
                                 new_mem.arrays.insert(arr.clone(), signs);
                                 new_possible.insert(new_mem);
@@ -134,7 +188,7 @@ impl MonotoneFramework for SignAnalysis {
         Direction::Forward
     }
 
-    fn initial(&self, pg: &ProgramGraph) -> Self::Domain {
+    fn initial(&self, _pg: &ProgramGraph) -> Self::Domain {
         [self.assignment.clone()].into_iter().collect()
     }
 }
@@ -241,7 +295,6 @@ impl AExpr {
                         .get(arr)
                         .unwrap_or_else(|| panic!("could not get sign of array '{arr}'"))
                         .iter()
-                        .copied()
                         .collect()
                 } else {
                     Default::default()

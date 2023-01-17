@@ -1,4 +1,3 @@
-use lalrpop_util::lalrpop_mod;
 use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;

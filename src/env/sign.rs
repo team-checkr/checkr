@@ -1,4 +1,4 @@
-use std::collections::{BTreeSet, HashMap, HashSet};
+use std::collections::{HashMap, HashSet};
 
 use itertools::Itertools;
 
@@ -10,7 +10,7 @@ use crate::{
     ast::{Commands, Variable},
     generation::Generate,
     pg::{Determinism, ProgramGraph},
-    sign::{Memory, Sign, SignAnalysis, SignMemory},
+    sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
 };
 
 use super::{Environment, ToMarkdown, ValidationResult};
@@ -67,7 +67,7 @@ impl Generate for Sign {
             .unwrap()
     }
 }
-impl Generate for BTreeSet<Sign> {
+impl Generate for Signs {
     type Context = Commands;
 
     fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
