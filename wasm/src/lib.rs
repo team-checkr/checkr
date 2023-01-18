@@ -3,7 +3,7 @@ use serde::{Deserialize, Serialize};
 use smtlib::{SatResultWithModel, Sort};
 use tracing::{info, warn};
 use verification_lawyer::{
-    env::{Application, SecurityEnv, SignEnv, StepWiseEnv},
+    env::{graph::GraphEnv, Application, SecurityEnv, SignEnv, StepWiseEnv},
     pg::{Determinism, ProgramGraph},
 };
 use wasm_bindgen::prelude::*;

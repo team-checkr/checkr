@@ -12,7 +12,10 @@ use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
 use tracing::{debug, error};
 use verification_lawyer::{
-    env::{Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown, ValidationResult},
+    env::{
+        graph::GraphEnv, Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown,
+        ValidationResult,
+    },
     AnalysisSummary,
 };
 use xshell::{cmd, Shell};
@@ -32,6 +35,8 @@ enum Cli {
         dir: PathBuf,
         #[clap(long, short)]
         group_nr: u64,
+        #[clap(long, short, default_value = "false")]
+        pull: bool,
         #[clap(long, short)]
         output: PathBuf,
     },
@@ -130,13 +135,16 @@ async fn run() -> anyhow::Result<()> {
         Cli::GenerateReport {
             dir,
             group_nr,
+            pull,
             output,
         } => {
             let sh = Shell::new()?;
             sh.change_dir(dir);
 
-            cmd!(sh, "git checkout master").run()?;
-            cmd!(sh, "git pull").run()?;
+            if pull {
+                cmd!(sh, "git checkout master").run()?;
+                cmd!(sh, "git pull").run()?;
+            }
 
             let result = generate_report(&sh, group_nr)?;
             fs::write(output, result)?;
@@ -180,47 +188,24 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
 
     writeln!(output, "# Group {group_nr}")?;
 
-    let env = StepWiseEnv;
-    let summaries = (0..samples)
-        .map(|idx| {
-            verification_lawyer::run_analysis(
-                &env,
-                sh.current_dir(),
-                None,
-                Some(base_seed + idx),
-                &run_command,
-            )
-        })
-        .collect_vec();
-    generate_markdown(&env, &mut output, &summaries)?;
-
-    let env = SignEnv;
-    let summaries = (0..samples)
-        .map(|idx| {
-            verification_lawyer::run_analysis(
-                &env,
-                sh.current_dir(),
-                None,
-                Some(base_seed + idx),
-                &run_command,
-            )
-        })
-        .collect_vec();
-    generate_markdown(&env, &mut output, &summaries)?;
-
-    let env = SecurityEnv;
-    let summaries = (0..samples)
-        .map(|idx| {
-            verification_lawyer::run_analysis(
-                &env,
-                sh.current_dir(),
-                None,
-                Some(base_seed + idx),
-                &run_command,
-            )
-        })
-        .collect_vec();
-    generate_markdown(&env, &mut output, &summaries)?;
+    // fun_name(
+    //     samples,
+    //     StepWiseEnv,
+    //     sh,
+    //     base_seed,
+    //     &run_command,
+    //     &mut output,
+    // )?;
+    // fun_name(samples, SignEnv, sh, base_seed, &run_command, &mut output)?;
+    // fun_name(
+    //     samples,
+    //     SecurityEnv,
+    //     sh,
+    //     base_seed,
+    //     &run_command,
+    //     &mut output,
+    // )?;
+    fun_name(samples, GraphEnv, sh, base_seed, &run_command, &mut output)?;
 
     let mut table = comfy_table::Table::new();
     table
@@ -237,6 +222,33 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
     writeln!(output, "\n{table}")?;
 
     Ok(output)
+}
+
+fn fun_name<E: Environment>(
+    samples: u64,
+    env: E,
+    sh: &Shell,
+    base_seed: u64,
+    run_command: &String,
+    output: &mut String,
+) -> Result<(), anyhow::Error>
+where
+    E::Input: ToMarkdown,
+    E::Output: ToMarkdown,
+{
+    let summaries = (0..samples)
+        .map(|idx| {
+            verification_lawyer::run_analysis(
+                &env,
+                sh.current_dir(),
+                None,
+                Some(base_seed + idx),
+                run_command,
+            )
+        })
+        .collect_vec();
+    generate_markdown(&env, output, &summaries)?;
+    Ok(())
 }
 
 fn details(summary: impl std::fmt::Display, body: impl std::fmt::Display) -> String {
