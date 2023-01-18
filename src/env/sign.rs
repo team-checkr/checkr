@@ -40,21 +40,36 @@ impl Generate for SignAnalysisInput {
 
 impl ToMarkdown for SignAnalysisInput {
     fn to_markdown(&self) -> String {
-        format!(
-            "Determinism: {:?}\n\nMemory: [{}]",
-            self.determinism,
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(["Input"]);
+
+        table.add_row([
+            "Determinism:",
+            match self.determinism {
+                Determinism::Deterministic => "**✓**",
+                Determinism::NonDeterministic => "**✕**",
+            },
+        ]);
+
+        table.add_row([
+            "Memory:".to_string(),
             self.assignment
                 .variables
                 .iter()
-                .map(|(v, x)| format!("{v} = {x}"))
+                .map(|(v, x)| format!("`{v} = {x}`"))
                 .chain(
                     self.assignment
                         .arrays
                         .iter()
-                        .map(|(v, x)| format!("{v} = {{{}}}", x.iter().format(", ")))
+                        .map(|(v, x)| format!("`{v} = {x:?}`")),
                 )
                 .format(", ")
-        )
+                .to_string(),
+        ]);
+
+        format!("{table}")
     }
 }
 

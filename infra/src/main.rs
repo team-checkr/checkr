@@ -188,24 +188,24 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
 
     writeln!(output, "# Group {group_nr}")?;
 
-    // fun_name(
-    //     samples,
-    //     StepWiseEnv,
-    //     sh,
-    //     base_seed,
-    //     &run_command,
-    //     &mut output,
-    // )?;
-    // fun_name(samples, SignEnv, sh, base_seed, &run_command, &mut output)?;
-    // fun_name(
-    //     samples,
-    //     SecurityEnv,
-    //     sh,
-    //     base_seed,
-    //     &run_command,
-    //     &mut output,
-    // )?;
-    fun_name(samples, GraphEnv, sh, base_seed, &run_command, &mut output)?;
+    fun_name(
+        samples,
+        StepWiseEnv,
+        sh,
+        base_seed,
+        &run_command,
+        &mut output,
+    )?;
+    fun_name(samples, SignEnv, sh, base_seed, &run_command, &mut output)?;
+    fun_name(
+        samples,
+        SecurityEnv,
+        sh,
+        base_seed,
+        &run_command,
+        &mut output,
+    )?;
+    // fun_name(samples, GraphEnv, sh, base_seed, &run_command, &mut output)?;
 
     let mut table = comfy_table::Table::new();
     table
@@ -253,6 +253,7 @@ where
 
 fn details(summary: impl std::fmt::Display, body: impl std::fmt::Display) -> String {
     format!("<details><summary>{summary}</summary>\n\n{body}\n\n</details>")
+    // format!("{summary}\n\n{body}\n\n")
 }
 fn code_block(lang: impl std::fmt::Display, code: impl std::fmt::Display) -> String {
     format!("\n```{lang}\n{code}\n```\n\n")

@@ -22,7 +22,7 @@ Sep<T, S>: Vec<T> = {
     }
 };
 SepNonEmpty<T, S>: Vec<T> = {
-    <mut v:(<T> S)*> <e:T> S? =>{
+    <mut v:(<T> S)*> <e:T> =>{
         v.push(e);
         v
     }
@@ -30,6 +30,10 @@ SepNonEmpty<T, S>: Vec<T> = {
 
 pub Commands: Commands = {
     Sep<Command, ";"> => Commands(<>),
+};
+
+NonEmptyCommands: Commands = {
+    SepNonEmpty<Command, ";"> => Commands(<>),
 };
 
 Command: Command = {
@@ -57,7 +61,7 @@ Array: Array = <arr:Ident> "[" <idx:AExpr> "]" => Array(arr, box idx);
 Guards: Vec<Guard> = Sep<Guard, "[]">;
 
 Guard: Guard = {
-    <BExpr> "->" <Commands> => Guard(<>),
+    <BExpr> "->" <NonEmptyCommands> => Guard(<>),
 };
 
 AExpr_ = AExpr;

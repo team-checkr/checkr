@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ast::{Commands, Variable},
     generation::Generate,
-    security::{Flow, SecurityAnalysisResult, SecurityClass, SecurityLattice},
+    security::{Flow, SecurityAnalysisOutput, SecurityClass, SecurityLattice},
 };
 
 use super::{Environment, ToMarkdown, ValidationResult};
@@ -67,25 +67,83 @@ impl Generate for SecurityAnalysisInput {
 
 impl ToMarkdown for SecurityAnalysisInput {
     fn to_markdown(&self) -> String {
-        format!(
-            "Lattice: {}\n\nClassification: [{}]",
+        let mut table = comfy_table::Table::new();
+        table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
+
+        table.set_header(["Input"]);
+        table.add_row([
+            "Lattice:".to_string(),
             self.lattice
                 .0
                 .iter()
-                .map(|f| format!("{} < {}", f.from, f.into))
-                .format(", "),
+                .map(|f| format!("`{} < {}`", f.from, f.into))
+                .format(", ")
+                .to_string(),
+        ]);
+
+        table.add_row([
+            "Classification:".to_string(),
             self.classification
                 .iter()
-                .map(|(a, c)| format!("{a} = {c}"))
+                .map(|(a, c)| format!("`{a} = {c}`"))
                 .format(", ")
-        )
+                .to_string(),
+        ]);
+
+        format!("{table}")
+    }
+}
+
+impl ToMarkdown for SecurityAnalysisOutput {
+    fn to_markdown(&self) -> String {
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(["", "Flows"]);
+
+        // ->͢→↦⇒⇛⇨➙➞➝➜➱➽➼⟴⟶➾
+        table.add_row([
+            "Actual".to_string(),
+            self.actual
+                .iter()
+                .map(|f| format!("`{} → {}`", f.from, f.into))
+                .format(", ")
+                .to_string(),
+        ]);
+        table.add_row([
+            "Allowed".to_string(),
+            self.allowed
+                .iter()
+                .map(|f| format!("`{} → {}`", f.from, f.into))
+                .format(", ")
+                .to_string(),
+        ]);
+        table.add_row([
+            "Violations".to_string(),
+            self.violations
+                .iter()
+                .map(|f| format!("`{} → {}`", f.from, f.into))
+                .format(", ")
+                .to_string(),
+        ]);
+
+        table.add_row([
+            "Result".to_string(),
+            if self.violations.is_empty() {
+                format!("**Secure**")
+            } else {
+                format!("**Insecure**")
+            },
+        ]);
+
+        format!("{table}")
     }
 }
 
 impl Environment for SecurityEnv {
     type Input = SecurityAnalysisInput;
 
-    type Output = SecurityAnalysisResult;
+    type Output = SecurityAnalysisOutput;
 
     fn command() -> &'static str {
         "security"
@@ -96,7 +154,7 @@ impl Environment for SecurityEnv {
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let lattice = SecurityLattice::new(&input.lattice.0);
-        SecurityAnalysisResult::run(&input.classification, &lattice, cmds)
+        SecurityAnalysisOutput::run(&input.classification, &lattice, cmds)
     }
 
     fn validate(

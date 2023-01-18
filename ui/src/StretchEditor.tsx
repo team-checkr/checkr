@@ -38,7 +38,7 @@ export const StretchEditor = ({
         minimap: { enabled: false },
         smoothScrolling: true,
         readOnly: !onChange,
-        lineNumbers: "off",
+        lineNumbers: "on",
         scrollBeyondLastLine: false,
         folding: false,
         quickSuggestions: false,
@@ -442,7 +442,7 @@ const theme: monaco.editor.IStandaloneThemeData = {
   ],
   colors: {
     "editor.foreground": "#D0D0FF",
-    "editor.background": "#200020",
+    "editor.background": "#1e293b",
     "editor.selectionBackground": "#80000080",
     "editor.lineHighlightBackground": "#80000040",
     "editorCursor.foreground": "#7070FF",

@@ -3,7 +3,10 @@ use serde::{Deserialize, Serialize};
 use smtlib::{SatResultWithModel, Sort};
 use tracing::{info, warn};
 use verification_lawyer::{
-    env::{graph::GraphEnv, Application, SecurityEnv, SignEnv, StepWiseEnv},
+    env::{
+        graph::{GraphEnv, GraphEnvInput},
+        AnyEnvironment, Application, Environment, SecurityEnv, SignEnv, StepWiseEnv,
+    },
     pg::{Determinism, ProgramGraph},
 };
 use wasm_bindgen::prelude::*;
@@ -57,6 +60,53 @@ impl WebApplication {
         };
 
         serde_json::to_string(&g).unwrap()
+    }
+
+    pub fn generate_program(&self) -> String {
+        let (cmds, _, _, _) = verification_lawyer::generate_program(None, None);
+        cmds.to_string()
+    }
+
+    pub fn dot(&self, deterministic: bool, src: &str) -> String {
+        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            return "Parse error".to_string()
+        };
+        GraphEnv
+            .run(
+                &cmds,
+                &GraphEnvInput {
+                    determinism: if deterministic {
+                        Determinism::Deterministic
+                    } else {
+                        Determinism::NonDeterministic
+                    },
+                },
+            )
+            .dot
+    }
+    pub fn security(&self, src: &str) -> String {
+        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            return "Parse error".to_string()
+        };
+        let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
+        let sample = SecurityEnv.gen_sample(&cmds, &mut rng);
+        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+    }
+    pub fn step_wise(&self, src: &str) -> String {
+        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            return "Parse error".to_string()
+        };
+        let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
+        let sample = StepWiseEnv.gen_sample(&cmds, &mut rng);
+        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+    }
+    pub fn sign(&self, src: &str) -> String {
+        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            return "Parse error".to_string()
+        };
+        let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
+        let sample = SignEnv.gen_sample(&cmds, &mut rng);
+        serde_json::to_string(&[sample.0, sample.1]).unwrap()
     }
 }
 

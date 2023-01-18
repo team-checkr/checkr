@@ -4,7 +4,7 @@ use serde::{Deserialize, Serialize};
 use crate::{
     ast::Commands,
     generation::Generate,
-    interpreter::{Interpreter, InterpreterMemory, ProgramTrace},
+    interpreter::{Interpreter, InterpreterMemory, ProgramState, ProgramTrace},
     pg::{Determinism, Node, ProgramGraph},
     sign::Memory,
 };
@@ -43,21 +43,36 @@ impl Generate for StepWiseInput {
 
 impl ToMarkdown for StepWiseInput {
     fn to_markdown(&self) -> String {
-        format!(
-            "#### Determinism:\n\n{:?}\n\n#### Memory:\n\n`[{}]`",
-            self.determinism,
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(["Input"]);
+
+        table.add_row([
+            "Determinism:",
+            match self.determinism {
+                Determinism::Deterministic => "**✓**",
+                Determinism::NonDeterministic => "**✕**",
+            },
+        ]);
+
+        table.add_row([
+            "Memory:".to_string(),
             self.assignment
                 .variables
                 .iter()
-                .map(|(v, x)| format!("{v} = {x}"))
+                .map(|(v, x)| format!("`{v} = {x}`"))
                 .chain(
                     self.assignment
                         .arrays
                         .iter()
-                        .map(|(v, x)| format!("{v} = {x:?}"))
+                        .map(|(v, x)| format!("`{v} = {x:?}`")),
                 )
                 .format(", ")
-        )
+                .to_string(),
+        ]);
+
+        format!("{table}")
     }
 }
 
@@ -66,7 +81,51 @@ pub struct StepWiseOutput(Vec<ProgramTrace<String>>);
 
 impl ToMarkdown for StepWiseOutput {
     fn to_markdown(&self) -> String {
-        format!("```\n{self:#?}\n```")
+        let variables = self
+            .0
+            .iter()
+            .flat_map(|t| {
+                t.memory
+                    .variables
+                    .keys()
+                    .map(|k| k.to_string())
+                    .chain(t.memory.arrays.keys().cloned())
+            })
+            .sorted()
+            .dedup()
+            .collect_vec();
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(std::iter::once("Node".to_string()).chain(variables.iter().cloned()));
+
+        for t in &self.0 {
+            match t.state {
+                ProgramState::Running => {
+                    table.add_row(
+                        std::iter::once(t.node.to_string()).chain(
+                            t.memory
+                                .variables
+                                .iter()
+                                .map(|(var, value)| (value.to_string(), var.to_string()))
+                                .chain(t.memory.arrays.iter().map(|(arr, values)| {
+                                    (format!("[{}]", values.iter().format(",")), arr.to_string())
+                                }))
+                                .sorted_by_key(|(_, k)| k.to_string())
+                                .map(|(v, _)| v),
+                        ),
+                    );
+                }
+                ProgramState::Stuck => {
+                    table.add_row([format!("**Stuck**")]);
+                }
+                ProgramState::Terminated => {
+                    table.add_row([format!("**Terminated successfully**")]);
+                }
+            }
+        }
+        format!("{table}")
     }
 }
 

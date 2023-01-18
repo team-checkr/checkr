@@ -194,19 +194,13 @@ impl SecurityLattice {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SecurityAnalysisResult {
+pub struct SecurityAnalysisOutput {
     pub actual: Vec<Flow<Variable>>,
     pub allowed: Vec<Flow<Variable>>,
     pub violations: Vec<Flow<Variable>>,
 }
 
-impl ToMarkdown for SecurityAnalysisResult {
-    fn to_markdown(&self) -> String {
-        format!("```\n{self:#?}\n```")
-    }
-}
-
-impl SecurityAnalysisResult {
+impl SecurityAnalysisOutput {
     pub fn run(
         mapping: &HashMap<Variable, SecurityClass>,
         lattice: &SecurityLattice,

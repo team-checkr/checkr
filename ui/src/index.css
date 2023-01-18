@@ -1,3 +1,15 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+@layer base {
+  .prose code {
+    @apply whitespace-nowrap;
+  }
+  .prose code::before {
+    content: "";
+  }
+  .prose code::after {
+    content: "";
+  }
+}
