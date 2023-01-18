@@ -5,6 +5,7 @@ use tracing::{info, warn};
 use verification_lawyer::{
     env::{
         graph::{GraphEnv, GraphEnvInput},
+        pv::ProgramVerificationEnv,
         AnyEnvironment, Application, Environment, SecurityEnv, SignEnv, StepWiseEnv,
     },
     pg::{Determinism, ProgramGraph},
@@ -106,6 +107,14 @@ impl WebApplication {
         };
         let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
         let sample = SignEnv.gen_sample(&cmds, &mut rng);
+        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+    }
+    pub fn pv(&self, src: &str) -> String {
+        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            return "Parse error".to_string()
+        };
+        let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
+        let sample = ProgramVerificationEnv.gen_sample(&cmds, &mut rng);
         serde_json::to_string(&[sample.0, sample.1]).unwrap()
     }
 }

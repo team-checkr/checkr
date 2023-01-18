@@ -172,19 +172,20 @@ impl Environment for StepWiseEnv {
                         // TODO: check state
                         if m == trace.memory {
                             next_mem.push((edge.to(), m));
-                        } else {
-                            // eprintln!("{cmds}");
-                            // debug!("Initial: {:?}", input.assignment);
-                            // debug!("Ref:     {m:?}");
-                            // debug!("Their:   {:?}", trace.memory);
                         }
                     }
                 }
             }
             if next_mem.is_empty() {
-                return ValidationResult::Mismatch {
-                    reason: format!("The traces do not match after {idx} iterations"),
-                };
+                match trace.state {
+                    ProgramState::Running => {
+                        return ValidationResult::Mismatch {
+                            reason: format!("The traces do not match after {idx} iterations"),
+                        };
+                    }
+                    ProgramState::Stuck => break,
+                    ProgramState::Terminated => break,
+                }
             }
             mem = next_mem;
         }

@@ -120,16 +120,16 @@ a := 95
 
 | Program    | Result              | Time         |
 |------------|---------------------|--------------|
-| Program 1  | Correct             | 156.293042ms |
-| Program 2  | Correct             | 160.018416ms |
-| Program 3  | Correct             | 169.632ms    |
-| Program 4  | Correct             | 170.544459ms |
-| Program 5  | Correct<sup>*</sup> | 180.671375ms |
-| Program 6  | Correct             | 179.69ms     |
-| Program 7  | Correct             | 162.366458ms |
-| Program 8  | Correct<sup>*</sup> | 165.90925ms  |
-| Program 9  | Correct             | 165.683959ms |
-| Program 10 | Correct<sup>*</sup> | 160.013625ms |
+| Program 1  | Correct             | 168.668625ms |
+| Program 2  | Correct             | 158.750792ms |
+| Program 3  | Correct             | 160.722166ms |
+| Program 4  | Correct             | 153.455875ms |
+| Program 5  | Correct<sup>*</sup> | 155.287959ms |
+| Program 6  | Correct             | 159.334125ms |
+| Program 7  | Correct             | 162.759916ms |
+| Program 8  | Correct<sup>*</sup> | 160.298958ms |
+| Program 9  | Correct             | 159.728541ms |
+| Program 10 | Correct<sup>*</sup> | 160.706875ms |
 ## Detection of Signs Analysis
 <details><summary><strong>Program 1</strong> – Correct</summary>
 
@@ -178,7 +178,7 @@ od
 | Input        |                                    |
 |--------------|------------------------------------|
 | Determinism: | **✕**                              |
-| Memory:      | `a = +`, `b = +`, `c = -`, `d = -` |
+| Memory:      | `a = +`, `b = -`, `c = -`, `d = +` |
 
 
 
@@ -186,7 +186,7 @@ od
 
 | Node    | a | b | c | d |
 |---------|---|---|---|---|
-| Node 0  | + | + | - | - |
+| Node 0  | + | - | - | + |
 | Node 1  |   |   |   |   |
 | Node 10 |   |   |   |   |
 | Node 11 |   |   |   |   |
@@ -198,13 +198,13 @@ od
 | Node 17 |   |   |   |   |
 | Node 18 |   |   |   |   |
 | Node 19 |   |   |   |   |
-| Node 2  | + | + | - | + |
+| Node 2  | + | - | - | - |
 | Node 20 |   |   |   |   |
 | Node 21 |   |   |   |   |
 | Node 22 |   |   |   |   |
-| Node 3  | + | + | + | + |
-| Node 4  | + | - | + | + |
-| Node 5  | + | + | + | + |
+| Node 3  | + | - | - | - |
+| Node 4  | + | - | - | - |
+| Node 5  | + | - | - | - |
 | Node 6  |   |   |   |   |
 | Node 7  |   |   |   |   |
 | Node 8  |   |   |   |   |
@@ -242,7 +242,7 @@ a := 95
 | Input        |                                    |
 |--------------|------------------------------------|
 | Determinism: | **✕**                              |
-| Memory:      | `a = -`, `b = -`, `c = -`, `d = 0` |
+| Memory:      | `a = -`, `b = -`, `c = 0`, `d = -` |
 
 
 
@@ -250,20 +250,20 @@ a := 95
 
 | Node    | a | b | c | d |
 |---------|---|---|---|---|
-| Node 0  | - | - | - | 0 |
-| Node 1  | + | - | + | 0 |
+| Node 0  | - | - | 0 | - |
+| Node 1  |   |   |   |   |
 | Node 10 |   |   |   |   |
-| Node 11 | 0 | - | 0 | 0 |
-| Node 12 | 0 | - | + | 0 |
-| Node 13 | 0 | - | + | 0 |
-| Node 2  | - | - | - | 0 |
+| Node 11 |   |   |   |   |
+| Node 12 |   |   |   |   |
+| Node 13 |   |   |   |   |
+| Node 2  | - | - | 0 | - |
 | Node 3  |   |   |   |   |
-| Node 4  | - | - | - | 0 |
-| Node 5  | - | - | - | 0 |
-| Node 6  | 0 | - | - | 0 |
-| Node 7  | 0 | - | 0 | 0 |
-| Node 8  | - | - | 0 | 0 |
-| Node 9  | - | - | 0 | 0 |
+| Node 4  |   |   |   |   |
+| Node 5  |   |   |   |   |
+| Node 6  |   |   |   |   |
+| Node 7  |   |   |   |   |
+| Node 8  |   |   |   |   |
+| Node 9  |   |   |   |   |
 
 
 
@@ -271,16 +271,16 @@ a := 95
 
 | Program    | Result   | Time         |
 |------------|----------|--------------|
-| Program 1  | Correct  | 163.2025ms   |
-| Program 2  | Mismatch | 179.736125ms |
-| Program 3  | Correct  | 167.692333ms |
-| Program 4  | Correct  | 165.771417ms |
-| Program 5  | Mismatch | 173.754458ms |
-| Program 6  | Mismatch | 167.677875ms |
-| Program 7  | Mismatch | 165.533292ms |
-| Program 8  | Error    | 218.302708ms |
-| Program 9  | Error    | 207.238083ms |
-| Program 10 | Mismatch | 168.234792ms |
+| Program 1  | Correct  | 161.741375ms |
+| Program 2  | Mismatch | 165.2695ms   |
+| Program 3  | Correct  | 165.090584ms |
+| Program 4  | Correct  | 166.288875ms |
+| Program 5  | Mismatch | 166.203416ms |
+| Program 6  | Mismatch | 165.7065ms   |
+| Program 7  | Mismatch | 167.391792ms |
+| Program 8  | Error    | 198.979875ms |
+| Program 9  | Error    | 204.383917ms |
+| Program 10 | Mismatch | 167.532959ms |
 ## Security Analysis
 <details><summary><strong>Program 1</strong> – Correct</summary>
 
@@ -329,7 +329,7 @@ od
 | Input           |                                    |
 |-----------------|------------------------------------|
 | Lattice:        | `A < B`, `C < D`                   |
-| Classification: | `b = D`, `c = D`, `d = D`, `a = A` |
+| Classification: | `c = A`, `b = D`, `d = D`, `a = D` |
 
 
 
@@ -338,8 +338,8 @@ od
 |            | Flows                                                                                    |
 |------------|------------------------------------------------------------------------------------------|
 | Actual     | `a → c`, `a → d`, `b → c`, `b → d`, `c → c`, `c → d`, `d → b`, `d → c`, `d → d`          |
-| Allowed    | `a → a`, `b → b`, `b → c`, `b → d`, `c → b`, `c → c`, `c → d`, `d → b`, `d → c`, `d → d` |
-| Violations | `a → c`, `a → d`                                                                         |
+| Allowed    | `a → a`, `a → b`, `a → d`, `b → a`, `b → b`, `b → d`, `c → c`, `d → a`, `d → b`, `d → d` |
+| Violations | `a → c`, `b → c`, `c → d`, `d → c`                                                       |
 | Result     | **Insecure**                                                                             |
 
 
@@ -374,7 +374,7 @@ a := 95
 | Input           |                                    |
 |-----------------|------------------------------------|
 | Lattice:        | `A < B`, `C < D`                   |
-| Classification: | `d = B`, `a = C`, `c = B`, `b = C` |
+| Classification: | `b = C`, `c = C`, `d = B`, `a = B` |
 
 
 
@@ -383,8 +383,8 @@ a := 95
 |            | Flows                                                                  |
 |------------|------------------------------------------------------------------------|
 | Actual     | `a → a`, `b → a`, `b → b`, `c → a`, `c → c`, `d → a`, `d → b`, `d → c` |
-| Allowed    | `a → a`, `a → b`, `b → a`, `b → b`, `c → c`, `c → d`, `d → c`, `d → d` |
-| Violations | `c → a`, `d → a`, `d → b`                                              |
+| Allowed    | `a → a`, `a → d`, `b → b`, `b → c`, `c → b`, `c → c`, `d → a`, `d → d` |
+| Violations | `b → a`, `c → a`, `d → b`, `d → c`                                     |
 | Result     | **Insecure**                                                           |
 
 
@@ -393,16 +393,138 @@ a := 95
 
 | Program    | Result   | Time         |
 |------------|----------|--------------|
-| Program 1  | Correct  | 151.86725ms  |
-| Program 2  | Correct  | 150.568417ms |
-| Program 3  | Correct  | 149.345875ms |
-| Program 4  | Correct  | 155.629708ms |
-| Program 5  | Correct  | 147.513667ms |
-| Program 6  | Correct  | 159.042208ms |
-| Program 7  | Correct  | 155.294959ms |
-| Program 8  | Mismatch | 156.818208ms |
-| Program 9  | Correct  | 151.398375ms |
-| Program 10 | Correct  | 148.575ms    |
+| Program 1  | Correct  | 149.324709ms |
+| Program 2  | Correct  | 154.745917ms |
+| Program 3  | Correct  | 158.2785ms   |
+| Program 4  | Correct  | 160.3395ms   |
+| Program 5  | Correct  | 150.735625ms |
+| Program 6  | Correct  | 166.004ms    |
+| Program 7  | Correct  | 159.269875ms |
+| Program 8  | Mismatch | 166.0895ms   |
+| Program 9  | Correct  | 160.702542ms |
+| Program 10 | Correct  | 158.0585ms   |
+## Program Verification
+<details><summary><strong>Program 1</strong> – command failed</summary>
+
+
+```py
+d := b ;
+c := d ;
+b := -1 ;
+b := d ;
+if (68 <= -2) ->
+   c := c
+fi ;
+do (b = 8) ->
+   do (!(-29 <= c) | true) ->
+      do !(b <= a) ->
+         do ((false || (((-59 >= b) && !!!true) & true)) || false) ->
+            c := -92
+         od
+      od
+   od
+od ;
+d := d ;
+if !(false & !(((a > b) || (!false || true)) | true)) ->
+   d := c
+fi ;
+do !((-6 > d) & ((c >= b) && true)) ->
+   d := -99
+od ;
+do !(a <= b) ->
+   if (false & ((c <= a) || (d != -58))) ->
+      do !(c <= -62) ->
+         if !(-66 = a) ->
+            do true ->
+               c := a
+            od
+         fi
+      od
+   fi
+od
+```
+
+
+
+### Input
+
+| Input         |            |
+|---------------|------------|
+| Postcondition | `Q = true` |
+
+
+
+<details><summary>`stdout`</summary>
+
+
+```json
+Unknown analysis pv
+
+```
+
+
+
+</details>
+
+</details>
+<details><summary><strong>Program 2</strong> – command failed</summary>
+
+
+```py
+do (((b != -98) & (!(d = 45) | !!true)) & false) ->
+   b := b
+od ;
+if (d >= c) ->
+   c := c
+fi ;
+a := d ;
+c := d ;
+a := b ;
+do false ->
+   c := -49
+od ;
+a := c ;
+c := 24 ;
+a := a ;
+a := 95
+```
+
+
+
+### Input
+
+| Input         |                                                   |
+|---------------|---------------------------------------------------|
+| Postcondition | `Q = ((((a > 0) ∧ (b = 0)) ∧ (c > 0)) ∧ (d < 0))` |
+
+
+
+<details><summary>`stdout`</summary>
+
+
+```json
+Unknown analysis pv
+
+```
+
+
+
+</details>
+
+</details>
+
+| Program    | Result | Time        |
+|------------|--------|-------------|
+| Program 1  | Error  | 30.485167ms |
+| Program 2  | Error  | 30.137042ms |
+| Program 3  | Error  | 29.348917ms |
+| Program 4  | Error  | 29.298625ms |
+| Program 5  | Error  | 29.309083ms |
+| Program 6  | Error  | 28.446542ms |
+| Program 7  | Error  | 30.997041ms |
+| Program 8  | Error  | 29.289166ms |
+| Program 9  | Error  | 29.259667ms |
+| Program 10 | Error  | 29.259209ms |
 
 ## Result explanations
 

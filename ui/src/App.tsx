@@ -2,10 +2,7 @@ import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import { WebApplication, WasmZ3 } from "verification-lawyer";
 import { StretchEditor } from "./StretchEditor";
-import {
-  ArrowPathRoundedSquareIcon,
-  ChevronDownIcon,
-} from "@heroicons/react/24/solid";
+import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/solid";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./z3";
@@ -16,7 +13,8 @@ export const App = () => {
   return <AppA />;
 };
 
-type Envs = "Sign" | "Step-wise" | "Security";
+const ENVS = ["Sign", "Step-wise", "Security", "Program Verification"] as const;
+type Envs = (typeof ENVS)[number];
 
 const AppA = () => {
   const [src, setSrc] = useState(app.generate_program());
@@ -63,9 +61,9 @@ const AppA = () => {
               value={env}
               onChange={(e) => setEnv(e.target.value as Envs)}
             >
-              <option>Step-wise</option>
-              <option>Sign</option>
-              <option>Security</option>
+              {ENVS.map((e) => (
+                <option key={e}>{e}</option>
+              ))}
             </select>
           </div>
           <div className="relative bg-slate-200">
@@ -95,6 +93,9 @@ const Env = ({ env, src }: { env: Envs; src: string }) => {
           break;
         case "Step-wise":
           setIO(JSON.parse(app.step_wise(src)));
+          break;
+        case "Program Verification":
+          setIO(JSON.parse(app.pv(src)));
           break;
       }
     } catch (e) {

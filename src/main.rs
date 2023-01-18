@@ -6,7 +6,9 @@ use clap::{Parser, Subcommand};
 use tracing::info;
 
 use verification_lawyer::{
-    env::{Application, Environment, SecurityEnv, SignEnv, StepWiseEnv},
+    env::{
+        pv::ProgramVerificationEnv, Application, Environment, SecurityEnv, SignEnv, StepWiseEnv,
+    },
     generate_program,
     interpreter::{Interpreter, InterpreterMemory},
     parse,
@@ -53,6 +55,7 @@ enum Reference {
     Interpreter { src: String, input: String },
     Security { src: String, input: String },
     Sign { src: String, input: String },
+    Pv { src: String, input: String },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -157,6 +160,16 @@ fn main() -> anyhow::Result<()> {
                 let cmds = parse::parse_commands(&src)?;
 
                 let env = SignEnv;
+                let output = env.run(&cmds, &serde_json::from_str(&input)?);
+
+                println!("{}", serde_json::to_string(&output)?);
+
+                Ok(())
+            }
+            Reference::Pv { src, input } => {
+                let cmds = parse::parse_commands(&src)?;
+
+                let env = ProgramVerificationEnv;
                 let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
                 println!("{}", serde_json::to_string(&output)?);

@@ -13,7 +13,7 @@ use tower::ServiceBuilder;
 use tracing::{debug, error};
 use verification_lawyer::{
     env::{
-        graph::GraphEnv, Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown,
+        pv::ProgramVerificationEnv, Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown,
         ValidationResult,
     },
     AnalysisSummary,
@@ -200,6 +200,14 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
     fun_name(
         samples,
         SecurityEnv,
+        sh,
+        base_seed,
+        &run_command,
+        &mut output,
+    )?;
+    fun_name(
+        samples,
+        ProgramVerificationEnv,
         sh,
         base_seed,
         &run_command,

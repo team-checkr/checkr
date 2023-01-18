@@ -1,3 +1,9 @@
 default:
     # rm -rf example
     cargo run -- test example-config.toml --base example
+
+generate-self:
+    RUST_LOG=debug cargo run -- generate-report .. -g 2 -o result.md
+
+generate-vagt:
+    RUST_LOG=debug cargo run -- generate-report ../gcmd/ -g 2 -o result.md

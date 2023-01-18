@@ -9,7 +9,7 @@ use crate::{
     analysis::{mono_analysis, FiFo},
     ast::{Commands, Variable},
     generation::Generate,
-    pg::{Determinism, ProgramGraph},
+    pg::{Determinism, Node, ProgramGraph},
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
 };
 
@@ -91,12 +91,16 @@ impl Generate for Signs {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct SignAnalysisOutput(HashMap<String, HashSet<SignMemory>>);
+pub struct SignAnalysisOutput {
+    pub initial_node: String,
+    pub final_node: String,
+    pub nodes: HashMap<String, HashSet<SignMemory>>,
+}
 
 impl ToMarkdown for SignAnalysisOutput {
     fn to_markdown(&self) -> String {
         let idents: HashSet<_> = self
-            .0
+            .nodes
             .iter()
             .flat_map(|(_, worlds)| {
                 worlds.iter().flat_map(|w| {
@@ -114,7 +118,7 @@ impl ToMarkdown for SignAnalysisOutput {
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
             .set_header(std::iter::once("Node".to_string()).chain(idents.iter().cloned()));
 
-        for (n, worlds) in self.0.iter().sorted_by_key(|(n, _)| {
+        for (n, worlds) in self.nodes.iter().sorted_by_key(|(n, _)| {
             if *n == "qStart" {
                 "".to_string()
             } else {
@@ -163,8 +167,10 @@ impl Environment for SignEnv {
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);
-        SignAnalysisOutput(
-            mono_analysis::<_, FiFo>(
+        SignAnalysisOutput {
+            initial_node: Node::Start.to_string(),
+            final_node: Node::End.to_string(),
+            nodes: mono_analysis::<_, FiFo>(
                 SignAnalysis {
                     assignment: input.assignment.clone(),
                 },
@@ -174,7 +180,7 @@ impl Environment for SignEnv {
             .into_iter()
             .map(|(k, v)| (format!("{k}"), v))
             .collect(),
-        )
+        }
     }
 
     fn validate(
@@ -188,9 +194,9 @@ impl Environment for SignEnv {
     {
         let reference = self.run(cmds, input);
 
-        let mut pool = reference.0.values().collect_vec();
+        let mut pool = reference.nodes.values().collect_vec();
 
-        for o in output.0.values() {
+        for o in output.nodes.values() {
             if let Some(idx) = pool.iter().position(|r| *r == o) {
                 pool.remove(idx);
             } else {

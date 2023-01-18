@@ -1,0 +1,2 @@
+compile = "cargo build --release"
+run = "verification-lawyer reference"

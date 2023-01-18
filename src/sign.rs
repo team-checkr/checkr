@@ -108,7 +108,7 @@ impl FromIterator<Sign> for Signs {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Memory<T, A = T> {
     pub variables: BTreeMap<Variable, T>,
     pub arrays: BTreeMap<String, A>,

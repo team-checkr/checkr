@@ -86,7 +86,7 @@ AExpr: AExpr = {
     <l:AExpr> "-" <r:AExpr> => AExpr::Binary(box l, AOp::Minus, box r),
 };
 
-BExpr: BExpr = {
+pub BExpr: BExpr = {
     #[precedence(level="0")]
     <l:AExpr_> <op:RelOp> <r:AExpr_> => BExpr::Rel(l, op, r),
     "true" => BExpr::Bool(true),
