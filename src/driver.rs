@@ -114,6 +114,7 @@ impl Driver {
     }
 }
 
+#[derive(Debug)]
 pub struct ExecOutput<E: Environment> {
     pub output: std::process::Output,
     pub parsed: E::Output,

@@ -7,6 +7,7 @@ use std::{
 
 use axum::{http::StatusCode, routing::post, Json, Router};
 use clap::Parser;
+use infra::RunOption;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tower::ServiceBuilder;
@@ -51,12 +52,6 @@ struct Config {
 struct GroupConfig {
     name: String,
     git: String,
-}
-
-#[derive(Debug, Clone, Serialize, Deserialize)]
-struct RunOption {
-    run: String,
-    compile: Option<String>,
 }
 
 async fn run() -> anyhow::Result<()> {

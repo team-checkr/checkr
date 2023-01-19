@@ -44,7 +44,11 @@ pub trait AnyEnvironment {
     fn command(&self) -> &'static str;
     fn name(&self) -> String;
 
-    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> (String, String);
+    fn gen_sample(
+        &self,
+        cmds: &Commands,
+        rng: &mut SmallRng,
+    ) -> (serde_json::Value, String, String);
 }
 
 impl<E> AnyEnvironment for E
@@ -60,11 +64,19 @@ where
         self.name()
     }
 
-    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> (String, String) {
+    fn gen_sample(
+        &self,
+        cmds: &Commands,
+        rng: &mut SmallRng,
+    ) -> (serde_json::Value, String, String) {
         let input = E::Input::gen(&mut cmds.clone(), rng);
         let output = self.run(cmds, &input);
 
-        (input.to_markdown(), output.to_markdown())
+        (
+            serde_json::to_value(&input).unwrap(),
+            input.to_markdown(),
+            output.to_markdown(),
+        )
     }
 }
 

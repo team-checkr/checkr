@@ -3,7 +3,7 @@
 @tailwind utilities;
 
 @layer base {
-  .prose code {
+  .prose :not(pre) > code {
     @apply whitespace-nowrap;
   }
   .prose code::before {

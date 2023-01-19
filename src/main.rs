@@ -7,7 +7,8 @@ use tracing::info;
 
 use verification_lawyer::{
     env::{
-        pv::ProgramVerificationEnv, Application, Environment, SecurityEnv, SignEnv, StepWiseEnv,
+        graph::GraphEnv, pv::ProgramVerificationEnv, Application, Environment, SecurityEnv,
+        SignEnv, StepWiseEnv,
     },
     generate_program,
     interpreter::{Interpreter, InterpreterMemory},
@@ -56,6 +57,7 @@ enum Reference {
     Security { src: String, input: String },
     Sign { src: String, input: String },
     Pv { src: String, input: String },
+    Graph { src: String, input: String },
 }
 
 fn main() -> anyhow::Result<()> {
@@ -170,6 +172,16 @@ fn main() -> anyhow::Result<()> {
                 let cmds = parse::parse_commands(&src)?;
 
                 let env = ProgramVerificationEnv;
+                let output = env.run(&cmds, &serde_json::from_str(&input)?);
+
+                println!("{}", serde_json::to_string(&output)?);
+
+                Ok(())
+            }
+            Reference::Graph { src, input } => {
+                let cmds = parse::parse_commands(&src)?;
+
+                let env = GraphEnv;
                 let output = env.run(&cmds, &serde_json::from_str(&input)?);
 
                 println!("{}", serde_json::to_string(&output)?);

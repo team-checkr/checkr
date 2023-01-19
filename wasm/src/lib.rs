@@ -56,7 +56,10 @@ impl WebApplication {
                 .app
                 .envs
                 .iter()
-                .map(|env| (env.name(), env.gen_sample(&cmds, &mut rng)))
+                .map(|env| {
+                    let sample = env.gen_sample(&cmds, &mut rng);
+                    (env.name(), (sample.0.to_string(), sample.1, sample.2))
+                })
                 .collect(),
         };
 
@@ -91,7 +94,7 @@ impl WebApplication {
         };
         let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
         let sample = SecurityEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+        serde_json::to_string(&[sample.0.to_string(), sample.1, sample.2]).unwrap()
     }
     pub fn step_wise(&self, src: &str) -> String {
         let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
@@ -99,7 +102,7 @@ impl WebApplication {
         };
         let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
         let sample = StepWiseEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+        serde_json::to_string(&[sample.0.to_string(), sample.1, sample.2]).unwrap()
     }
     pub fn sign(&self, src: &str) -> String {
         let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
@@ -107,7 +110,7 @@ impl WebApplication {
         };
         let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
         let sample = SignEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+        serde_json::to_string(&[sample.0.to_string(), sample.1, sample.2]).unwrap()
     }
     pub fn pv(&self, src: &str) -> String {
         let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
@@ -115,7 +118,7 @@ impl WebApplication {
         };
         let (_, _, _, mut rng) = verification_lawyer::generate_program(None, None);
         let sample = ProgramVerificationEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&[sample.0, sample.1]).unwrap()
+        serde_json::to_string(&[sample.0.to_string(), sample.1, sample.2]).unwrap()
     }
 }
 
@@ -123,7 +126,7 @@ impl WebApplication {
 struct Generation {
     program: String,
     dot: String,
-    envs: Vec<(String, (String, String))>,
+    envs: Vec<(String, (String, String, String))>,
 }
 
 impl Default for WebApplication {
