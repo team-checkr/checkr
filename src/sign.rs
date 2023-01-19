@@ -65,6 +65,18 @@ bitflags::bitflags! {
     }
 }
 
+impl Default for Signs {
+    fn default() -> Self {
+        Self::NONE
+    }
+}
+
+impl std::fmt::Display for Signs {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{{{}}}", self.iter().format(", "))
+    }
+}
+
 impl From<Signs> for Vec<Sign> {
     fn from(value: Signs) -> Self {
         value.iter().collect()
@@ -291,11 +303,11 @@ impl AExpr {
             AExpr::Array(Array(arr, idx)) => {
                 let idx_signs = idx.semantics_sign(mem);
                 if idx_signs.contains(&Sign::Zero) || idx_signs.contains(&Sign::Positive) {
-                    mem.arrays
-                        .get(arr)
-                        .unwrap_or_else(|| panic!("could not get sign of array '{arr}'"))
-                        .iter()
-                        .collect()
+                    if let Some(arr) = mem.arrays.get(arr) {
+                        arr.iter().collect()
+                    } else {
+                        Default::default()
+                    }
                 } else {
                     Default::default()
                 }

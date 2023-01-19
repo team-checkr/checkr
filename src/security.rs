@@ -8,7 +8,6 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     ast::{Array, Command, Commands, Guard, Variable},
-    env::ToMarkdown,
     gcl,
     parse::ParseError,
 };
@@ -61,6 +60,7 @@ impl Command {
                 .iter()
                 .cloned()
                 .chain(a.fv())
+                .chain(a.fa().into_iter().map(|a| Variable(a)))
                 .map(|i| Flow {
                     from: i,
                     into: Variable(x.clone()),
@@ -86,7 +86,9 @@ impl Command {
                 .iter()
                 .cloned()
                 .chain(a.fv())
+                .chain(a.fa().into_iter().map(|a| Variable(a)))
                 .chain(idx.fv())
+                .chain(idx.fa().into_iter().map(|a| Variable(a)))
                 // TODO: Should this really be variable?
                 .map(|i| Flow {
                     from: i,
@@ -101,7 +103,12 @@ impl Command {
 
 impl Guard {
     fn sec2(&self, implicit: &HashSet<Variable>) -> (HashSet<Variable>, HashSet<Flow<Variable>>) {
-        let implicit = implicit.iter().cloned().chain(self.0.fv()).collect();
+        let implicit = implicit
+            .iter()
+            .cloned()
+            .chain(self.0.fv())
+            .chain(self.1.fa().into_iter().map(|a| Variable(a)))
+            .collect();
         let flows = self.1.sec(&implicit);
         (implicit, flows)
     }
@@ -206,16 +213,18 @@ impl SecurityAnalysisOutput {
         lattice: &SecurityLattice,
         cmds: &Commands,
     ) -> Self {
-        let allowed = lattice.all_allowed(mapping).collect();
+        let allowed = lattice.all_allowed(mapping).sorted().dedup().collect_vec();
         let actual = cmds.flows();
         let violations = actual
             .iter()
             .cloned()
-            .filter(|flow| !lattice.allows(&flow.map(|f| mapping[f].clone())))
+            .filter(|flow| !allowed.contains(flow))
+            .sorted()
+            .dedup()
             .collect();
 
         Self {
-            actual: actual.into_iter().collect(),
+            actual: actual.into_iter().sorted().collect(),
             allowed,
             violations,
         }

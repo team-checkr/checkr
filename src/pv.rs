@@ -44,11 +44,11 @@ impl Guard {
 impl BExpr {
     fn well_defined(&self) -> BExpr {
         match self {
-            BExpr::Bool(b) => BExpr::Bool(true),
-            BExpr::Rel(l, op, r) => {
+            BExpr::Bool(_) => BExpr::Bool(true),
+            BExpr::Rel(l, _, r) => {
                 BExpr::Logic(box l.well_defined(), LogicOp::And, box r.well_defined())
             }
-            BExpr::Logic(l, op, r) => {
+            BExpr::Logic(l, _, r) => {
                 BExpr::Logic(box l.well_defined(), LogicOp::And, box r.well_defined())
             }
             BExpr::Not(e) => BExpr::Not(box e.well_defined()),

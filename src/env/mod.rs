@@ -115,7 +115,7 @@ where
     fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         Memory {
             variables: cx.fv().into_iter().map(|v| (v, T::gen(cx, rng))).collect(),
-            arrays: Default::default(),
+            arrays: cx.fa().into_iter().map(|v| (v, A::gen(cx, rng))).collect(),
         }
     }
 }

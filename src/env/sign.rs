@@ -63,7 +63,7 @@ impl ToMarkdown for SignAnalysisInput {
                     self.assignment
                         .arrays
                         .iter()
-                        .map(|(v, x)| format!("`{v} = {x:?}`")),
+                        .map(|(v, x)| format!("`{v} = {x}`")),
                 )
                 .format(", ")
                 .to_string(),
@@ -99,24 +99,27 @@ pub struct SignAnalysisOutput {
 
 impl ToMarkdown for SignAnalysisOutput {
     fn to_markdown(&self) -> String {
-        let idents: HashSet<_> = self
+        let variables: HashSet<_> = self
             .nodes
             .iter()
-            .flat_map(|(_, worlds)| {
-                worlds.iter().flat_map(|w| {
-                    w.variables
-                        .keys()
-                        .map(|v| v.to_string())
-                        .chain(w.arrays.keys().cloned())
-                })
-            })
+            .flat_map(|(_, worlds)| worlds.iter().flat_map(|w| w.variables.keys().cloned()))
             .collect();
-        let idents = idents.into_iter().sorted().collect_vec();
+        let arrays: HashSet<_> = self
+            .nodes
+            .iter()
+            .flat_map(|(_, worlds)| worlds.iter().flat_map(|w| w.arrays.keys().cloned()))
+            .collect();
+        let variables = variables.into_iter().sorted().collect_vec();
+        let arrays = arrays.into_iter().sorted().collect_vec();
 
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-            .set_header(std::iter::once("Node".to_string()).chain(idents.iter().cloned()));
+            .set_header(
+                std::iter::once("Node".to_string())
+                    .chain(variables.iter().map(|v| v.to_string()))
+                    .chain(arrays.iter().cloned()),
+            );
 
         for (n, worlds) in self.nodes.iter().sorted_by_key(|(n, _)| {
             if *n == "qStart" {
@@ -136,13 +139,18 @@ impl ToMarkdown for SignAnalysisOutput {
                     } else {
                         "".to_string()
                     })
-                    .chain(idents.iter().map(|var| {
+                    .chain(variables.iter().map(|var| {
                         w.variables
-                            .get(&Variable(var.clone()))
+                            .get(var)
                             .cloned()
                             .unwrap_or_default()
                             .to_string()
-                    })),
+                    }))
+                    .chain(
+                        arrays
+                            .iter()
+                            .map(|arr| w.arrays.get(arr).cloned().unwrap_or_default().to_string()),
+                    ),
                 );
             }
             if worlds.is_empty() {

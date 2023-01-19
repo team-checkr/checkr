@@ -271,43 +271,23 @@ where
     E::Input: ToMarkdown,
     E::Output: ToMarkdown,
 {
+    const NUM_VISIBLE: usize = 2;
+
     writeln!(f, "## {}", env.name())?;
-    for (idx, summary) in summaries.iter().enumerate().take(2) {
-        let program_nr = idx + 1;
-        let program_summary = match &summary.result {
-            Ok(ValidationResult::CorrectTerminated) => "Correct".to_string(),
-            Ok(ValidationResult::CorrectNonTerminated { .. }) => "Correct<sup>*</sup>".to_string(),
-            Ok(e @ ValidationResult::Mismatch { .. }) => format!("{e:?}"),
-            Ok(e @ ValidationResult::TimeOut) => format!("{e:?}"),
-            Err(e) => format!("{e:?}"),
-        };
-        let body = [
-            code_block("py", &summary.cmds),
-            format!("### Input\n\n{}\n\n", summary.input.to_markdown()),
-            if let Some(output) = &summary.output {
-                format!("### Output \n\n{}\n\n", output.to_markdown())
-            } else {
-                details("`stdout`", code_block("json", &summary.stdout))
-            },
-        ]
-        .into_iter()
-        .format("\n\n");
-        writeln!(
-            f,
-            "{}",
-            details(
-                format!("<strong>Program {program_nr}</strong> – {program_summary}"),
-                body
-            )
-        )?;
-    }
 
     let mut table = comfy_table::Table::new();
     table
         .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-        .set_header(["Program", "Result", "Time"]);
+        .set_header(["Program", "Result", "Time", "Link"]);
 
     for (idx, summary) in summaries.iter().enumerate() {
+        let mut target = String::new();
+        let mut serializer = url::form_urlencoded::Serializer::new(&mut target);
+        serializer
+            .append_pair("analysis", E::command())
+            .append_pair("src", &summary.cmds.to_string())
+            .append_pair("input", &serde_json::to_string(&summary.input)?);
+
         table.add_row([
             format!("Program {}", idx + 1),
             match &summary.result {
@@ -319,6 +299,11 @@ where
             }
             .to_string(),
             format!("{:?}", summary.time),
+            if idx < NUM_VISIBLE {
+                format!("[Link](http://localhost:3000/?{target})")
+            } else {
+                "Hidden".to_string()
+            },
         ]);
     }
     writeln!(f, "\n{table}")?;

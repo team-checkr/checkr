@@ -12,7 +12,7 @@ impl std::fmt::Debug for Variable {
     }
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Array(pub String, pub Box<AExpr>);
+pub struct Array<Idx>(pub String, pub Idx);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);
@@ -24,7 +24,7 @@ pub enum Command {
     If(Vec<Guard>),
     Loop(Vec<Guard>),
     /// **Extension**
-    ArrayAssignment(Array, AExpr),
+    ArrayAssignment(Array<Box<AExpr>>, AExpr),
     /// **Extension**
     Break,
     /// **Extension**
@@ -40,7 +40,7 @@ pub enum AExpr {
     Variable(Variable),
     Binary(Box<AExpr>, AOp, Box<AExpr>),
     /// **Extension**z
-    Array(Array),
+    Array(Array<Box<AExpr>>),
     Minus(Box<AExpr>),
 }
 
@@ -83,6 +83,9 @@ impl Commands {
     pub fn fv(&self) -> HashSet<Variable> {
         self.0.iter().flat_map(|c| c.fv()).collect()
     }
+    pub fn fa(&self) -> HashSet<String> {
+        self.0.iter().flat_map(|c| c.fa()).collect()
+    }
 }
 impl Command {
     pub fn fv(&self) -> HashSet<Variable> {
@@ -98,13 +101,32 @@ impl Command {
             Command::Continue => HashSet::default(),
         }
     }
+    pub fn fa(&self) -> HashSet<String> {
+        match self {
+            Command::Assignment(_, a) => a.fa(),
+            Command::Skip => HashSet::default(),
+            Command::If(c) => guards_fa(c),
+            Command::Loop(c) => guards_fa(c),
+            Command::ArrayAssignment(Array(name, idx), a) => std::iter::once(name.to_string())
+                .chain(idx.fa().union(&a.fa()).cloned())
+                .collect(),
+            Command::Break => HashSet::default(),
+            Command::Continue => HashSet::default(),
+        }
+    }
 }
 fn guards_fv(guards: &[Guard]) -> HashSet<Variable> {
     guards.iter().flat_map(|g| g.fv()).collect()
 }
+fn guards_fa(guards: &[Guard]) -> HashSet<String> {
+    guards.iter().flat_map(|g| g.fa()).collect()
+}
 impl Guard {
     pub fn fv(&self) -> HashSet<Variable> {
         self.0.fv().union(&self.1.fv()).cloned().collect()
+    }
+    pub fn fa(&self) -> HashSet<String> {
+        self.0.fa().union(&self.1.fa()).cloned().collect()
     }
 }
 impl AExpr {
@@ -117,6 +139,17 @@ impl AExpr {
             AExpr::Minus(x) => x.fv(),
         }
     }
+    pub fn fa(&self) -> HashSet<String> {
+        match self {
+            AExpr::Number(_) => Default::default(),
+            AExpr::Variable(_) => Default::default(),
+            AExpr::Binary(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
+            AExpr::Array(Array(name, idx)) => {
+                std::iter::once(name.to_string()).chain(idx.fa()).collect()
+            }
+            AExpr::Minus(x) => x.fa(),
+        }
+    }
 }
 impl BExpr {
     pub fn fv(&self) -> HashSet<Variable> {
@@ -125,6 +158,14 @@ impl BExpr {
             BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Not(x) => x.fv(),
+        }
+    }
+    pub fn fa(&self) -> HashSet<String> {
+        match self {
+            BExpr::Bool(_) => Default::default(),
+            BExpr::Rel(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
+            BExpr::Logic(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
+            BExpr::Not(x) => x.fa(),
         }
     }
 }

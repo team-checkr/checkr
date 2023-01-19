@@ -122,6 +122,13 @@ impl WebApplication {
     }
 }
 
+#[typeshare::typeshare]
+struct Sample {
+    input_json: String,
+    input_md: String,
+    output_md: String,
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Generation {
     program: String,

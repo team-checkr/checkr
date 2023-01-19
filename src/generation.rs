@@ -77,9 +77,9 @@ impl Generate for Command {
                 (0.7, box |cx, rng| {
                     Command::Assignment(Variable::gen(cx, rng), AExpr::gen(cx, rng))
                 }),
-                // (0.3, box |cx, rng| {
-                //     Command::ArrayAssignment(Array::gen(cx, rng), AExpr::gen(cx, rng))
-                // }),
+                (0.3, box |cx, rng| {
+                    Command::ArrayAssignment(Array::gen(cx, rng), AExpr::gen(cx, rng))
+                }),
                 (0.3, box |cx, rng| Command::If(cx.many(1, 10, rng))),
                 (0.3, box |cx, rng| Command::Loop(cx.many(1, 10, rng))),
             ],
@@ -97,10 +97,13 @@ impl Generate for Guard {
     }
 }
 
-impl Generate for Array {
+impl<Idx> Generate for Array<Idx>
+where
+    Idx: Generate<Context = Context>,
+{
     type Context = Context;
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        Array(cx.array_name(rng), box AExpr::gen(cx, rng))
+        Array(cx.array_name(rng), Idx::gen(cx, rng))
     }
 }
 
@@ -111,6 +114,13 @@ impl Generate for Variable {
     }
 }
 
+impl Generate for Box<AExpr> {
+    type Context = Context;
+
+    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        box AExpr::gen(cx, rng)
+    }
+}
 impl Generate for AExpr {
     type Context = Context;
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
@@ -119,7 +129,7 @@ impl Generate for AExpr {
             vec![
                 (0.4, box |_, rng| AExpr::Number(rng.gen_range(-100..=100))),
                 (0.7, box |cx, rng| AExpr::Variable(cx.var_name(rng))),
-                // (0.1, box |cx, rng| AExpr::Array(Array::gen(cx, rng))),
+                (0.1, box |cx, rng| AExpr::Array(Array::gen(cx, rng))),
                 (
                     if cx.recursion_limit == 0 || cx.fuel == 0 {
                         0.0

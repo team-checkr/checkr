@@ -34,7 +34,15 @@ impl Generate for StepWiseInput {
                     .sorted()
                     .map(|v| (v, rng.gen_range(-10..=10)))
                     .collect(),
-                arrays: Default::default(),
+                arrays: cx
+                    .fa()
+                    .into_iter()
+                    .sorted()
+                    .map(|a| {
+                        let len = rng.gen_range(5..=10);
+                        (a, (0..len).map(|_| rng.gen_range(-10..=10)).collect())
+                    })
+                    .collect(),
             },
             trace_count: rng.gen_range(10..=15),
         }
@@ -84,13 +92,14 @@ impl ToMarkdown for StepWiseOutput {
         let variables = self
             .0
             .iter()
-            .flat_map(|t| {
-                t.memory
-                    .variables
-                    .keys()
-                    .map(|k| k.to_string())
-                    .chain(t.memory.arrays.keys().cloned())
-            })
+            .flat_map(|t| t.memory.variables.keys().map(|k| k.to_string()))
+            .sorted()
+            .dedup()
+            .collect_vec();
+        let arrays = self
+            .0
+            .iter()
+            .flat_map(|t| t.memory.arrays.keys().cloned())
             .sorted()
             .dedup()
             .collect_vec();
@@ -98,7 +107,11 @@ impl ToMarkdown for StepWiseOutput {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-            .set_header(std::iter::once("Node".to_string()).chain(variables.iter().cloned()));
+            .set_header(
+                std::iter::once("Node".to_string())
+                    .chain(variables.iter().cloned())
+                    .chain(arrays.iter().cloned()),
+            );
 
         for t in &self.0 {
             match t.state {
@@ -109,10 +122,19 @@ impl ToMarkdown for StepWiseOutput {
                                 .variables
                                 .iter()
                                 .map(|(var, value)| (value.to_string(), var.to_string()))
-                                .chain(t.memory.arrays.iter().map(|(arr, values)| {
-                                    (format!("[{}]", values.iter().format(",")), arr.to_string())
-                                }))
                                 .sorted_by_key(|(_, k)| k.to_string())
+                                .chain(
+                                    t.memory
+                                        .arrays
+                                        .iter()
+                                        .map(|(arr, values)| {
+                                            (
+                                                format!("[{}]", values.iter().format(",")),
+                                                arr.to_string(),
+                                            )
+                                        })
+                                        .sorted_by_key(|(_, k)| k.to_string()),
+                                )
                                 .map(|(v, _)| v),
                         ),
                     );

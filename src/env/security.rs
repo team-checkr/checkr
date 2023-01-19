@@ -29,32 +29,43 @@ impl Generate for SecurityAnalysisInput {
     type Context = Commands;
 
     fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        let classification = cx
+        let private = SecurityClass("Private".to_string());
+        let internal = SecurityClass("Internal".to_string());
+        let public = SecurityClass("Public".to_string());
+        let dubious = SecurityClass("Dubious".to_string());
+        let trusted = SecurityClass("Trusted".to_string());
+        let classes = [&private, &internal, &public, &dubious, &trusted].map(Clone::clone);
+        let variable_classification = cx
             .fv()
             .into_iter()
-            .map(|v| {
+            .map(|v| (v, classes.choose(rng).unwrap().clone()))
+            .collect_vec();
+        let array_classification = cx
+            .fa()
+            .into_iter()
+            .map(|arr| {
                 (
-                    v,
-                    [
-                        SecurityClass("A".to_string()),
-                        SecurityClass("B".to_string()),
-                        SecurityClass("C".to_string()),
-                        SecurityClass("D".to_string()),
-                    ]
-                    .choose(rng)
-                    .unwrap()
-                    .clone(),
+                    Variable(arr.to_string()),
+                    classes.choose(rng).unwrap().clone(),
                 )
             })
+            .collect_vec();
+        let classification = variable_classification
+            .into_iter()
+            .chain(array_classification)
             .collect();
         let lattice = SecurityLatticeInput(vec![
             Flow {
-                from: SecurityClass("A".to_string()),
-                into: SecurityClass("B".to_string()),
+                from: public.clone(),
+                into: internal.clone(),
             },
             Flow {
-                from: SecurityClass("C".to_string()),
-                into: SecurityClass("D".to_string()),
+                from: internal.clone(),
+                into: private.clone(),
+            },
+            Flow {
+                from: trusted.clone(),
+                into: dubious.clone(),
             },
         ]);
 
@@ -86,6 +97,7 @@ impl ToMarkdown for SecurityAnalysisInput {
             self.classification
                 .iter()
                 .map(|(a, c)| format!("`{a} = {c}`"))
+                .sorted()
                 .format(", ")
                 .to_string(),
         ]);

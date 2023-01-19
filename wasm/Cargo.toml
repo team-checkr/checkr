@@ -24,6 +24,7 @@ futures = "0.3.25"
 async-trait = "0.1.61"
 tracing-wasm = "0.2.1"
 tracing = "0.1.37"
+typeshare = "1.0.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]

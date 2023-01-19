@@ -9,17 +9,32 @@ import "./z3";
 
 const app = WebApplication.new();
 
+const searchParams = new URL(document.location.toString()).searchParams;
+
+const inputted: { analysis?: string; src?: string; input?: string } =
+  Object.fromEntries(searchParams.entries());
+
 export const App = () => {
   return <AppA />;
 };
 
 const ENVS = ["Sign", "Step-wise", "Security", "Program Verification"] as const;
 type Envs = (typeof ENVS)[number];
+const COMMAND_TO_ENVS = {
+  sign: "Sign",
+  interpreter: "Step-wise",
+  security: "Security",
+  pv: "Program Verification",
+} satisfies Record<string, Envs>;
 
 const AppA = () => {
-  const [src, setSrc] = useState(app.generate_program());
+  const [src, setSrc] = useState(inputted.src ?? app.generate_program());
   const [deterministic, setDeterministic] = useState(true);
-  const [env, setEnv] = useState<Envs>("Step-wise");
+  const [env, setEnv] = useState<Envs>(
+    inputted.analysis && inputted.analysis in COMMAND_TO_ENVS
+      ? COMMAND_TO_ENVS[inputted.analysis as keyof typeof COMMAND_TO_ENVS]
+      : "Step-wise"
+  );
   const [dot, setDot] = useState<null | string>(null);
 
   useEffect(() => {
@@ -66,7 +81,7 @@ const AppA = () => {
               ))}
             </select>
           </div>
-          <div className="relative bg-slate-200">
+          <div className="relative">
             <StretchEditor source={src} onChange={setSrc} />
           </div>
         </div>

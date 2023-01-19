@@ -9,7 +9,10 @@ impl Display for Variable {
         write!(f, "{}", self.0)
     }
 }
-impl Display for Array {
+impl<Idx> Display for Array<Idx>
+where
+    Idx: Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}[{}]", self.0, self.1)
     }

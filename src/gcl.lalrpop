@@ -56,7 +56,7 @@ Command: Command = {
 #[inline]
 Variable: Variable = Ident => Variable(<>);
 #[inline]
-Array: Array = <arr:Ident> "[" <idx:AExpr> "]" => Array(arr, box idx);
+Array: Array<Box<AExpr>> = <arr:Ident> "[" <idx:AExpr> "]" => Array(arr, box idx);
 
 Guards: Vec<Guard> = Sep<Guard, "[]">;
 
