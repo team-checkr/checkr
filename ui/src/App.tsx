@@ -94,9 +94,19 @@ const AppA = () => {
   );
 };
 
+type RightTab = "reference" | "stdout" | "stderr";
+const RIGHT_TABS_LABEL = {
+  reference: "Reference output",
+  stdout: "Raw output",
+  stderr: "Compilation output",
+} satisfies Record<RightTab, string>;
+
 const Env = ({ env, src }: { env: Envs; src: string }) => {
-  const [[inputJson, input, output], setIO] = useState(["", "", ""]);
+  const [[inputJson, input, referenceOutput], setIO] = useState(["", "", ""]);
+  const [tab, setTab] = useState<RightTab>("reference");
   const [remoteOutput, setRemoteOutput] = useState("");
+  const [remoteStdout, setRemoteStdout] = useState("");
+  const [remoteStderr, setRemoteStderr] = useState("");
 
   useEffect(() => {
     const headers = new Headers();
@@ -119,6 +129,8 @@ const Env = ({ env, src }: { env: Envs; src: string }) => {
       .then((result) => {
         console.log(result);
         setRemoteOutput(result.parsed_markdown);
+        setRemoteStdout(result.stdout);
+        setRemoteStderr(result.stderr);
       })
       .catch((error) => console.log("error", error));
   }, [src, inputJson]);
@@ -155,18 +167,37 @@ const Env = ({ env, src }: { env: Envs; src: string }) => {
         {/* <div className="absolute inset-0 grid grid-cols-[1fr_2fr] divide-slate-600 overflow-y-auto"> */}
         <div className="absolute inset-0 flex justify-center divide-slate-600 overflow-y-auto bg-slate-800">
           <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
-            <h3 className="text-lg">Output 1</h3>
-            <div className="prose prose-invert w-full max-w-none prose-table:w-full">
-              <ReactMarkdown children={output} remarkPlugins={[remarkGfm]} />
-            </div>
-          </div>
-          <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
-            <h3 className="text-lg">Output 2</h3>
+            <h3 className="text-lg">Output</h3>
             <div className="prose prose-invert w-full max-w-none prose-table:w-full">
               <ReactMarkdown
                 children={remoteOutput}
                 remarkPlugins={[remarkGfm]}
               />
+            </div>
+          </div>
+          <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
+            <select
+              className="flex appearance-none bg-transparent text-lg"
+              value={tab}
+              onChange={(e) => setTab(e.target.value as RightTab)}
+            >
+              {Object.entries(RIGHT_TABS_LABEL).map(([value, label]) => (
+                <option key={value} value={value}>
+                  {label}
+                </option>
+              ))}
+            </select>
+            <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+              {tab == "reference" ? (
+                <ReactMarkdown
+                  children={referenceOutput}
+                  remarkPlugins={[remarkGfm]}
+                />
+              ) : tab == "stderr" ? (
+                <pre className="whitespace-pre-wrap">{remoteStderr}</pre>
+              ) : tab == "stdout" ? (
+                <pre className="whitespace-pre-wrap">{remoteStdout}</pre>
+              ) : null}
             </div>
           </div>
         </div>
