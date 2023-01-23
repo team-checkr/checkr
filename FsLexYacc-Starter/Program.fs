@@ -1,17 +1,14 @@
 ﻿open FSharp.Text.Lexing
 open System
-
-open CalculatorTypesAST
-
-open Parser
-open Lexer
+open Newtonsoft.Json
+open AST
 
 exception ParseError of Position * string * Exception
 
-let parse src =
+let parse parser src =
     let lexbuf = LexBuffer<char>.FromString src
 
-    let parser = Parser.start Lexer.tokenize
+    let parser = parser Lexer.tokenize
 
     try
         Ok(parser lexbuf)
@@ -21,91 +18,81 @@ let parse src =
         let line = pos.Line
         let column = pos.Column
         let message = e.Message
-        let lastToken = new System.String(lexbuf.Lexeme)
-        printf "Parse failed at line %d, column %d:\n" line column
-        printf "Last token: %s" lastToken
-        printf "\n"
+        let lastToken = new String(lexbuf.Lexeme)
+        eprintf "Parse failed at line %d, column %d:\n" line column
+        eprintf "Last token: %s" lastToken
+        eprintf "\n"
         Error(ParseError(pos, lastToken, e))
 
-let unwrap =
+let rec evaluate: expr -> float =
     function
-    | Ok r -> r
-    | Error e -> raise e
+    | Num x -> x
+    | TimesExpr (a, b) -> evaluate a * evaluate b
+    | DivExpr (a, b) -> evaluate a / evaluate b
+    | PlusExpr (a, b) -> evaluate a + evaluate b
+    | MinusExpr (a, b) -> evaluate a - evaluate b
+    | PowExpr (a, b) -> evaluate a ** evaluate b
+    | UPlusExpr a -> evaluate a
+    | UMinusExpr a -> -evaluate a
 
-// We define the evaluation function recursively, by induction on the structure
-// of arithmetic expressions (AST of type expr)
-let rec eval e =
-    match e with
-    | Num (x) -> x
-    | TimesExpr (x, y) -> eval (x) * eval (y)
-    | DivExpr (x, y) -> eval (x) / eval (y)
-    | PlusExpr (x, y) -> eval (x) + eval (y)
-    | MinusExpr (x, y) -> eval (x) - eval (y)
-    | PowExpr (x, y) -> eval (x) ** eval (y)
-    | UPlusExpr (x) -> eval (x)
-    | UMinusExpr (x) -> - eval(x)
-
-// We implement here the function that interacts with the user
-let rec compute n =
-    if n = 0 then
-        printfn "Bye bye"
-    else
-        printf "Enter an arithmetic expression: "
-
-        try
-            // We parse the input string
-            let e = parse (Console.ReadLine()) |> unwrap
-            // and print the result of evaluating it
-            printfn "Result: %f" (eval (e))
-            compute n
-        with
-        | err -> compute (n - 1)
-
-type Flow = { from: string; into: string }
-let flow a b : Flow = { from = a; into = b }
-
-type SecurityInput =
-    { lattice: Flow list
-      classification: Map<String, String> }
-
-type SecurityOutput =
-    { actual: Flow list
-      allowed: Flow list
-      violations: Flow list }
+// Please do not change the main function, with exception to the "calc" case.
+// The other cases are needed for the validation and evaluation tools!
 
 [<EntryPoint>]
 let main (args) =
-    match args[0] with
-    | "security" ->
-        let src = args[1]
-        let input = Newtonsoft.Json.JsonConvert.DeserializeObject<SecurityInput> args[2]
-        Console.Error.WriteLine("{0}\n{1}", src, input)
-
-        let output: SecurityOutput =
-            { actual =
-                [ flow "a" "b"
-                  flow "b" "b"
-                  flow "b" "d" ]
-              allowed =
-                [ flow "a" "b"
-                  flow "b" "b"
-                  flow "b" "d" ]
-              violations =
-                [ flow "a" "b"
-                  flow "b" "b"
-                  flow "b" "d" ] }
-
-        Console.WriteLine("{0}", Newtonsoft.Json.JsonConvert.SerializeObject output)
+    match args |> List.ofArray with
+    | "calc" :: input ->
+        match parse Parser.start (String.concat " " input) with
+        | Ok ast ->
+            Console.Error.WriteLine("> {0}", ast)
+            Console.WriteLine("{0}", evaluate ast)
+        | Error e -> Console.Error.WriteLine("Parse error: {0}", e)
 
         0
+    | [ "graph"; src; input ] ->
+        let input = JsonConvert.DeserializeObject<Graph.Input> input
+        let output: Graph.Output = Graph.analysis src input
+        Console.WriteLine("{0}", JsonConvert.SerializeObject output)
 
-    | unknown ->
-        Console.WriteLine("Unknown analysis {0}", unknown)
+        0
+    | [ "interpreter"; src; input ] ->
+        let input = JsonConvert.DeserializeObject<Interpreter.Input> input
+        let output: Interpreter.Output = Interpreter.analysis src input
+        Console.WriteLine("{0}", JsonConvert.SerializeObject output)
+
+        0
+    | [ "pv"; src; input ] ->
+        let input = JsonConvert.DeserializeObject<ProgramVerification.Input> input
+        let output: ProgramVerification.Output = ProgramVerification.analysis src input
+        Console.WriteLine("{0}", JsonConvert.SerializeObject output)
+
+        0
+    | [ "sign"; src; input ] ->
+        let input = JsonConvert.DeserializeObject<SignAnalysis.Input> input
+        let output: SignAnalysis.Output = SignAnalysis.analysis src input
+        Console.WriteLine("{0}", JsonConvert.SerializeObject output)
+
+        0
+    | [ "security"; src; input ] ->
+        let input = JsonConvert.DeserializeObject<Security.Input> input
+        let output: Security.Output = Security.analysis src input
+        Console.WriteLine("{0}", JsonConvert.SerializeObject output)
+
+        0
+    | _ ->
+        let commands =
+            [ "calc <EXPRESSION...>"
+              "graph <SRC> <INPUT>"
+              "interpreter <SRC> <INPUT>"
+              "pv <SRC> <INPUT>"
+              "sign <SRC> <INPUT>"
+              "security <SRC> <INPUT>" ]
+
+        Console.Error.WriteLine(
+            "\x1B[1;31merror:\x1B[0m unrecognized input: \x1B[0;33m'{0}'\x1B[0m\n\n{1}\n\nAvailable commands:\n{2}",
+            String.concat " " args,
+            "\x1B[1mUsage: dotnet run\x1B[0m <COMMAND>",
+            (List.fold (fun acc cmd -> acc + sprintf " - \x1B[1m%s\x1B[0m\n" cmd) "" commands)
+        )
+
         1
-
-// dotnet run security "if true -> x := 2 fi" "{ \"lattice\": [{\"from\": \"A\", \"into\": \"B\"}, {\"from\": \"C\", \"into\": \"D\"}], \"classification\": {\"a\": \"A\", \"b\": \"B\"} }"
-
-// Console.WriteLine("Hello JSON: {0}", Newtonsoft.Json.JsonConvert.SerializeObject exp)
-
-// Start interacting with the user
-// compute 3

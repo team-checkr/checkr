@@ -24,6 +24,8 @@ use xshell::{cmd, Shell};
 #[derive(Debug, Parser)]
 enum Cli {
     Test {
+        #[clap(short, default_value = "false")]
+        no_hidden: bool,
         #[clap(long, short)]
         base: PathBuf,
         config: PathBuf,
@@ -38,6 +40,8 @@ enum Cli {
         group_nr: u64,
         #[clap(long, short, default_value = "false")]
         pull: bool,
+        #[clap(long, default_value = "false")]
+        no_hidden: bool,
         #[clap(long, short)]
         output: PathBuf,
     },
@@ -56,11 +60,15 @@ struct GroupConfig {
 
 async fn run() -> anyhow::Result<()> {
     match Cli::parse() {
-        Cli::Test { base, config } => {
+        Cli::Test {
+            no_hidden,
+            base,
+            config,
+        } => {
             let config: Config = toml::from_str(&fs::read_to_string(config)?)?;
 
             for g in &config.groups {
-                if let Err(e) = test_group(&base, g) {
+                if let Err(e) = test_group(no_hidden, &base, g) {
                     error!(group = g.name, error = format!("{:?}", e), "Group errored")
                 }
             }
@@ -131,6 +139,7 @@ async fn run() -> anyhow::Result<()> {
             dir,
             group_nr,
             pull,
+            no_hidden,
             output,
         } => {
             let sh = Shell::new()?;
@@ -141,14 +150,18 @@ async fn run() -> anyhow::Result<()> {
                 cmd!(sh, "git pull").run()?;
             }
 
-            let result = generate_report(&sh, group_nr)?;
+            let result = generate_report(&sh, no_hidden, group_nr)?;
             fs::write(output, result)?;
             Ok(())
         }
     }
 }
 
-fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Result<String> {
+fn generate_report(
+    sh: &Shell,
+    no_hidden: bool,
+    group_nr: impl std::fmt::Display,
+) -> anyhow::Result<String> {
     use std::fmt::Write;
 
     let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
@@ -187,15 +200,25 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
         samples,
         StepWiseEnv,
         sh,
+        no_hidden,
         base_seed,
         &run_command,
         &mut output,
     )?;
-    fun_name(samples, SignEnv, sh, base_seed, &run_command, &mut output)?;
+    fun_name(
+        samples,
+        SignEnv,
+        sh,
+        no_hidden,
+        base_seed,
+        &run_command,
+        &mut output,
+    )?;
     fun_name(
         samples,
         SecurityEnv,
         sh,
+        no_hidden,
         base_seed,
         &run_command,
         &mut output,
@@ -204,11 +227,12 @@ fn generate_report(sh: &Shell, group_nr: impl std::fmt::Display) -> anyhow::Resu
         samples,
         ProgramVerificationEnv,
         sh,
+        no_hidden,
         base_seed,
         &run_command,
         &mut output,
     )?;
-    // fun_name(samples, GraphEnv, sh, base_seed, &run_command, &mut output)?;
+    // fun_name(samples, GraphEnv, no_hidden, sh, base_seed, &run_command, &mut output)?;
 
     let mut table = comfy_table::Table::new();
     table
@@ -231,6 +255,7 @@ fn fun_name<E: Environment>(
     samples: u64,
     env: E,
     sh: &Shell,
+    no_hidden: bool,
     base_seed: u64,
     run_command: &String,
     output: &mut String,
@@ -250,19 +275,12 @@ where
             )
         })
         .collect_vec();
-    generate_markdown(&env, output, &summaries)?;
+    generate_markdown(no_hidden, &env, output, &summaries)?;
     Ok(())
 }
 
-fn details(summary: impl std::fmt::Display, body: impl std::fmt::Display) -> String {
-    format!("<details><summary>{summary}</summary>\n\n{body}\n\n</details>")
-    // format!("{summary}\n\n{body}\n\n")
-}
-fn code_block(lang: impl std::fmt::Display, code: impl std::fmt::Display) -> String {
-    format!("\n```{lang}\n{code}\n```\n\n")
-}
-
 fn generate_markdown<E: Environment>(
+    no_hidden: bool,
     env: &E,
     mut f: impl std::fmt::Write,
     summaries: &[AnalysisSummary<E>],
@@ -299,7 +317,7 @@ where
             }
             .to_string(),
             format!("{:?}", summary.time),
-            if idx < NUM_VISIBLE {
+            if no_hidden || idx < NUM_VISIBLE {
                 format!("[Link](http://localhost:3000/?{target})")
             } else {
                 "Hidden".to_string()
@@ -320,7 +338,7 @@ async fn main() -> anyhow::Result<()> {
     run().await
 }
 
-fn test_group(base: &Path, g: &GroupConfig) -> anyhow::Result<()> {
+fn test_group(no_hidden: bool, base: &Path, g: &GroupConfig) -> anyhow::Result<()> {
     let g_dir = base.join(&g.name);
     let sh = Shell::new()?;
     sh.create_dir(&g_dir)?;
@@ -340,7 +358,7 @@ fn test_group(base: &Path, g: &GroupConfig) -> anyhow::Result<()> {
     cmd!(sh, "git checkout master").run()?;
     cmd!(sh, "git pull").run()?;
 
-    let report = generate_report(&sh, &g.name)?;
+    let report = generate_report(&sh, no_hidden, &g.name)?;
 
     if cmd!(sh, "git checkout results").run().is_err() {
         cmd!(sh, "git switch --orphan results").run()?;

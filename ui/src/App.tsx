@@ -1,11 +1,26 @@
-import React from "react";
+import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import { WebApplication } from "verification-lawyer";
 import { StretchEditor } from "./StretchEditor";
-import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/solid";
+import deepEqual from "deep-equal";
+import {
+  ArrowPathIcon,
+  ArrowPathRoundedSquareIcon,
+  PlayCircleIcon,
+  QuestionMarkCircleIcon,
+} from "@heroicons/react/24/outline";
+import * as api from "./api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
 import "./z3";
+import {
+  Analysis,
+  AnalysisResponse,
+  CompilationStatus,
+  CompilerState,
+} from "./api-types";
+import { Link, Route, Router } from "wouter";
+import GuideText from "./guide.md?raw";
 
 const app = WebApplication.new();
 
@@ -15,139 +30,241 @@ const inputted: { analysis?: string; src?: string; input?: string } =
   Object.fromEntries(searchParams.entries());
 
 export const App = () => {
-  return <AppA />;
-};
-
-const ENVS = ["Sign", "Step-wise", "Security", "Program Verification"] as const;
-type Envs = (typeof ENVS)[number];
-const COMMAND_TO_ENVS = {
-  sign: "Sign",
-  interpreter: "Step-wise",
-  security: "Security",
-  pv: "Program Verification",
-} satisfies Record<string, Envs>;
-
-const AppA = () => {
-  const [src, setSrc] = useState(inputted.src ?? app.generate_program());
-  const [deterministic, setDeterministic] = useState(true);
-  const [env, setEnv] = useState<Envs>(
-    inputted.analysis && inputted.analysis in COMMAND_TO_ENVS
-      ? COMMAND_TO_ENVS[inputted.analysis as keyof typeof COMMAND_TO_ENVS]
-      : "Step-wise"
-  );
-  const [dot, setDot] = useState<null | string>(null);
-
-  useEffect(() => {
-    setDot(app.dot(deterministic, src));
-  }, [deterministic, src]);
-
   return (
     <div className="grid h-screen grid-rows-[auto_1fr]">
-      <nav className="bg-slate-900 font-bold text-slate-200">
-        <a className="flex p-2 text-lg">Verification Lawyer</a>
+      <nav className="flex items-center bg-slate-900 px-2 text-slate-200">
+        <Link href="/">
+          <a className="flex p-2 text-lg font-bold">Verification Lawyer</a>
+        </Link>
+        <div className="flex-1" />
+        <Link href="/">
+          <a className="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+            <span>Analysis</span> <PlayCircleIcon className="w-4" />
+          </a>
+        </Link>
+        <Link href="/guide">
+          <a className="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white">
+            <span>Guide</span> <QuestionMarkCircleIcon className="w-4" />
+          </a>
+        </Link>
       </nav>
-      <div className="grid min-h-0 grid-cols-[1fr_2fr] grid-rows-[1fr_auto_1fr] divide-slate-600">
-        <div className="grid grid-rows-[auto_1fr] divide-y divide-slate-600">
-          <div className="grid grid-cols-3 divide-x divide-slate-600 border-r border-slate-600">
-            <button
-              className="flex items-center justify-center space-x-1 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
-              onClick={() => {
-                setSrc(app.generate_program());
-              }}
-            >
-              <span>Generate</span>
-              <ArrowPathRoundedSquareIcon className="w-4" />
-            </button>
-            <label
-              htmlFor="determinism"
-              className="flex select-none items-center justify-center space-x-2 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
-            >
-              <span>Determinism</span>
-              <input
-                type="checkbox"
-                name="determinism"
-                id="determinism"
-                checked={deterministic}
-                onChange={(e) => setDeterministic(e.target.checked)}
-              />
-            </label>
-            <select
-              className="flex appearance-none items-center justify-center space-x-1 rounded-none bg-slate-800 py-1 px-1.5 text-center text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
-              value={env}
-              onChange={(e) => setEnv(e.target.value as Envs)}
-            >
-              {ENVS.map((e) => (
-                <option key={e}>{e}</option>
-              ))}
-            </select>
+      <Router>
+        <Route path="/">
+          <AnalysisEnv />
+        </Route>
+        <Route path="/guide">
+          <div className="prose prose-invert mx-auto py-10">
+            <ReactMarkdown children={GuideText} remarkPlugins={[remarkGfm]} />
           </div>
-          <div className="relative">
-            <StretchEditor source={src} onChange={setSrc} />
-          </div>
-        </div>
-        <div className="relative row-span-2 bg-slate-800">
-          {dot && <Network dot={dot} />}
-        </div>
-        <Env env={env} src={src} />
-      </div>
+        </Route>
+      </Router>
     </div>
   );
 };
 
-type RightTab = "reference" | "stdout" | "stderr";
+const ENVS = [
+  Analysis.Sign,
+  Analysis.StepWise,
+  Analysis.Security,
+  Analysis.ProgramVerification,
+] satisfies Analysis[];
+const COMMAND_TO_ENVS = {
+  sign: Analysis.Sign,
+  interpreter: Analysis.StepWise,
+  security: Analysis.Security,
+  pv: Analysis.ProgramVerification,
+} satisfies Record<string, Analysis>;
+
+type GraphShown = "graph" | "reference";
+
+const AnalysisEnv = () => {
+  const [src, setSrc] = useState(inputted.src ?? app.generate_program());
+  const [deterministic, setDeterministic] = useState(true);
+  const [env, setEnv] = useState<Analysis>(
+    inputted.analysis && inputted.analysis in COMMAND_TO_ENVS
+      ? COMMAND_TO_ENVS[inputted.analysis as keyof typeof COMMAND_TO_ENVS]
+      : Analysis.StepWise
+  );
+  const [graphShown, setGraphShown] = useState<GraphShown>("graph");
+  const [dotReference, setDotReference] = useState<null | string>(null);
+  const [dotGraph, setDotGraph] = useState<null | string>(null);
+
+  useEffect(() => {
+    setDotReference(app.dot(deterministic, src));
+
+    const { abort, promise } = api.graph({ deterministic, src });
+
+    promise
+      .then((res) => {
+        setDotGraph(res.dot ?? null);
+      })
+      .catch((e) => {
+        if (e.name != "AbortError") console.error("analysis error:", e);
+      });
+
+    return () => abort();
+  }, [deterministic, src]);
+
+  return (
+    <div className="grid min-h-0 grid-cols-[1fr_2fr] grid-rows-[1fr_auto_auto_1fr]">
+      <div className="grid grid-rows-[auto_1fr] divide-y divide-slate-600">
+        <div className="grid grid-cols-3 divide-x divide-slate-600 border-r border-slate-600">
+          <button
+            className="flex items-center justify-center space-x-1 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
+            onClick={() => {
+              setSrc(app.generate_program());
+            }}
+          >
+            <span>Generate</span>
+            <ArrowPathRoundedSquareIcon className="w-4" />
+          </button>
+          <label
+            htmlFor="determinism"
+            className="flex select-none items-center justify-center space-x-2 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
+          >
+            <span>Determinism</span>
+            <input
+              type="checkbox"
+              name="determinism"
+              id="determinism"
+              checked={deterministic}
+              onChange={(e) => setDeterministic(e.target.checked)}
+            />
+          </label>
+          <select
+            className="flex appearance-none items-center justify-center space-x-1 rounded-none bg-slate-800 py-1 px-1.5 text-center text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
+            value={env}
+            onChange={(e) => setEnv(e.target.value as Analysis)}
+          >
+            {ENVS.map((e) => (
+              <option key={e}>{e}</option>
+            ))}
+          </select>
+        </div>
+        <div className="relative">
+          <StretchEditor source={src} onChange={setSrc} />
+        </div>
+      </div>
+      <div className="relative row-span-2 bg-slate-800 text-xs">
+        <div className="absolute top-4 right-6 flex flex-col space-y-2">
+          <button
+            onClick={() => setGraphShown("graph")}
+            className={
+              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
+              (graphShown == "graph" ? "text-white" : "text-slate-600")
+            }
+          >
+            G
+          </button>
+          <button
+            onClick={() => setGraphShown("reference")}
+            className={
+              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
+              (graphShown == "reference" ? "text-white" : "text-slate-600")
+            }
+          >
+            R
+          </button>
+        </div>
+        {graphShown == "graph"
+          ? dotReference && <Network dot={dotReference} />
+          : dotGraph && <Network dot={dotGraph} />}
+      </div>
+      <Env env={env} src={src} />
+    </div>
+  );
+};
+
+type RightTab = "reference" | "stdout" | "stderr" | "validation";
 const RIGHT_TABS_LABEL = {
   reference: "Reference output",
   stdout: "Raw output",
-  stderr: "Compilation output",
+  stderr: "Debug output",
+  validation: "Validation result",
 } satisfies Record<RightTab, string>;
 
-const Env = ({ env, src }: { env: Envs; src: string }) => {
-  const [[inputJson, input, referenceOutput], setIO] = useState(["", "", ""]);
+const Env = ({ env, src }: { env: Analysis; src: string }) => {
+  const [[inputJson, inputMarkdown, realReferenceOutput], setIO] = useState([
+    "",
+    "",
+    "",
+  ]);
+  const [referenceOutput, setReferenceOutput] = useState(realReferenceOutput);
   const [tab, setTab] = useState<RightTab>("reference");
-  const [remoteOutput, setRemoteOutput] = useState("");
-  const [remoteStdout, setRemoteStdout] = useState("");
-  const [remoteStderr, setRemoteStderr] = useState("");
+  const [inFlight, setInFLight] = useState(false);
+  const [response, setResponse] = useState<null | AnalysisResponse>(null);
+  const [compilationStatus, setCompilationStatus] =
+    useState<null | CompilationStatus>(null);
+
+  const realReferenceOutputRef = useRef(realReferenceOutput);
+  realReferenceOutputRef.current = realReferenceOutput;
 
   useEffect(() => {
-    const headers = new Headers();
-    headers.append("Content-Type", "application/json");
+    const aborts = [] as (() => void)[];
 
-    const body = JSON.stringify({
-      analysis: {
-        Sign: "sign",
-        "Step-wise": "interpreter",
-        Security: "security",
-        "Program Verification": "pv",
-      }[env],
-      src,
+    const interval = setInterval(() => {
+      aborts.forEach((a) => a());
+      aborts.slice(0, aborts.length);
+      const { abort, promise } = api.compilationStatus();
+      aborts.push(abort);
+      promise
+        .then((res) => {
+          setCompilationStatus((old) => {
+            if (deepEqual(old, res)) return old;
+            console.log("got new");
+            return res;
+          });
+        })
+        .catch((e) => {
+          if (e.name != "AbortError") console.error("analysis error:", e);
+        });
+    }, 200);
+
+    return () => {
+      aborts.forEach((a) => a());
+      aborts.slice(0, aborts.length);
+      clearInterval(interval);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (!compilationStatus || compilationStatus.state != CompilerState.Compiled)
+      return;
+
+    setInFLight(true);
+
+    const { promise, abort } = api.analyze({
+      analysis: env,
       input: inputJson,
-      // '{"determinism":{"Case":"Deterministic"}}',
+      src,
     });
 
-    fetch("http://localhost:3000/analyze", { method: "POST", headers, body })
-      .then((res) => res.json())
-      .then((result) => {
-        console.log(result);
-        setRemoteOutput(result.parsed_markdown);
-        setRemoteStdout(result.stdout);
-        setRemoteStderr(result.stderr);
+    promise
+      .then((res) => {
+        setInFLight(false);
+        setResponse(res);
+        setReferenceOutput(realReferenceOutputRef.current);
       })
-      .catch((error) => console.log("error", error));
-  }, [src, inputJson]);
+      .catch((e) => {
+        if (e.name != "AbortError") console.error("analysis error:", e);
+      });
+
+    return () => abort();
+  }, [compilationStatus, src, inputJson]);
 
   useEffect(() => {
     try {
       switch (env) {
-        case "Security":
+        case Analysis.Security:
           setIO(JSON.parse(app.security(src)));
           break;
-        case "Sign":
+        case Analysis.Sign:
           setIO(JSON.parse(app.sign(src)));
           break;
-        case "Step-wise":
+        case Analysis.StepWise:
           setIO(JSON.parse(app.step_wise(src)));
           break;
-        case "Program Verification":
+        case Analysis.ProgramVerification:
           setIO(JSON.parse(app.pv(src)));
           break;
       }
@@ -156,52 +273,134 @@ const Env = ({ env, src }: { env: Envs; src: string }) => {
     }
   }, [env, src]);
 
+  const workingBehindTheScenes =
+    inFlight || compilationStatus?.state != CompilerState.Compiled;
+
   return (
     <>
-      <div className="grid place-items-start border-y border-slate-500 bg-slate-800 px-4 py-3 text-xl">
+      <div className="grid place-items-start border-t border-slate-500 bg-slate-800 px-4 py-3 text-xl">
         <div className="prose prose-invert">
-          <ReactMarkdown children={input} remarkPlugins={[remarkGfm]} />
+          <ReactMarkdown children={inputMarkdown} remarkPlugins={[remarkGfm]} />
         </div>
       </div>
-      <div className="relative col-span-2 grid">
-        {/* <div className="absolute inset-0 grid grid-cols-[1fr_2fr] divide-slate-600 overflow-y-auto"> */}
-        <div className="absolute inset-0 flex justify-center divide-slate-600 overflow-y-auto bg-slate-800">
-          <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
-            <h3 className="text-lg">Output</h3>
-            <div className="prose prose-invert w-full max-w-none prose-table:w-full">
-              <ReactMarkdown
-                children={remoteOutput}
-                remarkPlugins={[remarkGfm]}
-              />
-            </div>
-          </div>
-          <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
-            <select
-              className="flex appearance-none bg-transparent text-lg"
-              value={tab}
-              onChange={(e) => setTab(e.target.value as RightTab)}
-            >
-              {Object.entries(RIGHT_TABS_LABEL).map(([value, label]) => (
-                <option key={value} value={value}>
-                  {label}
-                </option>
-              ))}
-            </select>
-            <div className="prose prose-invert w-full max-w-none prose-table:w-full">
-              {tab == "reference" ? (
-                <ReactMarkdown
-                  children={referenceOutput}
-                  remarkPlugins={[remarkGfm]}
-                />
-              ) : tab == "stderr" ? (
-                <pre className="whitespace-pre-wrap">{remoteStderr}</pre>
-              ) : tab == "stdout" ? (
-                <pre className="whitespace-pre-wrap">{remoteStdout}</pre>
-              ) : null}
+      <div
+        className={
+          "relative col-span-full w-full border-t-4 border-current transition " +
+          (workingBehindTheScenes
+            ? "text-gray-500"
+            : response
+            ? response.validation_result
+              ? response.validation_result.type == "CorrectTerminated"
+                ? "text-green-700"
+                : response.validation_result.type == "CorrectNonTerminated"
+                ? "text-green-700"
+                : response.validation_result.type == "Mismatch"
+                ? "text-orange-500"
+                : response.validation_result.type == "TimeOut"
+                ? "text-blue-700"
+                : ""
+              : "text-red-500"
+            : "")
+        }
+      >
+        <div className="absolute right-0 top-0 z-10 grid aspect-square w-6 -translate-y-full place-items-center rounded-tl bg-current">
+          <span className="font-mono text-sm text-white">
+            {workingBehindTheScenes ? (
+              <ArrowPathIcon className="w-3 animate-spin" />
+            ) : response ? (
+              response.validation_result ? (
+                response.validation_result.type == "CorrectTerminated" ? (
+                  "C"
+                ) : response.validation_result.type ==
+                  "CorrectNonTerminated" ? (
+                  "C"
+                ) : response.validation_result.type == "Mismatch" ? (
+                  "M"
+                ) : response.validation_result.type == "TimeOut" ? (
+                  "T"
+                ) : (
+                  ""
+                )
+              ) : (
+                "E"
+              )
+            ) : (
+              ""
+            )}
+          </span>
+        </div>
+      </div>
+      {response ? (
+        <div
+          className={
+            "relative col-span-2 grid grid-cols-2 transition duration-700 " +
+            (inFlight ? "blur-sm delay-100" : "")
+          }
+        >
+          {/* <div className="absolute inset-0 grid grid-cols-[1fr_2fr] divide-slate-600 overflow-y-auto"> */}
+          <div className="absolute inset-0 grid grid-cols-2 justify-center divide-slate-600 overflow-y-auto bg-slate-800">
+            {response.validation_result ? (
+              <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
+                <h3 className="text-lg">Output</h3>
+                <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+                  <ReactMarkdown
+                    children={response.parsed_markdown ?? ""}
+                    remarkPlugins={[remarkGfm]}
+                  />
+                </div>
+              </div>
+            ) : (
+              <div className="flux w-full space-y-2 px-4 py-2">
+                <h3 className="text-lg font-bold italic text-white">Error</h3>
+                <div
+                  className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full"
+                  title={JSON.stringify(response.stderr)}
+                >
+                  <ReactMarkdown
+                    children={"````bash\n" + response.stderr + "\n```"}
+                    remarkPlugins={[remarkGfm]}
+                  />
+                </div>
+              </div>
+            )}
+            <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
+              <select
+                className="flex appearance-none bg-transparent text-lg"
+                value={tab}
+                onChange={(e) => setTab(e.target.value as RightTab)}
+              >
+                {Object.entries(RIGHT_TABS_LABEL).map(([value, label]) => (
+                  <option key={value} value={value}>
+                    {label}
+                  </option>
+                ))}
+              </select>
+              <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+                {tab == "reference" ? (
+                  <ReactMarkdown
+                    children={referenceOutput}
+                    remarkPlugins={[remarkGfm]}
+                  />
+                ) : tab == "stderr" ? (
+                  <pre className="whitespace-pre-wrap">{response.stderr}</pre>
+                ) : tab == "stdout" ? (
+                  <pre className="whitespace-pre-wrap">{response.stdout}</pre>
+                ) : tab == "validation" ? (
+                  <pre className="whitespace-pre-wrap">
+                    {response.validation_result
+                      ? JSON.stringify(response.validation_result, null, 2)
+                      : ""}
+                  </pre>
+                ) : null}
+              </div>
             </div>
           </div>
         </div>
-      </div>
+      ) : (
+        <div className="col-span-2 grid place-items-center text-4xl">
+          <div className="animate-bounce">👻</div>
+        </div>
+      )}
     </>
   );
 };

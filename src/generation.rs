@@ -1,6 +1,8 @@
 use rand::{seq::SliceRandom, Rng};
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Variable};
+use crate::ast::{
+    AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
+};
 
 pub struct Context {
     fuel: u32,
@@ -19,12 +21,25 @@ impl Context {
         }
     }
 
-    fn array_name<R: Rng>(&self, rng: &mut R) -> String {
-        self.names.choose(rng).cloned().unwrap().to_uppercase()
+    fn use_array(&self) -> bool {
+        false
     }
 
-    fn var_name<R: Rng>(&self, rng: &mut R) -> Variable {
-        Variable(self.names.choose(rng).cloned().unwrap())
+    fn reference<R: Rng>(&mut self, rng: &mut R) -> Target<Box<AExpr>> {
+        self.sample(
+            rng,
+            vec![
+                (0.7, box |cx, rng| {
+                    Target::Variable(Variable(cx.names.choose(rng).cloned().unwrap()))
+                }),
+                (if self.use_array() { 0.3 } else { 0.0 }, box |cx, rng| {
+                    Target::Array(
+                        Array(cx.names.choose(rng).cloned().unwrap().to_uppercase()),
+                        box AExpr::gen(cx, rng),
+                    )
+                }),
+            ],
+        )
     }
 
     fn sample<G: Generate<Context = Self>, R: Rng>(
@@ -74,16 +89,21 @@ impl Generate for Command {
         cx.sample(
             rng,
             vec![
-                (0.7, box |cx, rng| {
-                    Command::Assignment(Variable::gen(cx, rng), AExpr::gen(cx, rng))
-                }),
-                (0.3, box |cx, rng| {
-                    Command::ArrayAssignment(Array::gen(cx, rng), AExpr::gen(cx, rng))
+                (1.0, box |cx, rng| {
+                    Command::Assignment(Target::gen(cx, rng), AExpr::gen(cx, rng))
                 }),
                 (0.3, box |cx, rng| Command::If(cx.many(1, 10, rng))),
                 (0.3, box |cx, rng| Command::Loop(cx.many(1, 10, rng))),
             ],
         )
+    }
+}
+
+impl Generate for Target<Box<AExpr>> {
+    type Context = Context;
+
+    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        cx.reference(rng)
     }
 }
 
@@ -94,23 +114,6 @@ impl Generate for Guard {
         cx.recursion_limit = 5;
         cx.negation_limit = 3;
         Guard(Generate::gen(cx, rng), Commands::gen(cx, rng))
-    }
-}
-
-impl<Idx> Generate for Array<Idx>
-where
-    Idx: Generate<Context = Context>,
-{
-    type Context = Context;
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        Array(cx.array_name(rng), Idx::gen(cx, rng))
-    }
-}
-
-impl Generate for Variable {
-    type Context = Context;
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        cx.var_name(rng)
     }
 }
 
@@ -128,8 +131,7 @@ impl Generate for AExpr {
             rng,
             vec![
                 (0.4, box |_, rng| AExpr::Number(rng.gen_range(-100..=100))),
-                (0.7, box |cx, rng| AExpr::Variable(cx.var_name(rng))),
-                (0.1, box |cx, rng| AExpr::Array(Array::gen(cx, rng))),
+                (0.8, box |cx, rng| AExpr::Reference(cx.reference(rng))),
                 (
                     if cx.recursion_limit == 0 || cx.fuel == 0 {
                         0.0

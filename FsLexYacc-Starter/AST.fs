@@ -1,6 +1,6 @@
 // This file implements a module where we define a data type "expr"
 // to store represent arithmetic expressions
-module CalculatorTypesAST
+module AST
 
 type expr =
     | Num of float

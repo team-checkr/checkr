@@ -37,10 +37,8 @@ NonEmptyCommands: Commands = {
 };
 
 Command: Command = {
-    <Variable> ":=" <AExpr> =>
+    <Target> ":=" <AExpr> =>
         Command::Assignment(<>),
-    <Array>  ":=" <AExpr> =>
-        Command::ArrayAssignment(<>),
     "if" <Guards> "fi" =>
         Command::If(<>),
     "do" <Guards> "od" =>
@@ -54,9 +52,14 @@ Command: Command = {
 };
 
 #[inline]
+Target: Target<Box<AExpr>> = {
+    Variable => Target::Variable(<>),
+    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, box idx),
+}
+#[inline]
 Variable: Variable = Ident => Variable(<>);
 #[inline]
-Array: Array<Box<AExpr>> = <arr:Ident> "[" <idx:AExpr> "]" => Array(arr, box idx);
+Array: Array = Ident => Array(<>);
 
 Guards: Vec<Guard> = Sep<Guard, "[]">;
 
@@ -68,8 +71,7 @@ AExpr_ = AExpr;
 AExpr: AExpr = {
     #[precedence(level="1")]
     Int => AExpr::Number(<>),
-    Variable => AExpr::Variable(<>),
-    Array => AExpr::Array(<>),
+    Target => AExpr::Reference(<>),
     "-" <AExpr> => AExpr::Minus(box <>),
     "(" <AExpr_> ")",
 

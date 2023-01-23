@@ -36,7 +36,7 @@ pub trait Environment {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 pub enum ValidationResult {
     CorrectTerminated,
-    CorrectNonTerminated { iterations: usize },
+    CorrectNonTerminated { iterations: u64 },
     Mismatch { reason: String },
     TimeOut,
 }
@@ -113,9 +113,11 @@ where
     type Context = Commands;
 
     fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        Memory {
-            variables: cx.fv().into_iter().map(|v| (v, T::gen(cx, rng))).collect(),
-            arrays: cx.fa().into_iter().map(|v| (v, A::gen(cx, rng))).collect(),
-        }
+        Memory::from_targets_with(
+            cx.fv(),
+            (cx, rng),
+            |(cx, rng), _| T::gen(cx, rng),
+            |(cx, rng), _| A::gen(cx, rng),
+        )
     }
 }

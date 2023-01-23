@@ -1,0 +1,3 @@
+compile = "dotnet publish -c Release --self-contained --output bin/run"
+run = "./bin/run/calculator"
+watch = ["*.fs", "*.fsl", "*.fsy"]

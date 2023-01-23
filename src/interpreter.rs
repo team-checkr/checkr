@@ -1,7 +1,7 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{AExpr, AOp, Array, BExpr, LogicOp, RelOp},
+    ast::{AExpr, AOp, BExpr, LogicOp, RelOp, Target},
     pg::{Action, Node, ProgramGraph},
     sign::Memory,
 };
@@ -12,10 +12,7 @@ pub type InterpreterMemory = Memory<i64, Vec<i64>>;
 
 impl InterpreterMemory {
     pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
-        InterpreterMemory {
-            variables: pg.fv().into_iter().map(|k| (k, 0)).collect(),
-            arrays: Default::default(),
-        }
+        Memory::from_targets(pg.fv(), |_| 0, |_| vec![])
     }
 }
 
@@ -46,7 +43,7 @@ impl<A> ProgramTrace<A> {
 
 impl Interpreter {
     pub fn evaluate(
-        mut steps: usize,
+        mut steps: u64,
         memory: InterpreterMemory,
         pg: &ProgramGraph,
     ) -> Vec<ProgramTrace> {
@@ -95,7 +92,7 @@ impl Interpreter {
 impl Action {
     pub fn semantics(&self, m: &InterpreterMemory) -> Result<InterpreterMemory, InterpreterError> {
         match self {
-            Action::Assignment(x, a) => {
+            Action::Assignment(Target::Variable(x), a) => {
                 if m.variables.contains_key(x) {
                     let mut m2 = m.clone();
                     m2.variables.insert(x.clone(), a.semantics(m)?);
@@ -104,18 +101,20 @@ impl Action {
                     todo!("variable '{x}' is not in memory")
                 }
             }
-            Action::ArrayAssignment(arr, idx, a) => {
+            Action::Assignment(Target::Array(arr, idx), a) => {
                 let idx = idx.semantics(m)?;
-                match m.arrays.get(arr) {
+                match m.get_arr(arr) {
                     Some(data) if 0 <= idx && idx < data.len() as _ => {
                         let mut m2 = m.clone();
                         let data = m2.arrays.get_mut(arr).unwrap();
                         data[idx as usize] = a.semantics(m)?;
                         Ok(m2)
                     }
-                    Some(_) => Err(InterpreterError::ArrayNotFound { name: arr.clone() }),
+                    Some(_) => Err(InterpreterError::ArrayNotFound {
+                        name: arr.to_string(),
+                    }),
                     None => Err(InterpreterError::IndexOutOfBound {
-                        name: arr.clone(),
+                        name: arr.to_string(),
                         index: idx,
                     }),
                 }
@@ -136,7 +135,7 @@ impl AExpr {
     pub fn semantics(&self, m: &InterpreterMemory) -> Result<i64, InterpreterError> {
         Ok(match self {
             AExpr::Number(n) => *n,
-            AExpr::Variable(x) => {
+            AExpr::Reference(Target::Variable(x)) => {
                 if let Some(x) = m.variables.get(x) {
                     *x
                 } else {
@@ -145,23 +144,25 @@ impl AExpr {
                     });
                 }
             }
-            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
-            AExpr::Array(Array(arr, idx)) => {
+            AExpr::Reference(Target::Array(arr, idx)) => {
                 let data = if let Some(data) = m.arrays.get(arr) {
                     data
                 } else {
-                    return Err(InterpreterError::ArrayNotFound { name: arr.clone() });
+                    return Err(InterpreterError::ArrayNotFound {
+                        name: arr.to_string(),
+                    });
                 };
                 let idx = idx.semantics(m)?;
                 if let Some(x) = data.get(idx as usize) {
                     *x
                 } else {
                     return Err(InterpreterError::IndexOutOfBound {
-                        name: arr.clone(),
+                        name: arr.to_string(),
                         index: idx,
                     });
                 }
             }
+            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
             AExpr::Minus(n) => -n.semantics(m)?,
         })
     }

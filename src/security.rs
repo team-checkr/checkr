@@ -1,15 +1,13 @@
-use std::{
-    collections::{HashMap, HashSet},
-    fmt::Display,
-};
+use std::{collections::HashSet, fmt::Display};
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{Array, Command, Commands, Guard, Variable},
+    ast::{Command, Commands, Guard, Target},
     gcl,
     parse::ParseError,
+    sign::Memory,
 };
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
@@ -26,14 +24,6 @@ where
         write!(f, "Flow({:?} -> {:?})", self.from, self.into)
     }
 }
-impl<T> Flow<T> {
-    fn map<S>(&self, f: impl Fn(&T) -> S) -> Flow<S> {
-        Flow {
-            from: f(&self.from),
-            into: f(&self.into),
-        }
-    }
-}
 
 impl<T> Display for Flow<T>
 where
@@ -45,25 +35,28 @@ where
 }
 
 impl Commands {
-    pub fn flows(&self) -> HashSet<Flow<Variable>> {
+    pub fn flows(&self) -> HashSet<Flow<Target>> {
         self.sec(&Default::default())
     }
-    fn sec(&self, implicit: &HashSet<Variable>) -> HashSet<Flow<Variable>> {
+    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
         self.0.iter().flat_map(|c| c.sec(implicit)).collect()
     }
 }
 
 impl Command {
-    fn sec(&self, implicit: &HashSet<Variable>) -> HashSet<Flow<Variable>> {
+    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
         match self {
-            Command::Assignment(Variable(x), a) => implicit
+            Command::Assignment(t, a) => implicit
                 .iter()
                 .cloned()
+                .chain(match t {
+                    Target::Variable(_) => Default::default(),
+                    Target::Array(_, idx) => idx.fv(),
+                })
                 .chain(a.fv())
-                .chain(a.fa().into_iter().map(|a| Variable(a)))
                 .map(|i| Flow {
                     from: i,
-                    into: Variable(x.clone()),
+                    into: t.clone().unit(),
                 })
                 .collect(),
             Command::Skip => HashSet::default(),
@@ -82,19 +75,6 @@ impl Command {
                     )
                     .1
             }
-            Command::ArrayAssignment(Array(arr, idx), a) => implicit
-                .iter()
-                .cloned()
-                .chain(a.fv())
-                .chain(a.fa().into_iter().map(|a| Variable(a)))
-                .chain(idx.fv())
-                .chain(idx.fa().into_iter().map(|a| Variable(a)))
-                // TODO: Should this really be variable?
-                .map(|i| Flow {
-                    from: i,
-                    into: Variable(arr.clone()),
-                })
-                .collect(),
             Command::Break => HashSet::default(),
             Command::Continue => HashSet::default(),
         }
@@ -102,13 +82,8 @@ impl Command {
 }
 
 impl Guard {
-    fn sec2(&self, implicit: &HashSet<Variable>) -> (HashSet<Variable>, HashSet<Flow<Variable>>) {
-        let implicit = implicit
-            .iter()
-            .cloned()
-            .chain(self.0.fv())
-            .chain(self.1.fa().into_iter().map(|a| Variable(a)))
-            .collect();
+    fn sec2(&self, implicit: &HashSet<Target>) -> (HashSet<Target>, HashSet<Flow<Target>>) {
+        let implicit = implicit.iter().cloned().chain(self.0.fv()).collect();
         let flows = self.1.sec(&implicit);
         (implicit, flows)
     }
@@ -179,19 +154,19 @@ impl SecurityLattice {
 
     fn all_allowed<'a>(
         &'a self,
-        classification: &'a HashMap<Variable, SecurityClass>,
-    ) -> impl Iterator<Item = Flow<Variable>> + 'a {
+        classification: &'a Memory<SecurityClass>,
+    ) -> impl Iterator<Item = Flow<Target>> + 'a {
         classification
             .iter()
             .cartesian_product(classification.iter())
-            .filter_map(|((a, a_class), (b, b_class))| {
+            .filter_map(|(a, b)| {
                 if self.allows(&Flow {
-                    from: a_class.clone(),
-                    into: b_class.clone(),
+                    from: a.value().clone(),
+                    into: b.value().clone(),
                 }) {
                     Some(Flow {
-                        from: a.clone(),
-                        into: b.clone(),
+                        from: a.target(),
+                        into: b.target(),
                     })
                 } else {
                     None
@@ -202,14 +177,14 @@ impl SecurityLattice {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct SecurityAnalysisOutput {
-    pub actual: Vec<Flow<Variable>>,
-    pub allowed: Vec<Flow<Variable>>,
-    pub violations: Vec<Flow<Variable>>,
+    pub actual: Vec<Flow<Target>>,
+    pub allowed: Vec<Flow<Target>>,
+    pub violations: Vec<Flow<Target>>,
 }
 
 impl SecurityAnalysisOutput {
     pub fn run(
-        mapping: &HashMap<Variable, SecurityClass>,
+        mapping: &Memory<SecurityClass>,
         lattice: &SecurityLattice,
         cmds: &Commands,
     ) -> Self {

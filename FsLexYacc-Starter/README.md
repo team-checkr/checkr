@@ -1,12 +1,19 @@
-This folder contains examples of "calculator" programs in F# and Java tha read an arithmetic expression from the command line and print the result of evaluating such expression.
+This folder contains the skeleton of a parser along with the input and output types for each analysis given in the assignment. It also contain an example of a "calculator" program in F# that reads an arithmetic expression from the command line and print the result of evaluating such expression for initial testing.
 
 ## Files
 
 F#/FsLexYacc
-* [Lexer.fsl](Lexer.fsl): The F# lexer for arithmetic expressions
-* [Parser.fsp](Parser.fsp): The F# parser for arithmetic expressions
-* [CalculatorTypesAST.fs](CalculatorTypesAST.fs): F# types for AST of arithmetic expressions
-* [Program.fs](Program.fs): The F# script for the calculator
+* [Lexer.fsl](Lexer.fsl): The lexer for arithmetic expressions
+* [Parser.fsp](Parser.fsp): The parser for arithmetic expressions
+* [Types.fs](Types.fs): Global types which are used in many analysis
+* [AST.fs](AST.fs): Types for AST of arithmetic expressions
+* [Program.fs](Program.fs): The entrypoint for the program
+* [Security.fs](Security.fs): File for the security analysis
+* [SignAnalysis.fs](SignAnalysis.fs): File for the sign analysis
+* [ProgramVerification.fs](ProgramVerification.fs): File for program verification
+* [Graph.fs](Graph.fs): File for graphs
+* [Interpreter.fs](Interpreter.fs): File for the interpreter
+
 
 ## Running on macOS M1
 
@@ -16,7 +23,7 @@ Building on macOS requires the `dotnet-sdk` package. This can be installed using
 brew install dotnet-sdk
 ```
 
-## Instructions for F# #/FSLexYacc
+## Instructions for F#/FSLexYacc
 
 To run the program do:
 
@@ -24,13 +31,33 @@ To run the program do:
 dotnet run
 ```
 
-You should be able to interact with the calculator program as follows:
+### Calculator
 
+To run the calculator do:
+
+```bash
+dotnet run calc "1 + 52 * 23"
 ```
-Enter an arithmetic expression: 1
-1.0
-Enter an arithmetic expression: 1 + 2
-3.0
-Enter an arithmetic expression: 1 + 2 * 3
-7.0
+
+## Interactive UI
+
+The analysis can be explored in the interactive tool. Run the program in `dev/` folder matching you operating system.
+
+```bash
+# Windows
+./dev/win.exe --open
+
+# macOS
+./dev/macos --open
+
+# linux
+./dev/linux --open
 ```
+
+With the `--open` flag this should open the tool at `http://localhost:3000/` in your browser.
+
+## Evaluation
+
+Every time you push to git, the program gets evaluated automatically.
+
+The result can be seen at GitLab in the `result` branch.

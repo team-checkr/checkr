@@ -1,4 +1,8 @@
-use std::{path::PathBuf, process::Command, time::Duration};
+use std::{
+    path::{Path, PathBuf},
+    process::Command,
+    time::Duration,
+};
 
 use tracing::error;
 
@@ -14,7 +18,7 @@ pub struct Driver {
 pub enum DriverError {
     #[error("running compile failed")]
     RunCompile(#[source] std::io::Error),
-    #[error("failed to compile")]
+    #[error("failed to compile:\n  {}", std::str::from_utf8(&_0.stdout).unwrap())]
     CompileFailure(std::process::Output),
 }
 
@@ -24,7 +28,7 @@ pub enum ExecError {
     Serialize(serde_json::Error),
     #[error("running exec failed")]
     RunExec(#[source] std::io::Error),
-    #[error("command failed")]
+    #[error("command failed:\n{:?}", _0.stdout)]
     CommandFailed(std::process::Output, Duration),
     #[error("parse failed")]
     Parse {
@@ -36,14 +40,18 @@ pub enum ExecError {
 }
 
 impl Driver {
-    pub fn new(dir: PathBuf, run_cmd: String) -> Driver {
+    pub fn new(dir: impl AsRef<Path>, run_cmd: &str) -> Driver {
         Driver {
-            dir,
-            run_cmd,
+            dir: dir.as_ref().to_owned(),
+            run_cmd: run_cmd.to_string(),
             compile_output: None,
         }
     }
-    pub fn compile(dir: PathBuf, compile: String, run_cmd: String) -> Result<Driver, DriverError> {
+    pub fn compile(
+        dir: impl AsRef<Path>,
+        compile: &str,
+        run_cmd: &str,
+    ) -> Result<Driver, DriverError> {
         let mut args = compile.split(' ');
         let program = args.next().unwrap();
 
@@ -58,8 +66,8 @@ impl Driver {
         }
 
         Ok(Driver {
-            dir,
-            run_cmd,
+            dir: dir.as_ref().to_owned(),
+            run_cmd: run_cmd.to_string(),
             compile_output: Some(compile_output),
         })
     }
@@ -72,7 +80,7 @@ impl Driver {
 
         cmd
     }
-    pub fn exec<E>(&self, cmds: &Commands, input: &E::Input) -> Result<ExecOutput<E>, ExecError>
+    pub fn exec_raw_cmds<E>(&self, cmds: &str, input: &E::Input) -> Result<ExecOutput<E>, ExecError>
     where
         E: Environment,
     {
@@ -107,6 +115,12 @@ impl Driver {
                 time: took,
             }),
         }
+    }
+    pub fn exec<E>(&self, cmds: &Commands, input: &E::Input) -> Result<ExecOutput<E>, ExecError>
+    where
+        E: Environment,
+    {
+        self.exec_raw_cmds(&cmds.to_string(), input)
     }
 
     pub fn compile_output(&self) -> Option<&std::process::Output> {

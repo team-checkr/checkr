@@ -63,8 +63,7 @@ pub fn run_analysis<E: Environment>(
     let (cmds, fuel, seed, mut rng) = generate_program(fuel, seed);
 
     let input = <E as Environment>::Input::gen(&mut cmds.clone(), &mut rng);
-    let exec_result =
-        Driver::new(current_dir.as_ref().to_owned(), program.to_string()).exec::<E>(&cmds, &input);
+    let exec_result = Driver::new(current_dir, program).exec::<E>(&cmds, &input);
     match exec_result {
         Ok(exec_result) => {
             let validation_result = env.validate(&cmds, &input, &exec_result.parsed);

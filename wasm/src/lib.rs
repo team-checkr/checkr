@@ -58,7 +58,12 @@ impl WebApplication {
                 .iter()
                 .map(|env| {
                     let sample = env.gen_sample(&cmds, &mut rng);
-                    (env.name(), (sample.0.to_string(), sample.1, sample.2))
+                    Env {
+                        name: env.name(),
+                        input_json: sample.0.to_string(),
+                        input_markdown: sample.1,
+                        output_markdown: sample.2,
+                    }
                 })
                 .collect(),
         };
@@ -129,11 +134,20 @@ struct Sample {
     output_md: String,
 }
 
+#[typeshare::typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+struct Env {
+    name: String,
+    input_json: String,
+    input_markdown: String,
+    output_markdown: String,
+}
+#[typeshare::typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Generation {
     program: String,
     dot: String,
-    envs: Vec<(String, (String, String, String))>,
+    envs: Vec<Env>,
 }
 
 impl Default for WebApplication {

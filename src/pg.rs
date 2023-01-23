@@ -6,7 +6,7 @@ use std::{
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-use crate::ast::{AExpr, Array, BExpr, Command, Commands, Guard, LogicOp, Variable};
+use crate::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
 
 pub struct ProgramGraph {
     edges: Vec<Edge>,
@@ -55,17 +55,14 @@ impl Node {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Action {
-    Assignment(Variable, AExpr),
-    ArrayAssignment(String, AExpr, AExpr),
+    Assignment(Target<Box<AExpr>>, AExpr),
     Skip,
     Condition(BExpr),
 }
 impl Action {
-    fn fv(&self) -> HashSet<Variable> {
+    fn fv(&self) -> HashSet<Target> {
         match self {
-            Action::Assignment(x, a) => [x.clone()].into_iter().chain(a.fv()).collect(),
-            // TODO
-            Action::ArrayAssignment(_, _, a) => a.fv(),
+            Action::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
             Action::Skip => Default::default(),
             Action::Condition(b) => b.fv(),
         }
@@ -92,7 +89,6 @@ impl std::fmt::Display for Action {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Action::Assignment(v, x) => write!(f, "{v} := {x}"),
-            Action::ArrayAssignment(arr, idx, x) => write!(f, "{arr}[{idx}] := {x}"),
             Action::Skip => write!(f, "skip"),
             Action::Condition(b) => write!(f, "{b}"),
         }
@@ -169,13 +165,6 @@ impl Command {
                 edges.push(Edge(s, Action::Condition(b), t));
                 edges
             }
-            Command::ArrayAssignment(Array(arr, idx), expr) => {
-                vec![Edge(
-                    s,
-                    Action::ArrayAssignment(arr.clone(), *idx.clone(), expr.clone()),
-                    t,
-                )]
-            }
             Command::Break => todo!(),
             Command::Continue => todo!(),
         }
@@ -222,7 +211,7 @@ impl ProgramGraph {
             .unwrap_or_default()
     }
 
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         self.edges.iter().flat_map(|e| e.action().fv()).collect()
     }
 

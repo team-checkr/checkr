@@ -94,15 +94,21 @@ impl Generate for ProgramVerificationEnvInput {
                     .variables
                     .iter()
                     .map(|(v, s)| match s {
-                        Sign::Positive => {
-                            BExpr::Rel(AExpr::Variable(v.clone()), RelOp::Gt, AExpr::Number(0))
-                        }
-                        Sign::Zero => {
-                            BExpr::Rel(AExpr::Variable(v.clone()), RelOp::Eq, AExpr::Number(0))
-                        }
-                        Sign::Negative => {
-                            BExpr::Rel(AExpr::Variable(v.clone()), RelOp::Lt, AExpr::Number(0))
-                        }
+                        Sign::Positive => BExpr::Rel(
+                            AExpr::Reference(v.clone().into()),
+                            RelOp::Gt,
+                            AExpr::Number(0),
+                        ),
+                        Sign::Zero => BExpr::Rel(
+                            AExpr::Reference(v.clone().into()),
+                            RelOp::Eq,
+                            AExpr::Number(0),
+                        ),
+                        Sign::Negative => BExpr::Rel(
+                            AExpr::Reference(v.clone().into()),
+                            RelOp::Lt,
+                            AExpr::Number(0),
+                        ),
                     })
                     .reduce(|a, b| BExpr::Logic(box a, LogicOp::And, box b))
             })

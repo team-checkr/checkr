@@ -2,6 +2,71 @@ use std::collections::HashSet;
 
 use serde::{Deserialize, Serialize};
 
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Target<Idx = ()> {
+    Variable(Variable),
+    Array(Array, Idx),
+}
+
+impl Target<()> {
+    pub fn promote_to_array(self) -> Target<()> {
+        match self {
+            Target::Variable(Variable(var)) => Target::Array(Array(var), ()),
+            Target::Array(arr, ()) => Target::Array(arr, ()),
+        }
+    }
+}
+impl<Idx> Target<Idx> {
+    pub fn map_idx<T>(self, f: impl FnOnce(Idx) -> T) -> Target<T> {
+        match self {
+            Target::Variable(var) => Target::Variable(var),
+            Target::Array(arr, idx) => Target::Array(arr, f(idx)),
+        }
+    }
+    pub fn unit(self) -> Target {
+        self.map_idx(|_| ())
+    }
+    pub fn same_name<T>(&self, other: &Target<T>) -> bool {
+        match (self, other) {
+            (Target::Variable(a), Target::Variable(b)) => a == b,
+            (Target::Array(a, _), Target::Array(b, _)) => a == b,
+            _ => false,
+        }
+    }
+}
+
+impl<Idx> std::fmt::Debug for Target<Idx>
+where
+    Idx: std::fmt::Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable(v) => v.fmt(f),
+            Self::Array(a, idx) => write!(f, "Array({a}, {idx:?})"),
+        }
+    }
+}
+
+impl serde::Serialize for Target {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        match self {
+            Target::Variable(v) => v.serialize(serializer),
+            Target::Array(a, ()) => a.serialize(serializer),
+        }
+    }
+}
+impl<'de> serde::Deserialize<'de> for Target {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'de>,
+    {
+        Ok(Target::Variable(Variable::deserialize(deserializer)?))
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Variable(pub String);
@@ -11,20 +76,35 @@ impl std::fmt::Debug for Variable {
         write!(f, "{}", self.0)
     }
 }
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Array<Idx>(pub String, pub Idx);
+#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct Array(pub String);
+
+impl std::fmt::Debug for Array {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+impl<Idx> From<Variable> for Target<Idx> {
+    fn from(value: Variable) -> Self {
+        Target::Variable(value)
+    }
+}
+impl From<Array> for Target<()> {
+    fn from(value: Array) -> Self {
+        Target::Array(value, ())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Command {
-    Assignment(Variable, AExpr),
+    Assignment(Target<Box<AExpr>>, AExpr),
     Skip,
     If(Vec<Guard>),
     Loop(Vec<Guard>),
-    /// **Extension**
-    ArrayAssignment(Array<Box<AExpr>>, AExpr),
     /// **Extension**
     Break,
     /// **Extension**
@@ -37,10 +117,8 @@ pub struct Guard(pub BExpr, pub Commands);
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AExpr {
     Number(i64),
-    Variable(Variable),
+    Reference(Target<Box<AExpr>>),
     Binary(Box<AExpr>, AOp, Box<AExpr>),
-    /// **Extension**z
-    Array(Array<Box<AExpr>>),
     Minus(Box<AExpr>),
 }
 
@@ -80,92 +158,59 @@ pub enum LogicOp {
 }
 
 impl Commands {
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         self.0.iter().flat_map(|c| c.fv()).collect()
-    }
-    pub fn fa(&self) -> HashSet<String> {
-        self.0.iter().flat_map(|c| c.fa()).collect()
     }
 }
 impl Command {
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         match self {
-            Command::Assignment(x, a) => [x.clone()].into_iter().chain(a.fv()).collect(),
+            Command::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
             Command::Skip => HashSet::default(),
             Command::If(c) => guards_fv(c),
             Command::Loop(c) => guards_fv(c),
-            Command::ArrayAssignment(Array(_, idx), a) => {
-                idx.fv().union(&a.fv()).cloned().collect()
-            }
-            Command::Break => HashSet::default(),
-            Command::Continue => HashSet::default(),
-        }
-    }
-    pub fn fa(&self) -> HashSet<String> {
-        match self {
-            Command::Assignment(_, a) => a.fa(),
-            Command::Skip => HashSet::default(),
-            Command::If(c) => guards_fa(c),
-            Command::Loop(c) => guards_fa(c),
-            Command::ArrayAssignment(Array(name, idx), a) => std::iter::once(name.to_string())
-                .chain(idx.fa().union(&a.fa()).cloned())
-                .collect(),
             Command::Break => HashSet::default(),
             Command::Continue => HashSet::default(),
         }
     }
 }
-fn guards_fv(guards: &[Guard]) -> HashSet<Variable> {
+fn guards_fv(guards: &[Guard]) -> HashSet<Target> {
     guards.iter().flat_map(|g| g.fv()).collect()
 }
-fn guards_fa(guards: &[Guard]) -> HashSet<String> {
-    guards.iter().flat_map(|g| g.fa()).collect()
-}
 impl Guard {
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         self.0.fv().union(&self.1.fv()).cloned().collect()
     }
-    pub fn fa(&self) -> HashSet<String> {
-        self.0.fa().union(&self.1.fa()).cloned().collect()
+}
+impl Target<Box<AExpr>> {
+    pub fn fv(&self) -> HashSet<Target> {
+        match self {
+            Target::Variable(v) => [Target::Variable(v.clone())].into_iter().collect(),
+            Target::Array(Array(a), idx) => {
+                let mut fv = idx.fv();
+                fv.insert(Target::Array(Array(a.clone()), ()));
+                fv
+            }
+        }
     }
 }
 impl AExpr {
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         match self {
             AExpr::Number(_) => Default::default(),
-            AExpr::Variable(v) => [v.clone()].into_iter().collect(),
+            AExpr::Reference(v) => v.fv(),
             AExpr::Binary(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
-            AExpr::Array(Array(_, idx)) => idx.fv(),
             AExpr::Minus(x) => x.fv(),
-        }
-    }
-    pub fn fa(&self) -> HashSet<String> {
-        match self {
-            AExpr::Number(_) => Default::default(),
-            AExpr::Variable(_) => Default::default(),
-            AExpr::Binary(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
-            AExpr::Array(Array(name, idx)) => {
-                std::iter::once(name.to_string()).chain(idx.fa()).collect()
-            }
-            AExpr::Minus(x) => x.fa(),
         }
     }
 }
 impl BExpr {
-    pub fn fv(&self) -> HashSet<Variable> {
+    pub fn fv(&self) -> HashSet<Target> {
         match self {
             BExpr::Bool(_) => Default::default(),
             BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Not(x) => x.fv(),
-        }
-    }
-    pub fn fa(&self) -> HashSet<String> {
-        match self {
-            BExpr::Bool(_) => Default::default(),
-            BExpr::Rel(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
-            BExpr::Logic(l, _, r) => l.fa().union(&r.fa()).cloned().collect(),
-            BExpr::Not(x) => x.fa(),
         }
     }
 }

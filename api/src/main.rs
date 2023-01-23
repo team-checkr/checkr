@@ -1,5 +1,11 @@
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
+use std::{
+    net::SocketAddr,
+    path::PathBuf,
+    sync::{Arc, Mutex},
+    time::Duration,
+};
 
+use anyhow::Context;
 use axum::{
     extract::State,
     http::{header::CONTENT_TYPE, HeaderValue, Method, StatusCode},
@@ -8,86 +14,187 @@ use axum::{
     Json, Router,
 };
 use clap::Parser;
-use rand::SeedableRng;
+use itertools::Itertools;
+use notify::Watcher;
+use notify_debouncer_mini::DebounceEventResult;
 use serde::{Deserialize, Serialize};
 use tower_http::{cors::CorsLayer, trace::TraceLayer};
 use tracing::info;
 use verification_lawyer::{
-    driver::{Driver, ExecOutput},
+    driver::{Driver, DriverError},
     env::{
-        graph::GraphEnv, pv::ProgramVerificationEnv, Environment, SecurityEnv, SignEnv,
-        StepWiseEnv, ToMarkdown,
+        graph::{GraphEnv, GraphEnvInput},
+        pv::ProgramVerificationEnv,
+        Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown,
     },
-    generation::Generate,
+    pg::Determinism,
 };
 
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub enum Analysis {
+    Graph,
+    Sign,
+    StepWise,
+    Security,
+    ProgramVerification,
+}
+
+#[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct AnalysisRequest {
-    pub analysis: String,
+    pub analysis: Analysis,
     pub src: String,
     pub input: String,
 }
 
+#[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct ExecOutputAny {
+pub struct AnalysisResponse {
     pub stdout: String,
     pub stderr: String,
-    pub parsed_markdown: String,
+    pub parsed_markdown: Option<String>,
     pub took: Duration,
+    pub validation_result: Option<ValidationResult>,
 }
 
-impl<E: Environment> From<ExecOutput<E>> for ExecOutputAny
-where
-    E::Output: ToMarkdown,
-{
-    fn from(value: ExecOutput<E>) -> Self {
-        Self {
-            stdout: String::from_utf8(value.output.stdout).unwrap(),
-            stderr: String::from_utf8(value.output.stderr).unwrap(),
-            parsed_markdown: value.parsed.to_markdown(),
-            took: value.took,
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
+pub enum ValidationResult {
+    CorrectTerminated,
+    CorrectNonTerminated { iterations: u32 },
+    Mismatch { reason: String },
+    TimeOut,
+}
+
+impl From<verification_lawyer::env::ValidationResult> for ValidationResult {
+    fn from(r: verification_lawyer::env::ValidationResult) -> Self {
+        use verification_lawyer::env::ValidationResult as VR;
+
+        match r {
+            VR::CorrectTerminated => ValidationResult::CorrectTerminated,
+            VR::CorrectNonTerminated { iterations } => ValidationResult::CorrectNonTerminated {
+                iterations: iterations as _,
+            },
+            VR::Mismatch { reason } => ValidationResult::Mismatch { reason },
+            VR::TimeOut => ValidationResult::TimeOut,
         }
     }
 }
 
-#[axum::debug_handler]
+fn ayo<E: Environment>(driver: &Mutex<Driver>, env: E, cmds: &str, input: &str) -> AnalysisResponse
+where
+    E: std::fmt::Debug,
+    E::Output: ToMarkdown,
+{
+    info!(env = format!("{env:?}"), input = input);
+    let input: E::Input = serde_json::from_str(input).expect("failed to parse input");
+    match driver.lock().unwrap().exec_raw_cmds::<E>(&cmds, &input) {
+        Ok(exec_output) => {
+            let cmds = verification_lawyer::parse::parse_commands(&cmds).unwrap();
+            let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
+            AnalysisResponse {
+                stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
+                stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
+                parsed_markdown: Some(exec_output.parsed.to_markdown()),
+                took: exec_output.took,
+                validation_result: Some(validation_res.into()),
+            }
+        }
+        Err(e) => match e {
+            verification_lawyer::driver::ExecError::Serialize(_) => todo!(),
+            verification_lawyer::driver::ExecError::RunExec(_) => todo!(),
+            verification_lawyer::driver::ExecError::CommandFailed(output, took) => {
+                AnalysisResponse {
+                    stdout: String::from_utf8(output.stdout).unwrap(),
+                    stderr: String::from_utf8(output.stderr).unwrap(),
+                    parsed_markdown: None,
+                    took,
+                    validation_result: None,
+                }
+            }
+            verification_lawyer::driver::ExecError::Parse {
+                inner,
+                run_output,
+                time,
+            } => AnalysisResponse {
+                stdout: String::from_utf8(run_output.stdout).unwrap(),
+                stderr: String::from_utf8(run_output.stderr).unwrap(),
+                parsed_markdown: None,
+                took: time,
+                validation_result: None,
+            },
+        },
+    }
+}
+
 async fn analyze(
-    shared_driver: State<Arc<Driver>>,
+    State(state): State<ApplicationState>,
     Json(body): Json<AnalysisRequest>,
-) -> Json<ExecOutputAny> {
-    use verification_lawyer::env::Environment;
-
-    let cmds = verification_lawyer::parse::parse_commands(&body.src).unwrap();
-    info!(input = body.input);
+) -> Json<AnalysisResponse> {
+    let driver = &*state.driver;
+    let cmds = body.src;
     let output = match body.analysis {
-        name if name == SignEnv::command() => {
-            type E = SignEnv;
-            let input = serde_json::from_str(&body.input).unwrap();
-            ExecOutputAny::from(shared_driver.exec::<E>(&cmds, &input).unwrap())
-        }
-        name if name == StepWiseEnv::command() => {
-            type E = StepWiseEnv;
-            let input = serde_json::from_str(&body.input).unwrap();
-            ExecOutputAny::from(shared_driver.exec::<E>(&cmds, &input).unwrap())
-        }
-        name if name == SecurityEnv::command() => {
-            type E = SecurityEnv;
-            let input = serde_json::from_str(&body.input).unwrap();
-            ExecOutputAny::from(shared_driver.exec::<E>(&cmds, &input).unwrap())
-        }
-        name if name == ProgramVerificationEnv::command() => {
-            type E = ProgramVerificationEnv;
-            let input = serde_json::from_str(&body.input).unwrap();
-            ExecOutputAny::from(shared_driver.exec::<E>(&cmds, &input).unwrap())
-        }
-        name if name == GraphEnv::command() => {
-            let input = serde_json::from_str(&body.input).unwrap();
-            ExecOutputAny::from(shared_driver.exec::<GraphEnv>(&cmds, &input).unwrap())
-        }
-        _ => todo!(),
+        Analysis::Graph => ayo(driver, GraphEnv, &cmds, &body.input),
+        Analysis::Sign => ayo(driver, SignEnv, &cmds, &body.input),
+        Analysis::StepWise => ayo(driver, StepWiseEnv, &cmds, &body.input),
+        Analysis::Security => ayo(driver, SecurityEnv, &cmds, &body.input),
+        Analysis::ProgramVerification => ayo(driver, ProgramVerificationEnv, &cmds, &body.input),
     };
-
     Json(output)
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphRequest {
+    src: String,
+    deterministic: bool,
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+pub struct GraphResponse {
+    dot: Option<String>,
+}
+
+async fn graph(
+    State(state): State<ApplicationState>,
+    Json(body): Json<GraphRequest>,
+) -> Json<GraphResponse> {
+    match state.driver.lock().unwrap().exec_raw_cmds::<GraphEnv>(
+        &body.src,
+        &GraphEnvInput {
+            determinism: match body.deterministic {
+                true => Determinism::Deterministic,
+                false => Determinism::NonDeterministic,
+            },
+        },
+    ) {
+        Ok(output) => Json(GraphResponse {
+            dot: Some(output.parsed.dot),
+        }),
+        Err(_) => Json(GraphResponse { dot: None }),
+    }
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+enum CompilerState {
+    Compiling,
+    Compiled,
+    CompileError,
+}
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct CompilationStatus {
+    compiled_at: u32,
+    state: CompilerState,
+}
+
+async fn compilation_status(State(state): State<ApplicationState>) -> Json<CompilationStatus> {
+    Json(state.compilation_status.lock().unwrap().clone())
 }
 
 #[axum::debug_handler]
@@ -132,45 +239,129 @@ enum Cli {
     },
 }
 
+#[derive(Clone)]
+struct ApplicationState {
+    driver: Arc<Mutex<Driver>>,
+    compilation_status: Arc<Mutex<CompilationStatus>>,
+}
+
 async fn run() -> anyhow::Result<()> {
     match Cli::parse() {
         Cli::WupWup { open, dir } => {
-            let run = infra::RunOption::from_file(dir.join("run.toml"))?;
+            let run = infra::RunOption::from_file(dir.join("run.toml"))
+                .with_context(|| format!("could not to read {:?}", dir.join("run.toml")))?;
 
-            info!(run = format!("{run:?}"));
-
-            let driver = if let Some(compile) = run.compile {
-                Driver::compile(dir, compile, run.run)?
+            let driver = if let Some(compile) = &run.compile {
+                Driver::compile(&dir, compile, &run.run)
+                    .with_context(|| format!("compiling using config: {run:?}"))?
             } else {
-                Driver::new(dir, run.run)
+                Driver::new(&dir, &run.run)
             };
+            let shared_driver = Arc::new(Mutex::new(driver));
+            let shared_compilation_status = Arc::new(Mutex::new(CompilationStatus {
+                compiled_at: std::time::SystemTime::now()
+                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                    .unwrap()
+                    .as_millis() as _,
+                state: CompilerState::Compiled,
+            }));
 
-            // info!(driver = format!("{driver:?}"));
+            let matches = run
+                .watch
+                .iter()
+                .map(|p| glob::Pattern::new(p).unwrap())
+                .collect_vec();
 
-            use verification_lawyer::env::Environment;
+            let watcher_driver = Arc::clone(&shared_driver);
+            let watcher_compilation_status = Arc::clone(&shared_compilation_status);
+            let watcher_dir = dir.clone();
+            let watcher_run = run.clone();
+            let mut watcher = notify_debouncer_mini::new_debouncer(
+                Duration::from_millis(200),
+                None,
+                move |res: DebounceEventResult| match res {
+                    Ok(events) => {
+                        if !events
+                            .iter()
+                            .any(|e| matches.iter().any(|p| p.matches_path(&e.path)))
+                        {
+                            return;
+                        }
 
-            let mut cmds = verification_lawyer::parse::parse_commands("if true -> skip fi")?;
-            let mut rng = rand::rngs::SmallRng::from_entropy();
-            let input = verification_lawyer::env::sign::SignAnalysisInput::gen(&mut cmds, &mut rng);
+                        let (run, dir) = (watcher_run.clone(), watcher_dir.clone());
 
-            let output = driver.exec::<SignEnv>(&cmds, &input)?;
-
-            info!(output = format!("{output:?}"));
-
-            let shared_driver = Arc::new(driver);
+                        info!("Recompile!");
+                        *watcher_compilation_status.lock().unwrap() = CompilationStatus {
+                            compiled_at: std::time::SystemTime::now()
+                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as _,
+                            state: CompilerState::Compiling,
+                        };
+                        let driver = if let Some(compile) = &run.compile {
+                            match Driver::compile(&dir, compile, &run.run) {
+                                Ok(driver) => driver,
+                                Err(DriverError::CompileFailure(_)) => {
+                                    *watcher_compilation_status.lock().unwrap() =
+                                        CompilationStatus {
+                                            compiled_at: std::time::SystemTime::now()
+                                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_millis()
+                                                as _,
+                                            state: CompilerState::CompileError,
+                                        };
+                                    return;
+                                }
+                                Err(DriverError::RunCompile(_)) => {
+                                    *watcher_compilation_status.lock().unwrap() =
+                                        CompilationStatus {
+                                            compiled_at: std::time::SystemTime::now()
+                                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                                .unwrap()
+                                                .as_millis()
+                                                as _,
+                                            state: CompilerState::CompileError,
+                                        };
+                                    return;
+                                }
+                            }
+                        } else {
+                            Driver::new(&dir, &run.run)
+                        };
+                        *watcher_compilation_status.lock().unwrap() = CompilationStatus {
+                            compiled_at: std::time::SystemTime::now()
+                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                                .unwrap()
+                                .as_millis() as _,
+                            state: CompilerState::Compiled,
+                        };
+                        *watcher_driver.lock().unwrap() = driver;
+                    }
+                    Err(errors) => errors.iter().for_each(|e| println!("Error {:?}", e)),
+                },
+            )?;
+            watcher
+                .watcher()
+                .watch(&dir, notify::RecursiveMode::Recursive)?;
 
             let app = Router::new()
                 .route("/analyze", post(analyze))
-                .with_state(shared_driver);
+                .route("/graph", post(graph))
+                .route("/compilation-status", get(compilation_status))
+                .with_state(ApplicationState {
+                    driver: shared_driver,
+                    compilation_status: shared_compilation_status,
+                });
             let app = app.fallback(static_dir);
-            let app = app
-                .layer(
-                    CorsLayer::new()
-                        .allow_origin("*".parse::<HeaderValue>().unwrap())
-                        .allow_headers([CONTENT_TYPE])
-                        .allow_methods([Method::GET, Method::POST]),
-                )
-                .layer(TraceLayer::new_for_http());
+            let app = app.layer(
+                CorsLayer::new()
+                    .allow_origin("*".parse::<HeaderValue>().unwrap())
+                    .allow_headers([CONTENT_TYPE])
+                    .allow_methods([Method::GET, Method::POST]),
+            );
+            // NOTE: Enable for HTTP logging
+            // .layer(TraceLayer::new_for_http());
 
             if open {
                 tokio::task::spawn(async move {

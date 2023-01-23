@@ -4,10 +4,11 @@ use itertools::Itertools;
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use tracing::error;
 
 use crate::{
     analysis::{mono_analysis, FiFo},
-    ast::{Commands, Variable},
+    ast::Commands,
     generation::Generate,
     pg::{Determinism, Node, ProgramGraph},
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
@@ -56,15 +57,8 @@ impl ToMarkdown for SignAnalysisInput {
         table.add_row([
             "Memory:".to_string(),
             self.assignment
-                .variables
                 .iter()
-                .map(|(v, x)| format!("`{v} = {x}`"))
-                .chain(
-                    self.assignment
-                        .arrays
-                        .iter()
-                        .map(|(v, x)| format!("`{v} = {x}`")),
-                )
+                .map(|e| format!("`{e}`"))
                 .format(", ")
                 .to_string(),
         ]);
@@ -118,7 +112,7 @@ impl ToMarkdown for SignAnalysisOutput {
             .set_header(
                 std::iter::once("Node".to_string())
                     .chain(variables.iter().map(|v| v.to_string()))
-                    .chain(arrays.iter().cloned()),
+                    .chain(arrays.iter().map(|v| v.to_string())),
             );
 
         for (n, worlds) in self.nodes.iter().sorted_by_key(|(n, _)| {
@@ -204,12 +198,15 @@ impl Environment for SignEnv {
 
         let mut pool = reference.nodes.values().collect_vec();
 
-        for o in output.nodes.values() {
+        for (n, o) in &output.nodes {
             if let Some(idx) = pool.iter().position(|r| *r == o) {
                 pool.remove(idx);
             } else {
+                error!(not_in_reference = format!("{o:?}"), "damn...");
                 return ValidationResult::Mismatch {
-                    reason: "Produced world which did not exist in reference".to_string(),
+                    reason: format!(
+                        "Produced world which did not exist in reference: {n:?} ~> {o:?}"
+                    ),
                 };
             }
         }
@@ -217,6 +214,7 @@ impl Environment for SignEnv {
         if pool.is_empty() {
             ValidationResult::CorrectTerminated
         } else {
+            error!(missing = format!("{pool:?}"), "oh no...");
             ValidationResult::Mismatch {
                 reason: "Reference had world which was not present".to_string(),
             }

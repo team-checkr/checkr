@@ -1,6 +1,6 @@
 // Open the file that defines the type "expr" we shall use as AST
 %{
-open CalculatorTypesAST
+open AST
 %}
 
 // Declare the tokens (terminal symbols)
@@ -20,8 +20,8 @@ open CalculatorTypesAST
 %start start
 
 // We specify the return type of each of then non-terminal symbols
-%type <CalculatorTypesAST.expr> start
-%type <expr> expression
+%type <AST.expr> start
+%type <AST.expr> expression
 
 // Grammar productions
 %%

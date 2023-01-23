@@ -1,14 +1,14 @@
-use std::collections::HashMap;
-
 use itertools::Itertools;
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use tracing::debug;
 
 use crate::{
-    ast::{Commands, Variable},
+    ast::Commands,
     generation::Generate,
     security::{Flow, SecurityAnalysisOutput, SecurityClass, SecurityLattice},
+    sign::Memory,
 };
 
 use super::{Environment, ToMarkdown, ValidationResult};
@@ -21,7 +21,7 @@ pub struct SecurityLatticeInput(Vec<Flow<SecurityClass>>);
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecurityAnalysisInput {
-    pub classification: HashMap<Variable, SecurityClass>,
+    pub classification: Memory<SecurityClass>,
     pub lattice: SecurityLatticeInput,
 }
 
@@ -35,25 +35,12 @@ impl Generate for SecurityAnalysisInput {
         let dubious = SecurityClass("Dubious".to_string());
         let trusted = SecurityClass("Trusted".to_string());
         let classes = [&private, &internal, &public, &dubious, &trusted].map(Clone::clone);
-        let variable_classification = cx
-            .fv()
-            .into_iter()
-            .map(|v| (v, classes.choose(rng).unwrap().clone()))
-            .collect_vec();
-        let array_classification = cx
-            .fa()
-            .into_iter()
-            .map(|arr| {
-                (
-                    Variable(arr.to_string()),
-                    classes.choose(rng).unwrap().clone(),
-                )
-            })
-            .collect_vec();
-        let classification = variable_classification
-            .into_iter()
-            .chain(array_classification)
-            .collect();
+        let classification = Memory::from_targets_with(
+            cx.fv(),
+            rng,
+            |rng, _| classes.choose(rng).unwrap().clone(),
+            |rng, _| classes.choose(rng).unwrap().clone(),
+        );
         let lattice = SecurityLatticeInput(vec![
             Flow {
                 from: public.clone(),
@@ -96,7 +83,7 @@ impl ToMarkdown for SecurityAnalysisInput {
             "Classification:".to_string(),
             self.classification
                 .iter()
-                .map(|(a, c)| format!("`{a} = {c}`"))
+                .map(|e| format!("`{e}`"))
                 .sorted()
                 .format(", ")
                 .to_string(),
@@ -186,6 +173,11 @@ impl Environment for SecurityEnv {
         output.actual.sort();
         output.allowed.sort();
         output.violations.sort();
+
+        debug!(
+            reference = format!("{:?}", reference),
+            output = format!("{:?}", output)
+        );
 
         if reference == output {
             ValidationResult::CorrectTerminated

@@ -6,7 +6,7 @@ generate-self:
     RUST_LOG=debug cargo run -- generate-report .. -g 2 -o result.md
 
 generate-vagt:
-    RUST_LOG=debug cargo run -- generate-report ../gcmd/ -g 2 -o result.md
+    RUST_LOG=debug cargo run -- generate-report --no-hidden ../gcmd/ -g 2 -o result.md
 
 docker-shell:
     docker build . -t vl-infra

@@ -6,7 +6,7 @@ use crate::{
     generation::Generate,
     interpreter::{Interpreter, InterpreterMemory, ProgramState, ProgramTrace},
     pg::{Determinism, Node, ProgramGraph},
-    sign::Memory,
+    sign::{Memory, MemoryRef},
 };
 
 use super::{Environment, ToMarkdown, ValidationResult};
@@ -18,32 +18,25 @@ pub struct StepWiseEnv;
 pub struct StepWiseInput {
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
-    pub trace_count: usize,
+    pub trace_count: u64,
 }
 
 impl Generate for StepWiseInput {
     type Context = Commands;
 
-    fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gen<R: rand::Rng>(cx: &mut Self::Context, mut rng: &mut R) -> Self {
+        let assignment = Memory::from_targets_with(
+            cx.fv(),
+            &mut rng,
+            |rng, _| rng.gen_range(-10..=10),
+            |rng, _| {
+                let len = rng.gen_range(5..=10);
+                (0..len).map(|_| rng.gen_range(-10..=10)).collect()
+            },
+        );
         StepWiseInput {
             determinism: Determinism::Deterministic,
-            assignment: Memory {
-                variables: cx
-                    .fv()
-                    .into_iter()
-                    .sorted()
-                    .map(|v| (v, rng.gen_range(-10..=10)))
-                    .collect(),
-                arrays: cx
-                    .fa()
-                    .into_iter()
-                    .sorted()
-                    .map(|a| {
-                        let len = rng.gen_range(5..=10);
-                        (a, (0..len).map(|_| rng.gen_range(-10..=10)).collect())
-                    })
-                    .collect(),
-            },
+            assignment,
             trace_count: rng.gen_range(10..=15),
         }
     }
@@ -67,15 +60,11 @@ impl ToMarkdown for StepWiseInput {
         table.add_row([
             "Memory:".to_string(),
             self.assignment
-                .variables
                 .iter()
-                .map(|(v, x)| format!("`{v} = {x}`"))
-                .chain(
-                    self.assignment
-                        .arrays
-                        .iter()
-                        .map(|(v, x)| format!("`{v} = {x:?}`")),
-                )
+                .map(|e| match e {
+                    MemoryRef::Variable(v, x) => format!("`{v} = {x}`"),
+                    MemoryRef::Array(v, x) => format!("`{v} = {x:?}`"),
+                })
                 .format(", ")
                 .to_string(),
         ]);
@@ -99,7 +88,7 @@ impl ToMarkdown for StepWiseOutput {
         let arrays = self
             .0
             .iter()
-            .flat_map(|t| t.memory.arrays.keys().cloned())
+            .flat_map(|t| t.memory.arrays.keys().map(|k| k.to_string()))
             .sorted()
             .dedup()
             .collect_vec();
@@ -212,7 +201,7 @@ impl Environment for StepWiseEnv {
             mem = next_mem;
         }
 
-        if output.0.len() < input.trace_count {
+        if output.0.len() < input.trace_count as usize {
             ValidationResult::CorrectTerminated
         } else {
             ValidationResult::CorrectNonTerminated {

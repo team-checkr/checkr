@@ -2,19 +2,35 @@ use std::fmt::Display;
 
 use itertools::Itertools;
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Variable};
+use crate::ast::{
+    AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
+};
 
 impl Display for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
 }
-impl<Idx> Display for Array<Idx>
-where
-    Idx: Display,
-{
+impl Display for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}[{}]", self.0, self.1)
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::fmt::Display for Target<Box<AExpr>> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable(v) => v.fmt(f),
+            Self::Array(a, idx) => write!(f, "{a}[{idx}]"),
+        }
+    }
+}
+impl std::fmt::Display for Target<()> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Variable(v) => v.fmt(f),
+            Self::Array(a, ()) => a.fmt(f),
+        }
     }
 }
 
@@ -22,7 +38,6 @@ impl Display for Command {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Command::Assignment(target, expr) => write!(f, "{target} := {expr}"),
-            Command::ArrayAssignment(arr, expr) => write!(f, "{arr} := {expr}"),
             Command::If(guards) => write!(f, "if {}\nfi", guards.iter().format("\n[] ")),
             Command::Loop(guards) => write!(f, "do {}\nod", guards.iter().format("\n[] ")),
             Command::Break => write!(f, "break"),
@@ -57,9 +72,8 @@ impl Display for AExpr {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             AExpr::Number(n) => write!(f, "{n}"),
-            AExpr::Variable(x) => write!(f, "{x}"),
+            AExpr::Reference(x) => write!(f, "{x}"),
             AExpr::Binary(l, op, r) => write!(f, "({l} {op} {r})"),
-            AExpr::Array(a) => write!(f, "{a}"),
             AExpr::Minus(m) => write!(f, "-{m}"),
         }
     }

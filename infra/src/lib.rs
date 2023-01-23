@@ -6,6 +6,8 @@ use serde::{Deserialize, Serialize};
 pub struct RunOption {
     pub run: String,
     pub compile: Option<String>,
+    #[serde(default)]
+    pub watch: Vec<String>,
 }
 
 impl RunOption {
