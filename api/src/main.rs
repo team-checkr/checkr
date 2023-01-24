@@ -15,11 +15,10 @@ use axum::{
 };
 use clap::Parser;
 use itertools::Itertools;
-use notify::Watcher;
 use notify_debouncer_mini::DebounceEventResult;
 use serde::{Deserialize, Serialize};
-use tower_http::{cors::CorsLayer, trace::TraceLayer};
-use tracing::info;
+use tower_http::cors::CorsLayer;
+use tracing::{error, info};
 use verification_lawyer::{
     driver::{Driver, DriverError},
     env::{
@@ -88,11 +87,10 @@ where
     E: std::fmt::Debug,
     E::Output: ToMarkdown,
 {
-    info!(env = format!("{env:?}"), input = input);
     let input: E::Input = serde_json::from_str(input).expect("failed to parse input");
-    match driver.lock().unwrap().exec_raw_cmds::<E>(&cmds, &input) {
+    match driver.lock().unwrap().exec_raw_cmds::<E>(cmds, &input) {
         Ok(exec_output) => {
-            let cmds = verification_lawyer::parse::parse_commands(&cmds).unwrap();
+            let cmds = verification_lawyer::parse::parse_commands(cmds).unwrap();
             let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
             AnalysisResponse {
                 stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
@@ -115,7 +113,7 @@ where
                 }
             }
             verification_lawyer::driver::ExecError::Parse {
-                inner,
+                inner: _,
                 run_output,
                 time,
             } => AnalysisResponse {
@@ -193,6 +191,18 @@ struct CompilationStatus {
     state: CompilerState,
 }
 
+impl CompilationStatus {
+    fn new(state: CompilerState) -> Self {
+        Self {
+            compiled_at: std::time::SystemTime::now()
+                .duration_since(std::time::SystemTime::UNIX_EPOCH)
+                .unwrap()
+                .as_millis() as _,
+            state,
+        }
+    }
+}
+
 async fn compilation_status(State(state): State<ApplicationState>) -> Json<CompilationStatus> {
     Json(state.compilation_status.lock().unwrap().clone())
 }
@@ -231,12 +241,11 @@ async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
 }
 
 #[derive(Debug, Parser)]
-enum Cli {
-    WupWup {
-        #[clap(short, long, default_value_t = false)]
-        open: bool,
-        dir: PathBuf,
-    },
+struct Cli {
+    #[clap(short, long, default_value_t = false)]
+    open: bool,
+    #[clap(default_value = ".")]
+    dir: PathBuf,
 }
 
 #[derive(Clone)]
@@ -246,145 +255,164 @@ struct ApplicationState {
 }
 
 async fn run() -> anyhow::Result<()> {
-    match Cli::parse() {
-        Cli::WupWup { open, dir } => {
-            let run = infra::RunOption::from_file(dir.join("run.toml"))
-                .with_context(|| format!("could not to read {:?}", dir.join("run.toml")))?;
+    let cli = Cli::parse();
+    let run = infra::RunOption::from_file(cli.dir.join("run.toml"))
+        .with_context(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
-            let driver = if let Some(compile) = &run.compile {
-                Driver::compile(&dir, compile, &run.run)
-                    .with_context(|| format!("compiling using config: {run:?}"))?
-            } else {
-                Driver::new(&dir, &run.run)
-            };
-            let shared_driver = Arc::new(Mutex::new(driver));
-            let shared_compilation_status = Arc::new(Mutex::new(CompilationStatus {
-                compiled_at: std::time::SystemTime::now()
-                    .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                    .unwrap()
-                    .as_millis() as _,
-                state: CompilerState::Compiled,
-            }));
+    let driver = if let Some(compile) = &run.compile {
+        Driver::compile(&cli.dir, compile, &run.run)
+            .with_context(|| format!("compiling using config: {run:?}"))?
+    } else {
+        Driver::new(&cli.dir, &run.run)
+    };
+    let shared_driver = Arc::new(Mutex::new(driver));
+    let shared_compilation_status = Arc::new(Mutex::new(CompilationStatus {
+        compiled_at: std::time::SystemTime::now()
+            .duration_since(std::time::SystemTime::UNIX_EPOCH)
+            .unwrap()
+            .as_millis() as _,
+        state: CompilerState::Compiled,
+    }));
 
-            let matches = run
-                .watch
-                .iter()
-                .map(|p| glob::Pattern::new(p).unwrap())
-                .collect_vec();
+    let matches = run
+        .watch
+        .iter()
+        .map(|p| glob::Pattern::new(p).unwrap())
+        .collect_vec();
 
-            let watcher_driver = Arc::clone(&shared_driver);
-            let watcher_compilation_status = Arc::clone(&shared_compilation_status);
-            let watcher_dir = dir.clone();
-            let watcher_run = run.clone();
-            let mut watcher = notify_debouncer_mini::new_debouncer(
-                Duration::from_millis(200),
-                None,
-                move |res: DebounceEventResult| match res {
-                    Ok(events) => {
-                        if !events
-                            .iter()
-                            .any(|e| matches.iter().any(|p| p.matches_path(&e.path)))
-                        {
+    let watcher_driver = Arc::clone(&shared_driver);
+    let watcher_compilation_status = Arc::clone(&shared_compilation_status);
+    let watcher_dir = cli.dir.clone();
+    let watcher_run = run.clone();
+    let mut watcher = notify_debouncer_mini::new_debouncer(
+        Duration::from_millis(200),
+        None,
+        move |res: DebounceEventResult| match res {
+            Ok(events) => {
+                if !events
+                    .iter()
+                    .any(|e| matches.iter().any(|p| p.matches_path(&e.path)))
+                {
+                    return;
+                }
+
+                let (run, dir) = (watcher_run.clone(), watcher_dir.clone());
+
+                info!("recompiling due to changes!");
+                let compile_start = std::time::Instant::now();
+                *watcher_compilation_status.lock().unwrap() =
+                    CompilationStatus::new(CompilerState::Compiling);
+                let driver = if let Some(compile) = &run.compile {
+                    match Driver::compile(&dir, compile, &run.run) {
+                        Ok(driver) => driver,
+                        Err(DriverError::CompileFailure(output)) => {
+                            error!("failed to compile:");
+                            eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
+                            eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
+                            *watcher_compilation_status.lock().unwrap() =
+                                CompilationStatus::new(CompilerState::CompileError);
                             return;
                         }
-
-                        let (run, dir) = (watcher_run.clone(), watcher_dir.clone());
-
-                        info!("Recompile!");
-                        *watcher_compilation_status.lock().unwrap() = CompilationStatus {
-                            compiled_at: std::time::SystemTime::now()
-                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                .unwrap()
-                                .as_millis() as _,
-                            state: CompilerState::Compiling,
-                        };
-                        let driver = if let Some(compile) = &run.compile {
-                            match Driver::compile(&dir, compile, &run.run) {
-                                Ok(driver) => driver,
-                                Err(DriverError::CompileFailure(_)) => {
-                                    *watcher_compilation_status.lock().unwrap() =
-                                        CompilationStatus {
-                                            compiled_at: std::time::SystemTime::now()
-                                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                                .unwrap()
-                                                .as_millis()
-                                                as _,
-                                            state: CompilerState::CompileError,
-                                        };
-                                    return;
-                                }
-                                Err(DriverError::RunCompile(_)) => {
-                                    *watcher_compilation_status.lock().unwrap() =
-                                        CompilationStatus {
-                                            compiled_at: std::time::SystemTime::now()
-                                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                                .unwrap()
-                                                .as_millis()
-                                                as _,
-                                            state: CompilerState::CompileError,
-                                        };
-                                    return;
-                                }
-                            }
-                        } else {
-                            Driver::new(&dir, &run.run)
-                        };
-                        *watcher_compilation_status.lock().unwrap() = CompilationStatus {
-                            compiled_at: std::time::SystemTime::now()
-                                .duration_since(std::time::SystemTime::UNIX_EPOCH)
-                                .unwrap()
-                                .as_millis() as _,
-                            state: CompilerState::Compiled,
-                        };
-                        *watcher_driver.lock().unwrap() = driver;
+                        Err(DriverError::RunCompile(err)) => {
+                            error!("run compile failed:");
+                            eprintln!("{err}");
+                            *watcher_compilation_status.lock().unwrap() =
+                                CompilationStatus::new(CompilerState::CompileError);
+                            return;
+                        }
                     }
-                    Err(errors) => errors.iter().for_each(|e| println!("Error {:?}", e)),
-                },
-            )?;
-            watcher
-                .watcher()
-                .watch(&dir, notify::RecursiveMode::Recursive)?;
-
-            let app = Router::new()
-                .route("/analyze", post(analyze))
-                .route("/graph", post(graph))
-                .route("/compilation-status", get(compilation_status))
-                .with_state(ApplicationState {
-                    driver: shared_driver,
-                    compilation_status: shared_compilation_status,
-                });
-            let app = app.fallback(static_dir);
-            let app = app.layer(
-                CorsLayer::new()
-                    .allow_origin("*".parse::<HeaderValue>().unwrap())
-                    .allow_headers([CONTENT_TYPE])
-                    .allow_methods([Method::GET, Method::POST]),
-            );
-            // NOTE: Enable for HTTP logging
-            // .layer(TraceLayer::new_for_http());
-
-            if open {
-                tokio::task::spawn(async move {
-                    tokio::time::sleep(Duration::from_millis(200)).await;
-                    open::that("http://localhost:3000").unwrap();
-                });
+                } else {
+                    Driver::new(&dir, &run.run)
+                };
+                info!("compiled in {:?}", compile_start.elapsed());
+                *watcher_compilation_status.lock().unwrap() =
+                    CompilationStatus::new(CompilerState::Compiled);
+                *watcher_driver.lock().unwrap() = driver;
             }
+            Err(errors) => errors.iter().for_each(|e| eprintln!("Error {e:?}")),
+        },
+    )?;
+    watcher
+        .watcher()
+        .watch(&cli.dir, notify::RecursiveMode::Recursive)?;
 
-            let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
-            axum::Server::bind(&addr)
-                .serve(app.into_make_service())
-                .await
-                .unwrap();
+    let app = Router::new()
+        .route("/analyze", post(analyze))
+        .route("/graph", post(graph))
+        .route("/compilation-status", get(compilation_status))
+        .with_state(ApplicationState {
+            driver: shared_driver,
+            compilation_status: shared_compilation_status,
+        });
+    let app = app.fallback(static_dir);
+    let app = app.layer(
+        CorsLayer::new()
+            .allow_origin("*".parse::<HeaderValue>().unwrap())
+            .allow_headers([CONTENT_TYPE])
+            .allow_methods([Method::GET, Method::POST]),
+    );
+    // NOTE: Enable for HTTP logging
+    // .layer(TraceLayer::new_for_http());
 
-            Ok(())
-        }
+    if cli.open {
+        tokio::task::spawn(async move {
+            tokio::time::sleep(Duration::from_millis(200)).await;
+            open::that("http://localhost:3000").unwrap();
+        });
     }
+
+    {
+        use termion::*;
+
+        eprintln!("{}{}", clear::All, cursor::Goto(1, 1));
+        eprintln!(
+            "  {}{}Verification Lawyer{}{} is running",
+            color::Fg(color::LightGreen),
+            style::Bold,
+            style::Reset,
+            color::Fg(color::LightGreen),
+        );
+        eprintln!();
+        eprintln!(
+            "  ➜  {}{}Local:   {}{}http://localhost:{}3000{}{}/{}",
+            color::Fg(color::White),
+            style::Bold,
+            style::Reset,
+            color::Fg(color::Cyan),
+            style::Bold,
+            style::Reset,
+            color::Fg(color::Cyan),
+            style::Reset,
+        );
+        eprintln!();
+        eprintln!(
+            "  {}Press {}Ctrl + C{}{} to exit{}",
+            style::Faint,
+            style::Bold,
+            style::Reset,
+            style::Faint,
+            style::Reset
+        );
+        eprintln!();
+    }
+
+    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    axum::Server::bind(&addr)
+        .serve(app.into_make_service())
+        .await
+        .unwrap();
+
+    Ok(())
 }
 
 #[tokio::main]
 async fn main() -> anyhow::Result<()> {
     tracing_subscriber::fmt::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
+        .with_env_filter(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .without_time()
         .init();
 

@@ -28,3 +28,4 @@ typeshare = "1.0.0"
 notify = "5.0.0"
 notify-debouncer-mini = { version = "0.2.1", default-features = false }
 glob = "0.3.1"
+termion = "2.0.1"

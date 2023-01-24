@@ -95,11 +95,11 @@ impl Driver {
         let took = before.elapsed();
 
         if !cmd_output.status.success() {
-            error!(
-                stdout = std::str::from_utf8(&cmd_output.stdout).unwrap(),
-                stderr = std::str::from_utf8(&cmd_output.stderr).unwrap(),
-                "failed to run command",
-            );
+            // error!(
+            //     stdout = std::str::from_utf8(&cmd_output.stdout).unwrap(),
+            //     stderr = std::str::from_utf8(&cmd_output.stderr).unwrap(),
+            //     "failed to run command",
+            // );
             return Err(ExecError::CommandFailed(cmd_output, took));
         }
 
