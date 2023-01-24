@@ -26,17 +26,17 @@ enum Cli {
         #[clap(short, long)]
         seed: Option<u64>,
     },
-    /// Test subcommand
-    Test {
-        #[clap(short, long)]
-        fuel: Option<u32>,
-        #[clap(short, long)]
-        seed: Option<u64>,
-        #[clap(short, long)]
-        program: String,
-        #[command(subcommand)]
-        command: Test,
-    },
+    // /// Test subcommand
+    // Test {
+    //     #[clap(short, long)]
+    //     fuel: Option<u32>,
+    //     #[clap(short, long)]
+    //     seed: Option<u64>,
+    //     #[clap(short, long)]
+    //     program: String,
+    //     #[command(subcommand)]
+    //     command: Test,
+    // },
     /// Reference subcommand
     Reference {
         #[command(subcommand)]
@@ -115,28 +115,28 @@ fn main() -> anyhow::Result<()> {
 
             Ok(())
         }
-        Cli::Test {
-            fuel,
-            seed,
-            program,
-            command,
-        } => match command {
-            Test::Interpreter {} => {
-                let result = run_analysis(&StepWiseEnv, ".", fuel, seed, &program);
-                println!("{result:?}");
-                Ok(())
-            }
-            Test::Security {} => {
-                let result = run_analysis(&SecurityEnv, ".", fuel, seed, &program);
-                println!("{result:?}");
-                Ok(())
-            }
-            Test::Sign {} => {
-                let result = run_analysis(&SignEnv, ".", fuel, seed, &program);
-                println!("{result:?}");
-                Ok(())
-            }
-        },
+        // Cli::Test {
+        //     fuel,
+        //     seed,
+        //     program,
+        //     command,
+        // } => match command {
+        //     Test::Interpreter {} => {
+        //         let result = run_analysis(&StepWiseEnv, fuel, seed, &program);
+        //         println!("{result:?}");
+        //         Ok(())
+        //     }
+        //     Test::Security {} => {
+        //         let result = run_analysis(&SecurityEnv, fuel, seed, &program);
+        //         println!("{result:?}");
+        //         Ok(())
+        //     }
+        //     Test::Sign {} => {
+        //         let result = run_analysis(&SignEnv, fuel, seed, &program);
+        //         println!("{result:?}");
+        //         Ok(())
+        //     }
+        // },
         Cli::Reference { command } => match command {
             Reference::Interpreter { src, input } => {
                 let cmds = parse::parse_commands(&src)?;

@@ -1,5 +1,5 @@
 default:
-    # rm -rf example
+    rm -rf example
     cargo run -- test example-config.toml --base example
 
 generate-self:

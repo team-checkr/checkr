@@ -1,6 +1,7 @@
 use std::path::Path;
 
 use serde::{Deserialize, Serialize};
+use verification_lawyer::driver::{Driver, DriverError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunOption {
@@ -13,5 +14,12 @@ pub struct RunOption {
 impl RunOption {
     pub fn from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
         Ok(toml::from_str(&std::fs::read_to_string(path)?)?)
+    }
+    pub fn driver(&self, dir: impl AsRef<Path>) -> Result<Driver, DriverError> {
+        if let Some(compile) = &self.compile {
+            Driver::compile(dir, compile, &self.run)
+        } else {
+            Ok(Driver::new(dir, &self.run))
+        }
     }
 }

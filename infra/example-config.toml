@@ -1,7 +1,30 @@
+base_seed = 12341231234
+samples = 10
+
 [[groups]]
 name = "01"
-git = "git@gitlab.gbar.dtu.dk:verification-lawyer-dev-env/demo-group-01.git"
+git = "git@gitlab.gbar.dtu.dk:s184229/FsLexYacc-Starter.git"
 
 [[groups]]
 name = "02"
 git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "03"
+# git = "git@github.com:CamillaFaerch/verification-lawyer.git"
+
+[[groups]]
+name = "04"
+git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "05"
+# git = "git@github.com:CamillaFaerch/verification-lawyer.git"
+
+[[groups]]
+name = "06"
+git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "07"
+# git = "git@github.com:CamillaFaerch/verification-lawyer.git"

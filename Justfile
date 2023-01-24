@@ -26,3 +26,12 @@ serve-api: build-ui
 # aarch64-apple-darwin
 update-api: build-api
     cp $(which api) FsLexYacc-Starter/dev
+
+build-image:
+    docker build . -t vl-infra
+
+docker-shell: build-image
+    docker run -it --rm -v $(realpath ./):/root/code vl-infra bash
+
+full-competition: build-image
+    cd infra; cargo run --release -- generate-competition --base example --output competition.md example-config.toml
