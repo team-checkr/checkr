@@ -24,7 +24,15 @@ pub mod pv;
 pub mod security;
 pub mod sign;
 
-pub fn generate_program(fuel: Option<u32>, seed: Option<u64>) -> (Commands, u32, u64, SmallRng) {
+#[derive(Debug)]
+pub struct GeneratedProgram {
+    pub cmds: Commands,
+    pub fuel: u32,
+    pub seed: u64,
+    pub rng: SmallRng,
+}
+
+pub fn generate_program(fuel: Option<u32>, seed: Option<u64>) -> GeneratedProgram {
     let seed = match seed {
         Some(seed) => seed,
         None => rand::random(),
@@ -35,7 +43,12 @@ pub fn generate_program(fuel: Option<u32>, seed: Option<u64>) -> (Commands, u32,
 
     let mut cx = generation::Context::new(fuel, &mut rng);
 
-    (Commands(cx.many(5, 10, &mut rng)), fuel, seed, rng)
+    GeneratedProgram {
+        cmds: Commands(cx.many(5, 10, &mut rng)),
+        fuel,
+        seed,
+        rng,
+    }
 }
 
 #[derive(Debug)]
@@ -59,7 +72,12 @@ pub fn run_analysis<E: Environment>(
 ) -> AnalysisSummary<E> {
     debug!(name = env.name(), "running analysis");
 
-    let (cmds, fuel, seed, mut rng) = generate_program(fuel, seed);
+    let GeneratedProgram {
+        cmds,
+        fuel,
+        seed,
+        mut rng,
+    } = generate_program(fuel, seed);
 
     let input = <E as Environment>::Input::gen(&mut cmds.clone(), &mut rng);
     let exec_result = driver.exec::<E>(&cmds, &input);

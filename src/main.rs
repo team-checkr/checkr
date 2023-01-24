@@ -72,7 +72,7 @@ fn main() -> anyhow::Result<()> {
     match Cli::parse() {
         Cli::Generate { fuel, seed } => {
             for _ in 0.. {
-                let (cmds, _, _, _) = generate_program(fuel, seed);
+                let cmds = generate_program(fuel, seed).cmds;
 
                 print!("{esc}c", esc = 27 as char);
                 // println!("{}", crate::fmt::fmt_commands(&cmds));

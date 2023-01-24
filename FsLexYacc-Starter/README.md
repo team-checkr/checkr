@@ -1,3 +1,5 @@
+# FsLexYacc-Starter
+
 This folder contains the skeleton of a parser along with the input and output types for each analysis given in the assignment. It also contain an example of a "calculator" program in F# that reads an arithmetic expression from the command line and print the result of evaluating such expression for initial testing.
 
 ## Files
@@ -5,7 +7,7 @@ This folder contains the skeleton of a parser along with the input and output ty
 F#/FsLexYacc
 * [Lexer.fsl](Lexer.fsl): The lexer for arithmetic expressions
 * [Parser.fsp](Parser.fsp): The parser for arithmetic expressions
-* [Types.fs](Types.fs): Global types which are used in many analysis
+* [Types.fs](Types.fs): Global types that are used in many analysis
 * [AST.fs](AST.fs): Types for AST of arithmetic expressions
 * [Program.fs](Program.fs): The entrypoint for the program
 * [Security.fs](Security.fs): File for the security analysis
@@ -55,6 +57,8 @@ The analysis can be explored in the interactive tool. Run the program in `dev/` 
 ```
 
 With the `--open` flag this should open the tool at `http://localhost:3000/` in your browser.
+
+The tool knows how to compile your program by the instructions in `run.toml`.
 
 ## Evaluation
 

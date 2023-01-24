@@ -40,15 +40,20 @@ pub enum ValidationResult {
     Mismatch { reason: String },
     TimeOut,
 }
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct Sample {
+    pub input_json: serde_json::Value,
+    pub input_markdown: String,
+    pub output_markdown: String,
+}
+
 pub trait AnyEnvironment {
     fn command(&self) -> &'static str;
     fn name(&self) -> String;
 
-    fn gen_sample(
-        &self,
-        cmds: &Commands,
-        rng: &mut SmallRng,
-    ) -> (serde_json::Value, String, String);
+    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample;
 }
 
 impl<E> AnyEnvironment for E
@@ -64,19 +69,15 @@ where
         self.name()
     }
 
-    fn gen_sample(
-        &self,
-        cmds: &Commands,
-        rng: &mut SmallRng,
-    ) -> (serde_json::Value, String, String) {
+    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample {
         let input = E::Input::gen(&mut cmds.clone(), rng);
         let output = self.run(cmds, &input);
 
-        (
-            serde_json::to_value(&input).unwrap(),
-            input.to_markdown(),
-            output.to_markdown(),
-        )
+        Sample {
+            input_json: serde_json::to_value(&input).unwrap(),
+            input_markdown: input.to_markdown(),
+            output_markdown: output.to_markdown(),
+        }
     }
 }
 

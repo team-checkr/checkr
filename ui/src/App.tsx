@@ -21,6 +21,7 @@ import {
 } from "./api-types";
 import { Link, Route, Router } from "wouter";
 import GuideText from "./guide.md?raw";
+import { Sample } from "./base-types";
 
 const app = WebApplication.new();
 
@@ -184,14 +185,17 @@ const RIGHT_TABS_LABEL = {
 } satisfies Record<RightTab, string>;
 
 const Env = ({ env, src }: { env: Analysis; src: string }) => {
-  const [[inputJson, inputMarkdown, realReferenceOutput], setIO] = useState([
-    "",
-    "",
-    "",
-  ]);
+  const [
+    { input_json, input_markdown, output_markdown: realReferenceOutput },
+    setIO,
+  ] = useState<Sample>({
+    input_json: {},
+    input_markdown: "",
+    output_markdown: "",
+  });
   const [referenceOutput, setReferenceOutput] = useState(realReferenceOutput);
   const [tab, setTab] = useState<RightTab>("reference");
-  const [inFlight, setInFLight] = useState(false);
+  const [inFlight, setInFlight] = useState(false);
   const [response, setResponse] = useState<null | AnalysisResponse>(null);
   const [compilationStatus, setCompilationStatus] =
     useState<null | CompilationStatus>(null);
@@ -231,17 +235,17 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
     if (!compilationStatus || compilationStatus.state != CompilerState.Compiled)
       return;
 
-    setInFLight(true);
+    setInFlight(true);
 
     const { promise, abort } = api.analyze({
       analysis: env,
-      input: inputJson,
+      input: JSON.stringify(input_json),
       src,
     });
 
     promise
       .then((res) => {
-        setInFLight(false);
+        setInFlight(false);
         setResponse(res);
         setReferenceOutput(realReferenceOutputRef.current);
       })
@@ -250,7 +254,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
       });
 
     return () => abort();
-  }, [compilationStatus, src, inputJson]);
+  }, [compilationStatus, src, input_json]);
 
   useEffect(() => {
     try {
@@ -280,7 +284,10 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
     <>
       <div className="grid place-items-start border-t border-slate-500 bg-slate-800 px-4 py-3 text-xl">
         <div className="prose prose-invert">
-          <ReactMarkdown children={inputMarkdown} remarkPlugins={[remarkGfm]} />
+          <ReactMarkdown
+            children={input_markdown}
+            remarkPlugins={[remarkGfm]}
+          />
         </div>
       </div>
       <div
