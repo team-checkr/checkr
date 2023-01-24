@@ -11,7 +11,7 @@ use crate::{
     sign::Memory,
 };
 
-use super::{Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SecurityEnv;
@@ -144,12 +144,7 @@ impl Environment for SecurityEnv {
 
     type Output = SecurityAnalysisOutput;
 
-    fn command() -> &'static str {
-        "security"
-    }
-    fn name(&self) -> String {
-        "Security Analysis".to_string()
-    }
+    const ANALYSIS: Analysis = Analysis::Security;
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let lattice = SecurityLattice::new(&input.lattice.0);

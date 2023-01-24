@@ -22,7 +22,7 @@
 | 2    | 02    | 9/10 passed | 3.586445628s |
 | 3    | 06    | 9/10 passed | 3.78179775s  |
 | 4    | 01    | 0/10 passed | 2.742346418s |
-## Step-wise Execution
+## Interpreter Execution
 
 | Rank | Group | Result      | Time         |
 |------|-------|-------------|--------------|

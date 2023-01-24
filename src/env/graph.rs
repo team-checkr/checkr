@@ -11,7 +11,7 @@ use crate::{
     pg::{Determinism, ProgramGraph},
 };
 
-use super::{Environment, ToMarkdown};
+use super::{Analysis, Environment, ToMarkdown};
 
 #[derive(Debug)]
 pub struct GraphEnv;
@@ -53,13 +53,7 @@ impl Environment for GraphEnv {
 
     type Output = GraphEnvOutput;
 
-    fn command() -> &'static str {
-        "graph"
-    }
-
-    fn name(&self) -> String {
-        "Graph (graphviz)".to_string()
-    }
+    const ANALYSIS: Analysis = Analysis::Graph;
 
     fn run(&self, cmds: &crate::ast::Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);

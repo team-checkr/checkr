@@ -8,8 +8,8 @@ use crate::{
 };
 
 use super::{
-    sign::SignAnalysisInput, step_wise::StepWiseInput, Environment, SignEnv, ToMarkdown,
-    ValidationResult,
+    interpreter::InterpreterInput, sign::SignAnalysisInput, Analysis, Environment, SignEnv,
+    ToMarkdown, ValidationResult,
 };
 
 #[derive(Debug)]
@@ -129,13 +129,7 @@ impl Environment for ProgramVerificationEnv {
 
     type Output = ProgramVerificationEnvOutput;
 
-    fn command() -> &'static str {
-        "pv"
-    }
-
-    fn name(&self) -> String {
-        "Program Verification".to_string()
-    }
+    const ANALYSIS: Analysis = Analysis::ProgramVerification;
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let q = crate::parse::parse_bexpr(&input.post_condition).unwrap();
@@ -158,7 +152,7 @@ impl Environment for ProgramVerificationEnv {
         let mut rng = SmallRng::seed_from_u64(0xBADA55);
 
         for _ in 0..100 {
-            let sample = StepWiseInput::gen(&mut cmds.clone(), &mut rng);
+            let sample = InterpreterInput::gen(&mut cmds.clone(), &mut rng);
 
             if a.semantics(&sample.assignment) != b.semantics(&sample.assignment) {
                 return ValidationResult::Mismatch {

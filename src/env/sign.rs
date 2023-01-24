@@ -14,7 +14,7 @@ use crate::{
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
 };
 
-use super::{Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SignEnv;
@@ -160,12 +160,7 @@ impl Environment for SignEnv {
 
     type Output = SignAnalysisOutput;
 
-    fn command() -> &'static str {
-        "sign"
-    }
-    fn name(&self) -> String {
-        "Detection of Signs Analysis".to_string()
-    }
+    const ANALYSIS: Analysis = Analysis::Sign;
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);

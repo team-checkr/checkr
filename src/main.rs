@@ -7,8 +7,8 @@ use tracing::info;
 
 use verification_lawyer::{
     env::{
-        graph::GraphEnv, pv::ProgramVerificationEnv, Application, Environment, SecurityEnv,
-        SignEnv, StepWiseEnv,
+        graph::GraphEnv, pv::ProgramVerificationEnv, Analysis, Application, Environment,
+        InterpreterEnv, SecurityEnv, SignEnv,
     },
     generate_program,
     interpreter::{Interpreter, InterpreterMemory},
@@ -39,8 +39,10 @@ enum Cli {
     // },
     /// Reference subcommand
     Reference {
-        #[command(subcommand)]
-        command: Reference,
+        #[arg(value_enum)]
+        analysis: Analysis,
+        src: String,
+        input: String,
     },
 }
 
@@ -67,7 +69,7 @@ fn main() -> anyhow::Result<()> {
         .init();
 
     let mut app = Application::new();
-    app.add_env(SecurityEnv).add_env(StepWiseEnv);
+    app.add_env(SecurityEnv).add_env(InterpreterEnv);
 
     match Cli::parse() {
         Cli::Generate { fuel, seed } => {
@@ -122,7 +124,7 @@ fn main() -> anyhow::Result<()> {
         //     command,
         // } => match command {
         //     Test::Interpreter {} => {
-        //         let result = run_analysis(&StepWiseEnv, fuel, seed, &program);
+        //         let result = run_analysis(&InterpreterEnv, fuel, seed, &program);
         //         println!("{result:?}");
         //         Ok(())
         //     }
@@ -137,57 +139,33 @@ fn main() -> anyhow::Result<()> {
         //         Ok(())
         //     }
         // },
-        Cli::Reference { command } => match command {
-            Reference::Interpreter { src, input } => {
-                let cmds = parse::parse_commands(&src)?;
+        Cli::Reference {
+            analysis,
+            src,
+            input,
+        } => {
+            let cmds = parse::parse_commands(&src)?;
+            let output = match analysis {
+                Analysis::Graph => {
+                    serde_json::to_string(&GraphEnv.run(&cmds, &serde_json::from_str(&input)?))?
+                }
+                Analysis::Sign => {
+                    serde_json::to_string(&SignEnv.run(&cmds, &serde_json::from_str(&input)?))?
+                }
+                Analysis::Interpreter => serde_json::to_string(
+                    &InterpreterEnv.run(&cmds, &serde_json::from_str(&input)?),
+                )?,
+                Analysis::Security => {
+                    serde_json::to_string(&SecurityEnv.run(&cmds, &serde_json::from_str(&input)?))?
+                }
+                Analysis::ProgramVerification => serde_json::to_string(
+                    &ProgramVerificationEnv.run(&cmds, &serde_json::from_str(&input)?),
+                )?,
+            };
 
-                let env = StepWiseEnv;
-                let output = env.run(&cmds, &serde_json::from_str(&input)?);
+            println!("{output}");
 
-                println!("{}", serde_json::to_string(&output)?);
-
-                Ok(())
-            }
-            Reference::Security { src, input } => {
-                let cmds = parse::parse_commands(&src)?;
-
-                let env = SecurityEnv;
-                let output = env.run(&cmds, &serde_json::from_str(&input)?);
-
-                println!("{}", serde_json::to_string(&output)?);
-
-                Ok(())
-            }
-            Reference::Sign { src, input } => {
-                let cmds = parse::parse_commands(&src)?;
-
-                let env = SignEnv;
-                let output = env.run(&cmds, &serde_json::from_str(&input)?);
-
-                println!("{}", serde_json::to_string(&output)?);
-
-                Ok(())
-            }
-            Reference::Pv { src, input } => {
-                let cmds = parse::parse_commands(&src)?;
-
-                let env = ProgramVerificationEnv;
-                let output = env.run(&cmds, &serde_json::from_str(&input)?);
-
-                println!("{}", serde_json::to_string(&output)?);
-
-                Ok(())
-            }
-            Reference::Graph { src, input } => {
-                let cmds = parse::parse_commands(&src)?;
-
-                let env = GraphEnv;
-                let output = env.run(&cmds, &serde_json::from_str(&input)?);
-
-                println!("{}", serde_json::to_string(&output)?);
-
-                Ok(())
-            }
-        },
+            Ok(())
+        }
     }
 }

@@ -18,8 +18,8 @@ use tracing::{debug, error};
 use verification_lawyer::{
     driver::Driver,
     env::{
-        graph::GraphEnv, pv::ProgramVerificationEnv, Environment, SecurityEnv, SignEnv,
-        StepWiseEnv, ToMarkdown, ValidationResult,
+        graph::GraphEnv, pv::ProgramVerificationEnv, Analysis, Environment, InterpreterEnv,
+        SecurityEnv, SignEnv, ToMarkdown, ValidationResult,
     },
     generation::Generate,
     AnalysisSummary,
@@ -276,11 +276,11 @@ struct GroupResults<'a> {
     config: &'a Config,
     driver: &'a Driver,
 
-    categories: Vec<(String, Vec<TestResult>)>,
+    categories: Vec<(Analysis, Vec<TestResult>)>,
 }
 
 impl GroupResults<'_> {
-    fn generate(config: &Config, sh: &Shell) -> anyhow::Result<Vec<(String, Vec<TestResult>)>> {
+    fn generate(config: &Config, sh: &Shell) -> anyhow::Result<Vec<(Analysis, Vec<TestResult>)>> {
         let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
         let driver = run.driver(sh.current_dir())?;
 
@@ -291,7 +291,7 @@ impl GroupResults<'_> {
         };
 
         results
-            .push(&StepWiseEnv)
+            .push(&InterpreterEnv)
             .push(&SignEnv)
             .push(&SecurityEnv)
             .push(&ProgramVerificationEnv);
@@ -305,7 +305,7 @@ impl GroupResults<'_> {
         E::Output: ToMarkdown,
     {
         self.categories.push((
-            env.name(),
+            E::ANALYSIS,
             generate_test_results(self.config, env, self.driver),
         ));
         self
@@ -326,7 +326,7 @@ fn generate_report(
     writeln!(output, "# Group {group_nr}")?;
 
     for (category, summaries) in categories {
-        generate_markdown(no_hidden, &category, &mut output, &summaries)?;
+        generate_markdown(no_hidden, category, &mut output, &summaries)?;
     }
 
     let mut table = comfy_table::Table::new();
@@ -360,7 +360,7 @@ where
             let summary =
                 verification_lawyer::run_analysis(env, None, Some(config.base_seed + idx), driver);
             TestResult {
-                analysis: E::command().to_string(),
+                analysis: E::ANALYSIS,
                 src: summary.cmds.to_string(),
                 input_json: serde_json::to_string(&summary.input)
                     .expect("failed to serialize input"),
@@ -396,7 +396,7 @@ enum TestResultType {
 
 #[derive(Debug, Serialize, Deserialize)]
 struct TestResult {
-    analysis: String,
+    analysis: Analysis,
     src: String,
     input_json: String,
     result: TestResultType,
@@ -405,13 +405,13 @@ struct TestResult {
 
 fn generate_markdown(
     no_hidden: bool,
-    name: &str,
+    analysis: Analysis,
     mut f: impl std::fmt::Write,
     summaries: &[TestResult],
 ) -> anyhow::Result<()> {
     const NUM_VISIBLE: usize = 2;
 
-    writeln!(f, "## {name}")?;
+    writeln!(f, "## {analysis}")?;
 
     let mut table = comfy_table::Table::new();
     table
@@ -422,7 +422,7 @@ fn generate_markdown(
         let mut target = String::new();
         let mut serializer = url::form_urlencoded::Serializer::new(&mut target);
         serializer
-            .append_pair("analysis", &summary.analysis)
+            .append_pair("analysis", summary.analysis.command())
             .append_pair("src", &summary.src)
             .append_pair("input", &summary.input_json);
 

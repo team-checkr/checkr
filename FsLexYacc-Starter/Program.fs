@@ -61,7 +61,7 @@ let main (args) =
         Console.WriteLine("{0}", JsonConvert.SerializeObject output)
 
         0
-    | [ "pv"; src; input ] ->
+    | [ "program-verification"; src; input ] ->
         let input = JsonConvert.DeserializeObject<ProgramVerification.Input> input
         let output: ProgramVerification.Output = ProgramVerification.analysis src input
         Console.WriteLine("{0}", JsonConvert.SerializeObject output)

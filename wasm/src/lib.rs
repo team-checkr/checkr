@@ -4,7 +4,8 @@ use verification_lawyer::{
     env::{
         graph::{GraphEnv, GraphEnvInput},
         pv::ProgramVerificationEnv,
-        AnyEnvironment, Application, Environment, Sample, SecurityEnv, SignEnv, StepWiseEnv,
+        Analysis, AnyEnvironment, Application, Environment, InterpreterEnv, Sample, SecurityEnv,
+        SignEnv,
     },
     pg::{Determinism, ProgramGraph},
     GeneratedProgram,
@@ -42,7 +43,11 @@ impl WebApplication {
     }
 
     pub fn list_envs(&self) -> String {
-        self.app.envs.iter().map(|e| e.name()).join(",")
+        self.app
+            .envs
+            .iter()
+            .map(|e| e.analysis().to_string())
+            .join(",")
     }
 
     pub fn generate(&self) -> String {
@@ -59,7 +64,7 @@ impl WebApplication {
                 .map(|env| {
                     let sample = env.gen_sample(&cmds, &mut rng);
                     Env {
-                        name: env.name(),
+                        analysis: env.analysis(),
                         sample,
                     }
                 })
@@ -100,12 +105,12 @@ impl WebApplication {
         let sample = SecurityEnv.gen_sample(&cmds, &mut rng);
         serde_json::to_string(&sample).unwrap()
     }
-    pub fn step_wise(&self, src: &str) -> String {
+    pub fn interpreter(&self, src: &str) -> String {
         let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
         let mut rng = verification_lawyer::generate_program(None, None).rng;
-        let sample = StepWiseEnv.gen_sample(&cmds, &mut rng);
+        let sample = InterpreterEnv.gen_sample(&cmds, &mut rng);
         serde_json::to_string(&sample).unwrap()
     }
     pub fn sign(&self, src: &str) -> String {
@@ -129,7 +134,7 @@ impl WebApplication {
 #[typeshare::typeshare]
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 struct Env {
-    name: String,
+    analysis: Analysis,
     sample: Sample,
 }
 #[typeshare::typeshare]
@@ -143,7 +148,7 @@ struct Generation {
 impl Default for WebApplication {
     fn default() -> Self {
         let mut app = Application::new();
-        app.add_env(StepWiseEnv)
+        app.add_env(InterpreterEnv)
             .add_env(SecurityEnv)
             .add_env(SignEnv);
         WebApplication { app }

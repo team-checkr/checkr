@@ -18,10 +18,10 @@ import {
   AnalysisResponse,
   CompilationStatus,
   CompilerState,
-} from "./api-types";
+  Sample,
+} from "./types";
 import { Link, Route, Router } from "wouter";
 import GuideText from "./guide.md?raw";
-import { Sample } from "./base-types";
 
 const app = WebApplication.new();
 
@@ -65,16 +65,17 @@ export const App = () => {
 
 const ENVS = [
   Analysis.Sign,
-  Analysis.StepWise,
+  Analysis.Interpreter,
   Analysis.Security,
   Analysis.ProgramVerification,
 ] satisfies Analysis[];
-const COMMAND_TO_ENVS = {
-  sign: Analysis.Sign,
-  interpreter: Analysis.StepWise,
-  security: Analysis.Security,
-  pv: Analysis.ProgramVerification,
-} satisfies Record<string, Analysis>;
+const ANALYSIS_NAMES = {
+  [Analysis.Graph]: "Graph",
+  [Analysis.Sign]: "Sign",
+  [Analysis.Interpreter]: "Interpreter",
+  [Analysis.Security]: "Security",
+  [Analysis.ProgramVerification]: "Program Verification",
+} satisfies Record<Analysis, string>;
 
 type GraphShown = "graph" | "reference";
 
@@ -82,9 +83,9 @@ const AnalysisEnv = () => {
   const [src, setSrc] = useState(inputted.src ?? app.generate_program());
   const [deterministic, setDeterministic] = useState(true);
   const [env, setEnv] = useState<Analysis>(
-    inputted.analysis && inputted.analysis in COMMAND_TO_ENVS
-      ? COMMAND_TO_ENVS[inputted.analysis as keyof typeof COMMAND_TO_ENVS]
-      : Analysis.StepWise
+    inputted.analysis && (ENVS as string[]).includes(inputted.analysis)
+      ? (inputted.analysis as Analysis)
+      : Analysis.Interpreter
   );
   const [graphShown, setGraphShown] = useState<GraphShown>("graph");
   const [dotReference, setDotReference] = useState<null | string>(null);
@@ -138,7 +139,7 @@ const AnalysisEnv = () => {
             onChange={(e) => setEnv(e.target.value as Analysis)}
           >
             {ENVS.map((e) => (
-              <option key={e}>{e}</option>
+              <option key={e}>{ANALYSIS_NAMES[e]}</option>
             ))}
           </select>
         </div>
@@ -168,8 +169,8 @@ const AnalysisEnv = () => {
           </button>
         </div>
         {graphShown == "graph"
-          ? dotReference && <Network dot={dotReference} />
-          : dotGraph && <Network dot={dotGraph} />}
+          ? dotGraph && <Network dot={dotGraph} />
+          : dotReference && <Network dot={dotReference} />}
       </div>
       <Env env={env} src={src} />
     </div>
@@ -226,7 +227,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
     return () => {
       aborts.forEach((a) => a());
-      aborts.slice(0, aborts.length);
+      aborts.splice(0, aborts.length);
       clearInterval(interval);
     };
   }, []);
@@ -265,8 +266,8 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
         case Analysis.Sign:
           setIO(JSON.parse(app.sign(src)));
           break;
-        case Analysis.StepWise:
-          setIO(JSON.parse(app.step_wise(src)));
+        case Analysis.Interpreter:
+          setIO(JSON.parse(app.interpreter(src)));
           break;
         case Analysis.ProgramVerification:
           setIO(JSON.parse(app.pv(src)));

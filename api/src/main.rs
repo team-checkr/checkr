@@ -24,20 +24,10 @@ use verification_lawyer::{
     env::{
         graph::{GraphEnv, GraphEnvInput},
         pv::ProgramVerificationEnv,
-        Environment, SecurityEnv, SignEnv, StepWiseEnv, ToMarkdown,
+        Analysis, Environment, InterpreterEnv, SecurityEnv, SignEnv, ToMarkdown,
     },
     pg::Determinism,
 };
-
-#[typeshare::typeshare]
-#[derive(Debug, Clone, Serialize, Deserialize)]
-pub enum Analysis {
-    Graph,
-    Sign,
-    StepWise,
-    Security,
-    ProgramVerification,
-}
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -136,7 +126,7 @@ async fn analyze(
     let output = match body.analysis {
         Analysis::Graph => ayo(driver, GraphEnv, &cmds, &body.input),
         Analysis::Sign => ayo(driver, SignEnv, &cmds, &body.input),
-        Analysis::StepWise => ayo(driver, StepWiseEnv, &cmds, &body.input),
+        Analysis::Interpreter => ayo(driver, InterpreterEnv, &cmds, &body.input),
         Analysis::Security => ayo(driver, SecurityEnv, &cmds, &body.input),
         Analysis::ProgramVerification => ayo(driver, ProgramVerificationEnv, &cmds, &body.input),
     };

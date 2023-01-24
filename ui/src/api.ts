@@ -4,7 +4,7 @@ import {
   CompilationStatus,
   GraphRequest,
   GraphResponse,
-} from "./api-types";
+} from "./types";
 
 export const analyze = (
   req: AnalysisRequest

@@ -5,9 +5,7 @@ watch-web:
     cd ui; npm run dev
 
 typeshare:
-    typeshare . --lang=typescript --output-file=./ui/src/base-types.ts
-    cd wasm; typeshare . --lang=typescript --output-file=../ui/src/wasm-types.ts
-    cd api; typeshare . --lang=typescript --output-file=../ui/src/api-types.ts
+    typeshare . --lang=typescript --output-file=./ui/src/types.ts
 
 build-wasm:
     cd wasm; wasm-pack build --release --target bundler

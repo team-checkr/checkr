@@ -30,12 +30,21 @@ export interface CompilationStatus {
 	state: CompilerState;
 }
 
-export enum Analysis {
-	Graph = "Graph",
-	Sign = "Sign",
-	StepWise = "StepWise",
-	Security = "Security",
-	ProgramVerification = "ProgramVerification",
+export interface Sample {
+	input_json: unknown;
+	input_markdown: string;
+	output_markdown: string;
+}
+
+export interface Env {
+	analysis: Analysis;
+	sample: Sample;
+}
+
+export interface Generation {
+	program: string;
+	dot: string;
+	envs: Env[];
 }
 
 export type ValidationResult = 
@@ -52,5 +61,13 @@ export enum CompilerState {
 	Compiling = "Compiling",
 	Compiled = "Compiled",
 	CompileError = "CompileError",
+}
+
+export enum Analysis {
+	Graph = "graph",
+	Sign = "sign",
+	Interpreter = "interpreter",
+	Security = "security",
+	ProgramVerification = "program-verification",
 }
 

@@ -1,16 +1,76 @@
+use std::str::FromStr;
+
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
 use crate::{ast::Commands, generation::Generate, sign::Memory};
+pub use graph::GraphEnv;
+pub use interpreter::InterpreterEnv;
+pub use pv::ProgramVerificationEnv;
 pub use security::SecurityEnv;
 pub use sign::SignEnv;
-pub use step_wise::StepWiseEnv;
 
 pub mod graph;
+pub mod interpreter;
 pub mod pv;
 pub mod security;
 pub mod sign;
-pub mod step_wise;
+
+#[typeshare::typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[serde(rename_all = "kebab-case")]
+pub enum Analysis {
+    Graph,
+    Sign,
+    Interpreter,
+    Security,
+    ProgramVerification,
+}
+
+pub enum AnalysisInput {
+    Graph(<GraphEnv as Environment>::Input),
+    Sign(<SignEnv as Environment>::Input),
+    Interpreter(<InterpreterEnv as Environment>::Input),
+    Security(<SecurityEnv as Environment>::Input),
+    ProgramVerification(<ProgramVerificationEnv as Environment>::Input),
+}
+
+impl std::fmt::Display for Analysis {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Analysis::Graph => write!(f, "Graph"),
+            Analysis::Sign => write!(f, "Sign"),
+            Analysis::Interpreter => write!(f, "Interpreter"),
+            Analysis::Security => write!(f, "Security"),
+            Analysis::ProgramVerification => write!(f, "Program verification"),
+        }
+    }
+}
+impl Analysis {
+    pub fn command(&self) -> &'static str {
+        match self {
+            Analysis::Graph => "graph",
+            Analysis::Sign => "sign",
+            Analysis::Interpreter => "interpreter",
+            Analysis::Security => "security",
+            Analysis::ProgramVerification => "program-verification",
+        }
+    }
+}
+impl FromStr for Analysis {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        match s {
+            "graph" => Ok(Analysis::Graph),
+            "sign" => Ok(Analysis::Sign),
+            "interpreter" => Ok(Analysis::Interpreter),
+            "security" => Ok(Analysis::Security),
+            "program-verification" => Ok(Analysis::ProgramVerification),
+            _ => Err(()),
+        }
+    }
+}
 
 pub trait ToMarkdown {
     fn to_markdown(&self) -> String;
@@ -20,8 +80,7 @@ pub trait Environment {
     type Input: Generate<Context = Commands> + Serialize + for<'a> Deserialize<'a>;
     type Output: Serialize + for<'a> Deserialize<'a>;
 
-    fn command() -> &'static str;
-    fn name(&self) -> String;
+    const ANALYSIS: Analysis;
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output;
 
@@ -50,8 +109,9 @@ pub struct Sample {
 }
 
 pub trait AnyEnvironment {
-    fn command(&self) -> &'static str;
-    fn name(&self) -> String;
+    fn analysis(&self) -> Analysis;
+
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> serde_json::Value;
 
     fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample;
 }
@@ -62,11 +122,13 @@ where
     E::Input: std::fmt::Debug + ToMarkdown,
     E::Output: std::fmt::Debug + ToMarkdown,
 {
-    fn command(&self) -> &'static str {
-        E::command()
+    fn analysis(&self) -> Analysis {
+        E::ANALYSIS
     }
-    fn name(&self) -> String {
-        self.name()
+
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> serde_json::Value {
+        serde_json::to_value(&E::Input::gen(&mut cmds.clone(), rng))
+            .expect("failed to serialize input")
     }
 
     fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample {

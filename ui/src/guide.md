@@ -3,7 +3,7 @@ To generate new programs, click on the `Generate` button in the top left corner.
 
 To the left is a `Determinism` button which defines the determinism of the program, to change between non-determinism and determinism simply click on the button.
 
-To change the analysis for which you want to validate, choose from the analysis list by clicking on the environment button which defaults to `Step-Wise`.
+To change the analysis for which you want to validate, choose from the analysis list by clicking on the environment button which defaults to `Interpreter`.
 
 ## Input
 The input is automatically generated randomly and cannot be changed.

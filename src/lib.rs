@@ -70,7 +70,7 @@ pub fn run_analysis<E: Environment>(
     seed: Option<u64>,
     driver: &Driver,
 ) -> AnalysisSummary<E> {
-    debug!(name = env.name(), "running analysis");
+    debug!(name = E::ANALYSIS.to_string(), "running analysis");
 
     let GeneratedProgram {
         cmds,

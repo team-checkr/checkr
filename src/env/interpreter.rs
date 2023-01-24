@@ -9,19 +9,19 @@ use crate::{
     sign::{Memory, MemoryRef},
 };
 
-use super::{Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
-pub struct StepWiseEnv;
+pub struct InterpreterEnv;
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StepWiseInput {
+pub struct InterpreterInput {
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
     pub trace_count: u64,
 }
 
-impl Generate for StepWiseInput {
+impl Generate for InterpreterInput {
     type Context = Commands;
 
     fn gen<R: rand::Rng>(cx: &mut Self::Context, mut rng: &mut R) -> Self {
@@ -34,7 +34,7 @@ impl Generate for StepWiseInput {
                 (0..len).map(|_| rng.gen_range(-10..=10)).collect()
             },
         );
-        StepWiseInput {
+        InterpreterInput {
             determinism: Determinism::Deterministic,
             assignment,
             trace_count: rng.gen_range(10..=15),
@@ -42,7 +42,7 @@ impl Generate for StepWiseInput {
     }
 }
 
-impl ToMarkdown for StepWiseInput {
+impl ToMarkdown for InterpreterInput {
     fn to_markdown(&self) -> String {
         let mut table = comfy_table::Table::new();
         table
@@ -74,9 +74,9 @@ impl ToMarkdown for StepWiseInput {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct StepWiseOutput(Vec<ProgramTrace<String>>);
+pub struct InterpreterOutput(Vec<ProgramTrace<String>>);
 
-impl ToMarkdown for StepWiseOutput {
+impl ToMarkdown for InterpreterOutput {
     fn to_markdown(&self) -> String {
         let variables = self
             .0
@@ -140,21 +140,16 @@ impl ToMarkdown for StepWiseOutput {
     }
 }
 
-impl Environment for StepWiseEnv {
-    type Input = StepWiseInput;
+impl Environment for InterpreterEnv {
+    type Input = InterpreterInput;
 
-    type Output = StepWiseOutput;
+    type Output = InterpreterOutput;
 
-    fn command() -> &'static str {
-        "interpreter"
-    }
-    fn name(&self) -> String {
-        "Step-wise Execution".to_string()
-    }
+    const ANALYSIS: Analysis = Analysis::Interpreter;
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);
-        StepWiseOutput(
+        InterpreterOutput(
             Interpreter::evaluate(input.trace_count, input.assignment.clone(), &pg)
                 .into_iter()
                 .map(|t| t.map_node(|n| n.to_string()))
