@@ -13,21 +13,27 @@ build-wasm:
 build-ui: build-wasm typeshare
     cd ui; npm i && npm run build
 
-build-api: build-ui
-    cargo build -p api --release
+build-inspectify: build-ui
+    cargo build -p inspectify --release
 
-serve-api: build-ui
-    RUST_LOG=debug cargo run -p api wup-wup ./FsLexYacc-Starter
+serve-inspectify: build-ui
+    RUST_LOG=debug cargo run -p inspectify ./FsLexYacc-Starter
 
 # x86_64-apple-darwin
 # x86_64-pc-windows-msvc
 # x86_64-unknown-linux-gnu
 # aarch64-apple-darwin
-update-api: build-api
-    cp $(which api) FsLexYacc-Starter/dev
+# update-inspectify: build-inspectify
+#     cp $(which inspectify) FsLexYacc-Starter/dev
+
+# <registry URL>/<namespace>/<project>/<image>
+IMAGE_NAME := "gitlab.gbar.dtu.dk/verification-lawyer-dev-env/demo-group-01/image:latest"
 
 build-image:
-    docker build . -t vl-infra
+    docker build . -t {{IMAGE_NAME}}
+
+push-image: build-image
+    docker push {{IMAGE_NAME}}
 
 docker-shell: build-image
     docker run -it --rm -v $(realpath ./):/root/code vl-infra bash

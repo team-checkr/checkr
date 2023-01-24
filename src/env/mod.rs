@@ -17,14 +17,17 @@ pub mod security;
 pub mod sign;
 
 #[typeshare::typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, clap::ValueEnum)]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, clap::ValueEnum,
+)]
 #[serde(rename_all = "kebab-case")]
+#[clap(rename_all = "kebab-case")]
 pub enum Analysis {
     Graph,
-    Sign,
     Interpreter,
-    Security,
     ProgramVerification,
+    Sign,
+    Security,
 }
 
 pub enum AnalysisInput {

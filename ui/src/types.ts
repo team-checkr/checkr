@@ -65,9 +65,9 @@ export enum CompilerState {
 
 export enum Analysis {
 	Graph = "graph",
-	Sign = "sign",
 	Interpreter = "interpreter",
-	Security = "security",
 	ProgramVerification = "program-verification",
+	Sign = "sign",
+	Security = "security",
 }
 

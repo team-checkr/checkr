@@ -14,7 +14,7 @@ type InterpreterMemory =
 type Input =
     { determinism: Determinism
       assignment: InterpreterMemory
-      trace_count: int }
+      trace_size: int }
 
 type ProgramState =
     | Running

@@ -2,27 +2,22 @@ use std::{
     cmp::Reverse,
     collections::BTreeMap,
     fs,
-    net::SocketAddr,
     path::{Path, PathBuf},
     time::Duration,
 };
 
-use axum::{http::StatusCode, routing::post, Json, Router};
 use clap::Parser;
 use infra::RunOption;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
-use tower::ServiceBuilder;
-use tracing::{debug, error};
+use tracing::error;
 use verification_lawyer::{
     driver::Driver,
     env::{
-        graph::GraphEnv, pv::ProgramVerificationEnv, Analysis, Environment, InterpreterEnv,
-        SecurityEnv, SignEnv, ToMarkdown, ValidationResult,
+        pv::ProgramVerificationEnv, Analysis, Environment, InterpreterEnv, SecurityEnv, SignEnv,
+        ToMarkdown, ValidationResult,
     },
-    generation::Generate,
-    AnalysisSummary,
 };
 use xshell::{cmd, Shell};
 
@@ -35,33 +30,34 @@ enum Cli {
         base: PathBuf,
         config: PathBuf,
     },
-    Server {
-        #[clap(long, short, default_value = "25565")]
-        port: u16,
-    },
-    GenerateReport {
+    Report {
         dir: PathBuf,
         #[clap(long, short)]
         group_nr: u64,
-        #[clap(long, short, default_value = "false")]
+        #[clap(long, short, default_value_t = false)]
         pull: bool,
-        #[clap(long, default_value = "false")]
+        #[clap(long, default_value_t = false)]
         no_hidden: bool,
         #[clap(long, short)]
         output: PathBuf,
     },
-    GenerateCompetition {
-        #[clap(short, default_value = "false")]
-        no_hidden: bool,
+    /// Run and generate the results of competition
+    ///
+    /// This pulls down all of the repos from the config, and build and runs the
+    /// tests in individual containers.
+    Competition {
+        /// The folder where the student projects will be downloaded
         #[clap(long, short)]
         base: PathBuf,
-        config: PathBuf,
+        /// The file where the resulting markdown file will be written
         #[clap(long, short)]
         output: PathBuf,
+        /// The file containing the configuration for the class
+        config: PathBuf,
     },
-    SingleCompetition {
-        input: String,
-    },
+    /// The command used within the docker container to generate competition
+    /// results of a single group
+    InternalSingleCompetition { input: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -69,6 +65,12 @@ struct Config {
     base_seed: u64,
     samples: u64,
     groups: Vec<GroupConfig>,
+}
+
+impl Config {
+    fn seeds(&self) -> impl Iterator<Item = u64> + '_ {
+        (0..self.samples).map(|seed| seed + self.base_seed)
+    }
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -82,11 +84,63 @@ const DEFAULT_SAMPLES: u64 = 10;
 
 #[derive(Debug, Serialize, Deserialize)]
 struct SingleCompetitionInput {
+    group_name: String,
     base_seed: u64,
     samples: u64,
 }
 
+impl SingleCompetitionInput {
+    const RESULT_FILE: &'static str = "result.json";
+
+    fn run_in_docker(&self, sh: &Shell) -> anyhow::Result<IndividualMarkdown> {
+        let cwd = sh.current_dir();
+
+        let input = serde_json::to_string(self).unwrap();
+
+        const DOCKER_IMAGE_NAME: &str = "vl-infra";
+        const DOCKER_BINARY_NAME: &str = "infra";
+        const SINGLE_COMPETITION_CMD: &str = "internal-single-competition";
+        let cmd = [
+            DOCKER_IMAGE_NAME,
+            DOCKER_BINARY_NAME,
+            SINGLE_COMPETITION_CMD,
+        ];
+
+        cmd!(
+            sh,
+            "docker run -w /root/code --rm -v {cwd}:/root/code {cmd...} {input}"
+        )
+        .run()
+        .unwrap();
+
+        let output = sh.read_file(Self::RESULT_FILE).unwrap();
+
+        Ok(serde_json::from_str(&output)?)
+    }
+    fn run_from_within_docker(input: &str) -> anyhow::Result<()> {
+        let sh = Shell::new()?;
+
+        let input: SingleCompetitionInput = serde_json::from_str(input)?;
+
+        let results = GroupResults::generate(
+            &Config {
+                base_seed: input.base_seed,
+                samples: input.samples,
+                groups: vec![],
+            },
+            &input.group_name,
+            &sh,
+        )?;
+
+        sh.write_file(Self::RESULT_FILE, serde_json::to_string(&results)?)?;
+
+        Ok(())
+    }
+}
+
 async fn run() -> anyhow::Result<()> {
+    eprintln!("{}{}", termion::clear::All, termion::cursor::Goto(1, 1));
+
     match Cli::parse() {
         Cli::Test {
             no_hidden,
@@ -97,73 +151,13 @@ async fn run() -> anyhow::Result<()> {
 
             for g in &config.groups {
                 if let Err(e) = test_group(&config, no_hidden, &base, g) {
-                    error!(group = g.name, error = format!("{:?}", e), "Group errored")
+                    error!(group = g.name, error = format!("{e:?}"), "Group errored")
                 }
             }
 
             Ok(())
         }
-        Cli::Server { port } => {
-            use gitlab::api::AsyncQuery;
-
-            let glab = gitlab::GitlabBuilder::new("gitlab.gbar.dtu.dk", "N-aZmK-zJSDCT4JYRUx6")
-                .build_async()
-                .await?;
-
-            let result: serde_json::Value = gitlab::api::groups::Groups::builder()
-                .all_available(true)
-                .build()?
-                .query_async(&glab)
-                .await?;
-            debug!("{result:?}");
-
-            let pid = "verification-lawyer-dev-env/demo-group-01";
-
-            let result: Vec<gitlab::Hook> = gitlab::api::projects::hooks::Hooks::builder()
-                .project(pid)
-                .build()?
-                .query_async(&glab)
-                .await?;
-            debug!("{result:?}");
-
-            for h in result {
-                tokio::time::sleep(Duration::from_millis(1000)).await;
-                debug!("Deleting {h:?}");
-                let result: serde_json::Value = gitlab::api::projects::hooks::DeleteHook::builder()
-                    .project(pid)
-                    .hook_id(h.id.value())
-                    .build()?
-                    .query_async(&glab)
-                    .await?;
-                debug!("deleted {h:?}: {result:?}");
-            }
-
-            tokio::time::sleep(Duration::from_millis(1000)).await;
-
-            let result: serde_json::Value = gitlab::api::projects::hooks::CreateHook::builder()
-                .push_events(true)
-                .project(pid)
-                .url("http://2.108.179.189:25565")
-                .build()?
-                .query_async(&glab)
-                .await?;
-            debug!("{result:?}");
-
-            let app = Router::new()
-                .route(
-                    "/",
-                    post(|data: Json<gitlab::webhooks::WebHook>| async move {
-                        debug!("{data:#?}");
-                        StatusCode::OK
-                    }),
-                )
-                .layer(ServiceBuilder::new().layer(tower_http::trace::TraceLayer::new_for_http()));
-            axum::Server::bind(&SocketAddr::from(([0; 4], port)))
-                .serve(app.into_make_service())
-                .await?;
-            Ok(())
-        }
-        Cli::GenerateReport {
+        Cli::Report {
             dir,
             group_nr,
             pull,
@@ -174,25 +168,22 @@ async fn run() -> anyhow::Result<()> {
             sh.change_dir(dir);
 
             if pull {
-                cmd!(sh, "git checkout master").run()?;
+                let primary_branch = determine_primary_branch(&sh)?;
+                cmd!(sh, "git checkout {primary_branch}").run()?;
                 cmd!(sh, "git pull").run()?;
             }
 
-            let result = generate_report(
-                &Config {
-                    base_seed: DEFAULT_BASE_SEED,
-                    samples: DEFAULT_SAMPLES,
-                    groups: vec![],
-                },
-                &sh,
-                no_hidden,
-                group_nr,
-            )?;
-            fs::write(output, result)?;
+            let result = SingleCompetitionInput {
+                group_name: group_nr.to_string(),
+                base_seed: DEFAULT_BASE_SEED,
+                samples: DEFAULT_SAMPLES,
+            }
+            .run_in_docker(&sh)?;
+
+            fs::write(output, result.to_string())?;
             Ok(())
         }
-        Cli::GenerateCompetition {
-            no_hidden,
+        Cli::Competition {
             base,
             config,
             output,
@@ -212,37 +203,24 @@ async fn run() -> anyhow::Result<()> {
                             return None;
                         }
                     };
-
-                    let cwd = sh.current_dir();
-
                     let input = SingleCompetitionInput {
+                        group_name: g.name.clone(),
                         base_seed: config.base_seed,
                         samples: config.samples,
                     };
-                    let input = serde_json::to_string(&input).unwrap();
+                    let output = input.run_in_docker(&sh).unwrap();
 
-                    let cmd = ["vl-infra", "infra", "single-competition"];
-
-                    cmd!(
-                        sh,
-                        "docker run -w /root/code --rm -v {cwd}:/root/code {cmd...} {input}"
-                    )
-                    .run()
-                    .unwrap();
-
-                    let output = sh.read_file("result.json").unwrap();
-
-                    Some((g, serde_json::from_str(&output).unwrap()))
+                    Some((g, output))
                 })
-                .collect::<Vec<(&GroupConfig, Vec<_>)>>();
+                .collect::<Vec<(&GroupConfig, IndividualMarkdown)>>();
             for (g, categories) in results {
-                for (cat, results) in categories {
+                for sec in categories.sections {
                     input
-                        .categories
-                        .entry(cat)
+                        .sections
+                        .entry(sec.analysis)
                         .or_default()
                         .entry(g.name.clone())
-                        .or_insert(results);
+                        .or_insert(sec.programs);
                 }
             }
 
@@ -251,22 +229,8 @@ async fn run() -> anyhow::Result<()> {
 
             Ok(())
         }
-        Cli::SingleCompetition { input } => {
-            let sh = Shell::new()?;
-
-            let input: SingleCompetitionInput = serde_json::from_str(&input)?;
-
-            let results = GroupResults::generate(
-                &Config {
-                    base_seed: input.base_seed,
-                    samples: input.samples,
-                    groups: vec![],
-                },
-                &sh,
-            )?;
-
-            sh.write_file("result.json", serde_json::to_string(&results)?)?;
-
+        Cli::InternalSingleCompetition { input } => {
+            SingleCompetitionInput::run_from_within_docker(&input)?;
             Ok(())
         }
     }
@@ -276,18 +240,22 @@ struct GroupResults<'a> {
     config: &'a Config,
     driver: &'a Driver,
 
-    categories: Vec<(Analysis, Vec<TestResult>)>,
+    sections: Vec<IndividualMarkdownSection>,
 }
 
 impl GroupResults<'_> {
-    fn generate(config: &Config, sh: &Shell) -> anyhow::Result<Vec<(Analysis, Vec<TestResult>)>> {
+    fn generate(
+        config: &Config,
+        group_name: &str,
+        sh: &Shell,
+    ) -> anyhow::Result<IndividualMarkdown> {
         let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
         let driver = run.driver(sh.current_dir())?;
 
         let mut results = GroupResults {
             config,
             driver: &driver,
-            categories: vec![],
+            sections: vec![],
         };
 
         results
@@ -297,53 +265,23 @@ impl GroupResults<'_> {
             .push(&ProgramVerificationEnv);
         // .push(&GraphEnv);
 
-        Ok(results.categories)
+        Ok(IndividualMarkdown {
+            group_name: group_name.to_string(),
+            num_shown: 2,
+            sections: results.sections,
+        })
     }
     fn push<E: Environment>(&mut self, env: &E) -> &mut Self
     where
         E::Input: ToMarkdown,
         E::Output: ToMarkdown,
     {
-        self.categories.push((
-            E::ANALYSIS,
-            generate_test_results(self.config, env, self.driver),
-        ));
+        self.sections.push(IndividualMarkdownSection {
+            analysis: E::ANALYSIS,
+            programs: generate_test_results(self.config, env, self.driver),
+        });
         self
     }
-}
-
-fn generate_report(
-    config: &Config,
-    sh: &Shell,
-    no_hidden: bool,
-    group_nr: impl std::fmt::Display,
-) -> anyhow::Result<String> {
-    let categories = GroupResults::generate(config, sh)?;
-
-    use std::fmt::Write;
-
-    let mut output = String::new();
-    writeln!(output, "# Group {group_nr}")?;
-
-    for (category, summaries) in categories {
-        generate_markdown(no_hidden, category, &mut output, &summaries)?;
-    }
-
-    let mut table = comfy_table::Table::new();
-    table
-        .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-        .set_header(["Result", "Explanation"])
-        .add_row(["Correct", "Nice job! :)"])
-        .add_row([
-            "Correct<sup>*</sup>",
-            "The program ran correctly for the first {iterations} steps",
-        ])
-        .add_row(["Mismatch", "The result did not match the expected output"])
-        .add_row(["Error", "Unable to parse the output"]);
-    writeln!(output, "\n## Result explanations")?;
-    writeln!(output, "\n{table}")?;
-
-    Ok(output)
 }
 
 fn generate_test_results<E: Environment>(
@@ -355,10 +293,10 @@ where
     E::Input: ToMarkdown,
     E::Output: ToMarkdown,
 {
-    (0..config.samples)
-        .map(|idx| {
-            let summary =
-                verification_lawyer::run_analysis(env, None, Some(config.base_seed + idx), driver);
+    config
+        .seeds()
+        .map(|seed| {
+            let summary = verification_lawyer::run_analysis(env, None, Some(seed), driver);
             TestResult {
                 analysis: E::ANALYSIS,
                 src: summary.cmds.to_string(),
@@ -403,55 +341,18 @@ struct TestResult {
     time: Duration,
 }
 
-fn generate_markdown(
-    no_hidden: bool,
-    analysis: Analysis,
-    mut f: impl std::fmt::Write,
-    summaries: &[TestResult],
-) -> anyhow::Result<()> {
-    const NUM_VISIBLE: usize = 2;
-
-    writeln!(f, "## {analysis}")?;
-
-    let mut table = comfy_table::Table::new();
-    table
-        .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-        .set_header(["Program", "Result", "Time", "Link"]);
-
-    for (idx, summary) in summaries.iter().enumerate() {
-        let mut target = String::new();
-        let mut serializer = url::form_urlencoded::Serializer::new(&mut target);
-        serializer
-            .append_pair("analysis", summary.analysis.command())
-            .append_pair("src", &summary.src)
-            .append_pair("input", &summary.input_json);
-
-        table.add_row([
-            format!("Program {}", idx + 1),
-            match &summary.result {
-                TestResultType::CorrectTerminated => "Correct",
-                TestResultType::CorrectNonTerminated { .. } => "Correct<sup>*</sup>",
-                TestResultType::Mismatch { .. } => "Mismatch",
-                TestResultType::TimeOut => "Time out",
-                TestResultType::Error { .. } => "Error",
-            }
-            .to_string(),
-            format!("{:?}", summary.time),
-            if no_hidden || idx < NUM_VISIBLE {
-                format!("[Link](http://localhost:3000/?{target})")
-            } else {
-                "Hidden".to_string()
-            },
-        ]);
+impl TestResultType {
+    fn is_correct(&self) -> bool {
+        matches!(
+            self,
+            TestResultType::CorrectTerminated | TestResultType::CorrectNonTerminated { .. }
+        )
     }
-    writeln!(f, "\n{table}")?;
-
-    Ok(())
 }
 
 #[derive(Debug, Default)]
 struct CompetitionInput {
-    categories: BTreeMap<String, BTreeMap<String, Vec<TestResult>>>,
+    sections: BTreeMap<Analysis, BTreeMap<String, Vec<TestResult>>>,
 }
 
 impl CompetitionInput {
@@ -460,26 +361,20 @@ impl CompetitionInput {
 
         let mut buf = String::new();
 
-        for (cat, groups) in &self.categories {
+        for (analysis, groups) in &self.sections {
             let sorted_groups = groups
                 .iter()
                 .map(|(g, test_results)| {
                     let num_correct = test_results
                         .iter()
-                        .filter(|t| match t.result {
-                            TestResultType::CorrectTerminated
-                            | TestResultType::CorrectNonTerminated { .. } => true,
-                            TestResultType::Mismatch { .. }
-                            | TestResultType::TimeOut
-                            | TestResultType::Error { .. } => false,
-                        })
+                        .filter(|t| t.result.is_correct())
                         .count();
                     let time: Duration = test_results.iter().map(|t| t.time).sum();
                     (Reverse(num_correct), test_results.len(), time, g)
                 })
                 .sorted();
 
-            writeln!(buf, "## {cat}")?;
+            writeln!(buf, "## {analysis}")?;
 
             let mut table = comfy_table::Table::new();
             table
@@ -511,6 +406,15 @@ async fn main() -> anyhow::Result<()> {
     run().await
 }
 
+fn determine_primary_branch(sh: &Shell) -> anyhow::Result<String> {
+    let result = cmd!(sh, "git symbolic-ref refs/remotes/origin/HEAD").read()?;
+    Ok(result
+        .split('/')
+        .last()
+        .expect("no primary branch")
+        .to_string())
+}
+
 fn setup_shell_in_group(base: &Path, g: &GroupConfig) -> anyhow::Result<Shell> {
     let g_dir = base.join(&g.name);
     let sh = Shell::new()?;
@@ -523,8 +427,7 @@ fn setup_shell_in_group(base: &Path, g: &GroupConfig) -> anyhow::Result<Shell> {
     }
     sh.change_dir("repo");
 
-    let result = cmd!(sh, "git symbolic-ref refs/remotes/origin/HEAD").read()?;
-    let primary_branch = result.split('/').last().expect("no primary branch");
+    let primary_branch = determine_primary_branch(&sh)?;
 
     cmd!(sh, "git reset --hard").run()?;
     cmd!(sh, "git clean -xdf").run()?;
@@ -542,18 +445,94 @@ fn test_group(
 ) -> anyhow::Result<()> {
     let sh = setup_shell_in_group(base, g)?;
 
-    let report = generate_report(config, &sh, no_hidden, &g.name)?;
+    let report = SingleCompetitionInput {
+        group_name: g.name.clone(),
+        base_seed: config.base_seed,
+        samples: config.samples,
+    }
+    .run_in_docker(&sh)?;
 
     if cmd!(sh, "git checkout results").run().is_err() {
         cmd!(sh, "git switch --orphan results").run()?;
     }
     cmd!(sh, "git reset --hard").run()?;
     cmd!(sh, "git clean -xdf").run()?;
-    sh.write_file("README.md", report)?;
+    sh.write_file("README.md", report.to_string())?;
     cmd!(sh, "git add .").run()?;
     let msg = format!("Ran tests at {:?}", std::time::Instant::now());
     // cmd!(sh, "git commit -m {msg}").run()?;
     // cmd!(sh, "git push --force --set-upstream origin results").run()?;
 
     Ok(())
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct IndividualMarkdown {
+    group_name: String,
+    num_shown: usize,
+    sections: Vec<IndividualMarkdownSection>,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+struct IndividualMarkdownSection {
+    analysis: Analysis,
+    programs: Vec<TestResult>,
+}
+
+impl std::fmt::Display for IndividualMarkdown {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        writeln!(f, "# {}", self.group_name)?;
+
+        for sec in &self.sections {
+            writeln!(f, "## {}", sec.analysis)?;
+
+            let mut table = comfy_table::Table::new();
+            table
+                .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+                .set_header(["Program", "Result", "Time", "Link"]);
+
+            for (idx, summary) in sec.programs.iter().enumerate() {
+                table.add_row([
+                    format!("Program {}", idx + 1),
+                    match &summary.result {
+                        TestResultType::CorrectTerminated => "Correct",
+                        TestResultType::CorrectNonTerminated { .. } => "Correct<sup>*</sup>",
+                        TestResultType::Mismatch { .. } => "Mismatch",
+                        TestResultType::TimeOut => "Time out",
+                        TestResultType::Error { .. } => "Error",
+                    }
+                    .to_string(),
+                    format!("{:?}", summary.time),
+                    if idx < self.num_shown {
+                        let mut target = String::new();
+                        let mut serializer = url::form_urlencoded::Serializer::new(&mut target);
+                        serializer
+                            .append_pair("analysis", sec.analysis.command())
+                            .append_pair("src", &summary.src)
+                            .append_pair("input", &summary.input_json);
+                        format!("[Link](http://localhost:3000/?{target})")
+                    } else {
+                        "Hidden".to_string()
+                    },
+                ]);
+            }
+            writeln!(f, "\n{table}")?;
+        }
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(["Result", "Explanation"])
+            .add_row(["Correct", "Nice job! :)"])
+            .add_row([
+                "Correct<sup>*</sup>",
+                "The program ran correctly for a limited number of steps",
+            ])
+            .add_row(["Mismatch", "The result did not match the expected output"])
+            .add_row(["Error", "Unable to parse the output"]);
+        writeln!(f, "\n## Result explanations")?;
+        writeln!(f, "\n{table}")?;
+
+        Ok(())
+    }
 }

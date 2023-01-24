@@ -18,7 +18,7 @@ pub struct InterpreterEnv;
 pub struct InterpreterInput {
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
-    pub trace_count: u64,
+    pub trace_size: u64,
 }
 
 impl Generate for InterpreterInput {
@@ -37,7 +37,7 @@ impl Generate for InterpreterInput {
         InterpreterInput {
             determinism: Determinism::Deterministic,
             assignment,
-            trace_count: rng.gen_range(10..=15),
+            trace_size: rng.gen_range(10..=15),
         }
     }
 }
@@ -150,7 +150,7 @@ impl Environment for InterpreterEnv {
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let pg = ProgramGraph::new(input.determinism, cmds);
         InterpreterOutput(
-            Interpreter::evaluate(input.trace_count, input.assignment.clone(), &pg)
+            Interpreter::evaluate(input.trace_size, input.assignment.clone(), &pg)
                 .into_iter()
                 .map(|t| t.map_node(|n| n.to_string()))
                 .collect(),
@@ -196,11 +196,11 @@ impl Environment for InterpreterEnv {
             mem = next_mem;
         }
 
-        if output.0.len() < input.trace_count as usize {
+        if output.0.len() < input.trace_size as usize {
             ValidationResult::CorrectTerminated
         } else {
             ValidationResult::CorrectNonTerminated {
-                iterations: input.trace_count,
+                iterations: input.trace_size,
             }
         }
     }

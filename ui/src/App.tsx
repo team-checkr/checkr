@@ -6,6 +6,7 @@ import deepEqual from "deep-equal";
 import {
   ArrowPathIcon,
   ArrowPathRoundedSquareIcon,
+  CommandLineIcon,
   PlayCircleIcon,
   QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
@@ -35,7 +36,13 @@ export const App = () => {
     <div className="grid h-screen grid-rows-[auto_1fr]">
       <nav className="flex items-center bg-slate-900 px-2 text-slate-200">
         <Link href="/">
-          <a className="flex p-2 text-lg font-bold">Verification Lawyer</a>
+          <a className="flex items-center space-x-2 p-2 text-2xl font-thin italic">
+            <div className="relative">
+              <CommandLineIcon className="absolute inset-0 left-0.5 top-0.5 w-6 animate-pulse text-teal-500/50" />
+              <CommandLineIcon className="relative w-6" />
+            </div>
+            <span>Inspectify</span>
+          </a>
         </Link>
         <div className="flex-1" />
         <Link href="/">
@@ -453,9 +460,6 @@ export const Network = React.memo(({ dot }: { dot: string }) => {
 
     const debounce = requestAnimationFrame(() => run().catch(console.error));
     return () => cancelAnimationFrame(debounce);
-
-    // const debounce = requestIdleCallback(() => run().catch(console.error));
-    // return () => cancelIdleCallback(debounce);
   }, [container, dot]);
 
   return <div className="h-full w-full" ref={setContainer}></div>;

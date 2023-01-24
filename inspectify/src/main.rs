@@ -356,7 +356,7 @@ async fn run() -> anyhow::Result<()> {
 
         eprintln!("{}{}", clear::All, cursor::Goto(1, 1));
         eprintln!(
-            "  {}{}Verification Lawyer{}{} is running",
+            "  {}{}Inspectify{}{} is running",
             color::Fg(color::LightGreen),
             style::Bold,
             style::Reset,
