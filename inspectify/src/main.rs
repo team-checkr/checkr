@@ -350,38 +350,25 @@ async fn run() -> anyhow::Result<()> {
     }
 
     {
-        use termion::*;
+        use crossterm::{
+            cursor,
+            style::{self, Stylize},
+            terminal, ExecutableCommand,
+        };
+        use std::io::stdout;
 
-        eprintln!("{}{}", clear::All, cursor::Goto(1, 1));
-        eprintln!(
-            "  {}{}Inspectify{}{} is running",
-            color::Fg(color::LightGreen),
-            style::Bold,
-            style::Reset,
-            color::Fg(color::LightGreen),
-        );
-        eprintln!();
-        eprintln!(
-            "  ➜  {}{}Local:   {}{}http://localhost:{}3000{}{}/{}",
-            color::Fg(color::White),
-            style::Bold,
-            style::Reset,
-            color::Fg(color::Cyan),
-            style::Bold,
-            style::Reset,
-            color::Fg(color::Cyan),
-            style::Reset,
-        );
-        eprintln!();
-        eprintln!(
-            "  {}Press {}Ctrl + C{}{} to exit{}",
-            style::Faint,
-            style::Bold,
-            style::Reset,
-            style::Faint,
-            style::Reset
-        );
-        eprintln!();
+        stdout()
+            .execute(terminal::Clear(terminal::ClearType::All))?
+            .execute(cursor::MoveTo(3, 2))?
+            .execute(style::PrintStyledContent("Inspectify".bold().green()))?
+            .execute(style::PrintStyledContent(" is running".green()))?
+            .execute(cursor::MoveTo(3, 4))?
+            .execute(style::Print("  ➜  "))?
+            .execute(style::PrintStyledContent("Local:".bold()))?
+            .execute(style::PrintStyledContent("   http://localhost:".cyan()))?
+            .execute(style::PrintStyledContent("3000".cyan().bold()))?
+            .execute(style::PrintStyledContent("/".cyan()))?
+            .execute(cursor::MoveTo(0, 7))?;
     }
 
     let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
