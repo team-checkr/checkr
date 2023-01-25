@@ -63,7 +63,7 @@ jobs:
       uses: actions/cache@v2
       with:
         path: inspectify/ur/node_modules/
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/package-lock.json') }}
+        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
@@ -79,11 +79,16 @@ jobs:
         # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
         version: 'latest'
 
-    - name: Build inspectify
-      run: just build-inspectify
+    - name: Use Cross
+      shell: bash
+      run: |
+        cargo install cross
+        echo "CARGO=cross" >> $GITHUB_ENV
+        echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
+        echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
 
-    - name: Build checko
-      run: just build-checko
+    - name: Build inspectify and checko
+      run: just build-ci ${{ env.TARGET_FLAGS }}
 
     - name: Upload inspectify binary
       if: matrix.os != 'windows-2022'
