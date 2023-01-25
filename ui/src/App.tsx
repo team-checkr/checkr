@@ -146,7 +146,9 @@ const AnalysisEnv = () => {
             onChange={(e) => setEnv(e.target.value as Analysis)}
           >
             {ENVS.map((e) => (
-              <option key={e}>{ANALYSIS_NAMES[e]}</option>
+              <option key={e} value={e}>
+                {ANALYSIS_NAMES[e]}
+              </option>
             ))}
           </select>
         </div>

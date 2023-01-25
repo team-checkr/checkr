@@ -1,5 +1,3 @@
-#![feature(box_patterns, box_syntax)]
-
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
@@ -14,7 +12,6 @@ use verification_lawyer::{
     interpreter::{Interpreter, InterpreterMemory},
     parse,
     pg::{Determinism, ProgramGraph},
-    run_analysis,
 };
 
 #[derive(Debug, Parser)]

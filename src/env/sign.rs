@@ -1,6 +1,7 @@
-use std::collections::{HashMap, HashSet};
+use std::collections::HashSet;
 
-use itertools::Itertools;
+use indexmap::IndexMap;
+use itertools::{chain, Itertools};
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -88,7 +89,7 @@ impl Generate for Signs {
 pub struct SignAnalysisOutput {
     pub initial_node: String,
     pub final_node: String,
-    pub nodes: HashMap<String, HashSet<SignMemory>>,
+    pub nodes: IndexMap<String, HashSet<SignMemory>>,
 }
 
 impl ToMarkdown for SignAnalysisOutput {
@@ -109,43 +110,38 @@ impl ToMarkdown for SignAnalysisOutput {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-            .set_header(
-                std::iter::once("Node".to_string())
-                    .chain(variables.iter().map(|v| v.to_string()))
-                    .chain(arrays.iter().map(|v| v.to_string())),
-            );
+            .set_header(chain!(
+                ["Node".to_string()],
+                variables.iter().map(|v| v.to_string()),
+                arrays.iter().map(|v| v.to_string())
+            ));
 
-        for (n, worlds) in self.nodes.iter().sorted_by_key(|(n, _)| {
-            if *n == "qStart" {
-                "".to_string()
-            } else {
-                n.to_string()
-            }
-        }) {
+        for (n, worlds) in &self.nodes {
             let mut first = true;
             for w in worlds {
                 let is_first = first;
                 first = false;
 
-                table.add_row(
-                    std::iter::once(if is_first {
+                table.add_row(chain!(
+                    [if is_first {
                         n.to_string()
                     } else {
                         "".to_string()
-                    })
-                    .chain(variables.iter().map(|var| {
+                    }],
+                    variables.iter().map(|var| {
                         w.variables
                             .get(var)
                             .cloned()
                             .unwrap_or_default()
                             .to_string()
-                    }))
-                    .chain(
-                        arrays
-                            .iter()
-                            .map(|arr| w.arrays.get(arr).cloned().unwrap_or_default().to_string()),
-                    ),
-                );
+                    }),
+                    arrays.iter().map(|arr| w
+                        .arrays
+                        .get(arr)
+                        .cloned()
+                        .unwrap_or_default()
+                        .to_string()),
+                ));
             }
             if worlds.is_empty() {
                 table.add_row([n.to_string()]);

@@ -1,4 +1,4 @@
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -96,43 +96,39 @@ impl ToMarkdown for InterpreterOutput {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
-            .set_header(
-                std::iter::once("Node".to_string())
-                    .chain(variables.iter().cloned())
-                    .chain(arrays.iter().cloned()),
-            );
+            .set_header(chain!(
+                ["Node".to_string()],
+                variables.iter().cloned(),
+                arrays.iter().cloned()
+            ));
 
         for t in &self.0 {
             match t.state {
                 ProgramState::Running => {
-                    table.add_row(
-                        std::iter::once(t.node.to_string()).chain(
+                    table.add_row(chain!(
+                        [t.node.to_string()],
+                        chain!(
                             t.memory
                                 .variables
                                 .iter()
                                 .map(|(var, value)| (value.to_string(), var.to_string()))
-                                .sorted_by_key(|(_, k)| k.to_string())
-                                .chain(
-                                    t.memory
-                                        .arrays
-                                        .iter()
-                                        .map(|(arr, values)| {
-                                            (
-                                                format!("[{}]", values.iter().format(",")),
-                                                arr.to_string(),
-                                            )
-                                        })
-                                        .sorted_by_key(|(_, k)| k.to_string()),
-                                )
-                                .map(|(v, _)| v),
-                        ),
-                    );
+                                .sorted_by_key(|(_, k)| k.to_string()),
+                            t.memory
+                                .arrays
+                                .iter()
+                                .map(|(arr, values)| {
+                                    (format!("[{}]", values.iter().format(",")), arr.to_string())
+                                })
+                                .sorted_by_key(|(_, k)| k.to_string()),
+                        )
+                        .map(|(v, _)| v),
+                    ));
                 }
                 ProgramState::Stuck => {
-                    table.add_row([format!("**Stuck**")]);
+                    table.add_row(["**Stuck**".to_string()]);
                 }
                 ProgramState::Terminated => {
-                    table.add_row([format!("**Terminated successfully**")]);
+                    table.add_row(["**Terminated successfully**".to_string()]);
                 }
             }
         }

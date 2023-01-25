@@ -1,6 +1,6 @@
 use std::{collections::HashSet, fmt::Display};
 
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -46,19 +46,19 @@ impl Commands {
 impl Command {
     fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
         match self {
-            Command::Assignment(t, a) => implicit
-                .iter()
-                .cloned()
-                .chain(match t {
+            Command::Assignment(t, a) => chain!(
+                implicit.iter().cloned(),
+                match t {
                     Target::Variable(_) => Default::default(),
                     Target::Array(_, idx) => idx.fv(),
-                })
-                .chain(a.fv())
-                .map(|i| Flow {
-                    from: i,
-                    into: t.clone().unit(),
-                })
-                .collect(),
+                },
+                a.fv()
+            )
+            .map(|i| Flow {
+                from: i,
+                into: t.clone().unit(),
+            })
+            .collect(),
             Command::Skip => HashSet::default(),
             Command::If(c) | Command::Loop(c) => {
                 c.iter()

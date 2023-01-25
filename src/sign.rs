@@ -3,7 +3,7 @@ use std::{
     hash::Hash,
 };
 
-use itertools::Itertools;
+use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -18,18 +18,15 @@ pub struct SignAnalysis {
     pub assignment: SignMemory,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize)]
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+)]
 #[serde(tag = "Case")]
 pub enum Sign {
+    #[default]
     Positive,
     Zero,
     Negative,
-}
-
-impl Default for Sign {
-    fn default() -> Self {
-        Sign::Positive
-    }
 }
 
 impl std::fmt::Display for Sign {
@@ -214,14 +211,14 @@ impl<T, A> Memory<T, A> {
     }
 
     pub fn iter(&self) -> impl Iterator<Item = MemoryRef<T, A>> + Clone {
-        self.variables
-            .iter()
-            .map(|(var, value)| MemoryRef::Variable(var, value))
-            .chain(
-                self.arrays
-                    .iter()
-                    .map(|(arr, value)| MemoryRef::Array(arr, value)),
-            )
+        chain!(
+            self.variables
+                .iter()
+                .map(|(var, value)| MemoryRef::Variable(var, value)),
+            self.arrays
+                .iter()
+                .map(|(arr, value)| MemoryRef::Array(arr, value)),
+        )
     }
 
     pub fn with_var(mut self, var: &Variable, value: T) -> Self {
@@ -263,12 +260,12 @@ impl MonotoneFramework for SignAnalysis {
                         let signs: Signs = asdf.iter().collect();
 
                         for s in std::iter::once(None).chain(asdf.iter().map(Some)) {
-                            let mut signs = signs.clone();
+                            let mut signs = signs;
                             if let Some(s) = s {
                                 signs.remove(s.into());
                             }
                             for new_sign in expr.semantics_sign(mem) {
-                                let mut signs = signs.clone();
+                                let mut signs = signs;
                                 signs.insert(new_sign.into());
                                 let mut new_mem = mem.clone();
                                 new_mem.arrays.insert(arr.clone(), signs);

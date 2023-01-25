@@ -1,6 +1,12 @@
 base_seed = 12341231234
 samples = 10
 
+# [[programs]]
+# seed = 125234
+
+# [[programs]]
+# src = "asdfa"
+
 [[groups]]
 name = "01"
 git = "git@gitlab.gbar.dtu.dk:s184229/FsLexYacc-Starter.git"

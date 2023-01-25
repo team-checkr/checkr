@@ -1,6 +1,6 @@
 #![feature(box_patterns, box_syntax)]
 
-use std::{path::Path, time::Duration};
+use std::time::Duration;
 
 use driver::Driver;
 use env::{Environment, ValidationResult};
@@ -147,8 +147,7 @@ pub fn run_analysis<E: Environment>(
                 time,
                 stdout: String::from_utf8(run_output.stdout.clone())
                     .expect("stdout should be valid utf8"),
-                stderr: String::from_utf8(run_output.stderr.clone())
-                    .expect("stderr should be valid utf8"),
+                stderr: String::from_utf8(run_output.stderr).expect("stderr should be valid utf8"),
                 result: Err(inner.into()),
             },
         },

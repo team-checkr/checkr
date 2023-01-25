@@ -2949,6 +2949,7 @@ dependencies = [
  "clap",
  "comfy-table",
  "graphviz-rust",
+ "indexmap",
  "itertools",
  "lalrpop",
  "lalrpop-util",
