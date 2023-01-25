@@ -50,6 +50,21 @@ jobs:
     - name: Checkout repository
       uses: actions/checkout@v3
 
+    - name: ⚡ Cache Rust
+      uses: actions/cache@v2
+      with:
+        path: |
+          ~/.cargo/registry
+          ~/.cargo/git
+          target
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
+
+    - name: ⚡ Cache Node
+      uses: actions/cache@v2
+      with:
+        path: inspectify/ur/node_modules/
+        key: ${{ runner.os }}-cargo-${{ hashFiles('**/package-lock.json') }}
+
     - name: Install Rust
       uses: dtolnay/rust-toolchain@master
       with:
@@ -69,10 +84,6 @@ jobs:
 
     - name: Build checko
       run: just build-checko
-
-    - name: Strip release binary (linux and macos)
-      if: matrix.build == 'linux' || matrix.build == 'macos'
-      run: strip "target/${{ matrix.target }}/release/inspectify" && strip "target/${{ matrix.target }}/release/checko"
 
     - name: Upload inspectify binary
       if: matrix.os != 'windows-2022'
