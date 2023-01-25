@@ -131,6 +131,10 @@ impl Environment for ProgramVerificationEnv {
 
     const ANALYSIS: Analysis = Analysis::ProgramVerification;
 
+    fn setup_generation(&self) -> crate::ProgramGenerationBuilder {
+        crate::ProgramGenerationBuilder::default().no_loop(true)
+    }
+
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
         let q = crate::parse::parse_bexpr(&input.post_condition).unwrap();
         ProgramVerificationEnvOutput {

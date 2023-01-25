@@ -23,7 +23,9 @@ impl Command {
                 .reduce(|l, r| BExpr::Logic(box l, LogicOp::And, box r))
                 .unwrap_or_else(|| panic!("if-statement had no guards")),
             // TODO
-            Command::Loop(_) => q.clone(),
+            Command::Loop(_) => todo!(
+                "loops in program verification is not supported, please regenerate the program :)"
+            ),
             // TODO
             Command::Break => q.clone(),
             Command::Continue => q.clone(),

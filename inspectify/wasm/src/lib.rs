@@ -1,14 +1,12 @@
-use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use verification_lawyer::{
+    ast::Commands,
     env::{
         graph::{GraphEnv, GraphEnvInput},
         pv::ProgramVerificationEnv,
-        Analysis, AnyEnvironment, Application, Environment, InterpreterEnv, Sample, SecurityEnv,
-        SignEnv,
+        Analysis, AnyEnvironment, Environment, InterpreterEnv, Sample, SecurityEnv, SignEnv,
     },
-    pg::{Determinism, ProgramGraph},
-    GeneratedProgram,
+    pg::Determinism,
 };
 use wasm_bindgen::prelude::*;
 
@@ -24,111 +22,82 @@ pub fn init_hook() {
     tracing_wasm::set_as_global_default();
 }
 
+/// Returns a GCL string given an analysis
 #[wasm_bindgen]
-pub fn generate_program() -> String {
-    verification_lawyer::generate_program(None, None)
-        .cmds
-        .to_string()
+pub fn generate_program(analysis: String) -> String {
+    let analysis: Analysis = analysis.parse().unwrap();
+    let builder = match analysis {
+        Analysis::Graph => GraphEnv.setup_generation(),
+        Analysis::Interpreter => InterpreterEnv.setup_generation(),
+        Analysis::ProgramVerification => ProgramVerificationEnv.setup_generation(),
+        Analysis::Sign => SignEnv.setup_generation(),
+        Analysis::Security => SecurityEnv.setup_generation(),
+    };
+    builder.build().cmds.to_string()
 }
 
+/// Returns a `string` in DOT format
 #[wasm_bindgen]
-pub struct WebApplication {
-    app: Application,
-}
-
-#[wasm_bindgen]
-impl WebApplication {
-    pub fn new() -> Self {
-        Self::default()
-    }
-
-    pub fn list_envs(&self) -> String {
-        self.app
-            .envs
-            .iter()
-            .map(|e| e.analysis().to_string())
-            .join(",")
-    }
-
-    pub fn generate(&self) -> String {
-        let GeneratedProgram { cmds, mut rng, .. } =
-            verification_lawyer::generate_program(None, None);
-
-        let g = Generation {
-            program: cmds.to_string(),
-            dot: ProgramGraph::new(Determinism::NonDeterministic, &cmds).dot(),
-            envs: self
-                .app
-                .envs
-                .iter()
-                .map(|env| {
-                    let sample = env.gen_sample(&cmds, &mut rng);
-                    Env {
-                        analysis: env.analysis(),
-                        sample,
-                    }
-                })
-                .collect(),
-        };
-
-        serde_json::to_string(&g).unwrap()
-    }
-
-    pub fn generate_program(&self) -> String {
-        verification_lawyer::generate_program(None, None)
-            .cmds
-            .to_string()
-    }
-
-    pub fn dot(&self, deterministic: bool, src: &str) -> String {
-        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+pub fn dot(deterministic: bool, src: &str) -> String {
+    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
-        GraphEnv
-            .run(
-                &cmds,
-                &GraphEnvInput {
-                    determinism: if deterministic {
-                        Determinism::Deterministic
-                    } else {
-                        Determinism::NonDeterministic
-                    },
+    GraphEnv
+        .run(
+            &cmds,
+            &GraphEnvInput {
+                determinism: if deterministic {
+                    Determinism::Deterministic
+                } else {
+                    Determinism::NonDeterministic
                 },
-            )
-            .dot
-    }
-    pub fn security(&self, src: &str) -> String {
-        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+            },
+        )
+        .dot
+}
+
+/// Returns a `Sample`
+#[wasm_bindgen]
+pub fn security(src: &str) -> String {
+    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
-        let mut rng = verification_lawyer::generate_program(None, None).rng;
-        let sample = SecurityEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&sample).unwrap()
-    }
-    pub fn interpreter(&self, src: &str) -> String {
-        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let mut rng = Commands::builder().build().rng;
+    let sample = SecurityEnv.gen_sample(&cmds, &mut rng);
+    serde_json::to_string(&sample).unwrap()
+}
+
+/// Returns a `Sample`
+#[wasm_bindgen]
+pub fn interpreter(src: &str) -> String {
+    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
-        let mut rng = verification_lawyer::generate_program(None, None).rng;
-        let sample = InterpreterEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&sample).unwrap()
-    }
-    pub fn sign(&self, src: &str) -> String {
-        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let mut rng = Commands::builder().build().rng;
+    let sample = InterpreterEnv.gen_sample(&cmds, &mut rng);
+    serde_json::to_string(&sample).unwrap()
+}
+
+/// Returns a `Sample`
+#[wasm_bindgen]
+pub fn sign(src: &str) -> String {
+    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
-        let mut rng = verification_lawyer::generate_program(None, None).rng;
-        let sample = SignEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&sample).unwrap()
-    }
-    pub fn pv(&self, src: &str) -> String {
-        let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let mut rng = Commands::builder().build().rng;
+    let sample = SignEnv.gen_sample(&cmds, &mut rng);
+    serde_json::to_string(&sample).unwrap()
+}
+
+/// Returns a `Sample`
+#[wasm_bindgen]
+pub fn pv(src: &str) -> String {
+    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
-        let mut rng = verification_lawyer::generate_program(None, None).rng;
-        let sample = ProgramVerificationEnv.gen_sample(&cmds, &mut rng);
-        serde_json::to_string(&sample).unwrap()
-    }
+    let mut rng = Commands::builder().build().rng;
+    let sample = ProgramVerificationEnv.gen_sample(&cmds, &mut rng);
+    serde_json::to_string(&sample).unwrap()
 }
 
 #[typeshare::typeshare]
@@ -143,14 +112,4 @@ struct Generation {
     program: String,
     dot: String,
     envs: Vec<Env>,
-}
-
-impl Default for WebApplication {
-    fn default() -> Self {
-        let mut app = Application::new();
-        app.add_env(InterpreterEnv)
-            .add_env(SecurityEnv)
-            .add_env(SignEnv);
-        WebApplication { app }
-    }
 }

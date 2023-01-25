@@ -139,8 +139,6 @@ impl SingleCompetitionInput {
 }
 
 async fn run() -> anyhow::Result<()> {
-    eprintln!("{}{}", termion::clear::All, termion::cursor::Goto(1, 1));
-
     match Cli::parse() {
         Cli::Test {
             no_hidden,
@@ -296,7 +294,11 @@ where
     config
         .seeds()
         .map(|seed| {
-            let summary = verification_lawyer::run_analysis(env, None, Some(seed), driver);
+            let summary = env
+                .setup_generation()
+                .seed(Some(seed))
+                .build()
+                .run_analysis(env, driver);
             TestResult {
                 analysis: E::ANALYSIS,
                 src: summary.cmds.to_string(),

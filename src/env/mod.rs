@@ -3,7 +3,7 @@ use std::str::FromStr;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
-use crate::{ast::Commands, generation::Generate, sign::Memory};
+use crate::{ast::Commands, generation::Generate, sign::Memory, ProgramGenerationBuilder};
 pub use graph::GraphEnv;
 pub use interpreter::InterpreterEnv;
 pub use pv::ProgramVerificationEnv;
@@ -84,6 +84,10 @@ pub trait Environment {
     type Output: Serialize + for<'a> Deserialize<'a>;
 
     const ANALYSIS: Analysis;
+
+    fn setup_generation(&self) -> ProgramGenerationBuilder {
+        Default::default()
+    }
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output;
 

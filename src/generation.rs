@@ -8,6 +8,7 @@ pub struct Context {
     fuel: u32,
     recursion_limit: u32,
     negation_limit: u32,
+    no_loops: bool,
     names: Vec<String>,
 }
 
@@ -17,8 +18,14 @@ impl Context {
             fuel,
             recursion_limit: fuel,
             negation_limit: fuel,
+            no_loops: false,
             names: ["a", "b", "c", "d"].map(Into::into).to_vec(),
         }
+    }
+
+    pub fn set_no_loop(&mut self, no_loops: bool) -> &mut Self {
+        self.no_loops = no_loops;
+        self
     }
 
     fn use_array(&self) -> bool {
@@ -92,8 +99,10 @@ impl Generate for Command {
                 (1.0, box |cx, rng| {
                     Command::Assignment(Target::gen(cx, rng), AExpr::gen(cx, rng))
                 }),
-                (0.3, box |cx, rng| Command::If(cx.many(1, 10, rng))),
-                (0.3, box |cx, rng| Command::Loop(cx.many(1, 10, rng))),
+                (0.6, box |cx, rng| Command::If(cx.many(1, 10, rng))),
+                (if cx.no_loops { 0.0 } else { 0.3 }, box |cx, rng| {
+                    Command::Loop(cx.many(1, 10, rng))
+                }),
             ],
         )
     }

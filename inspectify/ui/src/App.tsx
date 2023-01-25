@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useEffect, useState } from "react";
-import { WebApplication } from "verification-lawyer";
+import * as wasm from "verification-lawyer";
 import { StretchEditor } from "./StretchEditor";
 import deepEqual from "deep-equal";
 import {
@@ -23,8 +23,6 @@ import {
 } from "./types";
 import { Link, Route, Router } from "wouter";
 import GuideText from "./guide.md?raw";
-
-const app = WebApplication.new();
 
 const searchParams = new URL(document.location.toString()).searchParams;
 
@@ -87,19 +85,19 @@ const ANALYSIS_NAMES = {
 type GraphShown = "graph" | "reference";
 
 const AnalysisEnv = () => {
-  const [src, setSrc] = useState(inputted.src ?? app.generate_program());
   const [deterministic, setDeterministic] = useState(true);
   const [env, setEnv] = useState<Analysis>(
     inputted.analysis && (ENVS as string[]).includes(inputted.analysis)
       ? (inputted.analysis as Analysis)
       : Analysis.Interpreter
   );
+  const [src, setSrc] = useState(inputted.src ?? wasm.generate_program(env));
   const [graphShown, setGraphShown] = useState<GraphShown>("graph");
   const [dotReference, setDotReference] = useState<null | string>(null);
   const [dotGraph, setDotGraph] = useState<null | string>(null);
 
   useEffect(() => {
-    setDotReference(app.dot(deterministic, src));
+    setDotReference(wasm.dot(deterministic, src));
 
     const { abort, promise } = api.graph({ deterministic, src });
 
@@ -121,7 +119,7 @@ const AnalysisEnv = () => {
           <button
             className="flex items-center justify-center space-x-1 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
             onClick={() => {
-              setSrc(app.generate_program());
+              setSrc(wasm.generate_program(env));
             }}
           >
             <span>Generate</span>
@@ -270,16 +268,16 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
     try {
       switch (env) {
         case Analysis.Security:
-          setIO(JSON.parse(app.security(src)));
+          setIO(JSON.parse(wasm.security(src)));
           break;
         case Analysis.Sign:
-          setIO(JSON.parse(app.sign(src)));
+          setIO(JSON.parse(wasm.sign(src)));
           break;
         case Analysis.Interpreter:
-          setIO(JSON.parse(app.interpreter(src)));
+          setIO(JSON.parse(wasm.interpreter(src)));
           break;
         case Analysis.ProgramVerification:
-          setIO(JSON.parse(app.pv(src)));
+          setIO(JSON.parse(wasm.pv(src)));
           break;
       }
     } catch (e) {
@@ -371,10 +369,10 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
                 <h3 className="text-lg font-bold italic text-white">Error</h3>
                 <div
                   className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full"
-                  title={JSON.stringify(response.stderr)}
+                  title={JSON.stringify(response.stderr.trim())}
                 >
                   <ReactMarkdown
-                    children={"````bash\n" + response.stderr + "\n```"}
+                    children={"````bash\n" + response.stderr.trim()}
                     remarkPlugins={[remarkGfm]}
                   />
                 </div>
