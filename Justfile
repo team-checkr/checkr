@@ -26,6 +26,9 @@ serve-inspectify: build-ui
 # update-inspectify: build-inspectify
 #     cp $(which inspectify) FsLexYacc-Starter/dev
 
+build-checko:
+    cargo build -p checko --release
+
 # <registry URL>/<namespace>/<project>/<image>
 IMAGE_NAME := "gitlab.gbar.dtu.dk/verification-lawyer-dev-env/demo-group-01/image:latest"
 
@@ -36,7 +39,7 @@ push-image: build-image
     docker push {{IMAGE_NAME}}
 
 docker-shell: build-image
-    docker run -it --rm -v $(realpath ./):/root/code vl-infra bash
+    docker run -it --rm -v $(realpath ./):/root/code vl-checko bash
 
 full-competition: build-image
-    cd infra; cargo run --release -- competition --base example --output competition.md example-config.toml
+    cd checko; cargo run --release -- competition --base example --output competition.md example-config.toml

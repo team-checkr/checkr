@@ -261,6 +261,33 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
+name = "checko"
+version = "0.1.0"
+dependencies = [
+ "anyhow",
+ "axum",
+ "axum-macros",
+ "clap",
+ "comfy-table",
+ "gitlab",
+ "indexmap",
+ "itertools",
+ "rayon",
+ "serde",
+ "serde_json",
+ "termion",
+ "tokio",
+ "toml",
+ "tower",
+ "tower-http",
+ "tracing",
+ "tracing-subscriber",
+ "url",
+ "verification-lawyer",
+ "xshell",
+]
+
+[[package]]
 name = "chrono"
 version = "0.4.23"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1175,33 +1202,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "infra"
-version = "0.1.0"
-dependencies = [
- "anyhow",
- "axum",
- "axum-macros",
- "clap",
- "comfy-table",
- "gitlab",
- "indexmap",
- "itertools",
- "rayon",
- "serde",
- "serde_json",
- "termion",
- "tokio",
- "toml",
- "tower",
- "tower-http",
- "tracing",
- "tracing-subscriber",
- "url",
- "verification-lawyer",
- "xshell",
-]
-
-[[package]]
 name = "inotify"
 version = "0.9.6"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1228,10 +1228,10 @@ dependencies = [
  "anyhow",
  "axum",
  "axum-macros",
+ "checko",
  "clap",
  "glob",
  "include_dir",
- "infra",
  "itertools",
  "mime",
  "mime_guess",

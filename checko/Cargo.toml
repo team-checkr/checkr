@@ -1,5 +1,5 @@
 [package]
-name = "infra"
+name = "checko"
 version = "0.1.0"
 edition = "2021"
 

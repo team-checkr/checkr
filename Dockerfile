@@ -1,4 +1,4 @@
-FROM rustlang/rust:nightly-slim as infra
+FROM rustlang/rust:nightly-slim as checko
 
 ENV CARGO_TARGET_DIR=/.cargo-target
 
@@ -15,9 +15,9 @@ WORKDIR /root/code
 RUN \
     --mount=type=cache,target=/.cargo-target/ \
     --mount=type=cache,target=/usr/local/cargo/registry/ \
-    cargo build --release -p infra && \
-    cp /.cargo-target/release/infra /root/infra
+    cargo build --release -p checko && \
+    cp /.cargo-target/release/checko /root/checko
 
 FROM mcr.microsoft.com/dotnet/sdk:7.0-bullseye-slim
 
-COPY --from=infra /root/infra /usr/bin
+COPY --from=checko /root/checko /usr/bin

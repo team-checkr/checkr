@@ -6,8 +6,8 @@ use std::{
     time::Duration,
 };
 
+use checko::RunOption;
 use clap::Parser;
-use infra::RunOption;
 use itertools::Itertools;
 use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
 use serde::{Deserialize, Serialize};
@@ -97,8 +97,10 @@ impl SingleCompetitionInput {
 
         let input = serde_json::to_string(self).unwrap();
 
-        const DOCKER_IMAGE_NAME: &str = "vl-infra";
-        const DOCKER_BINARY_NAME: &str = "infra";
+        // TODO: Don't duplicate the image name
+        const DOCKER_IMAGE_NAME: &str =
+            "gitlab.gbar.dtu.dk/verification-lawyer-dev-env/demo-group-01/image:latest";
+        const DOCKER_BINARY_NAME: &str = "checko";
         const SINGLE_COMPETITION_CMD: &str = "internal-single-competition";
         let cmd = [
             DOCKER_IMAGE_NAME,

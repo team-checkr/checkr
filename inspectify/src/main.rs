@@ -246,7 +246,7 @@ struct ApplicationState {
 
 async fn run() -> anyhow::Result<()> {
     let cli = Cli::parse();
-    let run = infra::RunOption::from_file(cli.dir.join("run.toml"))
+    let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
         .with_context(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
     let driver = if let Some(compile) = &run.compile {
