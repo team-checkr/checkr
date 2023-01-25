@@ -1,5 +1,4 @@
-use serde::{Deserialize, Serialize};
-use verification_lawyer::{
+use checkr::{
     ast::Commands,
     env::{
         graph::{GraphEnv, GraphEnvInput},
@@ -8,6 +7,7 @@ use verification_lawyer::{
     },
     pg::Determinism,
 };
+use serde::{Deserialize, Serialize};
 use wasm_bindgen::prelude::*;
 
 // When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
@@ -39,7 +39,7 @@ pub fn generate_program(analysis: String) -> String {
 /// Returns a `string` in DOT format
 #[wasm_bindgen]
 pub fn dot(deterministic: bool, src: &str) -> String {
-    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
     GraphEnv
@@ -59,7 +59,7 @@ pub fn dot(deterministic: bool, src: &str) -> String {
 /// Returns a `Sample`
 #[wasm_bindgen]
 pub fn security(src: &str) -> String {
-    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
     let mut rng = Commands::builder().build().rng;
@@ -70,7 +70,7 @@ pub fn security(src: &str) -> String {
 /// Returns a `Sample`
 #[wasm_bindgen]
 pub fn interpreter(src: &str) -> String {
-    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
     let mut rng = Commands::builder().build().rng;
@@ -81,7 +81,7 @@ pub fn interpreter(src: &str) -> String {
 /// Returns a `Sample`
 #[wasm_bindgen]
 pub fn sign(src: &str) -> String {
-    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
     let mut rng = Commands::builder().build().rng;
@@ -92,7 +92,7 @@ pub fn sign(src: &str) -> String {
 /// Returns a `Sample`
 #[wasm_bindgen]
 pub fn pv(src: &str) -> String {
-    let Ok(cmds) = verification_lawyer::parse::parse_commands(src) else {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
             return "Parse error".to_string()
         };
     let mut rng = Commands::builder().build().rng;

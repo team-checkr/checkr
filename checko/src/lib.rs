@@ -1,7 +1,7 @@
 use std::path::Path;
 
+use checkr::driver::{Driver, DriverError};
 use serde::{Deserialize, Serialize};
-use verification_lawyer::driver::{Driver, DriverError};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct RunOption {

@@ -1,6 +1,6 @@
 use clap::{Parser, Subcommand};
 
-use verification_lawyer::{
+use checkr::{
     env::{
         graph::GraphEnv, pv::ProgramVerificationEnv, Analysis, Application, Environment,
         InterpreterEnv, SecurityEnv, SignEnv,

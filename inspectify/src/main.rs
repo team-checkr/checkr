@@ -13,13 +13,7 @@ use axum::{
     routing::{get, post},
     Json, Router,
 };
-use clap::Parser;
-use itertools::Itertools;
-use notify_debouncer_mini::DebounceEventResult;
-use serde::{Deserialize, Serialize};
-use tower_http::cors::CorsLayer;
-use tracing::{error, info};
-use verification_lawyer::{
+use checkr::{
     driver::{Driver, DriverError},
     env::{
         graph::{GraphEnv, GraphEnvInput},
@@ -28,6 +22,12 @@ use verification_lawyer::{
     },
     pg::Determinism,
 };
+use clap::Parser;
+use itertools::Itertools;
+use notify_debouncer_mini::DebounceEventResult;
+use serde::{Deserialize, Serialize};
+use tower_http::cors::CorsLayer;
+use tracing::{error, info};
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -57,9 +57,9 @@ pub enum ValidationResult {
     TimeOut,
 }
 
-impl From<verification_lawyer::env::ValidationResult> for ValidationResult {
-    fn from(r: verification_lawyer::env::ValidationResult) -> Self {
-        use verification_lawyer::env::ValidationResult as VR;
+impl From<checkr::env::ValidationResult> for ValidationResult {
+    fn from(r: checkr::env::ValidationResult) -> Self {
+        use checkr::env::ValidationResult as VR;
 
         match r {
             VR::CorrectTerminated => ValidationResult::CorrectTerminated,
@@ -80,7 +80,7 @@ where
     let input: E::Input = serde_json::from_str(input).expect("failed to parse input");
     match driver.lock().unwrap().exec_raw_cmds::<E>(cmds, &input) {
         Ok(exec_output) => {
-            let cmds = verification_lawyer::parse::parse_commands(cmds).unwrap();
+            let cmds = checkr::parse::parse_commands(cmds).unwrap();
             let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
             AnalysisResponse {
                 stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
@@ -91,18 +91,16 @@ where
             }
         }
         Err(e) => match e {
-            verification_lawyer::driver::ExecError::Serialize(_) => todo!(),
-            verification_lawyer::driver::ExecError::RunExec(_) => todo!(),
-            verification_lawyer::driver::ExecError::CommandFailed(output, took) => {
-                AnalysisResponse {
-                    stdout: String::from_utf8(output.stdout).unwrap(),
-                    stderr: String::from_utf8(output.stderr).unwrap(),
-                    parsed_markdown: None,
-                    took,
-                    validation_result: None,
-                }
-            }
-            verification_lawyer::driver::ExecError::Parse {
+            checkr::driver::ExecError::Serialize(_) => todo!(),
+            checkr::driver::ExecError::RunExec(_) => todo!(),
+            checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
+                stdout: String::from_utf8(output.stdout).unwrap(),
+                stderr: String::from_utf8(output.stderr).unwrap(),
+                parsed_markdown: None,
+                took,
+                validation_result: None,
+            },
+            checkr::driver::ExecError::Parse {
                 inner: _,
                 run_output,
                 time,

@@ -7,18 +7,18 @@ use std::{
 };
 
 use checko::RunOption;
-use clap::Parser;
-use itertools::Itertools;
-use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
-use serde::{Deserialize, Serialize};
-use tracing::error;
-use verification_lawyer::{
+use checkr::{
     driver::Driver,
     env::{
         pv::ProgramVerificationEnv, Analysis, Environment, InterpreterEnv, SecurityEnv, SignEnv,
         ToMarkdown, ValidationResult,
     },
 };
+use clap::Parser;
+use itertools::Itertools;
+use rayon::prelude::{IntoParallelRefIterator, ParallelIterator};
+use serde::{Deserialize, Serialize};
+use tracing::error;
 use xshell::{cmd, Shell};
 
 #[derive(Debug, Parser)]
@@ -297,9 +297,7 @@ where
         .map(|program| {
             let builder = env.setup_generation().seed(Some(program.seed));
             let generated = match program.src.as_ref() {
-                Some(src) => {
-                    builder.from_cmds(verification_lawyer::parse::parse_commands(src).unwrap())
-                }
+                Some(src) => builder.from_cmds(checkr::parse::parse_commands(src).unwrap()),
                 None => builder.build(),
             };
 
