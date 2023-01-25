@@ -31,7 +31,9 @@ enum Cli {
         config: PathBuf,
     },
     Report {
-        dir: PathBuf,
+        /// The file containing the configuration for the class
+        #[clap(long, short)]
+        config: PathBuf,
         #[clap(long, short)]
         group_nr: u64,
         #[clap(long, short, default_value_t = false)]
@@ -40,6 +42,7 @@ enum Cli {
         no_hidden: bool,
         #[clap(long, short)]
         output: PathBuf,
+        dir: PathBuf,
     },
     /// Run and generate the results of competition
     ///
@@ -62,15 +65,14 @@ enum Cli {
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
 struct Config {
-    base_seed: u64,
-    samples: u64,
+    programs: Vec<ProgramConfig>,
     groups: Vec<GroupConfig>,
 }
 
-impl Config {
-    fn seeds(&self) -> impl Iterator<Item = u64> + '_ {
-        (0..self.samples).map(|seed| seed + self.base_seed)
-    }
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProgramConfig {
+    seed: u64,
+    src: Option<String>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -79,14 +81,10 @@ struct GroupConfig {
     git: String,
 }
 
-const DEFAULT_BASE_SEED: u64 = 12341231234;
-const DEFAULT_SAMPLES: u64 = 10;
-
 #[derive(Debug, Serialize, Deserialize)]
 struct SingleCompetitionInput {
     group_name: String,
-    base_seed: u64,
-    samples: u64,
+    programs: Vec<ProgramConfig>,
 }
 
 impl SingleCompetitionInput {
@@ -126,8 +124,7 @@ impl SingleCompetitionInput {
 
         let results = GroupResults::generate(
             &Config {
-                base_seed: input.base_seed,
-                samples: input.samples,
+                programs: input.programs,
                 groups: vec![],
             },
             &input.group_name,
@@ -158,12 +155,15 @@ async fn run() -> anyhow::Result<()> {
             Ok(())
         }
         Cli::Report {
-            dir,
+            config,
             group_nr,
             pull,
             no_hidden,
             output,
+            dir,
         } => {
+            let config: Config = toml::from_str(&fs::read_to_string(config)?)?;
+
             let sh = Shell::new()?;
             sh.change_dir(dir);
 
@@ -175,8 +175,7 @@ async fn run() -> anyhow::Result<()> {
 
             let result = SingleCompetitionInput {
                 group_name: group_nr.to_string(),
-                base_seed: DEFAULT_BASE_SEED,
-                samples: DEFAULT_SAMPLES,
+                programs: config.programs,
             }
             .run_in_docker(&sh)?;
 
@@ -205,8 +204,7 @@ async fn run() -> anyhow::Result<()> {
                     };
                     let input = SingleCompetitionInput {
                         group_name: g.name.clone(),
-                        base_seed: config.base_seed,
-                        samples: config.samples,
+                        programs: config.programs.clone(),
                     };
                     let output = input.run_in_docker(&sh).unwrap();
 
@@ -294,13 +292,18 @@ where
     E::Output: ToMarkdown,
 {
     config
-        .seeds()
-        .map(|seed| {
-            let summary = env
-                .setup_generation()
-                .seed(Some(seed))
-                .build()
-                .run_analysis(env, driver);
+        .programs
+        .iter()
+        .map(|program| {
+            let builder = env.setup_generation().seed(Some(program.seed));
+            let generated = match program.src.as_ref() {
+                Some(src) => {
+                    builder.from_cmds(verification_lawyer::parse::parse_commands(src).unwrap())
+                }
+                None => builder.build(),
+            };
+
+            let summary = generated.run_analysis(env, driver);
             TestResult {
                 analysis: E::ANALYSIS,
                 src: summary.cmds.to_string(),
@@ -451,8 +454,7 @@ fn test_group(
 
     let report = SingleCompetitionInput {
         group_name: g.name.clone(),
-        base_seed: config.base_seed,
-        samples: config.samples,
+        programs: config.programs.clone(),
     }
     .run_in_docker(&sh)?;
 

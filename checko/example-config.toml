@@ -1,11 +1,11 @@
-base_seed = 12341231234
-samples = 10
+[[programs]]
+seed = 125234
 
-# [[programs]]
-# seed = 125234
-
-# [[programs]]
-# src = "asdfa"
+[[programs]]
+seed = 12353
+src = '''
+x := y ; y := -x
+'''
 
 [[groups]]
 name = "01"

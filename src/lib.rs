@@ -47,7 +47,7 @@ impl ProgramGenerationBuilder {
     pub fn no_loop(self, no_loop: bool) -> Self {
         ProgramGenerationBuilder { no_loop, ..self }
     }
-    pub fn build(self) -> GeneratedProgram {
+    fn internal_build(self, cmds: Option<Commands>) -> GeneratedProgram {
         let seed = match self.seed {
             Some(seed) => seed,
             None => rand::random(),
@@ -60,11 +60,17 @@ impl ProgramGenerationBuilder {
         cx.set_no_loop(self.no_loop);
 
         GeneratedProgram {
-            cmds: Commands(cx.many(5, 10, &mut rng)),
+            cmds: cmds.unwrap_or_else(|| Commands(cx.many(5, 10, &mut rng))),
             fuel,
             seed,
             rng,
         }
+    }
+    pub fn from_cmds(self, cmds: Commands) -> GeneratedProgram {
+        self.internal_build(Some(cmds))
+    }
+    pub fn build(self) -> GeneratedProgram {
+        self.internal_build(None)
     }
 }
 
