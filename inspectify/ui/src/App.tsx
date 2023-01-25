@@ -1,6 +1,6 @@
 import React, { useRef } from "react";
 import { useEffect, useState } from "react";
-import * as wasm from "verification-lawyer";
+import * as wasm from "checkr";
 import { StretchEditor } from "./StretchEditor";
 import deepEqual from "deep-equal";
 import {

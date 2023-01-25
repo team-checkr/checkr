@@ -30,7 +30,7 @@ build-checko:
     cargo build -p checko --release
 
 # <registry URL>/<namespace>/<project>/<image>
-IMAGE_NAME := "gitlab.gbar.dtu.dk/verification-lawyer-dev-env/demo-group-01/image:latest"
+IMAGE_NAME := "gitlab.gbar.dtu.dk/checkr-dev-env/demo-group-01/image:latest"
 
 build-image:
     docker build . -t {{IMAGE_NAME}}

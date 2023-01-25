@@ -1,5 +1,5 @@
 {
-  "name": "verification-lawyer",
+  "name": "checkr",
   "private": true,
   "version": "0.0.0",
   "type": "module",
@@ -20,7 +20,7 @@
     "react-dom": "^18.2.0",
     "react-markdown": "^8.0.4",
     "remark-gfm": "^3.0.1",
-    "verification-lawyer": "file:../wasm/pkg/",
+    "checkr": "file:../wasm/pkg/",
     "vis-network": "^9.1.2",
     "wouter": "^2.9.2",
     "z3-solver": "^4.11.2"

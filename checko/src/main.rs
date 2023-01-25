@@ -97,7 +97,7 @@ impl SingleCompetitionInput {
 
         // TODO: Don't duplicate the image name
         const DOCKER_IMAGE_NAME: &str =
-            "gitlab.gbar.dtu.dk/verification-lawyer-dev-env/demo-group-01/image:latest";
+            "gitlab.gbar.dtu.dk/checkr-dev-env/demo-group-01/image:latest";
         const DOCKER_BINARY_NAME: &str = "checko";
         const SINGLE_COMPETITION_CMD: &str = "internal-single-competition";
         let cmd = [
