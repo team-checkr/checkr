@@ -36,7 +36,7 @@ serve-inspectify: build-ui
 build-checko:
     cargo build -p checko --release
 
-build-ci +target-flags: build-ui
+build-ci +target-flags:
     cross build -p inspectify --release {{target-flags}}
     cross build -p checko --release {{target-flags}}
 

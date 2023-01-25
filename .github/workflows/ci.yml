@@ -72,17 +72,19 @@ jobs:
 
     - uses: taiki-e/install-action@v2
       with:
-        tool: just,typeshare-cli
+        tool: just,typeshare-cli,cross
 
     - uses: jetli/wasm-pack-action@v0.4.0
       with:
         # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
         version: 'latest'
 
+    - name: Build UI
+      run: just build-ui
+
     - name: Use Cross
       shell: bash
       run: |
-        cargo install cross
         echo "CARGO=cross" >> $GITHUB_ENV
         echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
         echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
