@@ -16,6 +16,13 @@ build-ui: build-wasm typeshare
 build-inspectify: build-ui
     cargo build -p inspectify --release
 
+# build-inspectify-all: build-ui
+build-inspectify-all:
+    # cross build -p inspectify --release --target aarch64-apple-darwin
+    # cross build -p inspectify --release --target x86_64-apple-darwin
+    cross build -p inspectify --release --target x86_64-unknown-linux-gnu
+    cargo xwin build -p inspectify --release
+
 serve-inspectify: build-ui
     RUST_LOG=debug cargo run -p inspectify ./FsLexYacc-Starter
 
@@ -39,7 +46,15 @@ push-image: build-image
     docker push {{IMAGE_NAME}}
 
 docker-shell: build-image
-    docker run -it --rm -v $(realpath ./):/root/code vl-checko bash
+    docker run -it --rm -v $(realpath ./):/root/code {{IMAGE_NAME}} bash
 
 full-competition: build-image
     cd checko; cargo run --release -- competition --base example --output competition.md example-config.toml
+
+DEV_IMAGE_NAME := "checkr-dev"
+
+build-dev-image:
+    docker build . -f Dockerfile.dev -t {{DEV_IMAGE_NAME}}
+
+docker-dev: build-dev-image
+    docker run -it --rm -v /var/run/docker.sock:/var/run/docker.sock -v $(realpath ./):/root/code {{DEV_IMAGE_NAME}} bash
