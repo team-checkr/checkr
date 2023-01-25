@@ -19,25 +19,33 @@ jobs:
       RUST_BACKTRACE: 1
     runs-on: ${{ matrix.os }}
     strategy:
-      matrix:
-        build:
-        - nightly
-        - macos
-        - win-msvc
-        - win-gnu
+       matrix:
+        build: [linux, linux-arm, macos, win-msvc, win-gnu, win32-msvc]
         include:
-        - build: nightly
+        - build: linux
           os: ubuntu-22.04
           rust: nightly
+          target: x86_64-unknown-linux-musl
+        - build: linux-arm
+          os: ubuntu-22.04
+          rust: nightly
+          target: arm-unknown-linux-gnueabihf
         - build: macos
           os: macos-12
           rust: nightly
+          target: x86_64-apple-darwin
         - build: win-msvc
           os: windows-2022
           rust: nightly
+          target: x86_64-pc-windows-msvc
         - build: win-gnu
           os: windows-2022
           rust: nightly-x86_64-gnu
+          target: x86_64-pc-windows-gnu
+        - build: win32-msvc
+          os: windows-2022
+          rust: nightly
+          target: i686-pc-windows-msvc
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
@@ -58,3 +66,42 @@ jobs:
 
     - name: Build inspectify
       run: just build-inspectify
+
+    - name: Build checko
+      run: just build-checko
+
+    - name: Strip release binary (linux and macos)
+      if: matrix.build == 'linux' || matrix.build == 'macos'
+      run: strip "target/${{ matrix.target }}/release/inspectify" && strip "target/${{ matrix.target }}/release/checko"
+
+    - name: Upload inspectify binary
+      if: matrix.os != 'windows-2022'
+      uses: actions/upload-artifact@v3
+      with:
+        name: inspectify
+        path: target/${{ matrix.target }}/release/inspectify
+        if-no-files-found: error
+
+    - name: Upload inspectify windows binary
+      if: matrix.os == 'windows-2022'
+      uses: actions/upload-artifact@v3
+      with:
+        name: inspectify
+        path: target/${{ matrix.target }}/release/inspectify.exe
+        if-no-files-found: error
+
+    - name: Upload checko binary
+      if: matrix.os != 'windows-2022'
+      uses: actions/upload-artifact@v3
+      with:
+        name: checko
+        path: target/${{ matrix.target }}/release/checko
+        if-no-files-found: error
+
+    - name: Upload checko windows binary
+      if: matrix.os == 'windows-2022'
+      uses: actions/upload-artifact@v3
+      with:
+        name: checko
+        path: target/${{ matrix.target }}/release/checko.exe
+        if-no-files-found: error
