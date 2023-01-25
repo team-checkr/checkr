@@ -33,7 +33,7 @@ fn camillaify(s: &str) -> String {
         .replace("!=", "≠")
         .replace("!!", "")
         .replace("!!!", "¬")
-        .replace("!", "¬")
+        .replace('!', "¬")
 }
 
 impl ToMarkdown for ProgramVerificationEnvInput {
@@ -62,8 +62,7 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
             "`WP = {}`",
             crate::parse::parse_bexpr(&self.pre_condition)
                 .unwrap()
-                .simplify()
-                .to_string(),
+                .simplify(),
         ))]);
         // table.add_row([camillaify(&format!(
         //     "`WP = {} {{{}}}`",

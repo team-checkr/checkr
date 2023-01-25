@@ -86,7 +86,7 @@ impl Driver {
     {
         let mut cmd = self.new_command();
         cmd.arg(E::ANALYSIS.command());
-        cmd.arg(cmds.to_string());
+        cmd.arg(cmds);
 
         cmd.arg(serde_json::to_string(input).map_err(ExecError::Serialize)?);
 

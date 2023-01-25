@@ -43,16 +43,16 @@ impl Generate for SecurityAnalysisInput {
         );
         let lattice = SecurityLatticeInput(vec![
             Flow {
-                from: public.clone(),
+                from: public,
                 into: internal.clone(),
             },
             Flow {
-                from: internal.clone(),
-                into: private.clone(),
+                from: internal,
+                into: private,
             },
             Flow {
-                from: trusted.clone(),
-                into: dubious.clone(),
+                from: trusted,
+                into: dubious,
             },
         ]);
 
@@ -129,9 +129,9 @@ impl ToMarkdown for SecurityAnalysisOutput {
         table.add_row([
             "Result".to_string(),
             if self.violations.is_empty() {
-                format!("**Secure**")
+                "**Secure**".to_string()
             } else {
-                format!("**Insecure**")
+                "**Insecure**".to_string()
             },
         ]);
 
@@ -170,8 +170,8 @@ impl Environment for SecurityEnv {
         output.violations.sort();
 
         debug!(
-            reference = format!("{:?}", reference),
-            output = format!("{:?}", output)
+            reference = format!("{reference:?}"),
+            output = format!("{output:?}")
         );
 
         if reference == output {
