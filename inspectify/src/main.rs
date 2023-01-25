@@ -199,7 +199,7 @@ async fn compilation_status(State(state): State<ApplicationState>) -> Json<Compi
 
 #[axum::debug_handler]
 async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
-    static UI_DIR: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/../ui/dist/");
+    static UI_DIR: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/ui/dist/");
 
     if uri.path() == "/" {
         return Html(

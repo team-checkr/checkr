@@ -33,4 +33,4 @@ typeshare = "1.0.0"
 lalrpop = { version = "0.19.8", features = ["lexer"] }
 
 [workspace]
-members = ["wasm", "inspectify", "infra"]
+members = ["inspectify", "inspectify/wasm", "infra"]

@@ -30,12 +30,6 @@ export interface CompilationStatus {
 	state: CompilerState;
 }
 
-export interface Sample {
-	input_json: unknown;
-	input_markdown: string;
-	output_markdown: string;
-}
-
 export interface Env {
 	analysis: Analysis;
 	sample: Sample;
@@ -45,6 +39,12 @@ export interface Generation {
 	program: string;
 	dot: string;
 	envs: Env[];
+}
+
+export interface Sample {
+	input_json: unknown;
+	input_markdown: string;
+	output_markdown: string;
 }
 
 export type ValidationResult = 

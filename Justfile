@@ -1,17 +1,17 @@
 watch-wasm:
-    cd wasm; watchexec -w .. -e rs "wasm-pack build --dev --target bundler"
+    cd inspectify/wasm; watchexec -w .. -e rs "wasm-pack build --dev --target bundler"
 
 watch-web:
-    cd ui; npm run dev
+    cd inspectify/ui; npm run dev
 
 typeshare:
-    typeshare . --lang=typescript --output-file=./ui/src/types.ts
+    typeshare . --lang=typescript --output-file=./inspectify/ui/src/types.ts
 
 build-wasm:
-    cd wasm; wasm-pack build --release --target bundler
+    cd inspectify/wasm; wasm-pack build --release --target bundler
 
 build-ui: build-wasm typeshare
-    cd ui; npm i && npm run build
+    cd inspectify/ui; npm i && npm run build
 
 build-inspectify: build-ui
     cargo build -p inspectify --release
