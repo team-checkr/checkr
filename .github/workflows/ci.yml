@@ -116,3 +116,25 @@ jobs:
         name: checko-${{ matrix.build }}
         path: target/${{ matrix.target }}/release/checko.exe
         if-no-files-found: error
+  push_to_branch:
+    name: Push binaries to the binaries branch
+    needs: build
+    runs-on: ubuntu-latest
+    steps:
+    - name: Checkout repository
+      uses: actions/checkout@v3
+
+    - name: Checkout binaries branch or create if needed
+      run: |
+        git checkout binaries || git switch --orphan binaries
+
+    - name: Download all artifacts
+      uses: actions/download-artifact@v3
+
+    - name: Commit and push the new binaries
+      run: |
+        git config user.name github-actions
+        git config user.email github-actions@github.com
+        git add .
+        git commit -m "generated new binaries"
+        git push
