@@ -1,0 +1,36 @@
+---
+import {
+  CommandLineIcon,
+  PlayCircleIcon,
+  QuestionMarkCircleIcon,
+} from "@heroicons/react/24/outline";
+---
+
+<nav class="flex items-center bg-slate-900 px-2 text-slate-200">
+  <a href="/" class="flex items-center space-x-2 p-2 text-2xl font-thin italic">
+    <div class="relative">
+      <CommandLineIcon
+        className="absolute inset-0 left-0.5 top-0.5 w-6 animate-pulse text-teal-500/50"
+      />
+      <CommandLineIcon className="relative w-6" />
+    </div>
+    <span>Inspectify</span>
+  </a>
+
+  <div class="flex-1"></div>
+  <a
+    href="/"
+    class="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white"
+  >
+    <span>Analysis</span>
+    <PlayCircleIcon className="w-4" />
+  </a>
+
+  <a
+    href="/guide.html"
+    class="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white"
+  >
+    <span>Guide</span>
+    <QuestionMarkCircleIcon className="w-4" />
+  </a>
+</nav>

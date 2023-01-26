@@ -115,7 +115,7 @@ export const StretchEditor = ({
       const toLoc = (idx: number) => {
         const isOnNewline = source[idx] == "\n";
         const lines = source.slice(0, idx + 1).split("\n");
-        const offset = lines[lines.length - 1].length;
+        const offset = lines[lines.length - 1]!.length;
         return { line: lines.length, col: isOnNewline ? offset + 1 : offset };
       };
       const start = toLoc(error.loc.start);

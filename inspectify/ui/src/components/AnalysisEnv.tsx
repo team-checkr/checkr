@@ -1,72 +1,28 @@
 import React, { useRef } from "react";
 import { useEffect, useState } from "react";
-import * as wasm from "checkr";
-import { StretchEditor } from "./StretchEditor";
+import * as wasm from "../../../wasm/pkg/wasm";
 import deepEqual from "deep-equal";
 import {
   ArrowPathIcon,
   ArrowPathRoundedSquareIcon,
-  CommandLineIcon,
-  PlayCircleIcon,
-  QuestionMarkCircleIcon,
 } from "@heroicons/react/24/outline";
-import * as api from "./api";
+import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import "./z3";
+import "../lib/z3";
 import {
   Analysis,
   AnalysisResponse,
   CompilationStatus,
   CompilerState,
   Sample,
-} from "./types";
-import { Link, Route, Router } from "wouter";
-import GuideText from "./guide.md?raw";
+} from "../lib/types";
+import { StretchEditor } from "./StretchEditor";
 
 const searchParams = new URL(document.location.toString()).searchParams;
 
 const inputted: { analysis?: string; src?: string; input?: string } =
   Object.fromEntries(searchParams.entries());
-
-export const App = () => {
-  return (
-    <div className="grid h-screen grid-rows-[auto_1fr]">
-      <nav className="flex items-center bg-slate-900 px-2 text-slate-200">
-        <Link href="/">
-          <a className="flex items-center space-x-2 p-2 text-2xl font-thin italic">
-            <div className="relative">
-              <CommandLineIcon className="absolute inset-0 left-0.5 top-0.5 w-6 animate-pulse text-teal-500/50" />
-              <CommandLineIcon className="relative w-6" />
-            </div>
-            <span>Inspectify</span>
-          </a>
-        </Link>
-        <div className="flex-1" />
-        <Link href="/">
-          <a className="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white">
-            <span>Analysis</span> <PlayCircleIcon className="w-4" />
-          </a>
-        </Link>
-        <Link href="/guide">
-          <a className="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white">
-            <span>Guide</span> <QuestionMarkCircleIcon className="w-4" />
-          </a>
-        </Link>
-      </nav>
-      <Router>
-        <Route path="/">
-          <AnalysisEnv />
-        </Route>
-        <Route path="/guide">
-          <div className="prose prose-invert mx-auto py-10">
-            <ReactMarkdown children={GuideText} remarkPlugins={[remarkGfm]} />
-          </div>
-        </Route>
-      </Router>
-    </div>
-  );
-};
 
 const ENVS = [
   Analysis.Sign,
@@ -84,7 +40,7 @@ const ANALYSIS_NAMES = {
 
 type GraphShown = "graph" | "reference";
 
-const AnalysisEnv = () => {
+export const AnalysisEnv = () => {
   const [deterministic, setDeterministic] = useState(true);
   const [env, setEnv] = useState<Analysis>(
     inputted.analysis && (ENVS as string[]).includes(inputted.analysis)
@@ -432,7 +388,7 @@ export const Network = React.memo(({ dot }: { dot: string }) => {
 
       const data = vis.parseDOTNetwork(dot);
 
-      const network = new vis.Network(container, data, {
+      new vis.Network(container, data, {
         interaction: { zoomView: false },
         nodes: {
           color: {

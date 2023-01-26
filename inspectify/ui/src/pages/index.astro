@@ -1,0 +1,8 @@
+---
+import Layout from "../layouts/Layout.astro";
+import { AnalysisEnv } from "../components/AnalysisEnv";
+---
+
+<Layout title="Inspectify">
+  <AnalysisEnv client:only="react" />
+</Layout>

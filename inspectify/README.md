@@ -45,7 +45,7 @@ just watch-web
 just serve-inspectify
 ```
 
-Now the two servers should be running. On [localhost:5173](http://localhost:5173/) you should find the frontend hosted by [Vite](https://vitejs.dev/) that live updates on any changes. On [localhost:300](http://localhost:3000/) the backend is running, which shows a static version of the frontend at the time of building, but it also responds to queries about the external implementations. You should primaraly
+Now the two servers should be running. On [localhost:3001](http://localhost:3001/) you should find the frontend hosted by [Vite](https://vitejs.dev/) that live updates on any changes. On [localhost:3000](http://localhost:3000/) the backend is running, which shows a static version of the frontend at the time of building, but it also responds to queries about the external implementations. You should primaraly
 
 ### Building for production
 
