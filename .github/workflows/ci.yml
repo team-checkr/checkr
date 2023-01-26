@@ -20,7 +20,7 @@ jobs:
     runs-on: ${{ matrix.os }}
     strategy:
        matrix:
-        build: [linux, linux-arm, macos, win-msvc, win-gnu]
+        build: [linux, linux-arm, macos, win-msvc]
         include:
         - build: linux
           os: ubuntu-22.04
@@ -38,10 +38,6 @@ jobs:
           os: windows-2022
           rust: nightly
           target: x86_64-pc-windows-msvc
-        - build: win-gnu
-          os: windows-2022
-          rust: nightly-x86_64-gnu
-          target: x86_64-pc-windows-gnu
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
