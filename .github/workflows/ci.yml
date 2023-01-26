@@ -131,10 +131,18 @@ jobs:
     - name: Download all artifacts
       uses: actions/download-artifact@v3
 
-    - name: Commit and push the new binaries
+    - name: Commit to binaries branch
       run: |
         git config user.name github-actions
         git config user.email github-actions@github.com
         git add .
         git commit -m "generated new binaries"
-        git push origin binaries
+        git push --set-upstream origin binaries
+
+    - name: Push to binaries branch
+      uses: s0/git-publish-subdir-action@develop
+      env:
+        REPO: self
+        BRANCH: binaries
+        FOLDER: .
+        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
