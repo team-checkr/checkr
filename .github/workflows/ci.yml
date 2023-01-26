@@ -54,7 +54,7 @@ jobs:
     - name: ⚡ Cache Node
       uses: actions/cache@v2
       with:
-        path: inspectify/ur/node_modules/
+        path: inspectify/ui/node_modules/
         key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
 
     - name: Install Rust
