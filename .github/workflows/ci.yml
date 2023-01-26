@@ -137,7 +137,6 @@ jobs:
         git config user.email github-actions@github.com
         git add .
         git commit -m "generated new binaries"
-        git push --set-upstream origin binaries
 
     - name: Push to binaries branch
       uses: s0/git-publish-subdir-action@develop
