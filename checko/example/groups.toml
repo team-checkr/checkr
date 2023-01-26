@@ -1,12 +1,3 @@
-[[programs]]
-seed = 125234
-
-[[programs]]
-seed = 12353
-src = '''
-x := y ; y := -x
-'''
-
 [[groups]]
 name = "01"
 git = "git@gitlab.gbar.dtu.dk:s184229/FsLexYacc-Starter.git"

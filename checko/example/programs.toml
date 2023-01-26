@@ -1,0 +1,8 @@
+[[programs]]
+seed = 125234
+
+[[programs]]
+seed = 12353
+src = '''
+x := y ; y := -x
+'''

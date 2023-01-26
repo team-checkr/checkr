@@ -24,16 +24,18 @@ use xshell::{cmd, Shell};
 #[derive(Debug, Parser)]
 enum Cli {
     Test {
+        #[clap(long, short)]
+        programs: PathBuf,
+        #[clap(long, short)]
+        groups: PathBuf,
         #[clap(short, default_value = "false")]
         no_hidden: bool,
         #[clap(long, short)]
         base: PathBuf,
-        config: PathBuf,
     },
     Report {
-        /// The file containing the configuration for the class
         #[clap(long, short)]
-        config: PathBuf,
+        programs: PathBuf,
         #[clap(long, short)]
         group_nr: u64,
         #[clap(long, short, default_value_t = false)]
@@ -46,27 +48,35 @@ enum Cli {
     },
     /// Run and generate the results of competition
     ///
-    /// This pulls down all of the repos from the config, and build and runs the
-    /// tests in individual containers.
+    /// This pulls down all of the repos from the group config, and build and
+    /// runs the inputs from the programs config in individual containers.
     Competition {
-        /// The folder where the student projects will be downloaded
+        /// The configs file specifying the programs to run in the competition.
         #[clap(long, short)]
-        base: PathBuf,
-        /// The file where the resulting markdown file will be written
+        programs: PathBuf,
+        /// The configs file specifying the groups which are part of the competition.
+        #[clap(long, short)]
+        groups: PathBuf,
+        /// The folder where group projects are downloaded.
+        #[clap(long, short)]
+        submissions: PathBuf,
+        /// The path where the Markdown file for the competition results should go.
         #[clap(long, short)]
         output: PathBuf,
-        /// The file containing the configuration for the class
-        config: PathBuf,
     },
     /// The command used within the docker container to generate competition
-    /// results of a single group
+    /// results of a single group. This is not intended to be used by humans.
     InternalSingleCompetition { input: String },
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
-struct Config {
-    programs: Vec<ProgramConfig>,
+struct GroupsConfig {
     groups: Vec<GroupConfig>,
+}
+
+#[derive(Debug, Clone, Serialize, Deserialize)]
+struct ProgramsConfig {
+    programs: Vec<ProgramConfig>,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -84,7 +94,7 @@ struct GroupConfig {
 #[derive(Debug, Serialize, Deserialize)]
 struct SingleCompetitionInput {
     group_name: String,
-    programs: Vec<ProgramConfig>,
+    programs: ProgramsConfig,
 }
 
 impl SingleCompetitionInput {
@@ -122,14 +132,7 @@ impl SingleCompetitionInput {
 
         let input: SingleCompetitionInput = serde_json::from_str(input)?;
 
-        let results = GroupResults::generate(
-            &Config {
-                programs: input.programs,
-                groups: vec![],
-            },
-            &input.group_name,
-            &sh,
-        )?;
+        let results = GroupResults::generate(&input.programs, &input.group_name, &sh)?;
 
         sh.write_file(Self::RESULT_FILE, serde_json::to_string(&results)?)?;
 
@@ -140,14 +143,16 @@ impl SingleCompetitionInput {
 async fn run() -> anyhow::Result<()> {
     match Cli::parse() {
         Cli::Test {
+            programs,
+            groups,
             no_hidden,
             base,
-            config,
         } => {
-            let config: Config = toml::from_str(&fs::read_to_string(config)?)?;
+            let programs: ProgramsConfig = toml::from_str(&fs::read_to_string(programs)?)?;
+            let groups: GroupsConfig = toml::from_str(&fs::read_to_string(groups)?)?;
 
-            for g in &config.groups {
-                if let Err(e) = test_group(&config, no_hidden, &base, g) {
+            for g in &groups.groups {
+                if let Err(e) = test_group(&programs, no_hidden, &base, g) {
                     error!(group = g.name, error = format!("{e:?}"), "Group errored")
                 }
             }
@@ -155,14 +160,14 @@ async fn run() -> anyhow::Result<()> {
             Ok(())
         }
         Cli::Report {
-            config,
+            programs,
             group_nr,
             pull,
             no_hidden,
             output,
             dir,
         } => {
-            let config: Config = toml::from_str(&fs::read_to_string(config)?)?;
+            let programs: ProgramsConfig = toml::from_str(&fs::read_to_string(programs)?)?;
 
             let sh = Shell::new()?;
             sh.change_dir(dir);
@@ -175,7 +180,7 @@ async fn run() -> anyhow::Result<()> {
 
             let result = SingleCompetitionInput {
                 group_name: group_nr.to_string(),
-                programs: config.programs,
+                programs,
             }
             .run_in_docker(&sh)?;
 
@@ -183,19 +188,21 @@ async fn run() -> anyhow::Result<()> {
             Ok(())
         }
         Cli::Competition {
-            base,
-            config,
+            programs,
+            groups,
+            submissions,
             output,
         } => {
-            let config: Config = toml::from_str(&fs::read_to_string(config)?)?;
+            let programs: ProgramsConfig = toml::from_str(&fs::read_to_string(programs)?)?;
+            let groups: GroupsConfig = toml::from_str(&fs::read_to_string(groups)?)?;
 
             let mut input = CompetitionInput::default();
 
-            let results = config
+            let results = groups
                 .groups
                 .par_iter()
                 .filter_map(|g| {
-                    let sh = match setup_shell_in_group(&base, g) {
+                    let sh = match setup_shell_in_group(&submissions, g) {
                         Ok(sh) => sh,
                         Err(err) => {
                             error!(group = g.name, error = format!("{err:?}"), "Group errored");
@@ -204,7 +211,7 @@ async fn run() -> anyhow::Result<()> {
                     };
                     let input = SingleCompetitionInput {
                         group_name: g.name.clone(),
-                        programs: config.programs.clone(),
+                        programs: programs.clone(),
                     };
                     let output = input.run_in_docker(&sh).unwrap();
 
@@ -235,7 +242,7 @@ async fn run() -> anyhow::Result<()> {
 }
 
 struct GroupResults<'a> {
-    config: &'a Config,
+    config: &'a ProgramsConfig,
     driver: &'a Driver,
 
     sections: Vec<IndividualMarkdownSection>,
@@ -243,7 +250,7 @@ struct GroupResults<'a> {
 
 impl GroupResults<'_> {
     fn generate(
-        config: &Config,
+        config: &ProgramsConfig,
         group_name: &str,
         sh: &Shell,
     ) -> anyhow::Result<IndividualMarkdown> {
@@ -283,7 +290,7 @@ impl GroupResults<'_> {
 }
 
 fn generate_test_results<E: Environment>(
-    config: &Config,
+    config: &ProgramsConfig,
     env: &E,
     driver: &Driver,
 ) -> Vec<TestResult>
@@ -443,7 +450,7 @@ fn setup_shell_in_group(base: &Path, g: &GroupConfig) -> anyhow::Result<Shell> {
 }
 
 fn test_group(
-    config: &Config,
+    programs: &ProgramsConfig,
     no_hidden: bool,
     base: &Path,
     g: &GroupConfig,
@@ -452,7 +459,7 @@ fn test_group(
 
     let report = SingleCompetitionInput {
         group_name: g.name.clone(),
-        programs: config.programs.clone(),
+        programs: programs.clone(),
     }
     .run_in_docker(&sh)?;
 
