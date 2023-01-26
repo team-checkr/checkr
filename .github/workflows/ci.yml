@@ -17,6 +17,7 @@ jobs:
       TARGET_DIR: ./target
       # Emit backtraces on panics.
       RUST_BACKTRACE: 1
+      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: ${{ matrix.os }}
     strategy:
        matrix:
@@ -41,6 +42,9 @@ jobs:
     steps:
     - name: Checkout repository
       uses: actions/checkout@v3
+      with:
+        persist-credentials: false
+        fetch-depth: 0
 
     - name: ⚡ Cache Rust
       uses: actions/cache@v2
@@ -139,9 +143,7 @@ jobs:
         git commit -m "generated new binaries"
 
     - name: Push to binaries branch
-      uses: s0/git-publish-subdir-action@develop
-      env:
-        REPO: self
-        BRANCH: binaries
-        FOLDER: .
-        GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+      uses: ad-m/github-push-action@master
+      with:
+        github_token: ${{ secrets.GITHUB_TOKEN }}
+        branch: binaries
