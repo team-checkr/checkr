@@ -50,8 +50,7 @@ impl TestRunInput {
             sh,
             "docker run -w /root/code --rm -v {cwd}:/root/code {cmd...} {input}"
         )
-        .run()
-        .unwrap();
+        .run()?;
 
         let output = sh.read_file(Self::RESULT_FILE).unwrap();
 
@@ -73,6 +72,7 @@ impl TestRunInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestRunResults {
+    pub ran_at: std::time::SystemTime,
     pub sections: Vec<TestRunResultsSection>,
 }
 
@@ -129,9 +129,9 @@ impl GroupResults<'_> {
             .push(&SignEnv)
             .push(&SecurityEnv)
             .push(&ProgramVerificationEnv);
-        // .push(&GraphEnv);
 
         Ok(TestRunResults {
+            ran_at: std::time::SystemTime::now(),
             sections: results.sections,
         })
     }

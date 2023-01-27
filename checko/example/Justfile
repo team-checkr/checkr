@@ -1,8 +1,13 @@
 CHECKO := "cargo run --release -p checko --"
 
-run-competition:
-    {{CHECKO}} competition \
-        --programs programs.toml \
-        --groups groups.toml \
-        --submissions submissions/ \
-        --output competition-results.md
+run-tests:
+    {{CHECKO}} run-tests -p programs.toml -g groups.toml -s submissions/
+
+push-results:
+    {{CHECKO}} push-results-to-repos -g groups.toml -s submissions/
+
+push-results-execute:
+    {{CHECKO}} push-results-to-repos -g groups.toml -s submissions/ --execute
+
+generate-competition:
+    {{CHECKO}} generate-competition -g groups.toml -s submissions/ -o competition-results.md
