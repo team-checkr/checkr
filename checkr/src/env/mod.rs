@@ -80,8 +80,8 @@ pub trait ToMarkdown {
 }
 
 pub trait Environment {
-    type Input: Generate<Context = Commands> + Serialize + for<'a> Deserialize<'a>;
-    type Output: Serialize + for<'a> Deserialize<'a>;
+    type Input: Generate<Context = Commands> + Serialize + for<'a> Deserialize<'a> + ToMarkdown;
+    type Output: Serialize + for<'a> Deserialize<'a> + ToMarkdown;
 
     const ANALYSIS: Analysis;
 

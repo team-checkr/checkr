@@ -1,3 +1,7 @@
+pub mod config;
+pub mod fmt;
+pub mod test_runner;
+
 use std::path::Path;
 
 use checkr::driver::{Driver, DriverError};
