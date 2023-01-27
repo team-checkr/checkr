@@ -3,6 +3,12 @@ layout: ../layouts/Content.astro
 title: Guide
 ---
 
+import { Indicator, IndicatorState } from "../components/Indicator";
+
+# Guide
+
+This is a guide to the functions of the _Inspectify_ user-interface!
+
 ## Programs
 
 To generate new programs, click on the `Generate` button in the top left corner. This will randomly generate a valid GCL program. In the case you want to specify your own program, you can write in the box by clicking on the line you wish to change.
@@ -24,16 +30,18 @@ To switch between those, click on the title of the box, which is defaulted to `R
 
 ### Validation
 
-The line above the `Output` is representing the validation of the program, for which the color represent the following:
+The line above the `Output` is representing the validation of the program, for which the color and symbol represent the following:
 
-- 🟩 Correct
+- <Indicator state={IndicatorState.Working} /> Working
 
-- 🟧 Mismatch
+- <Indicator state={IndicatorState.Correct} /> Correct
 
-- 🟥 Error
+- <Indicator state={IndicatorState.Mismatch} /> Mismatch
 
-- 🟦 Timeout
+- <Indicator state={IndicatorState.TimeOut} /> Time-out
+
+- <Indicator state={IndicatorState.Error} /> Error
 
 ## Graph
 
-The default of the graph output will be that of your own implementation. To switch between your graph and the reference graph, use the `G` and `R` buttons to the right. `G` is graph produced by your code and `R` the graph from the reference implementation.
+The default of the graph output will be that of your own implementation. To switch between your graph and the reference graph, use the `G` and `R` buttons to the right. `G` is the graph produced by your code and `R` is the graph from the reference implementation.

@@ -2,14 +2,10 @@ import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import * as wasm from "../../../wasm/pkg/wasm";
 import deepEqual from "deep-equal";
-import {
-  ArrowPathIcon,
-  ArrowPathRoundedSquareIcon,
-} from "@heroicons/react/24/outline";
+import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/outline";
 import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-// import "../lib/z3";
 import {
   Analysis,
   AnalysisResponse,
@@ -18,6 +14,7 @@ import {
   Sample,
 } from "../lib/types";
 import { StretchEditor } from "./StretchEditor";
+import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";
 
 const searchParams = new URL(document.location.toString()).searchParams;
 
@@ -241,8 +238,22 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
     }
   }, [env, src]);
 
-  const workingBehindTheScenes =
-    inFlight || compilationStatus?.state != CompilerState.Compiled;
+  const indicatorState =
+    inFlight || compilationStatus?.state != CompilerState.Compiled
+      ? IndicatorState.Working
+      : response
+      ? response.validation_result
+        ? response.validation_result.type == "CorrectTerminated"
+          ? IndicatorState.Correct
+          : response.validation_result.type == "CorrectNonTerminated"
+          ? IndicatorState.Correct
+          : response.validation_result.type == "Mismatch"
+          ? IndicatorState.Mismatch
+          : response.validation_result.type == "TimeOut"
+          ? IndicatorState.TimeOut
+          : IndicatorState.Working
+        : IndicatorState.Error
+      : IndicatorState.Error;
 
   return (
     <>
@@ -257,48 +268,11 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
       <div
         className={
           "relative col-span-full w-full border-t-4 border-current transition " +
-          (workingBehindTheScenes
-            ? "text-gray-500"
-            : response
-            ? response.validation_result
-              ? response.validation_result.type == "CorrectTerminated"
-                ? "text-green-700"
-                : response.validation_result.type == "CorrectNonTerminated"
-                ? "text-green-700"
-                : response.validation_result.type == "Mismatch"
-                ? "text-orange-500"
-                : response.validation_result.type == "TimeOut"
-                ? "text-blue-700"
-                : ""
-              : "text-red-500"
-            : "")
+          INDICATOR_TEXT_COLOR[indicatorState]
         }
       >
-        <div className="absolute right-0 top-0 z-10 grid aspect-square w-6 -translate-y-full place-items-center rounded-tl bg-current">
-          <span className="font-mono text-sm text-white">
-            {workingBehindTheScenes ? (
-              <ArrowPathIcon className="w-3 animate-spin" />
-            ) : response ? (
-              response.validation_result ? (
-                response.validation_result.type == "CorrectTerminated" ? (
-                  "C"
-                ) : response.validation_result.type ==
-                  "CorrectNonTerminated" ? (
-                  "C"
-                ) : response.validation_result.type == "Mismatch" ? (
-                  "M"
-                ) : response.validation_result.type == "TimeOut" ? (
-                  "T"
-                ) : (
-                  ""
-                )
-              ) : (
-                "E"
-              )
-            ) : (
-              ""
-            )}
-          </span>
+        <div className="absolute right-0 top-0 z-10 -translate-y-full">
+          <Indicator state={indicatorState} />
         </div>
       </div>
       {response ? (
