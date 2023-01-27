@@ -9,7 +9,7 @@
     "build": "astro build",
     "preview": "astro preview",
     "astro": "astro",
-    "postinstall": "cp ./node_modules/z3-solver/build/z3-built.* ./node_modules/coi-serviceworker/coi-serviceworker.js public/"
+    "postinstall": "echo 'cp ./node_modules/z3-solver/build/z3-built.* ./node_modules/coi-serviceworker/coi-serviceworker.js public/'"
   },
   "dependencies": {
     "@astrojs/mdx": "^0.15.1",

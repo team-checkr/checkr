@@ -9,7 +9,7 @@ import {
 import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import remarkGfm from "remark-gfm";
-import "../lib/z3";
+// import "../lib/z3";
 import {
   Analysis,
   AnalysisResponse,
