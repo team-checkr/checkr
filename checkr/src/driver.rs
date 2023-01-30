@@ -80,7 +80,11 @@ impl Driver {
 
         cmd
     }
-    pub fn exec_raw_cmds<E>(&self, cmds: &str, input: &E::Input) -> Result<ExecOutput<E>, ExecError>
+    pub async fn exec_raw_cmds<E>(
+        &self,
+        cmds: &str,
+        input: &E::Input,
+    ) -> Result<ExecOutput<E>, ExecError>
     where
         E: Environment,
     {
@@ -116,11 +120,15 @@ impl Driver {
             }),
         }
     }
-    pub fn exec<E>(&self, cmds: &Commands, input: &E::Input) -> Result<ExecOutput<E>, ExecError>
+    pub async fn exec<E>(
+        &self,
+        cmds: &Commands,
+        input: &E::Input,
+    ) -> Result<ExecOutput<E>, ExecError>
     where
         E: Environment,
     {
-        self.exec_raw_cmds(&cmds.to_string(), input)
+        self.exec_raw_cmds(&cmds.to_string(), input).await
     }
 
     pub fn compile_output(&self) -> Option<&std::process::Output> {

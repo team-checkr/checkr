@@ -113,7 +113,11 @@ pub struct GeneratedProgram {
 }
 
 impl GeneratedProgram {
-    pub fn run_analysis<E: Environment>(self, env: &E, driver: &Driver) -> AnalysisSummary<E> {
+    pub async fn run_analysis<E: Environment>(
+        self,
+        env: &E,
+        driver: &Driver,
+    ) -> AnalysisSummary<E> {
         debug!(name = E::ANALYSIS.to_string(), "running analysis");
 
         let GeneratedProgram {
@@ -124,7 +128,7 @@ impl GeneratedProgram {
         } = self;
 
         let input = <E as Environment>::Input::gen(&mut cmds.clone(), &mut rng);
-        let exec_result = driver.exec::<E>(&cmds, &input);
+        let exec_result = driver.exec::<E>(&cmds, &input).await;
         match exec_result {
             Ok(exec_result) => {
                 let validation_result = env.validate(&cmds, &input, &exec_result.parsed);

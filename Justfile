@@ -5,7 +5,7 @@ watch-web:
     cd inspectify/ui; npm run dev
 
 typeshare:
-    typeshare . --lang=typescript --output-file=./inspectify/ui/src/types.ts
+    typeshare . --lang=typescript --output-file=./inspectify/ui/src/lib/types.ts
 
 build-wasm:
     cd inspectify/wasm; wasm-pack build --release --target bundler

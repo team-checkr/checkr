@@ -1,5 +1,10 @@
 CHECKO := "cargo run --release -p checko --"
 
+export RUST_LOG := "debug"
+
+clean:
+    rm -rf submissions/
+
 run-tests:
     {{CHECKO}} run-tests -p programs.toml -g groups.toml -s submissions/
 

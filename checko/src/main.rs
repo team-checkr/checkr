@@ -1,9 +1,11 @@
+#![feature(try_blocks)]
+
 use std::{
     fs,
     path::{Path, PathBuf},
+    sync::Arc,
 };
 
-use anyhow::Result;
 use checko::{
     config::{GroupConfig, GroupsConfig, ProgramsConfig},
     fmt::{CompetitionMarkdown, IndividualMarkdown},
@@ -11,7 +13,10 @@ use checko::{
 };
 
 use clap::Parser;
+use color_eyre::{eyre::Context, Result};
+use git_repository as git;
 use tracing::{error, info, span, Level};
+use tracing_subscriber::prelude::*;
 use xshell::{cmd, Shell};
 
 #[derive(Debug, Parser)]
@@ -27,6 +32,9 @@ enum Cli {
         /// The folder where group projects are downloaded.
         #[clap(long, short)]
         submissions: PathBuf,
+        /// Number of concurrent projects being evaluated.
+        #[clap(long, short, default_value_t = 2)]
+        concurrent: usize,
     },
     /// Generate and push results of previously run tests
     PushResultsToRepos {
@@ -56,36 +64,83 @@ enum Cli {
     InternalSingleCompetition { input: String },
 }
 
+fn read_programs(programs: impl AsRef<Path>) -> Result<ProgramsConfig> {
+    let p = programs.as_ref();
+    let src =
+        fs::read_to_string(p).wrap_err_with(|| format!("could not read programs at {p:?}"))?;
+    let parsed =
+        toml::from_str(&src).wrap_err_with(|| format!("error parsing programs from file {p:?}"))?;
+    Ok(parsed)
+}
+fn read_groups(groups: impl AsRef<Path>) -> Result<GroupsConfig> {
+    let p = groups.as_ref();
+    let src = fs::read_to_string(p).wrap_err_with(|| format!("could not read groups at {p:?}"))?;
+    let parsed =
+        toml::from_str(&src).wrap_err_with(|| format!("error parsing groups from file {p:?}"))?;
+    Ok(parsed)
+}
+
 async fn run() -> Result<()> {
     match Cli::parse() {
         Cli::RunTests {
             programs,
             groups,
             submissions,
+            concurrent,
         } => {
-            let programs: ProgramsConfig = toml::from_str(&fs::read_to_string(programs)?)?;
-            let groups: GroupsConfig = toml::from_str(&fs::read_to_string(groups)?)?;
+            let programs = read_programs(programs)?;
+            let groups = read_groups(groups)?;
 
-            // NOTE: This could easily be parallelized using rayon, but for the
-            // time being we keep it single threaded for easier debugging.
-            for g in &groups.groups {
-                let span = span!(Level::INFO, "Group", g.name);
-                let _enter = span.enter();
-                info!("evaluating group");
-                let env = GroupEnv::new(&submissions, g);
-                let sh = match env.shell_in_default_branch() {
-                    Ok(sh) => sh,
-                    Err(err) => {
-                        error!(
-                            error = format!("{err:?}"),
-                            "getting shell in default branch"
+            // NOTE: Check of docker daemon is running
+            {
+                let sh = Shell::new()?;
+                cmd!(sh, "docker ps")
+                    .quiet()
+                    .ignore_stdout()
+                    .run()
+                    .wrap_err("docker does not seem to be running")?;
+            }
+
+            let mut tasks = vec![];
+
+            let task_permits = Arc::new(tokio::sync::Semaphore::new(concurrent));
+
+            for g in groups.groups {
+                let task_permits = Arc::clone(&task_permits);
+
+                let submissions = submissions.clone();
+                let programs = programs.clone();
+                let task = tokio::spawn(async move {
+                    let _permit = task_permits.acquire().await.unwrap();
+
+                    let span = span!(Level::INFO, "Group", name = g.name);
+                    let _enter = span.enter();
+                    info!("evaluating group");
+                    let env = GroupEnv::new(&submissions, &g);
+
+                    let result: Result<()> = try {
+                        let (sh, _) = env
+                            .shell_in_default_branch()
+                            .wrap_err("getting shell in default branch")?;
+                        let cwd = sh.current_dir();
+                        drop(sh);
+                        let output = TestRunInput::run_in_docker(&cwd, programs.clone()).await?;
+                        info!(
+                            file = format!("{:?}", env.latest_run_path()),
+                            "writing result"
                         );
-                        continue;
+                        env.write_latest_run(&output)?;
+                    };
+
+                    if let Err(e) = result {
+                        error!(error = e.to_string(), "errored");
                     }
-                };
-                let output = TestRunInput::run_in_docker(&sh, programs.clone())?;
-                info!("writing result");
-                env.write_latest_run(&output)?;
+                });
+                tasks.push(task);
+            }
+
+            for task in tasks {
+                task.await?;
             }
 
             Ok(())
@@ -95,10 +150,10 @@ async fn run() -> Result<()> {
             submissions,
             execute,
         } => {
-            let groups: GroupsConfig = toml::from_str(&fs::read_to_string(groups)?)?;
+            let groups = read_groups(groups)?;
 
             for g in &groups.groups {
-                let span = span!(Level::TRACE, "Group: {}", g.name);
+                let span = span!(Level::INFO, "Group", name = g.name);
                 let _enter = span.enter();
                 let env = GroupEnv::new(&submissions, g);
                 let data = env.latest_run()?;
@@ -108,7 +163,7 @@ async fn run() -> Result<()> {
                     data,
                 };
 
-                let sh = env.shell_in_results_branch()?;
+                let (sh, _) = env.shell_in_results_branch()?;
 
                 sh.write_file("README.md", report.to_string())?;
                 cmd!(sh, "git add .").run()?;
@@ -119,8 +174,8 @@ async fn run() -> Result<()> {
                     cmd!(sh, "git push --force --set-upstream origin results").run()?;
                 } else {
                     info!("skipping push to results branch");
-                    eprintln!("(skipping) > git commit -m {msg:?}");
-                    eprintln!("(skipping) > git push --force --set-upstream origin results");
+                    info!("(skipping) > git commit -m {msg:?}");
+                    info!("(skipping) > git push --force --set-upstream origin results");
                 }
             }
 
@@ -131,12 +186,12 @@ async fn run() -> Result<()> {
             submissions,
             output,
         } => {
-            let groups: GroupsConfig = toml::from_str(&fs::read_to_string(groups)?)?;
+            let groups = read_groups(groups)?;
 
             let mut input = CompetitionMarkdown::default();
 
             for g in &groups.groups {
-                let span = span!(Level::TRACE, "Group: {}", g.name);
+                let span = span!(Level::INFO, "Group", name = g.name);
                 let _enter = span.enter();
                 let data = GroupEnv::new(&submissions, g).latest_run()?;
 
@@ -157,7 +212,7 @@ async fn run() -> Result<()> {
         }
         Cli::InternalSingleCompetition { input } => {
             let sh = Shell::new()?;
-            TestRunInput::run_from_within_docker(&sh, &input)?;
+            TestRunInput::run_from_within_docker(&sh, &input).await?;
             Ok(())
         }
     }
@@ -165,21 +220,23 @@ async fn run() -> Result<()> {
 
 #[tokio::main]
 async fn main() -> Result<()> {
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(tracing_subscriber::EnvFilter::from_default_env())
-        .without_time()
+    color_eyre::install()?;
+
+    tracing_subscriber::Registry::default()
+        .with(tracing_error::ErrorLayer::default())
+        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(false)
+                .with_timer(tracing_subscriber::fmt::time::uptime()),
+        )
         .init();
-    run().await
+
+    run().await?;
+
+    Ok(())
 }
 
-fn determine_primary_branch(sh: &Shell) -> Result<String> {
-    let result = cmd!(sh, "git symbolic-ref refs/remotes/origin/HEAD").read()?;
-    Ok(result
-        .split('/')
-        .last()
-        .expect("no primary branch")
-        .to_string())
-}
 struct GroupEnv<'a> {
     submissions_folder: &'a Path,
     config: &'a GroupConfig,
@@ -201,9 +258,12 @@ impl<'a> GroupEnv<'a> {
         Ok(())
     }
     fn latest_run(&self) -> Result<TestRunResults> {
-        Ok(serde_json::from_str(&fs::read_to_string(
-            self.latest_run_path(),
-        )?)?)
+        let p = self.latest_run_path();
+        let src = fs::read_to_string(&p)
+            .wrap_err_with(|| format!("could not read latest run at {p:?}"))?;
+        let parsed = toml::from_str(&src)
+            .wrap_err_with(|| format!("error parsing latest run from file {p:?}"))?;
+        Ok(parsed)
     }
     fn group_folder(&self) -> PathBuf {
         self.submissions_folder.join(&self.config.name)
@@ -215,31 +275,34 @@ impl<'a> GroupEnv<'a> {
         sh.change_dir(&g_dir);
         Ok(sh)
     }
-    fn shell_in_default_branch(&self) -> Result<Shell> {
+    fn shell_in_default_branch(&self) -> Result<(Shell, git::Repository)> {
         let sh = self.shell_in_folder()?;
-        if sh.read_dir("repo").is_err() {
-            let git = &self.config.git;
-            cmd!(sh, "git clone {git} repo").run()?;
-        }
+        sh.remove_path("repo")?;
+
+        info!(repo = self.config.git, "cloning repo");
+        let (mut prepare_checkout, _) = git::prepare_clone(
+            git::Url::try_from(&*self.config.git)?,
+            sh.current_dir().join("repo"),
+        )?
+        .fetch_then_checkout(git::progress::Discard, &git::interrupt::IS_INTERRUPTED)?;
+
+        let (repo, _) = prepare_checkout
+            .main_worktree(git::progress::Discard, &git::interrupt::IS_INTERRUPTED)?;
+        info!(repo = self.config.git, "cloned");
+
         sh.change_dir("repo");
 
-        let primary_branch = determine_primary_branch(&sh)?;
-
-        cmd!(sh, "git reset --hard").run()?;
-        cmd!(sh, "git clean -xdf").run()?;
-        cmd!(sh, "git checkout {primary_branch}").run()?;
-        cmd!(sh, "git pull").run()?;
-
-        Ok(sh)
+        Ok((sh, repo))
     }
-    fn shell_in_results_branch(&self) -> Result<Shell> {
-        let sh = self.shell_in_default_branch()?;
+    fn shell_in_results_branch(&self) -> Result<(Shell, git::Repository)> {
+        let (sh, repo) = self.shell_in_default_branch()?;
+
         if cmd!(sh, "git checkout results").run().is_err() {
             cmd!(sh, "git switch --orphan results").run()?;
         }
         cmd!(sh, "git reset --hard").run()?;
         cmd!(sh, "git clean -xdf").run()?;
         cmd!(sh, "git pull").run()?;
-        Ok(sh)
+        Ok((sh, repo))
     }
 }

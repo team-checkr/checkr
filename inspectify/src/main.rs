@@ -1,11 +1,5 @@
-use std::{
-    net::SocketAddr,
-    path::PathBuf,
-    sync::{Arc, Mutex},
-    time::Duration,
-};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
-use anyhow::Context;
 use axum::{
     extract::State,
     http::{header::CONTENT_TYPE, HeaderValue, Method, StatusCode},
@@ -23,9 +17,10 @@ use checkr::{
     pg::Determinism,
 };
 use clap::Parser;
-use itertools::Itertools;
+use color_eyre::eyre::Context;
 use notify_debouncer_mini::DebounceEventResult;
 use serde::{Deserialize, Serialize};
+use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
 
@@ -72,63 +67,66 @@ impl From<checkr::env::ValidationResult> for ValidationResult {
     }
 }
 
-fn ayo<E: Environment>(driver: &Mutex<Driver>, env: E, cmds: &str, input: &str) -> AnalysisResponse
-where
-    E: std::fmt::Debug,
-    E::Output: ToMarkdown,
-{
-    let input: E::Input = serde_json::from_str(input).expect("failed to parse input");
-    match driver.lock().unwrap().exec_raw_cmds::<E>(cmds, &input) {
-        Ok(exec_output) => {
-            let cmds = checkr::parse::parse_commands(cmds).unwrap();
-            let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
-            AnalysisResponse {
-                stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
-                stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
-                parsed_markdown: Some(exec_output.parsed.to_markdown()),
-                took: exec_output.took,
-                validation_result: Some(validation_res.into()),
-            }
-        }
-        Err(e) => match e {
-            checkr::driver::ExecError::Serialize(_) => todo!(),
-            checkr::driver::ExecError::RunExec(_) => todo!(),
-            checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
-                stdout: String::from_utf8(output.stdout).unwrap(),
-                stderr: String::from_utf8(output.stderr).unwrap(),
-                parsed_markdown: None,
-                took,
-                validation_result: None,
-            },
-            checkr::driver::ExecError::Parse {
-                inner: _,
-                run_output,
-                time,
-            } => AnalysisResponse {
-                stdout: String::from_utf8(run_output.stdout).unwrap(),
-                stderr: String::from_utf8(run_output.stderr).unwrap(),
-                parsed_markdown: None,
-                took: time,
-                validation_result: None,
-            },
-        },
-    }
-}
-
 async fn analyze(
     State(state): State<ApplicationState>,
     Json(body): Json<AnalysisRequest>,
 ) -> Json<AnalysisResponse> {
-    let driver = &*state.driver;
     let cmds = body.src;
     let output = match body.analysis {
-        Analysis::Graph => ayo(driver, GraphEnv, &cmds, &body.input),
-        Analysis::Sign => ayo(driver, SignEnv, &cmds, &body.input),
-        Analysis::Interpreter => ayo(driver, InterpreterEnv, &cmds, &body.input),
-        Analysis::Security => ayo(driver, SecurityEnv, &cmds, &body.input),
-        Analysis::ProgramVerification => ayo(driver, ProgramVerificationEnv, &cmds, &body.input),
+        Analysis::Graph => run(state.driver, GraphEnv, cmds, body.input).await,
+        Analysis::Sign => run(state.driver, SignEnv, cmds, body.input).await,
+        Analysis::Interpreter => run(state.driver, InterpreterEnv, cmds, body.input).await,
+        Analysis::Security => run(state.driver, SecurityEnv, cmds, body.input).await,
+        Analysis::ProgramVerification => {
+            run(state.driver, ProgramVerificationEnv, cmds, body.input).await
+        }
     };
-    Json(output)
+    return Json(output);
+
+    async fn run<E: Environment>(
+        driver: Arc<Mutex<Driver>>,
+        env: E,
+        cmds: String,
+        input: String,
+    ) -> AnalysisResponse {
+        let input: E::Input = serde_json::from_str(&input).expect("failed to parse input");
+        let driver = driver.lock().await;
+        match driver.exec_raw_cmds::<E>(&cmds, &input).await {
+            Ok(exec_output) => {
+                let cmds = checkr::parse::parse_commands(&cmds).unwrap();
+                let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
+                AnalysisResponse {
+                    stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
+                    stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
+                    parsed_markdown: Some(exec_output.parsed.to_markdown()),
+                    took: exec_output.took,
+                    validation_result: Some(validation_res.into()),
+                }
+            }
+            Err(e) => match e {
+                checkr::driver::ExecError::Serialize(_) => todo!(),
+                checkr::driver::ExecError::RunExec(_) => todo!(),
+                checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
+                    stdout: String::from_utf8(output.stdout).unwrap(),
+                    stderr: String::from_utf8(output.stderr).unwrap(),
+                    parsed_markdown: None,
+                    took,
+                    validation_result: None,
+                },
+                checkr::driver::ExecError::Parse {
+                    inner: _,
+                    run_output,
+                    time,
+                } => AnalysisResponse {
+                    stdout: String::from_utf8(run_output.stdout).unwrap(),
+                    stderr: String::from_utf8(run_output.stderr).unwrap(),
+                    parsed_markdown: None,
+                    took: time,
+                    validation_result: None,
+                },
+            },
+        }
+    }
 }
 
 #[typeshare::typeshare]
@@ -148,15 +146,21 @@ async fn graph(
     State(state): State<ApplicationState>,
     Json(body): Json<GraphRequest>,
 ) -> Json<GraphResponse> {
-    match state.driver.lock().unwrap().exec_raw_cmds::<GraphEnv>(
-        &body.src,
-        &GraphEnvInput {
-            determinism: match body.deterministic {
-                true => Determinism::Deterministic,
-                false => Determinism::NonDeterministic,
+    match state
+        .driver
+        .lock()
+        .await
+        .exec_raw_cmds::<GraphEnv>(
+            &body.src,
+            &GraphEnvInput {
+                determinism: match body.deterministic {
+                    true => Determinism::Deterministic,
+                    false => Determinism::NonDeterministic,
+                },
             },
-        },
-    ) {
+        )
+        .await
+    {
         Ok(output) => Json(GraphResponse {
             dot: Some(output.parsed.dot),
         }),
@@ -191,8 +195,8 @@ impl CompilationStatus {
     }
 }
 
-async fn compilation_status(State(state): State<ApplicationState>) -> Json<CompilationStatus> {
-    Json(state.compilation_status.lock().unwrap().clone())
+async fn get_compilation_status(State(state): State<ApplicationState>) -> Json<CompilationStatus> {
+    Json(state.compilation_status.lock().await.clone())
 }
 
 #[axum::debug_handler]
@@ -242,37 +246,22 @@ struct ApplicationState {
     compilation_status: Arc<Mutex<CompilationStatus>>,
 }
 
-async fn run() -> anyhow::Result<()> {
-    let cli = Cli::parse();
-    let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
-        .with_context(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
-
-    let driver = if let Some(compile) = &run.compile {
-        Driver::compile(&cli.dir, compile, &run.run)
-            .with_context(|| format!("compiling using config: {run:?}"))?
-    } else {
-        Driver::new(&cli.dir, &run.run)
-    };
-    let shared_driver = Arc::new(Mutex::new(driver));
-    let shared_compilation_status = Arc::new(Mutex::new(CompilationStatus {
-        compiled_at: std::time::SystemTime::now()
-            .duration_since(std::time::SystemTime::UNIX_EPOCH)
-            .unwrap()
-            .as_millis() as _,
-        state: CompilerState::Compiled,
-    }));
+fn spawn_watcher(
+    shared_driver: &Arc<Mutex<Driver>>,
+    shared_compilation_status: &Arc<Mutex<CompilationStatus>>,
+    dir: PathBuf,
+    run: checko::RunOption,
+) -> Result<(), color_eyre::Report> {
+    let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
+    let driver = Arc::clone(shared_driver);
+    let compilation_status = Arc::clone(shared_compilation_status);
 
     let matches = run
         .watch
         .iter()
-        .map(|p| glob::Pattern::new(p).unwrap())
-        .collect_vec();
-
-    let watcher_driver = Arc::clone(&shared_driver);
-    let watcher_compilation_status = Arc::clone(&shared_compilation_status);
-    let watcher_dir = cli.dir.clone();
-    let watcher_run = run.clone();
-    let mut watcher = notify_debouncer_mini::new_debouncer(
+        .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
+        .collect::<Result<Vec<glob::Pattern>, color_eyre::Report>>()?;
+    notify_debouncer_mini::new_debouncer(
         Duration::from_millis(200),
         None,
         move |res: DebounceEventResult| match res {
@@ -284,61 +273,80 @@ async fn run() -> anyhow::Result<()> {
                     return;
                 }
 
-                let (run, dir) = (watcher_run.clone(), watcher_dir.clone());
-
-                info!("recompiling due to changes!");
-                let compile_start = std::time::Instant::now();
-                *watcher_compilation_status.lock().unwrap() =
-                    CompilationStatus::new(CompilerState::Compiling);
-                let driver = if let Some(compile) = &run.compile {
-                    match Driver::compile(&dir, compile, &run.run) {
-                        Ok(driver) => driver,
-                        Err(DriverError::CompileFailure(output)) => {
-                            error!("failed to compile:");
-                            eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
-                            eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
-                            *watcher_compilation_status.lock().unwrap() =
-                                CompilationStatus::new(CompilerState::CompileError);
-                            return;
-                        }
-                        Err(DriverError::RunCompile(err)) => {
-                            error!("run compile failed:");
-                            eprintln!("{err}");
-                            *watcher_compilation_status.lock().unwrap() =
-                                CompilationStatus::new(CompilerState::CompileError);
-                            return;
-                        }
-                    }
-                } else {
-                    Driver::new(&dir, &run.run)
-                };
-                info!("compiled in {:?}", compile_start.elapsed());
-                *watcher_compilation_status.lock().unwrap() =
-                    CompilationStatus::new(CompilerState::Compiled);
-                *watcher_driver.lock().unwrap() = driver;
+                tx.send(()).expect("sending to file watcher failed");
             }
             Err(errors) => errors.iter().for_each(|e| eprintln!("Error {e:?}")),
         },
-    )?;
-    watcher
-        .watcher()
-        .watch(&cli.dir, notify::RecursiveMode::Recursive)?;
+    )?
+    .watcher()
+    .watch(&dir, notify::RecursiveMode::Recursive)?;
+
+    tokio::spawn(async move {
+        while let Some(()) = rx.recv().await {
+            info!("recompiling due to changes!");
+            let compile_start = std::time::Instant::now();
+            *compilation_status.lock().await = CompilationStatus::new(CompilerState::Compiling);
+            let new_driver = if let Some(compile) = &run.compile {
+                match Driver::compile(&dir, compile, &run.run) {
+                    Ok(driver) => driver,
+                    Err(DriverError::CompileFailure(output)) => {
+                        error!("failed to compile:");
+                        eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
+                        eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
+                        *compilation_status.lock().await =
+                            CompilationStatus::new(CompilerState::CompileError);
+                        return;
+                    }
+                    Err(DriverError::RunCompile(err)) => {
+                        error!("run compile failed:");
+                        eprintln!("{err}");
+                        *compilation_status.lock().await =
+                            CompilationStatus::new(CompilerState::CompileError);
+                        return;
+                    }
+                }
+            } else {
+                Driver::new(&dir, &run.run)
+            };
+            info!("compiled in {:?}", compile_start.elapsed());
+            *compilation_status.lock().await = CompilationStatus::new(CompilerState::Compiled);
+            *driver.lock().await = new_driver;
+        }
+    });
+    Ok(())
+}
+
+async fn run() -> color_eyre::Result<()> {
+    let cli = Cli::parse();
+    let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
+        .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
+
+    let driver = if let Some(compile) = &run.compile {
+        Driver::compile(&cli.dir, compile, &run.run)
+            .wrap_err_with(|| format!("compiling using config: {run:?}"))?
+    } else {
+        Driver::new(&cli.dir, &run.run)
+    };
+    let driver = Arc::new(Mutex::new(driver));
+    let compilation_status = Arc::new(Mutex::new(CompilationStatus::new(CompilerState::Compiled)));
+
+    spawn_watcher(&driver, &compilation_status, cli.dir, run)?;
 
     let app = Router::new()
         .route("/analyze", post(analyze))
         .route("/graph", post(graph))
-        .route("/compilation-status", get(compilation_status))
+        .route("/compilation-status", get(get_compilation_status))
         .with_state(ApplicationState {
-            driver: shared_driver,
-            compilation_status: shared_compilation_status,
-        });
-    let app = app.fallback(static_dir);
-    let app = app.layer(
-        CorsLayer::new()
-            .allow_origin("*".parse::<HeaderValue>().unwrap())
-            .allow_headers([CONTENT_TYPE])
-            .allow_methods([Method::GET, Method::POST]),
-    );
+            driver,
+            compilation_status,
+        })
+        .fallback(static_dir)
+        .layer(
+            CorsLayer::new()
+                .allow_origin("*".parse::<HeaderValue>().unwrap())
+                .allow_headers([CONTENT_TYPE])
+                .allow_methods([Method::GET, Method::POST]),
+        );
     // NOTE: Enable for HTTP logging
     // .layer(TraceLayer::new_for_http());
 
@@ -381,7 +389,9 @@ async fn run() -> anyhow::Result<()> {
 }
 
 #[tokio::main]
-async fn main() -> anyhow::Result<()> {
+async fn main() -> color_eyre::Result<()> {
+    color_eyre::install()?;
+
     tracing_subscriber::fmt::fmt()
         .with_env_filter(
             tracing_subscriber::EnvFilter::builder()

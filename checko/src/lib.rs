@@ -5,6 +5,7 @@ pub mod test_runner;
 use std::path::Path;
 
 use checkr::driver::{Driver, DriverError};
+use color_eyre::{eyre::Context, Result};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -16,8 +17,13 @@ pub struct RunOption {
 }
 
 impl RunOption {
-    pub fn from_file(path: impl AsRef<Path>) -> anyhow::Result<Self> {
-        Ok(toml::from_str(&std::fs::read_to_string(path)?)?)
+    pub fn from_file(path: impl AsRef<Path>) -> Result<Self> {
+        let p = path.as_ref();
+        let src = std::fs::read_to_string(p)
+            .wrap_err_with(|| format!("could not read run options at {p:?}"))?;
+        let parsed = toml::from_str(&src)
+            .wrap_err_with(|| format!("error parsing run options from file {p:?}"))?;
+        Ok(parsed)
     }
     pub fn driver(&self, dir: impl AsRef<Path>) -> Result<Driver, DriverError> {
         if let Some(compile) = &self.compile {

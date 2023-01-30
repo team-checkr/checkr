@@ -123,12 +123,7 @@ pub trait AnyEnvironment {
     fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample;
 }
 
-impl<E> AnyEnvironment for E
-where
-    E: Environment,
-    E::Input: std::fmt::Debug + ToMarkdown,
-    E::Output: std::fmt::Debug + ToMarkdown,
-{
+impl<E: Environment> AnyEnvironment for E {
     fn analysis(&self) -> Analysis {
         E::ANALYSIS
     }
@@ -161,8 +156,6 @@ impl Application {
     pub fn add_env<E>(&mut self, env: E) -> &mut Self
     where
         E: Environment + 'static,
-        E::Input: std::fmt::Debug + ToMarkdown,
-        E::Output: std::fmt::Debug + ToMarkdown,
     {
         self.envs.push(box env);
         self
