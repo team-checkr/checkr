@@ -1,2 +1,7 @@
 [workspace]
 members = ["checkr", "inspectify", "inspectify/wasm", "checko"]
+
+[profile.dist]
+inherits = "release"
+debug = true
+split-debuginfo = "packed"
