@@ -20,11 +20,12 @@ use color_eyre::{
     eyre::{eyre, Context, ContextCompat},
     Result,
 };
+use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use xshell::Shell;
 
-use crate::{config::ProgramsConfig, RunOption};
+use crate::{config::ProgramsConfig, docker::DockerImage, RunOption};
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestRunInput {
@@ -34,35 +35,28 @@ pub struct TestRunInput {
 impl TestRunInput {
     const RESULT_FILE: &'static str = "result.json";
 
-    pub async fn run_in_docker(cwd: &Path, programs: ProgramsConfig) -> Result<TestRunResults> {
+    pub async fn run_in_docker(
+        image: &DockerImage,
+        cwd: &Path,
+        programs: ProgramsConfig,
+    ) -> Result<TestRunResults> {
         let input = serde_json::to_string(&TestRunInput { programs }).unwrap();
 
-        // TODO: Don't duplicate the image name
-        const DOCKER_IMAGE_NAME: &str =
-            "gitlab.gbar.dtu.dk/checkr-dev-env/demo-group-01/image:latest";
-        const DOCKER_BINARY_NAME: &str = "checko";
         const SINGLE_COMPETITION_CMD: &str = "internal-single-competition";
 
-        let mut cmd = tokio::process::Command::new("docker");
-        cmd.current_dir(cwd);
-        cmd.arg("run")
-            .arg("--rm")
-            .args(["-w", "/root/code"])
-            .args([
-                "-v",
-                &format!(
-                    "{}:/root/code",
-                    cwd.to_str()
-                        .wrap_err("failed to create a str from cwd when spawning docker")?
-                ),
-            ])
-            .args([
-                DOCKER_IMAGE_NAME,
-                DOCKER_BINARY_NAME,
-                SINGLE_COMPETITION_CMD,
-            ])
-            .arg(input);
-        info!("spawning docker container");
+        let mut cmd = image.run_cmd(&[
+            "-w",
+            "/root/code",
+            "-v",
+            &format!(
+                "{}:/root/code",
+                cwd.to_str()
+                    .wrap_err("failed to create a str from cwd when spawning docker")?
+            ),
+        ]);
+        cmd.args(["checko", SINGLE_COMPETITION_CMD]).arg(input);
+
+        info!("spawning docker container: {}", format_cmd(&cmd));
         let output = cmd
             .output()
             .await
@@ -99,6 +93,19 @@ impl TestRunInput {
 
         Ok(())
     }
+}
+
+fn format_cmd(cmd: &tokio::process::Command) -> impl std::fmt::Display + '_ {
+    let cmd = cmd.as_std();
+
+    let program = Either::Left(Path::new(cmd.get_program()).display());
+
+    let program_args = cmd
+        .get_args()
+        .map(std::ffi::OsStr::to_string_lossy)
+        .map(Either::Right);
+
+    std::iter::once(program).chain(program_args).format(" ")
 }
 
 #[derive(Debug, Serialize, Deserialize)]

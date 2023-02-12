@@ -6,7 +6,7 @@ clean:
     rm -rf submissions/
 
 run-tests:
-    {{CHECKO}} run-tests -p programs.toml -g groups.toml -s submissions/
+    {{CHECKO}} run-tests -p programs.toml -g groups.toml -s submissions/ -l
 
 push-results:
     {{CHECKO}} push-results-to-repos -g groups.toml -s submissions/

@@ -8,6 +8,7 @@ use std::{
 
 use checko::{
     config::{GroupConfig, GroupsConfig, ProgramsConfig},
+    docker::DockerImage,
     fmt::{CompetitionMarkdown, IndividualMarkdown},
     test_runner::{TestRunInput, TestRunResults},
 };
@@ -32,6 +33,9 @@ enum Cli {
         /// The folder where group projects are downloaded.
         #[clap(long, short)]
         submissions: PathBuf,
+        /// When set will build the docker image from the source
+        #[clap(long, short, default_value_t = false)]
+        local_docker: bool,
         /// Number of concurrent projects being evaluated.
         #[clap(long, short, default_value_t = 2)]
         concurrent: usize,
@@ -86,6 +90,7 @@ async fn run() -> Result<()> {
             programs,
             groups,
             submissions,
+            local_docker,
             concurrent,
         } => {
             let programs = read_programs(programs)?;
@@ -101,6 +106,12 @@ async fn run() -> Result<()> {
                     .wrap_err("docker does not seem to be running")?;
             }
 
+            let image = if local_docker {
+                DockerImage::build_in_tree().await?
+            } else {
+                DockerImage::build().await?
+            };
+
             let mut tasks = vec![];
 
             let task_permits = Arc::new(tokio::sync::Semaphore::new(concurrent));
@@ -108,6 +119,7 @@ async fn run() -> Result<()> {
             for g in groups.groups {
                 let task_permits = Arc::clone(&task_permits);
 
+                let image = image.clone();
                 let submissions = submissions.clone();
                 let programs = programs.clone();
                 let task = tokio::spawn(async move {
@@ -124,7 +136,8 @@ async fn run() -> Result<()> {
                             .wrap_err("getting shell in default branch")?;
                         let cwd = sh.current_dir();
                         drop(sh);
-                        let output = TestRunInput::run_in_docker(&cwd, programs.clone()).await?;
+                        let output =
+                            TestRunInput::run_in_docker(&image, &cwd, programs.clone()).await?;
                         info!(
                             file = format!("{:?}", env.latest_run_path()),
                             "writing result"

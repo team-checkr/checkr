@@ -1,4 +1,5 @@
 pub mod config;
+pub mod docker;
 pub mod fmt;
 pub mod test_runner;
 
