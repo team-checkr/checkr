@@ -5,3 +5,4 @@ members = ["xtask", "checkr", "inspectify", "checko"]
 inherits = "release"
 debug = true
 split-debuginfo = "packed"
+strip = "debuginfo"
