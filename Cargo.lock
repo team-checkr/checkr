@@ -374,9 +374,9 @@ dependencies = [
 
 [[package]]
 name = "binswap-github"
-version = "0.1.1"
+version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "61104f33fb22224bb4ec114425bc189c83ebacf592972e0e54df117e1213374e"
+checksum = "8274c74565925409325c014ebb0a7a47a1ad62eda9f2a9067098243876fc9e63"
 dependencies = [
  "binstalk",
  "color-eyre",
@@ -3955,10 +3955,11 @@ dependencies = [
 
 [[package]]
 name = "thread_local"
-version = "1.1.4"
+version = "1.1.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "5516c27b78311c50bf42c071425c560ac799b11c30b31f87e3081965fe5e0180"
+checksum = "3fdd6f064ccff2d6567adcb3873ca630700f00b5ad3f060c25b5dcfd9a4ce152"
 dependencies = [
+ "cfg-if",
  "once_cell",
 ]
 
@@ -4798,6 +4799,16 @@ name = "xshell-macros"
 version = "0.2.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "1dbabb1cbd15a1d6d12d9ed6b35cc6777d4af87ab3ba155ea37215f20beab80c"
+
+[[package]]
+name = "xtask"
+version = "0.1.0"
+dependencies = [
+ "binswap-github",
+ "clap",
+ "color-eyre",
+ "tokio",
+]
 
 [[package]]
 name = "xz2"

@@ -1,5 +1,5 @@
 [workspace]
-members = ["checkr", "inspectify", "checko"]
+members = ["xtask", "checkr", "inspectify", "checko"]
 
 [profile.dist]
 inherits = "release"
