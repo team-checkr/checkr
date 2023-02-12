@@ -374,9 +374,9 @@ dependencies = [
 
 [[package]]
 name = "binswap-github"
-version = "0.1.0"
+version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "72111f5019499775a578bb9ba51326f68a957759273780a81ae4ae6e30aadbf8"
+checksum = "61104f33fb22224bb4ec114425bc189c83ebacf592972e0e54df117e1213374e"
 dependencies = [
  "binstalk",
  "color-eyre",
@@ -384,6 +384,7 @@ dependencies = [
  "crossterm 0.26.0",
  "derive_builder",
  "serde",
+ "serde_json",
  "tempfile",
  "tokio",
 ]
