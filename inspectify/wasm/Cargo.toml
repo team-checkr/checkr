@@ -28,3 +28,5 @@ typeshare = "1.0.0"
 
 [lib]
 crate-type = ["cdylib", "rlib"]
+
+[workspace]

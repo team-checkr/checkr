@@ -10,7 +10,6 @@ axum = "0.6.2"
 axum-macros = "0.3.1"
 clap = { version = "4.0.32", features = ["derive"] }
 comfy-table = "6.1.4"
-gitlab = "0.1507.0"
 indexmap = { version = "1.9.2", features = ["serde"] }
 itertools = "0.10.5"
 rayon = "1.6.1"
@@ -32,6 +31,6 @@ checkr = { version = "0.1.0", path = "../checkr" }
 xshell = "0.2.3"
 color-eyre = "0.6.2"
 tracing-error = "0.2.0"
-git-repository = { version = "0.33.0", features = [
+git-repository = { version = "0.35.0", features = [
     "blocking-http-transport-reqwest",
 ] }

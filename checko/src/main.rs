@@ -261,7 +261,7 @@ impl<'a> GroupEnv<'a> {
         let p = self.latest_run_path();
         let src = fs::read_to_string(&p)
             .wrap_err_with(|| format!("could not read latest run at {p:?}"))?;
-        let parsed = toml::from_str(&src)
+        let parsed = serde_json::from_str(&src)
             .wrap_err_with(|| format!("error parsing latest run from file {p:?}"))?;
         Ok(parsed)
     }
@@ -291,6 +291,8 @@ impl<'a> GroupEnv<'a> {
         info!(repo = self.config.git, "cloned");
 
         sh.change_dir("repo");
+
+        // TODO: possibly change to the latest commit just before a deadline
 
         Ok((sh, repo))
     }

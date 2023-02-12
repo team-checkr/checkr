@@ -234,10 +234,18 @@ async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
 
 #[derive(Debug, Parser)]
 struct Cli {
+    /// Automatically open inspectify in the browser
     #[clap(short, long, default_value_t = false)]
     open: bool,
+    /// Location of the directory containing `run.toml`
     #[clap(default_value = ".")]
     dir: PathBuf,
+    /// The port to host the server on
+    #[clap(short, long, default_value = "3000")]
+    port: u16,
+    /// Update the binary to the latest release from GitHub
+    #[clap(short = 'u', long, default_value_t = false)]
+    self_update: bool,
 }
 
 #[derive(Clone)]
@@ -316,8 +324,27 @@ fn spawn_watcher(
     Ok(())
 }
 
+async fn do_self_update() -> color_eyre::Result<()> {
+    binswap_github::builder()
+        .repo_author("team-checkr")
+        .repo_name("checkr")
+        .bin_name("inspectify")
+        .build()?
+        .fetch_and_write_in_place_of_current_exec()
+        .await?;
+
+    Ok(())
+}
+
 async fn run() -> color_eyre::Result<()> {
     let cli = Cli::parse();
+
+    if cli.self_update {
+        do_self_update().await?;
+
+        return Ok(());
+    }
+
     let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
         .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
@@ -353,7 +380,7 @@ async fn run() -> color_eyre::Result<()> {
     if cli.open {
         tokio::task::spawn(async move {
             tokio::time::sleep(Duration::from_millis(200)).await;
-            open::that("http://localhost:3000").unwrap();
+            open::that(format!("http://localhost:{}", cli.port)).unwrap();
         });
     }
 
@@ -374,12 +401,14 @@ async fn run() -> color_eyre::Result<()> {
             .execute(style::Print("  ➜  "))?
             .execute(style::PrintStyledContent("Local:".bold()))?
             .execute(style::PrintStyledContent("   http://localhost:".cyan()))?
-            .execute(style::PrintStyledContent("3000".cyan().bold()))?
+            .execute(style::PrintStyledContent(
+                cli.port.to_string().cyan().bold(),
+            ))?
             .execute(style::PrintStyledContent("/".cyan()))?
             .execute(cursor::MoveTo(0, 7))?;
     }
 
-    let addr = SocketAddr::from(([127, 0, 0, 1], 3000));
+    let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
     axum::Server::bind(&addr)
         .serve(app.into_make_service())
         .await
