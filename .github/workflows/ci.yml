@@ -62,7 +62,7 @@ jobs:
 
     - uses: taiki-e/install-action@v2
       with:
-        tool: just,typeshare-cli
+        tool: just
 
     - uses: jetli/wasm-pack-action@v0.4.0
       with:

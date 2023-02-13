@@ -5,7 +5,13 @@ watch-web:
     cd inspectify/ui; npm run dev
 
 typeshare:
-    typeshare . --lang=typescript --output-file=./inspectify/ui/src/lib/types.ts
+    #!/bin/bash
+    set -e
+    if which typeshare > /dev/null ; then
+        typeshare . --lang=typescript --output-file=./inspectify/ui/src/lib/types.ts
+    else
+        echo "typeshare not run. to run install with 'cargo binstall typeshare-cli'"
+    fi
 
 build-wasm:
     cd inspectify/wasm; wasm-pack build --release --target bundler

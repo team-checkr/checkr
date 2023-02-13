@@ -35,7 +35,7 @@ async fn run() -> Result<()> {
       - name: Install just and typeshare
         uses: taiki-e/install-action@v2
         with:
-          tool: just,typeshare-cli
+          tool: just
       - name: Install wasm-pack
         uses: jetli/wasm-pack-action@v0.4.0
         with:
