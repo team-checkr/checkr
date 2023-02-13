@@ -7,6 +7,7 @@ repository = "https://github.com/team-checkr/checkr/"
 
 [workspace.metadata.release]
 publish = false
+tag-name = "v{{version}}"
 
 [profile.release]
 strip = "debuginfo"
