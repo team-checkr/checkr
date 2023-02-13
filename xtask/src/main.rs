@@ -25,7 +25,9 @@ async fn run() -> Result<()> {
             }
             sh.write_file("Cargo.toml", doc.to_string())?;
 
-            cmd!(sh, "cargo dist init --ci=github --installer=github-shell --installer=github-powershell").run()?;
+            // NOTE: Installers produced a strange 404 error in CI. Disable for the moment.
+            // cmd!(sh, "cargo dist init --ci=github --installer=github-shell --installer=github-powershell").run()?;
+            cmd!(sh, "cargo dist init --ci=github").run()?;
             sh.write_file(
                 "Cargo.toml",
                 sh.read_file("Cargo.toml")?.trim().to_string() + "\n",
