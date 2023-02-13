@@ -4861,6 +4861,8 @@ dependencies = [
  "clap",
  "color-eyre",
  "tokio",
+ "toml_edit",
+ "xshell",
 ]
 
 [[package]]

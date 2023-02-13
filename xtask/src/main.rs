@@ -1,15 +1,73 @@
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use color_eyre::Result;
+use color_eyre::{eyre::ContextCompat, Result};
+use toml_edit::Document;
+use xshell::cmd;
 
 #[derive(Debug, Parser)]
 enum Cli {
+    RegenerateCi {},
     UpdateStartBinaries {},
 }
 
 async fn run() -> Result<()> {
     match Cli::parse() {
+        Cli::RegenerateCi {} => {
+            let sh = xshell::Shell::new()?;
+
+            sh.change_dir(project_root());
+
+            let toml = sh.read_file("Cargo.toml")?;
+            let mut doc = toml.parse::<Document>()?;
+            if let Some(profile) = doc.get_mut("profile").and_then(|p| p.as_table_mut()) {
+                profile.remove_entry("dist");
+            }
+            sh.write_file("Cargo.toml", doc.to_string())?;
+
+            cmd!(sh, "cargo dist init --ci=github --installer=github-shell --installer=github-powershell").run()?;
+            sh.write_file(
+                "Cargo.toml",
+                sh.read_file("Cargo.toml")?.trim().to_string() + "\n",
+            )?;
+
+            const ASDF: &str = r#"
+      - name: Install just and typeshare
+        uses: taiki-e/install-action@v2
+        with:
+          tool: just,typeshare-cli
+      - name: Install wasm-pack
+        uses: jetli/wasm-pack-action@v0.4.0
+        with:
+          # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
+          version: 'latest'
+      - name: Build UI
+        run: just build-ui"#;
+
+            const RELEASE_FILE: &str = ".github/workflows/release.yml";
+            let mut ci = sh.read_file(RELEASE_FILE)?;
+
+            let just_before_str = "run: ${{ matrix.install-dist }}";
+            let pos = ci
+                .find(just_before_str)
+                .wrap_err("did not find magic string in release.yml")?;
+
+            ci.insert_str(pos + just_before_str.len(), ASDF);
+            let ci = ci
+                .replace(
+                    "rustup update stable && rustup default stable",
+                    &[
+                        "rustup update nightly",
+                        "rustup default nightly",
+                        "rustup target add wasm32-unknown-unknown",
+                    ]
+                    .join(" && "),
+                )
+                .trim_end()
+                .to_string()
+                + "\n";
+            sh.write_file(RELEASE_FILE, ci)?;
+        }
         Cli::UpdateStartBinaries {} => {
             struct Target {
                 triple: &'static str,
