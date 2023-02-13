@@ -214,5 +214,5 @@ pub struct AnalysisSummary<E: Environment> {
     pub time: std::time::Duration,
     pub stdout: String,
     pub stderr: String,
-    pub result: anyhow::Result<ValidationResult>,
+    pub result: color_eyre::Result<ValidationResult>,
 }

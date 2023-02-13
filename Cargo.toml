@@ -5,6 +5,21 @@ members = ["xtask", "checkr", "inspectify", "checko"]
 version = "0.1.4"
 repository = "https://github.com/team-checkr/checkr/"
 
+[workspace.dependencies]
+color-eyre = "0.6.2"
+itertools = "0.10.5"
+serde = { version = "1.0.152", features = ["derive"] }
+serde_json = "1.0.91"
+thiserror = "1.0.38"
+tokio = { version = "1.25.0", features = ["full"] }
+tracing = "0.1.37"
+tracing-error = "0.2.0"
+tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+checkr = { path = "./checkr" }
+checko = { path = "./checko" }
+tsify = "0.4.3"
+typeshare = "1.0.0"
+
 [workspace.metadata.release]
 publish = false
 tag-name = "v{{version}}"

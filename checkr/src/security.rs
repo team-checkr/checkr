@@ -141,7 +141,7 @@ impl SecurityLattice {
 
         SecurityLattice { allowed }
     }
-    pub fn parse(src: &str) -> anyhow::Result<SecurityLattice> {
+    pub fn parse(src: &str) -> color_eyre::Result<SecurityLattice> {
         let flows = gcl::SecurityLatticeParser::new()
             .parse(src)
             .map_err(|e| ParseError::new(src, e))?;
