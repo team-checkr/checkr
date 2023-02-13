@@ -11,7 +11,7 @@ use checkr::{
     driver::{Driver, DriverError},
     env::{
         graph::{GraphEnv, GraphEnvInput},
-        Analysis,
+        Analysis, Markdown,
     },
     pg::Determinism,
 };
@@ -36,7 +36,7 @@ pub struct AnalysisRequest {
 pub struct AnalysisResponse {
     pub stdout: String,
     pub stderr: String,
-    pub parsed_markdown: Option<String>,
+    pub parsed_markdown: Option<Markdown>,
     pub took: Duration,
     pub validation_result: Option<ValidationResult>,
 }

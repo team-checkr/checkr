@@ -139,14 +139,11 @@ const RIGHT_TABS_LABEL = {
 } satisfies Record<RightTab, string>;
 
 const Env = ({ env, src }: { env: Analysis; src: string }) => {
-  const [
-    { input_json, input_markdown, output_markdown: realReferenceOutput },
-    setIO,
-  ] = useState<wasm.Sample>({
-    input_json: "{}",
-    input_markdown: "",
-    output_markdown: "",
-  });
+  const [input, setInput] = useState<wasm.Input | null>(null);
+  const [output, setOutput] = useState<wasm.Output | null>(null);
+
+  const realReferenceOutput = output?.markdown ?? "";
+
   const [referenceOutput, setReferenceOutput] = useState(realReferenceOutput);
   const [tab, setTab] = useState<RightTab>("reference");
   const [inFlight, setInFlight] = useState(false);
@@ -156,6 +153,17 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
   const realReferenceOutputRef = useRef(realReferenceOutput);
   realReferenceOutputRef.current = realReferenceOutput;
+
+  useEffect(() => {
+    if (input || !inputted.input) return;
+
+    try {
+      const fullInput = wasm.complete_input_from_json(env, inputted.input);
+      setInput(fullInput);
+    } catch (e) {
+      console.error(e);
+    }
+  }, [env, input]);
 
   useEffect(() => {
     const aborts = [] as (() => void)[];
@@ -186,14 +194,25 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
   }, []);
 
   useEffect(() => {
-    if (!compilationStatus || compilationStatus.state != CompilerState.Compiled)
+    if (
+      !input ||
+      !compilationStatus ||
+      compilationStatus.state != CompilerState.Compiled
+    )
       return;
+
+    if (input.analysis != env) {
+      console.info(
+        `not analyzing, since input was generated for ${input.analysis}, while current is ${env}`
+      );
+      return;
+    }
 
     setInFlight(true);
 
     const { promise, abort } = api.analyze({
       analysis: env,
-      input: input_json,
+      input: input.json,
       src,
     });
 
@@ -208,15 +227,32 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
       });
 
     return () => abort();
-  }, [compilationStatus, src, input_json]);
+  }, [compilationStatus, src, input]);
 
   useEffect(() => {
+    if (
+      (inputted.input ? input : false) &&
+      (input ? input.analysis != env : false)
+    ) {
+      try {
+        const input = wasm.generate_input_for(src, env);
+        setInput(input);
+      } catch (e) {
+        console.error(e);
+      }
+    }
+  }, [env, input, src]);
+
+  useEffect(() => {
+    if (!input) return;
+
     try {
-      setIO(wasm.generate_sample_for(src, env));
+      const output = wasm.run_analysis(src, input);
+      setOutput(output);
     } catch (e) {
       console.error(e);
     }
-  }, [env, src]);
+  }, [src, env, input]);
 
   const indicatorState =
     inFlight || compilationStatus?.state != CompilerState.Compiled
@@ -240,7 +276,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
       <div className="grid place-items-start border-t border-slate-500 bg-slate-800 px-4 py-3 text-xl">
         <div className="prose prose-invert">
           <ReactMarkdown
-            children={input_markdown}
+            children={input?.markdown ?? ""}
             remarkPlugins={[remarkGfm]}
           />
         </div>

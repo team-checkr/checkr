@@ -18,27 +18,6 @@ pub mod sign;
 
 macro_rules! define_analysis {
     ( $( $name:ident($env:path, $display:literal, $cmd:literal) ),* $(,)? ) => {
-        #[typeshare::typeshare]
-        #[derive(
-            Debug,
-            Clone,
-            PartialEq,
-            Eq,
-            PartialOrd,
-            Ord,
-            Hash,
-            Serialize,
-            Deserialize,
-            clap::ValueEnum,
-            tsify::Tsify,
-        )]
-        #[tsify(into_wasm_abi, from_wasm_abi)]
-        pub enum Analysis {
-            $(
-                $name,
-            )*
-        }
-
         impl std::fmt::Display for Analysis {
             fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
                 match self {
@@ -107,6 +86,28 @@ macro_rules! define_analysis {
         }
     };
 }
+#[typeshare::typeshare]
+#[derive(
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    clap::ValueEnum,
+    tsify::Tsify,
+)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub enum Analysis {
+    Graph,
+    Interpreter,
+    ProgramVerification,
+    Sign,
+    Security,
+}
 
 define_analysis!(
     Graph(GraphEnv, "Graph", "graph"),
@@ -120,8 +121,33 @@ define_analysis!(
     Security(SecurityEnv, "Security", "security"),
 );
 
+#[typeshare::typeshare]
+#[derive(
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, tsify::Tsify,
+)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct Markdown(String);
+
+impl From<String> for Markdown {
+    fn from(value: String) -> Self {
+        Markdown(value)
+    }
+}
+impl From<Markdown> for String {
+    fn from(value: Markdown) -> Self {
+        value.0
+    }
+}
+impl std::ops::Deref for Markdown {
+    type Target = str;
+
+    fn deref(&self) -> &Self::Target {
+        self.0.as_str()
+    }
+}
+
 pub trait ToMarkdown {
-    fn to_markdown(&self) -> String;
+    fn to_markdown(&self) -> Markdown;
 }
 
 pub trait Environment {
@@ -152,14 +178,6 @@ pub enum ValidationResult {
     TimeOut,
 }
 
-#[typeshare::typeshare]
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct Sample {
-    pub input_json: serde_json::Value,
-    pub input_markdown: String,
-    pub output_markdown: String,
-}
-
 pub trait AnyEnvironment {
     fn analysis(&self) -> Analysis;
 
@@ -169,8 +187,6 @@ pub trait AnyEnvironment {
 
     fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> String;
 
-    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample;
-
     fn validate(
         &self,
         cmds: &Commands,
@@ -178,8 +194,8 @@ pub trait AnyEnvironment {
         output: &str,
     ) -> Result<ValidationResult, serde_json::Error>;
 
-    fn input_markdown(&self, input: &str) -> Result<String, serde_json::Error>;
-    fn output_markdown(&self, output: &str) -> Result<String, serde_json::Error>;
+    fn input_markdown(&self, input: &str) -> Result<Markdown, serde_json::Error>;
+    fn output_markdown(&self, output: &str) -> Result<Markdown, serde_json::Error>;
 }
 
 impl<E: Environment> AnyEnvironment for E {
@@ -200,17 +216,6 @@ impl<E: Environment> AnyEnvironment for E {
             .expect("failed to serialize input")
     }
 
-    fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample {
-        let input = E::Input::gen(&mut cmds.clone(), rng);
-        let output = self.run(cmds, &input);
-
-        Sample {
-            input_json: serde_json::to_value(&input).unwrap(),
-            input_markdown: input.to_markdown(),
-            output_markdown: output.to_markdown(),
-        }
-    }
-
     fn validate(
         &self,
         cmds: &Commands,
@@ -224,12 +229,12 @@ impl<E: Environment> AnyEnvironment for E {
         ))
     }
 
-    fn input_markdown(&self, input: &str) -> Result<String, serde_json::Error> {
+    fn input_markdown(&self, input: &str) -> Result<Markdown, serde_json::Error> {
         let input: E::Input = serde_json::from_str(input)?;
         Ok(input.to_markdown())
     }
 
-    fn output_markdown(&self, output: &str) -> Result<String, serde_json::Error> {
+    fn output_markdown(&self, output: &str) -> Result<Markdown, serde_json::Error> {
         let output: E::Output = serde_json::from_str(output)?;
         Ok(output.to_markdown())
     }

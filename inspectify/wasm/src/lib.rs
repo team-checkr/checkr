@@ -2,7 +2,7 @@ use checkr::{
     ast::Commands,
     env::{
         graph::{GraphEnv, GraphEnvInput},
-        Analysis, Environment,
+        Analysis, Environment, Markdown,
     },
     pg::Determinism,
 };
@@ -50,29 +50,66 @@ pub fn dot(deterministic: bool, src: &str) -> String {
 }
 
 #[wasm_bindgen]
-pub fn generate_sample_for(src: &str, analysis: Analysis) -> Sample {
+pub fn complete_input_from_json(analysis: Analysis, input_json: String) -> Input {
+    let markdown = analysis
+        .input_markdown(&input_json)
+        .expect("failed to parse given json");
+    Input {
+        analysis,
+        json: input_json,
+        markdown,
+    }
+}
+
+#[wasm_bindgen]
+pub fn generate_input_for(src: &str, analysis: Analysis) -> Input {
     let Ok(cmds) = checkr::parse::parse_commands(src) else {
         todo!("Parse error");
     };
     let mut rng = Commands::builder().build().rng;
-    let sample = analysis.gen_sample(&cmds, &mut rng);
-    sample.into()
+    let json = analysis.gen_input(&cmds, &mut rng);
+    let markdown = analysis
+        .input_markdown(&json)
+        .expect("we just generated it, so it should be fine");
+    Input {
+        analysis,
+        json,
+        markdown,
+    }
+}
+
+#[wasm_bindgen]
+pub fn run_analysis(src: &str, input: Input) -> Output {
+    let Ok(cmds) = checkr::parse::parse_commands(src) else {
+        todo!("Parse error");
+    };
+    let json = input
+        .analysis
+        .run(&cmds, &input.json)
+        .expect("parsing input json failed");
+    let markdown = input
+        .analysis
+        .output_markdown(&json)
+        .expect("we just generated it, so it should be fine");
+    Output {
+        analysis: input.analysis,
+        json,
+        markdown,
+    }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Tsify)]
 #[tsify(into_wasm_abi, from_wasm_abi)]
-pub struct Sample {
-    pub input_json: String,
-    pub input_markdown: String,
-    pub output_markdown: String,
+pub struct Input {
+    analysis: Analysis,
+    json: String,
+    markdown: Markdown,
 }
 
-impl From<checkr::env::Sample> for Sample {
-    fn from(value: checkr::env::Sample) -> Self {
-        Sample {
-            input_json: value.input_json.to_string(),
-            input_markdown: value.input_markdown,
-            output_markdown: value.output_markdown,
-        }
-    }
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Tsify)]
+#[tsify(into_wasm_abi, from_wasm_abi)]
+pub struct Output {
+    analysis: Analysis,
+    json: String,
+    markdown: Markdown,
 }

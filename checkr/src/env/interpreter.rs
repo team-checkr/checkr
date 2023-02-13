@@ -9,7 +9,7 @@ use crate::{
     sign::{Memory, MemoryRef},
 };
 
-use super::{Analysis, Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct InterpreterEnv;
@@ -43,7 +43,7 @@ impl Generate for InterpreterInput {
 }
 
 impl ToMarkdown for InterpreterInput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
@@ -69,7 +69,7 @@ impl ToMarkdown for InterpreterInput {
                 .to_string(),
         ]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 
@@ -77,7 +77,7 @@ impl ToMarkdown for InterpreterInput {
 pub struct InterpreterOutput(Vec<ProgramTrace<String>>);
 
 impl ToMarkdown for InterpreterOutput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let variables = self
             .0
             .iter()
@@ -132,7 +132,7 @@ impl ToMarkdown for InterpreterOutput {
                 }
             }
         }
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 

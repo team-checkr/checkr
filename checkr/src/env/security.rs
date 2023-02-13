@@ -11,7 +11,7 @@ use crate::{
     sign::Memory,
 };
 
-use super::{Analysis, Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SecurityEnv;
@@ -64,7 +64,7 @@ impl Generate for SecurityAnalysisInput {
 }
 
 impl ToMarkdown for SecurityAnalysisInput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table.load_preset(comfy_table::presets::ASCII_MARKDOWN);
 
@@ -89,12 +89,12 @@ impl ToMarkdown for SecurityAnalysisInput {
                 .to_string(),
         ]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 
 impl ToMarkdown for SecurityAnalysisOutput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
@@ -135,7 +135,7 @@ impl ToMarkdown for SecurityAnalysisOutput {
             },
         ]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 

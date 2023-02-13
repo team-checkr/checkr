@@ -8,8 +8,8 @@ use crate::{
 };
 
 use super::{
-    interpreter::InterpreterInput, sign::SignAnalysisInput, Analysis, Environment, SignEnv,
-    ToMarkdown, ValidationResult,
+    interpreter::InterpreterInput, sign::SignAnalysisInput, Analysis, Environment, Markdown,
+    SignEnv, ToMarkdown, ValidationResult,
 };
 
 #[derive(Debug)]
@@ -37,7 +37,7 @@ fn camillaify(s: &str) -> String {
 }
 
 impl ToMarkdown for ProgramVerificationEnvInput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
@@ -48,11 +48,11 @@ impl ToMarkdown for ProgramVerificationEnvInput {
             camillaify(&format!("`Q = {}`", self.post_condition)),
         ]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 impl ToMarkdown for ProgramVerificationEnvOutput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
@@ -73,7 +73,7 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
         //     self.pre_condition
         // ))]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 

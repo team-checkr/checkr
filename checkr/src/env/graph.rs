@@ -11,7 +11,7 @@ use crate::{
     pg::{Determinism, ProgramGraph},
 };
 
-use super::{Analysis, Environment, ToMarkdown};
+use super::{Analysis, Environment, Markdown, ToMarkdown};
 
 #[derive(Debug)]
 pub struct GraphEnv;
@@ -38,13 +38,13 @@ impl Generate for GraphEnvInput {
 }
 
 impl ToMarkdown for GraphEnvInput {
-    fn to_markdown(&self) -> String {
-        format!("**Determinism:** {:?}", self.determinism)
+    fn to_markdown(&self) -> Markdown {
+        format!("**Determinism:** {:?}", self.determinism).into()
     }
 }
 impl ToMarkdown for GraphEnvOutput {
-    fn to_markdown(&self) -> String {
-        format!("\n\n```dot\n{}\n```\n\n", self.dot)
+    fn to_markdown(&self) -> Markdown {
+        format!("\n\n```dot\n{}\n```\n\n", self.dot).into()
     }
 }
 

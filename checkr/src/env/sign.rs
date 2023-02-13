@@ -15,7 +15,7 @@ use crate::{
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
 };
 
-use super::{Analysis, Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SignEnv;
@@ -41,7 +41,7 @@ impl Generate for SignAnalysisInput {
 }
 
 impl ToMarkdown for SignAnalysisInput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let mut table = comfy_table::Table::new();
         table
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
@@ -64,7 +64,7 @@ impl ToMarkdown for SignAnalysisInput {
                 .to_string(),
         ]);
 
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 
@@ -93,7 +93,7 @@ pub struct SignAnalysisOutput {
 }
 
 impl ToMarkdown for SignAnalysisOutput {
-    fn to_markdown(&self) -> String {
+    fn to_markdown(&self) -> Markdown {
         let variables: HashSet<_> = self
             .nodes
             .iter()
@@ -147,7 +147,7 @@ impl ToMarkdown for SignAnalysisOutput {
                 table.add_row([n.to_string()]);
             }
         }
-        format!("{table}")
+        format!("{table}").into()
     }
 }
 
