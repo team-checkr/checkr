@@ -8,14 +8,7 @@ jobs:
   build:
     name: build
     env:
-      # For some builds, we use cross to test on 32-bit and big-endian
-      # systems.
-      CARGO: cargo
-      # When CARGO is set to CROSS, this is set to `--target matrix.target`.
-      TARGET_FLAGS: ""
-      # When CARGO is set to CROSS, TARGET_DIR includes matrix.target.
       TARGET_DIR: ./target
-      # Emit backtraces on panics.
       RUST_BACKTRACE: 1
       GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
     runs-on: ${{ matrix.os }}
@@ -69,7 +62,7 @@ jobs:
 
     - uses: taiki-e/install-action@v2
       with:
-        tool: just,typeshare-cli,cross
+        tool: just,typeshare-cli
 
     - uses: jetli/wasm-pack-action@v0.4.0
       with:
@@ -79,71 +72,5 @@ jobs:
     - name: Build UI
       run: just build-ui
 
-    - name: Use Cross
-      shell: bash
-      run: |
-        echo "CARGO=cross" >> $GITHUB_ENV
-        echo "TARGET_FLAGS=--target ${{ matrix.target }}" >> $GITHUB_ENV
-        echo "TARGET_DIR=./target/${{ matrix.target }}" >> $GITHUB_ENV
-
     - name: Build inspectify and checko
-      run: just build-ci ${{ env.TARGET_FLAGS }}
-
-    - name: Upload inspectify binary
-      if: matrix.os != 'windows-2022'
-      uses: actions/upload-artifact@v3
-      with:
-        name: inspectify-${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/inspectify
-        if-no-files-found: error
-
-    - name: Upload inspectify windows binary
-      if: matrix.os == 'windows-2022'
-      uses: actions/upload-artifact@v3
-      with:
-        name: inspectify-${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/inspectify.exe
-        if-no-files-found: error
-
-    - name: Upload checko binary
-      if: matrix.os != 'windows-2022'
-      uses: actions/upload-artifact@v3
-      with:
-        name: checko-${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/checko
-        if-no-files-found: error
-
-    - name: Upload checko windows binary
-      if: matrix.os == 'windows-2022'
-      uses: actions/upload-artifact@v3
-      with:
-        name: checko-${{ matrix.build }}
-        path: target/${{ matrix.target }}/release/checko.exe
-        if-no-files-found: error
-  push_to_branch:
-    name: Push binaries to the binaries branch
-    needs: build
-    runs-on: ubuntu-latest
-    steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-
-    - name: Checkout binaries branch or create if needed
-      run: |
-        git checkout binaries || git switch --orphan binaries
-
-    - name: Download all artifacts
-      uses: actions/download-artifact@v3
-
-    - name: Commit to binaries branch
-      run: |
-        git config user.name github-actions
-        git config user.email github-actions@github.com
-        git add .
-        git commit -m "generated new binaries"
-
-    - name: Push to binaries branch
-      uses: ad-m/github-push-action@master
-      with:
-        github_token: ${{ secrets.GITHUB_TOKEN }}
-        branch: binaries
+      run: just build-ci

@@ -22,9 +22,9 @@ serve-inspectify:
 build-checko:
     cargo build -p checko --release
 
-build-ci +target-flags:
-    cross build -p inspectify --release {{target-flags}}
-    cross build -p checko --release {{target-flags}}
+build-ci:
+    cargo build -p inspectify
+    cargo build -p checko
 
 # <registry URL>/<namespace>/<project>/<image>
 IMAGE_NAME := "gitlab.gbar.dtu.dk/checkr-dev-env/demo-group-01/image:latest"
