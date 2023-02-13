@@ -22,6 +22,7 @@ use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
 use tracing::{error, info};
+use tracing_subscriber::prelude::*;
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -413,13 +414,17 @@ async fn run() -> color_eyre::Result<()> {
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
-    tracing_subscriber::fmt::fmt()
-        .with_env_filter(
+    tracing_subscriber::Registry::default()
+        .with(tracing_error::ErrorLayer::default())
+        .with(
             tracing_subscriber::EnvFilter::builder()
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
-        .without_time()
+        .with(tracing_subscriber::fmt::layer().without_time())
+        .with(tracing_subscriber::filter::FilterFn::new(|m| {
+            !m.target().contains("hyper")
+        }))
         .init();
 
     run().await

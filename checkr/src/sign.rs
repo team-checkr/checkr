@@ -222,7 +222,10 @@ impl<T, A> Memory<T, A> {
     }
 
     pub fn with_var(mut self, var: &Variable, value: T) -> Self {
-        *self.variables.get_mut(var).unwrap() = value;
+        *self
+            .variables
+            .get_mut(var)
+            .unwrap_or_else(|| panic!("variable `{var}` not declared")) = value;
         self
     }
     pub fn get_var(&self, var: &Variable) -> Option<&T> {

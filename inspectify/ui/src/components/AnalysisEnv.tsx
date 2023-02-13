@@ -16,6 +16,8 @@ import { StretchEditor } from "./StretchEditor";
 import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";
 import { capitalCase } from "change-case";
 
+wasm.init_hook();
+
 const searchParams = new URL(document.location.toString()).searchParams;
 
 const inputted: { analysis?: string; src?: string; input?: string } =
@@ -231,8 +233,8 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
   useEffect(() => {
     if (
-      (inputted.input ? input : false) &&
-      (input ? input.analysis != env : false)
+      (inputted.input ? input : true) &&
+      (input ? input.analysis != env : true)
     ) {
       try {
         const input = wasm.generate_input_for(src, env);
@@ -273,13 +275,19 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
   return (
     <>
-      <div className="grid place-items-start border-t border-slate-500 bg-slate-800 px-4 py-3 text-xl">
-        <div className="prose prose-invert">
+      <div className="grid place-items-start border-t border-slate-500 bg-slate-800">
+        <div className="prose prose-invert px-4 pt-3">
           <ReactMarkdown
             children={input?.markdown ?? ""}
             remarkPlugins={[remarkGfm]}
           />
         </div>
+        <button
+          className="p-1.5 hover:bg-slate-600 transition text-slate-100 rounded-tr"
+          onClick={() => setInput(wasm.generate_input_for(src, env))}
+        >
+          <ArrowPathRoundedSquareIcon className="w-3" />
+        </button>
       </div>
       <div
         className={

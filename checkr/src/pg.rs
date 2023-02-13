@@ -5,10 +5,11 @@ use std::{
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use tracing::warn;
 
 use crate::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
 
-#[derive(Debug)]
+#[derive(Debug, Clone)]
 pub struct ProgramGraph {
     edges: Vec<Edge>,
     nodes: HashSet<Node>,
@@ -293,7 +294,13 @@ impl ProgramGraph {
     pub fn rename_with_reverse_post_order(&self) -> Self {
         let (g, node_mapping, node_mapping_rev) = self.as_petgraph();
 
-        let mut dfs = petgraph::visit::DfsPostOrder::new(&g, node_mapping[&Node::Start]);
+        let initial_node = if let Some(n) = node_mapping.get(&Node::Start) {
+            *n
+        } else {
+            warn!("graph did not have a start node");
+            return self.clone();
+        };
+        let mut dfs = petgraph::visit::DfsPostOrder::new(&g, initial_node);
 
         let mut new_order = VecDeque::new();
 

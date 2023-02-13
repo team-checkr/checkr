@@ -2336,6 +2336,7 @@ dependencies = [
  "tokio",
  "tower-http",
  "tracing",
+ "tracing-error",
  "tracing-subscriber",
  "typeshare",
 ]
