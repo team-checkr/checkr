@@ -16,73 +16,109 @@ pub mod pv;
 pub mod security;
 pub mod sign;
 
-#[typeshare::typeshare]
-#[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    clap::ValueEnum,
-    tsify::Tsify,
-)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
-pub enum Analysis {
-    Graph,
-    Interpreter,
-    ProgramVerification,
-    Sign,
-    Security,
+macro_rules! define_analysis {
+    ( $( $name:ident($env:path, $display:literal, $cmd:literal) ),* $(,)? ) => {
+        #[typeshare::typeshare]
+        #[derive(
+            Debug,
+            Clone,
+            PartialEq,
+            Eq,
+            PartialOrd,
+            Ord,
+            Hash,
+            Serialize,
+            Deserialize,
+            clap::ValueEnum,
+            tsify::Tsify,
+        )]
+        #[tsify(into_wasm_abi, from_wasm_abi)]
+        pub enum Analysis {
+            $(
+                $name,
+            )*
+        }
+
+        impl std::fmt::Display for Analysis {
+            fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                match self {
+                    $( Analysis::$name => write!(f, $display), )*
+                }
+            }
+        }
+
+        impl Analysis {
+            pub fn command(&self) -> &'static str {
+                match self {
+                    $( Analysis::$name => $cmd, )*
+                }
+            }
+        }
+
+        impl FromStr for Analysis {
+            type Err = ();
+
+            fn from_str(s: &str) -> Result<Self, Self::Err> {
+                match s {
+                    $( $cmd => Ok(Analysis::$name), )*
+                    _ => Err(()),
+                }
+            }
+        }
+
+        impl std::ops::Deref for Analysis {
+            type Target = dyn AnyEnvironment;
+
+            fn deref(&self) -> &Self::Target {
+                match self {
+                    $( Analysis::$name => &$env, )*
+                }
+            }
+        }
+
+        #[typeshare::typeshare]
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, tsify::Tsify)]
+        #[tsify(into_wasm_abi, from_wasm_abi)]
+        pub enum AnalysisInput {
+            $( $name(<$env as Environment>::Input), )*
+        }
+
+        impl AnalysisInput {
+            pub fn analysis(&self) -> Analysis {
+                match self {
+                    $( AnalysisInput::$name(_) => Analysis::$name, )*
+                }
+            }
+        }
+
+        #[typeshare::typeshare]
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, tsify::Tsify)]
+        #[tsify(into_wasm_abi, from_wasm_abi)]
+        pub enum AnalysisOutput {
+            $( $name(<$env as Environment>::Output), )*
+        }
+
+        impl AnalysisOutput {
+            pub fn analysis(&self) -> Analysis {
+                match self {
+                    $( AnalysisOutput::$name(_) => Analysis::$name, )*
+                }
+            }
+        }
+    };
 }
 
-pub enum AnalysisInput {
-    Graph(<GraphEnv as Environment>::Input),
-    Sign(<SignEnv as Environment>::Input),
-    Interpreter(<InterpreterEnv as Environment>::Input),
-    Security(<SecurityEnv as Environment>::Input),
-    ProgramVerification(<ProgramVerificationEnv as Environment>::Input),
-}
-
-impl std::fmt::Display for Analysis {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Analysis::Graph => write!(f, "Graph"),
-            Analysis::Sign => write!(f, "Sign"),
-            Analysis::Interpreter => write!(f, "Interpreter"),
-            Analysis::Security => write!(f, "Security"),
-            Analysis::ProgramVerification => write!(f, "Program verification"),
-        }
-    }
-}
-impl Analysis {
-    pub fn command(&self) -> &'static str {
-        match self {
-            Analysis::Graph => "graph",
-            Analysis::Sign => "sign",
-            Analysis::Interpreter => "interpreter",
-            Analysis::Security => "security",
-            Analysis::ProgramVerification => "program-verification",
-        }
-    }
-}
-impl FromStr for Analysis {
-    type Err = ();
-
-    fn from_str(s: &str) -> Result<Self, Self::Err> {
-        match s {
-            "graph" => Ok(Analysis::Graph),
-            "sign" => Ok(Analysis::Sign),
-            "interpreter" => Ok(Analysis::Interpreter),
-            "security" => Ok(Analysis::Security),
-            "program-verification" => Ok(Analysis::ProgramVerification),
-            _ => Err(()),
-        }
-    }
-}
+define_analysis!(
+    Graph(GraphEnv, "Graph", "graph"),
+    Interpreter(InterpreterEnv, "Interpreter", "interpreter"),
+    ProgramVerification(
+        ProgramVerificationEnv,
+        "Program verification",
+        "program-verification"
+    ),
+    Sign(SignEnv, "Sign", "sign"),
+    Security(SecurityEnv, "Security", "security"),
+);
 
 pub trait ToMarkdown {
     fn to_markdown(&self) -> String;
@@ -206,20 +242,6 @@ impl Analysis {
 
     pub fn map_env<T>(&self, mut f: impl FnMut(&dyn AnyEnvironment) -> T) -> T {
         f(self.as_env())
-    }
-}
-
-impl std::ops::Deref for Analysis {
-    type Target = dyn AnyEnvironment;
-
-    fn deref(&self) -> &Self::Target {
-        match self {
-            Analysis::Graph => &GraphEnv,
-            Analysis::Interpreter => &InterpreterEnv,
-            Analysis::ProgramVerification => &ProgramVerificationEnv,
-            Analysis::Sign => &SignEnv,
-            Analysis::Security => &SecurityEnv,
-        }
     }
 }
 
