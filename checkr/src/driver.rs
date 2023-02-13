@@ -6,7 +6,10 @@ use std::{
 
 use tracing::error;
 
-use crate::{ast::Commands, env::Environment};
+use crate::{
+    ast::Commands,
+    env::{Analysis, Environment},
+};
 
 pub struct Driver {
     dir: PathBuf,
@@ -80,19 +83,17 @@ impl Driver {
 
         cmd
     }
-    pub async fn exec_raw_cmds<E>(
+    pub async fn exec_dyn_raw_cmds(
         &self,
+        analysis: &Analysis,
         cmds: &str,
-        input: &E::Input,
-    ) -> Result<ExecOutput<E>, ExecError>
-    where
-        E: Environment,
-    {
+        input: &str,
+    ) -> Result<ExecOutput<serde_json::Value>, ExecError> {
         let mut cmd = self.new_command();
-        cmd.arg(E::ANALYSIS.command());
+        cmd.arg(analysis.command());
         cmd.arg(cmds);
 
-        cmd.arg(serde_json::to_string(input).map_err(ExecError::Serialize)?);
+        cmd.arg(input);
 
         let before = std::time::Instant::now();
         let cmd_output = cmd.output().map_err(ExecError::RunExec)?;
@@ -120,15 +121,44 @@ impl Driver {
             }),
         }
     }
+    pub async fn exec_raw_cmds<E>(
+        &self,
+        cmds: &str,
+        input: &E::Input,
+    ) -> Result<ExecOutput<E::Output>, ExecError>
+    where
+        E: Environment,
+    {
+        let output = self
+            .exec_dyn_raw_cmds(
+                &E::ANALYSIS,
+                cmds,
+                &serde_json::to_string(input).map_err(ExecError::Serialize)?,
+            )
+            .await?;
+
+        match serde_json::from_value(output.parsed) {
+            Ok(parsed) => Ok(ExecOutput {
+                output: output.output,
+                parsed,
+                took: output.took,
+            }),
+            Err(err) => Err(ExecError::Parse {
+                inner: err,
+                run_output: output.output,
+                time: output.took,
+            }),
+        }
+    }
     pub async fn exec<E>(
         &self,
         cmds: &Commands,
         input: &E::Input,
-    ) -> Result<ExecOutput<E>, ExecError>
+    ) -> Result<ExecOutput<E::Output>, ExecError>
     where
         E: Environment,
     {
-        self.exec_raw_cmds(&cmds.to_string(), input).await
+        self.exec_raw_cmds::<E>(&cmds.to_string(), input).await
     }
 
     pub fn compile_output(&self) -> Option<&std::process::Output> {
@@ -137,8 +167,8 @@ impl Driver {
 }
 
 #[derive(Debug)]
-pub struct ExecOutput<E: Environment> {
+pub struct ExecOutput<O> {
     pub output: std::process::Output,
-    pub parsed: E::Output,
+    pub parsed: O,
     pub took: Duration,
 }

@@ -36,23 +36,12 @@ export interface CompilationStatus {
 	state: CompilerState;
 }
 
-export interface Env {
-	analysis: Analysis;
-	sample: Sample;
-}
-
-export interface Generation {
-	program: string;
-	dot: string;
-	envs: Env[];
-}
-
 export enum Analysis {
-	Graph = "graph",
-	Interpreter = "interpreter",
-	ProgramVerification = "program-verification",
-	Sign = "sign",
-	Security = "security",
+	Graph = "Graph",
+	Interpreter = "Interpreter",
+	ProgramVerification = "ProgramVerification",
+	Sign = "Sign",
+	Security = "Security",
 }
 
 export type ValidationResult = 

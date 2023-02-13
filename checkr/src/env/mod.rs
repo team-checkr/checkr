@@ -1,4 +1,4 @@
-use std::str::FromStr;
+use std::{ops::Deref, str::FromStr};
 
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
@@ -18,10 +18,19 @@ pub mod sign;
 
 #[typeshare::typeshare]
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, clap::ValueEnum,
+    Debug,
+    Clone,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    clap::ValueEnum,
+    tsify::Tsify,
 )]
-#[serde(rename_all = "kebab-case")]
-#[clap(rename_all = "kebab-case")]
+#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Analysis {
     Graph,
     Interpreter,
@@ -118,9 +127,23 @@ pub struct Sample {
 pub trait AnyEnvironment {
     fn analysis(&self) -> Analysis;
 
-    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> serde_json::Value;
+    fn setup_generation(&self) -> ProgramGenerationBuilder;
+
+    fn run(&self, cmds: &Commands, input: &str) -> Result<String, serde_json::Error>;
+
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> String;
 
     fn gen_sample(&self, cmds: &Commands, rng: &mut SmallRng) -> Sample;
+
+    fn validate(
+        &self,
+        cmds: &Commands,
+        input: &str,
+        output: &str,
+    ) -> Result<ValidationResult, serde_json::Error>;
+
+    fn input_markdown(&self, input: &str) -> Result<String, serde_json::Error>;
+    fn output_markdown(&self, output: &str) -> Result<String, serde_json::Error>;
 }
 
 impl<E: Environment> AnyEnvironment for E {
@@ -128,8 +151,16 @@ impl<E: Environment> AnyEnvironment for E {
         E::ANALYSIS
     }
 
-    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> serde_json::Value {
-        serde_json::to_value(&E::Input::gen(&mut cmds.clone(), rng))
+    fn setup_generation(&self) -> ProgramGenerationBuilder {
+        self.setup_generation()
+    }
+
+    fn run(&self, cmds: &Commands, input: &str) -> Result<String, serde_json::Error> {
+        serde_json::to_string(&self.run(cmds, &serde_json::from_str(input)?))
+    }
+
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> String {
+        serde_json::to_string(&E::Input::gen(&mut cmds.clone(), rng))
             .expect("failed to serialize input")
     }
 
@@ -143,28 +174,52 @@ impl<E: Environment> AnyEnvironment for E {
             output_markdown: output.to_markdown(),
         }
     }
-}
 
-pub struct Application {
-    pub envs: Vec<Box<dyn AnyEnvironment>>,
-}
-
-impl Application {
-    pub fn new() -> Self {
-        Application { envs: vec![] }
+    fn validate(
+        &self,
+        cmds: &Commands,
+        input: &str,
+        output: &str,
+    ) -> Result<ValidationResult, serde_json::Error> {
+        Ok(self.validate(
+            cmds,
+            &serde_json::from_str(input)?,
+            &serde_json::from_str(output)?,
+        ))
     }
-    pub fn add_env<E>(&mut self, env: E) -> &mut Self
-    where
-        E: Environment + 'static,
-    {
-        self.envs.push(box env);
-        self
+
+    fn input_markdown(&self, input: &str) -> Result<String, serde_json::Error> {
+        let input: E::Input = serde_json::from_str(input)?;
+        Ok(input.to_markdown())
+    }
+
+    fn output_markdown(&self, output: &str) -> Result<String, serde_json::Error> {
+        let output: E::Output = serde_json::from_str(output)?;
+        Ok(output.to_markdown())
     }
 }
 
-impl Default for Application {
-    fn default() -> Self {
-        Self::new()
+impl Analysis {
+    pub fn as_env(&self) -> &dyn AnyEnvironment {
+        self.deref()
+    }
+
+    pub fn map_env<T>(&self, mut f: impl FnMut(&dyn AnyEnvironment) -> T) -> T {
+        f(self.as_env())
+    }
+}
+
+impl std::ops::Deref for Analysis {
+    type Target = dyn AnyEnvironment;
+
+    fn deref(&self) -> &Self::Target {
+        match self {
+            Analysis::Graph => &GraphEnv,
+            Analysis::Interpreter => &InterpreterEnv,
+            Analysis::ProgramVerification => &ProgramVerificationEnv,
+            Analysis::Sign => &SignEnv,
+            Analysis::Security => &SecurityEnv,
+        }
     }
 }
 

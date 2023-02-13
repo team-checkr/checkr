@@ -25,6 +25,7 @@ async-trait = "0.1.61"
 tracing-wasm = "0.2.1"
 tracing = "0.1.37"
 typeshare = "1.0.0"
+tsify = { version = "0.4.3", default-features = false, features = ["js"] }
 
 [lib]
 crate-type = ["cdylib", "rlib"]

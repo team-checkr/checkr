@@ -11,8 +11,7 @@ use checkr::{
     driver::{Driver, DriverError},
     env::{
         graph::{GraphEnv, GraphEnvInput},
-        pv::ProgramVerificationEnv,
-        Analysis, Environment, InterpreterEnv, SecurityEnv, SignEnv, ToMarkdown,
+        Analysis,
     },
     pg::Determinism,
 };
@@ -72,61 +71,54 @@ async fn analyze(
     Json(body): Json<AnalysisRequest>,
 ) -> Json<AnalysisResponse> {
     let cmds = body.src;
-    let output = match body.analysis {
-        Analysis::Graph => run(state.driver, GraphEnv, cmds, body.input).await,
-        Analysis::Sign => run(state.driver, SignEnv, cmds, body.input).await,
-        Analysis::Interpreter => run(state.driver, InterpreterEnv, cmds, body.input).await,
-        Analysis::Security => run(state.driver, SecurityEnv, cmds, body.input).await,
-        Analysis::ProgramVerification => {
-            run(state.driver, ProgramVerificationEnv, cmds, body.input).await
-        }
-    };
-    return Json(output);
-
-    async fn run<E: Environment>(
-        driver: Arc<Mutex<Driver>>,
-        env: E,
-        cmds: String,
-        input: String,
-    ) -> AnalysisResponse {
-        let input: E::Input = serde_json::from_str(&input).expect("failed to parse input");
-        let driver = driver.lock().await;
-        match driver.exec_raw_cmds::<E>(&cmds, &input).await {
-            Ok(exec_output) => {
-                let cmds = checkr::parse::parse_commands(&cmds).unwrap();
-                let validation_res = env.validate(&cmds, &input, &exec_output.parsed);
-                AnalysisResponse {
-                    stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
-                    stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
-                    parsed_markdown: Some(exec_output.parsed.to_markdown()),
-                    took: exec_output.took,
-                    validation_result: Some(validation_res.into()),
-                }
+    let driver = state.driver.lock().await;
+    let output = match driver
+        .exec_dyn_raw_cmds(&body.analysis, &cmds, &body.input)
+        .await
+    {
+        Ok(exec_output) => {
+            let cmds = checkr::parse::parse_commands(&cmds).unwrap();
+            let validation_res = body
+                .analysis
+                .validate(&cmds, &body.input, &exec_output.parsed.to_string())
+                .expect("serialization error");
+            AnalysisResponse {
+                stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
+                stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
+                parsed_markdown: Some(
+                    body.analysis
+                        .output_markdown(&exec_output.parsed.to_string())
+                        .expect("serialization error during markdown generation"),
+                ),
+                took: exec_output.took,
+                validation_result: Some(validation_res.into()),
             }
-            Err(e) => match e {
-                checkr::driver::ExecError::Serialize(_) => todo!(),
-                checkr::driver::ExecError::RunExec(_) => todo!(),
-                checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
-                    stdout: String::from_utf8(output.stdout).unwrap(),
-                    stderr: String::from_utf8(output.stderr).unwrap(),
-                    parsed_markdown: None,
-                    took,
-                    validation_result: None,
-                },
-                checkr::driver::ExecError::Parse {
-                    inner: _,
-                    run_output,
-                    time,
-                } => AnalysisResponse {
-                    stdout: String::from_utf8(run_output.stdout).unwrap(),
-                    stderr: String::from_utf8(run_output.stderr).unwrap(),
-                    parsed_markdown: None,
-                    took: time,
-                    validation_result: None,
-                },
-            },
         }
-    }
+        Err(e) => match e {
+            checkr::driver::ExecError::Serialize(_) => todo!(),
+            checkr::driver::ExecError::RunExec(_) => todo!(),
+            checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
+                stdout: String::from_utf8(output.stdout).unwrap(),
+                stderr: String::from_utf8(output.stderr).unwrap(),
+                parsed_markdown: None,
+                took,
+                validation_result: None,
+            },
+            checkr::driver::ExecError::Parse {
+                inner: _,
+                run_output,
+                time,
+            } => AnalysisResponse {
+                stdout: String::from_utf8(run_output.stdout).unwrap(),
+                stderr: String::from_utf8(run_output.stderr).unwrap(),
+                parsed_markdown: None,
+                took: time,
+                validation_result: None,
+            },
+        },
+    };
+
+    Json(output)
 }
 
 #[typeshare::typeshare]

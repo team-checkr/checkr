@@ -1,4 +1,6 @@
-import type {
+import type * as wasm from "../../../wasm/pkg";
+import {
+  Analysis,
   AnalysisRequest,
   AnalysisResponse,
   CompilationStatus,
@@ -6,9 +8,16 @@ import type {
   GraphResponse,
 } from "./types";
 
-export const analyze = (
-  req: AnalysisRequest
-): { abort: () => void; promise: Promise<AnalysisResponse> } => {
+export const analyze = (req: {
+  analysis: wasm.Analysis;
+  input: string;
+  src: string;
+}): { abort: () => void; promise: Promise<AnalysisResponse> } => {
+  const internalRequest = {
+    analysis: Analysis[req.analysis],
+    input: req.input,
+    src: req.src,
+  } satisfies AnalysisRequest;
   const headers = new Headers();
   headers.append("Content-Type", "application/json");
 
@@ -17,7 +26,7 @@ export const analyze = (
   const promise = fetch("http://localhost:3000/analyze", {
     method: "POST",
     headers,
-    body: JSON.stringify(req),
+    body: JSON.stringify(internalRequest),
     signal: controller.signal,
   }).then((res) => res.json());
 

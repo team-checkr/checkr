@@ -11,29 +11,22 @@ import {
   AnalysisResponse,
   CompilationStatus,
   CompilerState,
-  Sample,
 } from "../lib/types";
 import { StretchEditor } from "./StretchEditor";
 import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";
+import { capitalCase } from "change-case";
 
 const searchParams = new URL(document.location.toString()).searchParams;
 
 const inputted: { analysis?: string; src?: string; input?: string } =
   Object.fromEntries(searchParams.entries());
 
-const ENVS = [
-  Analysis.Sign,
-  Analysis.Interpreter,
-  Analysis.Security,
-  Analysis.ProgramVerification,
-] satisfies Analysis[];
-const ANALYSIS_NAMES = {
-  [Analysis.Graph]: "Graph",
-  [Analysis.Sign]: "Sign",
-  [Analysis.Interpreter]: "Interpreter",
-  [Analysis.Security]: "Security",
-  [Analysis.ProgramVerification]: "Program Verification",
-} satisfies Record<Analysis, string>;
+const ENVS = Object.values(Analysis).filter(
+  (a) => a != Analysis.Graph
+) satisfies Analysis[];
+const ANALYSIS_NAMES = Object.fromEntries(
+  ENVS.map((env) => [env, capitalCase(env)] satisfies [Analysis, string])
+) as Record<Analysis, string>;
 
 type GraphShown = "graph" | "reference";
 
@@ -149,8 +142,8 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
   const [
     { input_json, input_markdown, output_markdown: realReferenceOutput },
     setIO,
-  ] = useState<Sample>({
-    input_json: {},
+  ] = useState<wasm.Sample>({
+    input_json: "{}",
     input_markdown: "",
     output_markdown: "",
   });
@@ -200,7 +193,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
     const { promise, abort } = api.analyze({
       analysis: env,
-      input: JSON.stringify(input_json),
+      input: input_json,
       src,
     });
 
@@ -219,20 +212,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
   useEffect(() => {
     try {
-      switch (env) {
-        case Analysis.Security:
-          setIO(JSON.parse(wasm.security(src)));
-          break;
-        case Analysis.Sign:
-          setIO(JSON.parse(wasm.sign(src)));
-          break;
-        case Analysis.Interpreter:
-          setIO(JSON.parse(wasm.interpreter(src)));
-          break;
-        case Analysis.ProgramVerification:
-          setIO(JSON.parse(wasm.pv(src)));
-          break;
-      }
+      setIO(wasm.generate_sample_for(src, env));
     } catch (e) {
       console.error(e);
     }
