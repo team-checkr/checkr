@@ -1,0 +1,3 @@
+[submodule "starters/fsharp-starter"]
+	path = starters/fsharp-starter
+	url = git@github.com:team-checkr/fsharp-starter.git
