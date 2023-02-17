@@ -1,5 +1,5 @@
 watch-wasm:
-    cd inspectify/wasm; watchexec -w .. -e rs "wasm-pack build --dev --target bundler"
+    cd inspectify/wasm; watchexec -w src -e rs "wasm-pack build --dev --target bundler"
 
 watch-web:
     cd inspectify/ui; npm i && npm run dev
