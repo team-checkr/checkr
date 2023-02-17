@@ -197,14 +197,12 @@ async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
     static UI_DIR: include_dir::Dir = include_dir::include_dir!("$CARGO_MANIFEST_DIR/ui/dist/");
 
     if uri.path() == "/" {
-        return Html(
-            UI_DIR
-                .get_file("index.html")
-                .unwrap()
-                .contents_utf8()
-                .unwrap(),
-        )
-        .into_response();
+        let index = if let Some(index) = UI_DIR.get_file("index.html") {
+            index.contents_utf8().unwrap()
+        } else {
+            "Frontend has not been build for release yet! Visit <a href=\"http://localhost:3001/\">localhost:3001</a> for the development site!"
+        };
+        return Html(index).into_response();
     }
 
     match UI_DIR.get_file(&uri.path()[1..]) {

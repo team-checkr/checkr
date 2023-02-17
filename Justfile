@@ -23,6 +23,7 @@ build-inspectify: build-ui
     cargo build -p inspectify --release
 
 serve-inspectify:
+    mkdir -p inspectify/ui/dist/
     RUST_LOG=debug cargo run -p inspectify .
 
 build-checko:
