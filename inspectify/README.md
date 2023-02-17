@@ -13,7 +13,7 @@ To build inspectify locally the following tools are required:
 - [Rust](https://www.rust-lang.org/): Install using [rustup](https://rustup.rs).
 - [Just](https://github.com/casey/just/): Install using `cargo install just` or with [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) using `cargo binstall just`.
 - [Typeshare](https://github.com/1Password/typeshare): Install using `cargo install typeshare-cli` or with [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) using `cargo binstall typeshare-cli`.
-- [watchexec](https://github.com/watchexec/watchexec): Install using `cargo install watchexec` or with [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) using `cargo binstall watchexec`.
+- [watchexec](https://github.com/watchexec/watchexec): Install using `cargo install watchexec-cli` or with [`cargo-binstall`](https://github.com/cargo-bins/cargo-binstall) using `cargo binstall watchexec-cli`.
 - [wasm-pack](https://github.com/rustwasm/wasm-pack): Install using the [wasm-pack installer](https://rustwasm.github.io/wasm-pack/installer/).
 - [NodeJS](https://nodejs.org/en/): Install in the best way you see fit, but I can recommend [Volta](https://volta.sh/) on macOS and Linux, and `winget install OpenJS.NodeJS` on Windows :)
 
