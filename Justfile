@@ -2,7 +2,7 @@ watch-wasm:
     cd inspectify/wasm; watchexec -w .. -e rs "wasm-pack build --dev --target bundler"
 
 watch-web:
-    cd inspectify/ui; npm run dev
+    cd inspectify/ui; npm i && npm run dev
 
 typeshare:
     #!/bin/bash
