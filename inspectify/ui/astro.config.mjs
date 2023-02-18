@@ -16,21 +16,22 @@ import compress from "astro-compress";
 // https://astro.build/config
 export default defineConfig({
   server: {
-    port: 3001
+    port: 3001,
   },
   integrations: [tailwind(), react(), mdx(), compress()],
   build: {
-    format: "file"
+    format: "file",
   },
   vite: {
     server: {
       fs: {
-        strict: false
-      }
+        strict: false,
+        // allow: ["../wasm/pkg"],
+      },
     },
     build: {
-      target: "esnext"
+      target: "esnext",
     },
-    plugins: [wasm()]
-  }
+    plugins: [wasm()],
+  },
 });

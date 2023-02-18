@@ -158,7 +158,7 @@ impl GeneratedProgram {
                     stderr: String::new(),
                     result: Err(err.into()),
                 },
-                driver::ExecError::RunExec(err) => AnalysisSummary {
+                driver::ExecError::RunExec { cmd, source } => AnalysisSummary {
                     fuel,
                     seed,
                     cmds,
@@ -167,7 +167,7 @@ impl GeneratedProgram {
                     time: Duration::ZERO,
                     stdout: String::new(),
                     stderr: String::new(),
-                    result: Err(err.into()),
+                    result: Err(source.into()),
                 },
                 driver::ExecError::CommandFailed(output, time) => AnalysisSummary {
                     fuel,

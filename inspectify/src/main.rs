@@ -95,14 +95,20 @@ async fn analyze(
                 validation_result: Some(validation_res.into()),
             }
         }
-        Err(e) => match e {
+        Err(e) => match &e {
             checkr::driver::ExecError::Serialize(_) => todo!(),
-            checkr::driver::ExecError::RunExec(_) => todo!(),
-            checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
-                stdout: String::from_utf8(output.stdout).unwrap(),
-                stderr: String::from_utf8(output.stderr).unwrap(),
+            checkr::driver::ExecError::RunExec { .. } => AnalysisResponse {
+                stdout: String::new(),
+                stderr: format!("Failed to run executable: {:?}", color_eyre::Report::new(e)),
                 parsed_markdown: None,
-                took,
+                took: Duration::ZERO,
+                validation_result: None,
+            },
+            checkr::driver::ExecError::CommandFailed(output, took) => AnalysisResponse {
+                stdout: String::from_utf8(output.stdout.clone()).unwrap(),
+                stderr: String::from_utf8(output.stderr.clone()).unwrap(),
+                parsed_markdown: None,
+                took: *took,
                 validation_result: None,
             },
             checkr::driver::ExecError::Parse {
@@ -110,10 +116,10 @@ async fn analyze(
                 run_output,
                 time,
             } => AnalysisResponse {
-                stdout: String::from_utf8(run_output.stdout).unwrap(),
-                stderr: String::from_utf8(run_output.stderr).unwrap(),
+                stdout: String::from_utf8(run_output.stdout.clone()).unwrap(),
+                stderr: String::from_utf8(run_output.stderr.clone()).unwrap(),
                 parsed_markdown: None,
-                took: time,
+                took: *time,
                 validation_result: None,
             },
         },

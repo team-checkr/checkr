@@ -29,8 +29,12 @@ pub enum DriverError {
 pub enum ExecError {
     #[error(transparent)]
     Serialize(serde_json::Error),
-    #[error("running exec failed")]
-    RunExec(#[source] std::io::Error),
+    #[error("running `{cmd}` failed")]
+    RunExec {
+        cmd: String,
+        #[source]
+        source: std::io::Error,
+    },
     #[error("command failed:\n{:?}", _0.stdout)]
     CommandFailed(std::process::Output, Duration),
     #[error("parse failed")]
@@ -96,7 +100,10 @@ impl Driver {
         cmd.arg(input);
 
         let before = std::time::Instant::now();
-        let cmd_output = cmd.output().map_err(ExecError::RunExec)?;
+        let cmd_output = cmd.output().map_err(|source| ExecError::RunExec {
+            cmd: self.run_cmd.clone(),
+            source,
+        })?;
         let took = before.elapsed();
 
         if !cmd_output.status.success() {

@@ -1,0 +1,9 @@
+name: mist
+
+windows:
+- app:
+    layout: main-vertical
+    panes:
+    - just watch-wasm
+    - just watch-web
+    - just serve-inspectify

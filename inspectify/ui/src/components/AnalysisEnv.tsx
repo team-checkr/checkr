@@ -5,6 +5,7 @@ import deepEqual from "deep-equal";
 import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/outline";
 import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
+import { parse } from "ansicolor";
 import remarkGfm from "remark-gfm";
 import {
   Analysis,
@@ -325,10 +326,9 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
                   className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full"
                   title={JSON.stringify(response.stderr.trim())}
                 >
-                  <ReactMarkdown
-                    children={"````bash\n" + response.stderr.trim()}
-                    remarkPlugins={[remarkGfm]}
-                  />
+                  <pre className="whitespace-pre-wrap">
+                    <AnsiSpans code={response.stderr} />
+                  </pre>
                 </div>
               </div>
             )}
@@ -351,9 +351,13 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
                     remarkPlugins={[remarkGfm]}
                   />
                 ) : tab == "stderr" ? (
-                  <pre className="whitespace-pre-wrap">{response.stderr}</pre>
+                  <pre className="whitespace-pre-wrap">
+                    <AnsiSpans code={response.stdout} />
+                  </pre>
                 ) : tab == "stdout" ? (
-                  <pre className="whitespace-pre-wrap">{response.stdout}</pre>
+                  <pre className="whitespace-pre-wrap">
+                    <AnsiSpans code={response.stdout} />
+                  </pre>
                 ) : tab == "validation" ? (
                   <pre className="whitespace-pre-wrap">
                     {response.validation_result
@@ -374,6 +378,46 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
   );
 };
 
+const AnsiSpans = ({ code }: { code: string }) => (
+  <>
+    {parse(code).spans.map((s) => {
+      const colors: Record<string, string> = {
+        black: "rgb(0,0,0)",
+        darkGray: "rgb(100,100,100)",
+        lightGray: "rgb(200,200,200)",
+        white: "rgb(255,255,255)",
+
+        red: "rgb(204,0,0)",
+        lightRed: "rgb(255,51,0)",
+
+        green: "rgb(0,204,0)",
+        lightGreen: "rgb(51,204,51)",
+
+        yellow: "rgb(204,102,0)",
+        lightYellow: "rgb(255,153,51)",
+
+        blue: "rgb(0,0,255)",
+        lightBlue: "rgb(26,140,255)",
+
+        magenta: "rgb(204,0,204)",
+        lightMagenta: "rgb(255,0,255)",
+
+        cyan: "rgb(0,153,255)",
+        lightCyan: "rgb(0,204,255)",
+      };
+
+      const values: React.CSSProperties = {};
+
+      if (s.bold) values.fontWeight = "bold";
+      if (s.color?.name)
+        values.color =
+          s.color.name in colors ? colors[s.color.name] : s.color.name;
+      if (s.italic) values.fontStyle = "italic";
+
+      return <span style={values}>{s.text}</span>;
+    })}
+  </>
+);
 export const Network = React.memo(({ dot }: { dot: string }) => {
   const [container, setContainer] = React.useState<null | HTMLDivElement>();
 
