@@ -1,3 +1,3 @@
-compile = "cargo build --release -p checkr"
+compile = "cargo build --color always --release -p checkr"
 run = "cargo run --release -p checkr -- reference"
 watch = ["*.rs", "*.lalrpop"]

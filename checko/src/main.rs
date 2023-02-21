@@ -15,7 +15,6 @@ use checko::{
 
 use clap::Parser;
 use color_eyre::{eyre::Context, Result};
-use git_repository as git;
 use tracing::{error, info, span, Level};
 use tracing_subscriber::prelude::*;
 use xshell::{cmd, Shell};
@@ -288,19 +287,19 @@ impl<'a> GroupEnv<'a> {
         sh.change_dir(&g_dir);
         Ok(sh)
     }
-    fn shell_in_default_branch(&self) -> Result<(Shell, git::Repository)> {
+    fn shell_in_default_branch(&self) -> Result<(Shell, gix::Repository)> {
         let sh = self.shell_in_folder()?;
         sh.remove_path("repo")?;
 
         info!(repo = self.config.git, "cloning repo");
-        let (mut prepare_checkout, _) = git::prepare_clone(
-            git::Url::try_from(&*self.config.git)?,
+        let (mut prepare_checkout, _) = gix::prepare_clone(
+            gix::Url::try_from(&*self.config.git)?,
             sh.current_dir().join("repo"),
         )?
-        .fetch_then_checkout(git::progress::Discard, &git::interrupt::IS_INTERRUPTED)?;
+        .fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
 
         let (repo, _) = prepare_checkout
-            .main_worktree(git::progress::Discard, &git::interrupt::IS_INTERRUPTED)?;
+            .main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
         info!(repo = self.config.git, "cloned");
 
         sh.change_dir("repo");
@@ -309,7 +308,7 @@ impl<'a> GroupEnv<'a> {
 
         Ok((sh, repo))
     }
-    fn shell_in_results_branch(&self) -> Result<(Shell, git::Repository)> {
+    fn shell_in_results_branch(&self) -> Result<(Shell, gix::Repository)> {
         let (sh, repo) = self.shell_in_default_branch()?;
 
         if cmd!(sh, "git checkout results").run().is_err() {

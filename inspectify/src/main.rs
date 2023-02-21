@@ -21,7 +21,7 @@ use notify_debouncer_mini::DebounceEventResult;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
-use tracing::{error, info};
+use tracing::{debug, error, info};
 use tracing_subscriber::prelude::*;
 
 #[typeshare::typeshare]
@@ -266,11 +266,12 @@ fn spawn_watcher(
         .iter()
         .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
         .collect::<Result<Vec<glob::Pattern>, color_eyre::Report>>()?;
-    notify_debouncer_mini::new_debouncer(
+    let mut debouncer = notify_debouncer_mini::new_debouncer(
         Duration::from_millis(200),
         None,
         move |res: DebounceEventResult| match res {
             Ok(events) => {
+                debug!("a file was saved: {events:?}");
                 if !events
                     .iter()
                     .any(|e| matches.iter().any(|p| p.matches_path(&e.path)))
@@ -282,9 +283,10 @@ fn spawn_watcher(
             }
             Err(errors) => errors.iter().for_each(|e| eprintln!("Error {e:?}")),
         },
-    )?
-    .watcher()
-    .watch(&dir, notify::RecursiveMode::Recursive)?;
+    )?;
+    debouncer
+        .watcher()
+        .watch(&dir, notify::RecursiveMode::Recursive)?;
 
     tokio::spawn(async move {
         while let Some(()) = rx.recv().await {
@@ -300,14 +302,14 @@ fn spawn_watcher(
                         eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
                         *compilation_status.lock().await =
                             CompilationStatus::new(CompilerState::CompileError);
-                        return;
+                        continue;
                     }
                     Err(DriverError::RunCompile(err)) => {
                         error!("run compile failed:");
                         eprintln!("{err}");
                         *compilation_status.lock().await =
                             CompilationStatus::new(CompilerState::CompileError);
-                        return;
+                        continue;
                     }
                 }
             } else {
@@ -317,6 +319,9 @@ fn spawn_watcher(
             *compilation_status.lock().await = CompilationStatus::new(CompilerState::Compiled);
             *driver.lock().await = new_driver;
         }
+        // NOTE: It is important to keep the debouncer alive for as long as the
+        // tokio process
+        drop(debouncer);
     });
     Ok(())
 }
@@ -425,7 +430,11 @@ async fn main() -> color_eyre::Result<()> {
                 .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
                 .from_env_lossy(),
         )
-        .with(tracing_subscriber::fmt::layer().without_time())
+        .with(
+            tracing_subscriber::fmt::layer()
+                .with_target(false)
+                .without_time(),
+        )
         .with(tracing_subscriber::filter::FilterFn::new(|m| {
             !m.target().contains("hyper")
         }))
