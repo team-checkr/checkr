@@ -38,7 +38,7 @@ export const AnalysisEnv = () => {
   const [env, setEnv] = useState<Analysis>(
     inputted.analysis && (ENVS as string[]).includes(inputted.analysis)
       ? (inputted.analysis as Analysis)
-      : Analysis.Interpreter
+      : Analysis.Parse
   );
   const [src, setSrc] = useState(inputted.src ?? wasm.generate_program(env));
   const [graphShown, setGraphShown] = useState<GraphShown>("graph");

@@ -34,6 +34,7 @@ export interface CompilationStatus {
 
 export enum Analysis {
 	Graph = "Graph",
+	Parse = "Parse",
 	Interpreter = "Interpreter",
 	ProgramVerification = "ProgramVerification",
 	Sign = "Sign",

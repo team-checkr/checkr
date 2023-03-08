@@ -6,12 +6,14 @@ use serde::{Deserialize, Serialize};
 use crate::{ast::Commands, generation::Generate, sign::Memory, ProgramGenerationBuilder};
 pub use graph::GraphEnv;
 pub use interpreter::InterpreterEnv;
+pub use parse::ParseEnv;
 pub use pv::ProgramVerificationEnv;
 pub use security::SecurityEnv;
 pub use sign::SignEnv;
 
 pub mod graph;
 pub mod interpreter;
+pub mod parse;
 pub mod pv;
 pub mod security;
 pub mod sign;
@@ -103,6 +105,7 @@ macro_rules! define_analysis {
 #[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Analysis {
     Graph,
+    Parse,
     Interpreter,
     ProgramVerification,
     Sign,
@@ -111,6 +114,7 @@ pub enum Analysis {
 
 define_analysis!(
     Graph(GraphEnv, "Graph", "graph"),
+    Parse(ParseEnv, "Parse", "parse"),
     Interpreter(InterpreterEnv, "Interpreter", "interpreter"),
     ProgramVerification(
         ProgramVerificationEnv,
