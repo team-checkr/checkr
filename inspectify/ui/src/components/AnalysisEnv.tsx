@@ -31,7 +31,7 @@ const ANALYSIS_NAMES = Object.fromEntries(
   ENVS.map((env) => [env, capitalCase(env)] satisfies [Analysis, string])
 ) as Record<Analysis, string>;
 
-type GraphShown = "graph" | "reference";
+type GraphShown = "graph" | "reference" | "split";
 
 export const AnalysisEnv = () => {
   const [deterministic, setDeterministic] = useState(true);
@@ -123,10 +123,28 @@ export const AnalysisEnv = () => {
           >
             R
           </button>
+          <button
+            onClick={() => setGraphShown("split")}
+            className={
+              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
+              (graphShown == "split" ? "text-white" : "text-slate-600")
+            }
+          >
+            S
+          </button>
         </div>
-        {graphShown == "graph"
-          ? dotGraph && <Network dot={dotGraph} />
-          : dotReference && <Network dot={dotReference} />}
+        {graphShown == "graph" ? (
+          dotGraph && <Network dot={dotGraph} />
+        ) : graphShown == "reference" ? (
+          dotReference && <Network dot={dotReference} />
+        ) : (
+          <div className="h-full w-full grid grid-cols-2 [&>*]:border-l [&>*]:border-slate-600">
+            <div className="text-white px-1 py-2">Graph</div>
+            <div className="text-white px-1 py-2">Reference</div>
+            {dotGraph && <Network dot={dotGraph} />}
+            {dotReference && <Network dot={dotReference} />}
+          </div>
+        )}
       </div>
       <Env env={env} src={src} />
     </div>
