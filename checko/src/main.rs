@@ -20,6 +20,7 @@ use tracing_subscriber::prelude::*;
 use xshell::{cmd, Shell};
 
 #[derive(Debug, Parser)]
+#[command(version)]
 enum Cli {
     /// Run the programs for all groups and store the results.
     RunTests {

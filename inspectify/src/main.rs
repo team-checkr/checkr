@@ -230,6 +230,7 @@ async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
 }
 
 #[derive(Debug, Parser)]
+#[command(version)]
 struct Cli {
     /// Automatically open inspectify in the browser
     #[clap(short, long, default_value_t = false)]

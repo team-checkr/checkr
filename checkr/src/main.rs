@@ -3,6 +3,7 @@ use clap::Parser;
 use checkr::{env::Analysis, parse};
 
 #[derive(Debug, Parser)]
+#[command(version)]
 enum Cli {
     /// Reference subcommand
     Reference {
