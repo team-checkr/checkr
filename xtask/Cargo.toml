@@ -3,6 +3,7 @@ name = "xtask"
 edition = "2021"
 version = { workspace = true }
 repository = { workspace = true }
+publish = false
 
 # NOTE: This has issues with cargo-dist: https://github.com/axodotdev/cargo-dist/issues/79
 # [package.metadata.release]
