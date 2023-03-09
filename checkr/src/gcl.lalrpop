@@ -97,11 +97,11 @@ pub BExpr: BExpr = {
     "(" <BExpr_> ")",
 
     #[precedence(level="1")] #[assoc(side="left")]
-    <l:BExpr> "&" <r:BExpr> => BExpr::Logic(box l, LogicOp::And, box r),
+    <l:BExpr> "&" <r:BExpr> => BExpr::Logic(box l, LogicOp::Land, box r),
     <l:BExpr> "&&" <r:BExpr> => BExpr::Logic(box l, LogicOp::And, box r),
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:BExpr> "|" <r:BExpr> => BExpr::Logic(box l, LogicOp::Or, box r),
+    <l:BExpr> "|" <r:BExpr> => BExpr::Logic(box l, LogicOp::Lor, box r),
     <l:BExpr> "||" <r:BExpr> => BExpr::Logic(box l, LogicOp::Or, box r),
 };
 BExpr_: BExpr = BExpr;
