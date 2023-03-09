@@ -154,7 +154,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "checkr"
-version = "0.1.6"
+version = "0.1.7"
 dependencies = [
  "bitflags",
  "clap",

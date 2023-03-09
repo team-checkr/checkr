@@ -2,7 +2,10 @@ import React, { useRef } from "react";
 import { useEffect, useState } from "react";
 import * as wasm from "../../../wasm/pkg/wasm";
 import deepEqual from "deep-equal";
-import { ArrowPathRoundedSquareIcon } from "@heroicons/react/24/outline";
+import {
+  ArrowPathRoundedSquareIcon,
+  ClipboardDocumentIcon,
+} from "@heroicons/react/24/outline";
 import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import { parse } from "ansicolor";
@@ -16,6 +19,7 @@ import {
 import { StretchEditor } from "./StretchEditor";
 import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";
 import { capitalCase } from "change-case";
+import { toast, Toaster } from "react-hot-toast";
 
 wasm.init_hook();
 
@@ -105,33 +109,44 @@ export const AnalysisEnv = () => {
       </div>
       <div className="relative row-span-2 bg-slate-800 text-xs">
         <div className="absolute top-4 right-6 flex flex-col space-y-2">
-          <button
-            onClick={() => setGraphShown("graph")}
-            className={
-              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
-              (graphShown == "graph" ? "text-white" : "text-slate-600")
-            }
-          >
-            G
-          </button>
-          <button
-            onClick={() => setGraphShown("reference")}
-            className={
-              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
-              (graphShown == "reference" ? "text-white" : "text-slate-600")
-            }
-          >
-            R
-          </button>
-          <button
-            onClick={() => setGraphShown("split")}
-            className={
-              "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
-              (graphShown == "split" ? "text-white" : "text-slate-600")
-            }
-          >
-            S
-          </button>
+          {(
+            [
+              { graph: "graph", icon: "G", dot: dotGraph },
+              { graph: "reference", icon: "R", dot: dotReference },
+              { graph: "split", icon: "S", dot: null },
+            ] satisfies {
+              graph: GraphShown;
+              icon: string;
+              dot: string | null;
+            }[]
+          ).map((g) => (
+            <div key={g.graph} className="flex flex-row-reverse">
+              <button
+                onClick={() => setGraphShown(g.graph)}
+                className={
+                  "z-10 flex aspect-square w-7 items-center justify-center rounded-full border border-current p-1 text-center transition hover:text-slate-200 " +
+                  (graphShown == g.graph ? "text-white" : "text-slate-600")
+                }
+              >
+                {g.icon}
+              </button>
+              {graphShown == g.graph && g.dot && (
+                <button
+                  onClick={() => {
+                    if (!g.dot) return;
+                    toast("Graph DOT copied to clipboard!");
+                    window.navigator.clipboard.writeText(g.dot);
+                  }}
+                  className={
+                    "z-10 flex aspect-square w-7 items-center justify-center p-1 transition text-slate-500 hover:text-slate-200 mr-2" +
+                    (graphShown == g.graph ? "text-white" : "text-slate-600")
+                  }
+                >
+                  <ClipboardDocumentIcon className="w-4" />
+                </button>
+              )}
+            </div>
+          ))}
         </div>
         {graphShown == "graph" ? (
           dotGraph && <Network dot={dotGraph} />
@@ -147,6 +162,7 @@ export const AnalysisEnv = () => {
         )}
       </div>
       <Env env={env} src={src} />
+      <Toaster />
     </div>
   );
 };
