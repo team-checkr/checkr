@@ -370,7 +370,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
                   />
                 ) : tab == "stderr" ? (
                   <pre className="whitespace-pre-wrap">
-                    <AnsiSpans code={response.stdout} />
+                    <AnsiSpans code={response.stderr} />
                   </pre>
                 ) : tab == "stdout" ? (
                   <pre className="whitespace-pre-wrap">
@@ -432,7 +432,11 @@ const AnsiSpans = ({ code }: { code: string }) => (
           s.color.name in colors ? colors[s.color.name] : s.color.name;
       if (s.italic) values.fontStyle = "italic";
 
-      return <span style={values}>{s.text}</span>;
+      return (
+        <span key={s.text} style={values}>
+          {s.text}
+        </span>
+      );
     })}
   </>
 );
