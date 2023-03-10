@@ -527,7 +527,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "checko"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "checkr",
  "clap",
@@ -550,7 +550,7 @@ dependencies = [
 
 [[package]]
 name = "checkr"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "bitflags",
  "clap",
@@ -2290,7 +2290,7 @@ dependencies = [
 
 [[package]]
 name = "inspectify"
-version = "0.1.9"
+version = "0.1.10"
 dependencies = [
  "axum",
  "axum-macros",
