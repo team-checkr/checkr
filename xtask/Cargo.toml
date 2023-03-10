@@ -10,7 +10,7 @@ publish = false
 # release = false
 
 [dependencies]
-binswap-github = "0.1.1"
+binswap-github = "0.1.6"
 clap = { version = "4.1.4", features = ["derive"] }
 color-eyre = { workspace = true }
 tokio = { workspace = true }
