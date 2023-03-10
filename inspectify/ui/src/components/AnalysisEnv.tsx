@@ -156,8 +156,12 @@ export const AnalysisEnv = () => {
           <div className="h-full w-full grid grid-cols-2 [&>*]:border-l [&>*]:border-slate-600">
             <div className="text-white px-1 py-2">Graph</div>
             <div className="text-white px-1 py-2">Reference</div>
-            {dotGraph && <Network dot={dotGraph} />}
-            {dotReference && <Network dot={dotReference} />}
+            <div className="w-full h-full">
+              {dotGraph && <Network dot={dotGraph} />}
+            </div>
+            <div className="w-full h-full">
+              {dotReference && <Network dot={dotReference} />}
+            </div>
           </div>
         )}
       </div>
