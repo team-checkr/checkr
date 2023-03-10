@@ -116,8 +116,8 @@ impl Display for LogicOp {
         match self {
             LogicOp::And => write!(f, "&"),
             LogicOp::Land => write!(f, "&&"),
-            LogicOp::Or => write!(f, "|"),
-            LogicOp::Lor => write!(f, "||"),
+            LogicOp::Or => write!(f, "||"),
+            LogicOp::Lor => write!(f, "|"),
         }
     }
 }
