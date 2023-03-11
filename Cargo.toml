@@ -27,6 +27,8 @@ typeshare = "1.0.0"
 [workspace.metadata.release]
 publish = false
 tag-name = "v{{version}}"
+shared-version = true
+pre-release-hook = ["just", "release-hook"]
 
 # Config for 'cargo dist'
 [workspace.metadata.dist]

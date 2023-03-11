@@ -33,6 +33,12 @@ build-ci:
     cargo build -p inspectify
     cargo build -p checko
 
+update-changelog:
+    git cliff -o CHANGELOG.md
+
+release-hook:
+    git cliff -t $NEW_VERSION -o CHANGELOG.md
+
 # <registry URL>/<namespace>/<project>/<image>
 IMAGE_NAME := "gitlab.gbar.dtu.dk/checkr-dev-env/demo-group-01/image:latest"
 
