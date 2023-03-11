@@ -1,7 +1,7 @@
 [package]
 name = "inspectify"
 edition = "2021"
-version = "0.1.10"
+version = { workspace = true }
 repository = { workspace = true }
 authors = { workspace = true }
 
