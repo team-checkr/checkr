@@ -24,6 +24,7 @@ build-inspectify: build-ui
 
 serve-inspectify:
     mkdir -p inspectify/ui/dist/
+    # RUST_LOG=debug cargo run -p inspectify starters/fsharp-starter
     RUST_LOG=debug cargo run -p inspectify .
 
 build-checko:
