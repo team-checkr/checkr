@@ -2,6 +2,27 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.12] - 2023-03-16
+
+### Bug Fixes
+
+- Swap & & && in when formatting to be correct
+- Correctly error on empty and programs with trailing `;`
+
+### Features
+
+- Add ignore option to `run.toml`
+- Update to the new IO for interpreter
+
+### Miscellaneous Tasks
+
+- Remove rust-toolchain.toml
+- Remove some unused deps
+- Remove #![feature(box_patterns, box_syntax)]
+- Update fsharp-starter ref
+- Add easy to use option to run inspectify against fsharp-starter
+- Update fsharp-starter ref
+
 ## [0.1.11] - 2023-03-11
 
 ### Bug Fixes
@@ -15,6 +36,7 @@ All notable changes to this project will be documented in this file.
 - Bump wasm lock file
 - Revert versions to be inherited from workspace
 - Add CHANGELOG
+- Release
 
 ## [0.1.9] - 2023-03-10
 
