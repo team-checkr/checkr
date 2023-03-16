@@ -29,10 +29,6 @@ SepNonEmpty<T, S>: Vec<T> = {
 };
 
 pub Commands: Commands = {
-    Sep<Command, ";"> => Commands(<>),
-};
-
-NonEmptyCommands: Commands = {
     SepNonEmpty<Command, ";"> => Commands(<>),
 };
 
@@ -64,7 +60,7 @@ Array: Array = Ident => Array(<>);
 Guards: Vec<Guard> = Sep<Guard, "[]">;
 
 Guard: Guard = {
-    <BExpr> "->" <NonEmptyCommands> => Guard(<>),
+    <BExpr> "->" <Commands> => Guard(<>),
 };
 
 AExpr_ = AExpr;
