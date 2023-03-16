@@ -22,6 +22,7 @@ All notable changes to this project will be documented in this file.
 - Update fsharp-starter ref
 - Add easy to use option to run inspectify against fsharp-starter
 - Update fsharp-starter ref
+- Prepare changelog for release
 
 ## [0.1.11] - 2023-03-11
 
