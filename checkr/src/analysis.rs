@@ -1,7 +1,6 @@
 use std::collections::{HashMap, HashSet, VecDeque};
 
 use serde::{Deserialize, Serialize};
-use serde_json_any_key::any_key_map;
 
 use crate::pg::{Edge, Node, ProgramGraph};
 
@@ -90,13 +89,9 @@ impl Worklist for LiFo {
 //     }
 // }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(transparent)]
+#[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalysisResults<A: MonotoneFramework> {
-    #[serde(with = "any_key_map")]
-    #[serde(bound(deserialize = "A::Domain: 'de + serde::Deserialize<'de>"))]
     pub facts: HashMap<Node, A::Domain>,
-    #[serde(skip)]
     pub semantic_calls: usize,
 }
 

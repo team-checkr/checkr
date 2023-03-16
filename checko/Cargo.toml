@@ -10,11 +10,10 @@ repository = { workspace = true }
 checkr = { workspace = true }
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
-comfy-table = "6.1.4"
-gix = { version = "0.37.1", features = ["blocking-http-transport-reqwest"] }
+comfy-table = { workspace = true }
+gix = { version = "0.42.0", features = ["blocking-http-transport-reqwest"] }
 indexmap = { version = "1.9.2", features = ["serde"] }
 itertools = { workspace = true }
-rayon = "1.6.1"
 serde = { workspace = true }
 serde_json = { workspace = true }
 tokio = { workspace = true }
