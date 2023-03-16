@@ -114,8 +114,8 @@ impl Display for RelOp {
 impl Display for LogicOp {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            LogicOp::And => write!(f, "&"),
-            LogicOp::Land => write!(f, "&&"),
+            LogicOp::And => write!(f, "&&"),
+            LogicOp::Land => write!(f, "&"),
             LogicOp::Or => write!(f, "||"),
             LogicOp::Lor => write!(f, "|"),
         }
