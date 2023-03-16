@@ -277,7 +277,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
     ) {
       try {
         const input = wasm.generate_input_for(src, env);
-        setInput(input);
+        setInput(input ?? null);
       } catch (e) {
         console.error(e);
       }
@@ -289,7 +289,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
 
     try {
       const output = wasm.run_analysis(src, input);
-      setOutput(output);
+      setOutput(output ?? null);
     } catch (e) {
       console.error(e);
     }
@@ -323,7 +323,7 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
         </div>
         <button
           className="p-1.5 hover:bg-slate-600 transition text-slate-100 rounded-tr"
-          onClick={() => setInput(wasm.generate_input_for(src, env))}
+          onClick={() => setInput(wasm.generate_input_for(src, env) ?? null)}
         >
           <ArrowPathRoundedSquareIcon className="w-3" />
         </button>

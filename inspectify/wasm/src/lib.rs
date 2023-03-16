@@ -7,6 +7,7 @@ use checkr::{
     pg::Determinism,
 };
 use serde::{Deserialize, Serialize};
+use tracing::error;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
 
@@ -62,26 +63,34 @@ pub fn complete_input_from_json(analysis: Analysis, input_json: String) -> Input
 }
 
 #[wasm_bindgen]
-pub fn generate_input_for(src: &str, analysis: Analysis) -> Input {
-    let Ok(cmds) = checkr::parse::parse_commands(src) else {
-        todo!("Parse error");
+pub fn generate_input_for(src: &str, analysis: Analysis) -> Option<Input> {
+    let cmds = match checkr::parse::parse_commands(src) {
+        Ok(cmds) => cmds,
+        Err(err) => {
+            error!("Parse error: {:?}", miette::Error::new(err));
+            return None;
+        }
     };
     let mut rng = Commands::builder().build().rng;
     let json = analysis.gen_input(&cmds, &mut rng);
     let markdown = analysis
         .input_markdown(&json)
         .expect("we just generated it, so it should be fine");
-    Input {
+    Some(Input {
         analysis,
         json,
         markdown,
-    }
+    })
 }
 
 #[wasm_bindgen]
-pub fn run_analysis(src: &str, input: Input) -> Output {
-    let Ok(cmds) = checkr::parse::parse_commands(src) else {
-        todo!("Parse error");
+pub fn run_analysis(src: &str, input: Input) -> Option<Output> {
+    let cmds = match checkr::parse::parse_commands(src) {
+        Ok(cmds) => cmds,
+        Err(err) => {
+            error!("Parse error: {:?}", miette::Error::new(err));
+            return None;
+        }
     };
     let json = input
         .analysis
@@ -91,11 +100,11 @@ pub fn run_analysis(src: &str, input: Input) -> Output {
         .analysis
         .output_markdown(&json)
         .expect("we just generated it, so it should be fine");
-    Output {
+    Some(Output {
         analysis: input.analysis,
         json,
         markdown,
-    }
+    })
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Tsify)]

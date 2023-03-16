@@ -33,6 +33,7 @@ use std::time::Duration;
 use driver::Driver;
 use env::{Environment, ValidationResult};
 use generation::Generate;
+pub use miette;
 use rand::prelude::*;
 use tracing::debug;
 

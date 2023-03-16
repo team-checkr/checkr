@@ -18,23 +18,21 @@ impl InterpreterMemory {
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "Case")]
-pub enum ProgramState {
+pub enum TerminationState {
     Running,
     Stuck,
     Terminated,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
-pub struct ProgramTrace<N = Node> {
-    pub state: ProgramState,
+pub struct Configuration<N = Node> {
     pub node: N,
     pub memory: InterpreterMemory,
 }
 
-impl<A> ProgramTrace<A> {
-    pub fn map_node<B>(self, f: impl FnOnce(A) -> B) -> ProgramTrace<B> {
-        ProgramTrace {
-            state: self.state,
+impl<A> Configuration<A> {
+    pub fn map_node<B>(self, f: impl FnOnce(A) -> B) -> Configuration<B> {
+        Configuration {
             node: f(self.node),
             memory: self.memory,
         }
@@ -46,19 +44,17 @@ impl Interpreter {
         mut steps: u64,
         memory: InterpreterMemory,
         pg: &ProgramGraph,
-    ) -> Vec<ProgramTrace> {
-        let mut state = ProgramTrace {
-            state: ProgramState::Running,
+    ) -> (Vec<Configuration>, TerminationState) {
+        let mut state = Configuration {
             node: Node::Start,
             memory,
         };
         let mut trace = vec![state.clone()];
 
-        while let ProgramState::Running = state.state {
+        let termination = loop {
             let next = pg.outgoing(state.node).iter().find_map(|e| {
                 e.1.semantics(&state.memory)
-                    .map(|m| ProgramTrace {
-                        state: ProgramState::Running,
+                    .map(|m| Configuration {
                         node: e.2,
                         memory: m,
                     })
@@ -66,26 +62,18 @@ impl Interpreter {
             });
             state = match next {
                 Some(s) => s,
-                None if state.node == Node::End => ProgramTrace {
-                    state: ProgramState::Terminated,
-                    node: state.node,
-                    memory: state.memory,
-                },
-                None => ProgramTrace {
-                    state: ProgramState::Stuck,
-                    node: state.node,
-                    memory: state.memory,
-                },
+                None if state.node == Node::End => break TerminationState::Terminated,
+                None => break TerminationState::Stuck,
             };
             trace.push(state.clone());
 
             if steps == 0 {
-                break;
+                break TerminationState::Running;
             }
             steps -= 1;
-        }
+        };
 
-        trace
+        (trace, termination)
     }
 }
 

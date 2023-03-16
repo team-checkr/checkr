@@ -13,6 +13,7 @@ use checkr::{
         graph::{GraphEnv, GraphEnvInput},
         Analysis, Markdown,
     },
+    miette,
     pg::Determinism,
 };
 use clap::Parser;
@@ -78,7 +79,19 @@ async fn analyze(
         .await
     {
         Ok(exec_output) => {
-            let cmds = checkr::parse::parse_commands(&cmds).unwrap();
+            let cmds = match checkr::parse::parse_commands(&cmds) {
+                Ok(cmds) => cmds,
+                Err(err) => {
+                    error!("Parse error: {:?}", miette::Error::new(err));
+                    return Json(AnalysisResponse {
+                        stdout: "".to_string(),
+                        stderr: "".to_string(),
+                        parsed_markdown: None,
+                        took: Duration::ZERO,
+                        validation_result: None,
+                    });
+                }
+            };
             let validation_res = body
                 .analysis
                 .validate(&cmds, &body.input, &exec_output.parsed.to_string())
