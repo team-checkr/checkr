@@ -195,6 +195,9 @@ impl Target<Box<AExpr>> {
     }
 }
 impl AExpr {
+    pub fn binary(lhs: Self, op: AOp, rhs: Self) -> Self {
+        Self::Binary(Box::new(lhs), op, Box::new(rhs))
+    }
     pub fn fv(&self) -> HashSet<Target> {
         match self {
             AExpr::Number(_) => Default::default(),
@@ -205,6 +208,12 @@ impl AExpr {
     }
 }
 impl BExpr {
+    pub fn logic(lhs: Self, op: LogicOp, rhs: Self) -> Self {
+        Self::Logic(Box::new(lhs), op, Box::new(rhs))
+    }
+    pub fn rel(lhs: AExpr, op: RelOp, rhs: AExpr) -> Self {
+        Self::Rel(lhs, op, rhs)
+    }
     pub fn fv(&self) -> HashSet<Target> {
         match self {
             BExpr::Bool(_) => Default::default(),

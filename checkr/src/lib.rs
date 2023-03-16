@@ -28,8 +28,6 @@
 //! Similarly, the inputs of [`Environment`] implementations must too implement
 //! [`Generate`].
 
-#![feature(box_patterns, box_syntax)]
-
 use std::time::Duration;
 
 use driver::Driver;

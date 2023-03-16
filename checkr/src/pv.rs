@@ -9,18 +9,16 @@ impl Commands {
 impl Command {
     pub fn wp(&self, q: &BExpr) -> BExpr {
         match self {
-            Command::Assignment(var @ Target::Variable(_), exp) => BExpr::Logic(
-                box q.subst_var(var, exp),
-                LogicOp::And,
-                box exp.well_defined(),
-            ),
+            Command::Assignment(var @ Target::Variable(_), exp) => {
+                BExpr::logic(q.subst_var(var, exp), LogicOp::And, exp.well_defined())
+            }
             // TODO
             Command::Assignment(Target::Array(_, _), _) => todo!(),
             Command::Skip => q.clone(),
             Command::If(guards) => guards
                 .iter()
                 .map(|g| g.wp(q))
-                .reduce(|l, r| BExpr::Logic(box l, LogicOp::And, box r))
+                .reduce(|l, r| BExpr::logic(l, LogicOp::And, r))
                 .unwrap_or_else(|| panic!("if-statement had no guards")),
             // TODO
             Command::Loop(_) => todo!(
@@ -35,12 +33,12 @@ impl Command {
 
 impl Guard {
     pub fn wp(&self, q: &BExpr) -> BExpr {
-        let a = BExpr::Logic(
-            box BExpr::Not(box self.0.clone()),
+        let a = BExpr::logic(
+            BExpr::Not(Box::new(self.0.clone())),
             LogicOp::Or,
-            box self.1.wp(q),
+            self.1.wp(q),
         );
-        BExpr::Logic(box a, LogicOp::And, box self.0.well_defined())
+        BExpr::logic(a, LogicOp::And, self.0.well_defined())
     }
 }
 
@@ -48,23 +46,17 @@ impl BExpr {
     fn well_defined(&self) -> BExpr {
         match self {
             BExpr::Bool(_) => BExpr::Bool(true),
-            BExpr::Rel(l, _, r) => {
-                BExpr::Logic(box l.well_defined(), LogicOp::And, box r.well_defined())
-            }
-            BExpr::Logic(l, _, r) => {
-                BExpr::Logic(box l.well_defined(), LogicOp::And, box r.well_defined())
-            }
-            BExpr::Not(e) => BExpr::Not(box e.well_defined()),
+            BExpr::Rel(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
+            BExpr::Logic(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
+            BExpr::Not(e) => BExpr::Not(Box::new(e.well_defined())),
         }
     }
     fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> BExpr {
         match self {
             BExpr::Bool(b) => BExpr::Bool(*b),
             BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
-            BExpr::Logic(l, op, r) => {
-                BExpr::Logic(box l.subst_var(t, x), *op, box r.subst_var(t, x))
-            }
-            BExpr::Not(e) => BExpr::Not(box e.subst_var(t, x)),
+            BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
+            BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
         }
     }
 
@@ -92,14 +84,14 @@ impl BExpr {
                     (BExpr::Bool(true), LogicOp::Or, _) | (_, LogicOp::Or, BExpr::Bool(true)) => {
                         BExpr::Bool(true)
                     }
-                    (l, op, r) => BExpr::Logic(box l, op, box r),
+                    (l, op, r) => BExpr::logic(l, op, r),
                 }
             }
             BExpr::Not(x) => {
                 let x = x.simplify();
                 match x {
                     BExpr::Bool(b) => BExpr::Bool(!b),
-                    x => BExpr::Not(box x),
+                    x => BExpr::Not(Box::new(x)),
                 }
             }
         }
@@ -112,10 +104,8 @@ impl AExpr {
             AExpr::Number(n) => AExpr::Number(*n),
             AExpr::Reference(v) if v.same_name(t) => x.clone(),
             AExpr::Reference(v) => AExpr::Reference(v.clone()),
-            AExpr::Binary(l, op, r) => {
-                AExpr::Binary(box l.subst_var(t, x), *op, box r.subst_var(t, x))
-            }
-            AExpr::Minus(e) => AExpr::Minus(box e.subst_var(t, x)),
+            AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
+            AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
         }
     }
 
@@ -124,18 +114,18 @@ impl AExpr {
             AExpr::Number(_) => BExpr::Bool(true),
             AExpr::Reference(_) => BExpr::Bool(true),
             AExpr::Binary(l, op, r) => {
-                let p = BExpr::Logic(box l.well_defined(), LogicOp::And, box r.well_defined());
+                let p = BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined());
                 match op {
                     AOp::Plus | AOp::Minus | AOp::Times => p,
-                    AOp::Divide => BExpr::Logic(
-                        box BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0)),
+                    AOp::Divide => BExpr::logic(
+                        BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0)),
                         LogicOp::And,
-                        box p,
+                        p,
                     ),
-                    AOp::Pow => BExpr::Logic(
-                        box BExpr::Rel(*r.clone(), RelOp::Ge, AExpr::Number(0)),
+                    AOp::Pow => BExpr::logic(
+                        BExpr::Rel(*r.clone(), RelOp::Ge, AExpr::Number(0)),
                         LogicOp::And,
-                        box p,
+                        p,
                     ),
                 }
             }
@@ -151,9 +141,11 @@ impl AExpr {
         {
             AExpr::Number(n) => AExpr::Number(n),
             AExpr::Reference(v) => AExpr::Reference(v.simplify()),
-            AExpr::Binary(l, op, r) => AExpr::Binary(box l.simplify(), op, box r.simplify()),
-            AExpr::Minus(box AExpr::Minus(e)) => e.simplify(),
-            AExpr::Minus(e) => AExpr::Minus(box e.simplify()),
+            AExpr::Binary(l, op, r) => AExpr::binary(l.simplify(), op, r.simplify()),
+            AExpr::Minus(e) => match &*e {
+                AExpr::Minus(inner) => inner.simplify(),
+                _ => AExpr::Minus(Box::new(e.simplify())),
+            },
         }
     }
 }
@@ -162,7 +154,7 @@ impl Target<Box<AExpr>> {
     pub fn simplify(&self) -> Self {
         match self {
             Target::Variable(v) => Target::Variable(v.clone()),
-            Target::Array(arr, idx) => Target::Array(arr.clone(), box idx.simplify()),
+            Target::Array(arr, idx) => Target::Array(arr.clone(), Box::new(idx.simplify())),
         }
     }
 }

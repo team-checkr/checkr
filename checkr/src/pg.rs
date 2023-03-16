@@ -154,12 +154,8 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge
                 edges.extend(g.1.edges(det, q, t));
 
                 let cond = if let Some(p) = prev {
-                    prev = Some(BExpr::Logic(
-                        box p.clone(),
-                        LogicOp::Or,
-                        box g.0.to_owned().clone(),
-                    ));
-                    BExpr::Logic(box BExpr::Not(box p), LogicOp::And, box g.0.clone())
+                    prev = Some(BExpr::logic(p.clone(), LogicOp::Or, g.0.to_owned().clone()));
+                    BExpr::logic(BExpr::Not(Box::new(p)), LogicOp::And, g.0.clone())
                 } else {
                     prev = Some(g.0.clone());
                     g.0.clone()
@@ -205,8 +201,8 @@ impl Command {
 fn done(guards: &[Guard]) -> BExpr {
     guards
         .iter()
-        .map(|g| BExpr::Not(box g.0.clone()))
-        .reduce(|a, b| BExpr::Logic(box a, LogicOp::And, box b))
+        .map(|g| BExpr::Not(Box::new(g.0.clone())))
+        .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
         .unwrap_or(BExpr::Bool(true))
 }
 

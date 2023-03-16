@@ -50,7 +50,7 @@ Command: Command = {
 #[inline]
 Target: Target<Box<AExpr>> = {
     Variable => Target::Variable(<>),
-    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, box idx),
+    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, Box::new(idx)),
 }
 #[inline]
 Variable: Variable = Ident => Variable(<>);
@@ -68,20 +68,20 @@ AExpr: AExpr = {
     #[precedence(level="1")]
     Int => AExpr::Number(<>),
     Target => AExpr::Reference(<>),
-    "-" <AExpr> => AExpr::Minus(box <>),
+    "-" <AExpr> => AExpr::Minus(Box::new(<>)),
     "(" <AExpr_> ")",
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:AExpr> "^" <r:AExpr> => AExpr::Binary(box l, AOp::Pow, box r),
+    <l:AExpr> "^" <r:AExpr> => AExpr::binary(l, AOp::Pow, r),
 
     #[precedence(level="3")] #[assoc(side="left")]
-    <l:AExpr> "*" <r:AExpr> => AExpr::Binary(box l, AOp::Times, box r),
-    <l:AExpr> "/" <r:AExpr> => AExpr::Binary(box l, AOp::Divide, box r),
+    <l:AExpr> "*" <r:AExpr> => AExpr::binary(l, AOp::Times, r),
+    <l:AExpr> "/" <r:AExpr> => AExpr::binary(l, AOp::Divide, r),
 
 
     #[precedence(level="4")] #[assoc(side="left")]
-    <l:AExpr> "+" <r:AExpr> => AExpr::Binary(box l, AOp::Plus, box r),
-    <l:AExpr> "-" <r:AExpr> => AExpr::Binary(box l, AOp::Minus, box r),
+    <l:AExpr> "+" <r:AExpr> => AExpr::binary(l, AOp::Plus, r),
+    <l:AExpr> "-" <r:AExpr> => AExpr::binary(l, AOp::Minus, r),
 };
 
 pub BExpr: BExpr = {
@@ -89,16 +89,16 @@ pub BExpr: BExpr = {
     <l:AExpr_> <op:RelOp> <r:AExpr_> => BExpr::Rel(l, op, r),
     "true" => BExpr::Bool(true),
     "false" => BExpr::Bool(false),
-    "!" <BExpr> => BExpr::Not(box <>),
+    "!" <BExpr> => BExpr::Not(Box::new(<>)),
     "(" <BExpr_> ")",
 
     #[precedence(level="1")] #[assoc(side="left")]
-    <l:BExpr> "&" <r:BExpr> => BExpr::Logic(box l, LogicOp::Land, box r),
-    <l:BExpr> "&&" <r:BExpr> => BExpr::Logic(box l, LogicOp::And, box r),
+    <l:BExpr> "&" <r:BExpr> => BExpr::logic(l, LogicOp::Land, r),
+    <l:BExpr> "&&" <r:BExpr> => BExpr::logic(l, LogicOp::And, r),
 
     #[precedence(level="2")] #[assoc(side="left")]
-    <l:BExpr> "|" <r:BExpr> => BExpr::Logic(box l, LogicOp::Lor, box r),
-    <l:BExpr> "||" <r:BExpr> => BExpr::Logic(box l, LogicOp::Or, box r),
+    <l:BExpr> "|" <r:BExpr> => BExpr::logic(l, LogicOp::Lor, r),
+    <l:BExpr> "||" <r:BExpr> => BExpr::logic(l, LogicOp::Or, r),
 };
 BExpr_: BExpr = BExpr;
 

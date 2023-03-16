@@ -36,15 +36,21 @@ impl Context {
         self.sample(
             rng,
             vec![
-                (0.7, box |cx, rng| {
-                    Target::Variable(Variable(cx.names.choose(rng).cloned().unwrap()))
-                }),
-                (if self.use_array() { 0.3 } else { 0.0 }, box |cx, rng| {
-                    Target::Array(
-                        Array(cx.names.choose(rng).cloned().unwrap().to_uppercase()),
-                        box AExpr::gen(cx, rng),
-                    )
-                }),
+                (
+                    0.7,
+                    Box::new(|cx, rng| {
+                        Target::Variable(Variable(cx.names.choose(rng).cloned().unwrap()))
+                    }),
+                ),
+                (
+                    if self.use_array() { 0.3 } else { 0.0 },
+                    Box::new(|cx, rng| {
+                        Target::Array(
+                            Array(cx.names.choose(rng).cloned().unwrap().to_uppercase()),
+                            Box::new(AExpr::gen(cx, rng)),
+                        )
+                    }),
+                ),
             ],
         )
     }
@@ -80,6 +86,17 @@ pub trait Generate {
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self;
 }
 
+impl<T> Generate for Box<T>
+where
+    T: Generate,
+{
+    type Context = T::Context;
+
+    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        Box::new(T::gen(cx, rng))
+    }
+}
+
 impl Generate for Commands {
     type Context = Context;
 
@@ -96,13 +113,17 @@ impl Generate for Command {
         cx.sample(
             rng,
             vec![
-                (1.0, box |cx, rng| {
-                    Command::Assignment(Target::gen(cx, rng), AExpr::gen(cx, rng))
-                }),
-                (0.6, box |cx, rng| Command::If(cx.many(1, 10, rng))),
-                (if cx.no_loops { 0.0 } else { 0.3 }, box |cx, rng| {
-                    Command::Loop(cx.many(1, 10, rng))
-                }),
+                (
+                    1.0,
+                    Box::new(|cx, rng| {
+                        Command::Assignment(Target::gen(cx, rng), AExpr::gen(cx, rng))
+                    }),
+                ),
+                (0.6, Box::new(|cx, rng| Command::If(cx.many(1, 10, rng)))),
+                (
+                    if cx.no_loops { 0.0 } else { 0.3 },
+                    Box::new(|cx, rng| Command::Loop(cx.many(1, 10, rng))),
+                ),
             ],
         )
     }
@@ -126,35 +147,27 @@ impl Generate for Guard {
     }
 }
 
-impl Generate for Box<AExpr> {
-    type Context = Context;
-
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        box AExpr::gen(cx, rng)
-    }
-}
 impl Generate for AExpr {
     type Context = Context;
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![
-                (0.4, box |_, rng| AExpr::Number(rng.gen_range(-100..=100))),
-                (0.8, box |cx, rng| AExpr::Reference(cx.reference(rng))),
+                (
+                    0.4,
+                    Box::new(|_, rng| AExpr::Number(rng.gen_range(-100..=100))),
+                ),
+                (0.8, Box::new(|cx, rng| AExpr::Reference(cx.reference(rng)))),
                 (
                     if cx.recursion_limit == 0 || cx.fuel == 0 {
                         0.0
                     } else {
                         0.9
                     },
-                    box |cx, rng| {
+                    Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
-                        AExpr::Binary(
-                            box AExpr::gen(cx, rng),
-                            AOp::gen(cx, rng),
-                            box AExpr::gen(cx, rng),
-                        )
-                    },
+                        AExpr::binary(AExpr::gen(cx, rng), AOp::gen(cx, rng), AExpr::gen(cx, rng))
+                    }),
                 ),
             ],
         )
@@ -168,11 +181,11 @@ impl Generate for AOp {
         cx.sample(
             rng,
             vec![
-                (0.5, box |_, _| AOp::Plus),
-                (0.4, box |_, _| AOp::Minus),
-                (0.4, box |_, _| AOp::Times),
-                (0.1, box |_, _| AOp::Pow),
-                (0.3, box |_, _| AOp::Divide),
+                (0.5, Box::new(|_, _| AOp::Plus)),
+                (0.4, Box::new(|_, _| AOp::Minus)),
+                (0.4, Box::new(|_, _| AOp::Times)),
+                (0.1, Box::new(|_, _| AOp::Pow)),
+                (0.3, Box::new(|_, _| AOp::Divide)),
             ],
         )
     }
@@ -185,35 +198,35 @@ impl Generate for BExpr {
         cx.sample(
             rng,
             vec![
-                (0.2, box |_cx, rng| BExpr::Bool(rng.gen())),
+                (0.2, Box::new(|_cx, rng| BExpr::Bool(rng.gen()))),
                 (
                     if cx.recursion_limit == 0 { 0.0 } else { 0.7 },
-                    box |cx, rng| {
+                    Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
                         BExpr::Rel(
                             AExpr::gen(cx, rng),
                             RelOp::gen(cx, rng),
                             AExpr::gen(cx, rng),
                         )
-                    },
+                    }),
                 ),
                 (
                     if cx.recursion_limit == 0 { 0.0 } else { 0.7 },
-                    box |cx, rng| {
+                    Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
-                        BExpr::Logic(
-                            box BExpr::gen(cx, rng),
+                        BExpr::logic(
+                            BExpr::gen(cx, rng),
                             LogicOp::gen(cx, rng),
-                            box BExpr::gen(cx, rng),
+                            BExpr::gen(cx, rng),
                         )
-                    },
+                    }),
                 ),
                 (
                     if cx.negation_limit == 0 { 0.0 } else { 0.4 },
-                    box |cx, rng| {
+                    Box::new(|cx, rng| {
                         cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
-                        BExpr::Not(box BExpr::gen(cx, rng))
-                    },
+                        BExpr::Not(Box::new(BExpr::gen(cx, rng)))
+                    }),
                 ),
             ],
         )
@@ -227,12 +240,12 @@ impl Generate for RelOp {
         cx.sample(
             rng,
             vec![
-                (0.3, box |_cx, _rng| RelOp::Eq),
-                (0.3, box |_cx, _rng| RelOp::Gt),
-                (0.3, box |_cx, _rng| RelOp::Ge),
-                (0.3, box |_cx, _rng| RelOp::Lt),
-                (0.3, box |_cx, _rng| RelOp::Le),
-                (0.3, box |_cx, _rng| RelOp::Ne),
+                (0.3, Box::new(|_cx, _rng| RelOp::Eq)),
+                (0.3, Box::new(|_cx, _rng| RelOp::Gt)),
+                (0.3, Box::new(|_cx, _rng| RelOp::Ge)),
+                (0.3, Box::new(|_cx, _rng| RelOp::Lt)),
+                (0.3, Box::new(|_cx, _rng| RelOp::Le)),
+                (0.3, Box::new(|_cx, _rng| RelOp::Ne)),
             ],
         )
     }
@@ -244,10 +257,10 @@ impl Generate for LogicOp {
         cx.sample(
             rng,
             vec![
-                (0.3, box |_cx, _rng| LogicOp::And),
-                (0.3, box |_cx, _rng| LogicOp::Land),
-                (0.3, box |_cx, _rng| LogicOp::Or),
-                (0.3, box |_cx, _rng| LogicOp::Lor),
+                (0.3, Box::new(|_cx, _rng| LogicOp::And)),
+                (0.3, Box::new(|_cx, _rng| LogicOp::Land)),
+                (0.3, Box::new(|_cx, _rng| LogicOp::Or)),
+                (0.3, Box::new(|_cx, _rng| LogicOp::Lor)),
             ],
         )
     }

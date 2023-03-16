@@ -109,9 +109,9 @@ impl Generate for ProgramVerificationEnvInput {
                             AExpr::Number(0),
                         ),
                     })
-                    .reduce(|a, b| BExpr::Logic(box a, LogicOp::And, box b))
+                    .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
             })
-            .reduce(|a, b| BExpr::Logic(box a, LogicOp::Or, box b))
+            .reduce(|a, b| BExpr::logic(a, LogicOp::Or, b))
             .unwrap_or(BExpr::Bool(true));
 
         Self {
