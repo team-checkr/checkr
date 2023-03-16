@@ -267,16 +267,29 @@ fn spawn_watcher(
         .iter()
         .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
         .collect::<Result<Vec<glob::Pattern>, color_eyre::Report>>()?;
+    let not_matches = run
+        .ignore
+        .iter()
+        .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
+        .collect::<Result<Vec<glob::Pattern>, color_eyre::Report>>()?;
+    let debouncer_dir = dir.canonicalize()?;
     let mut debouncer = notify_debouncer_mini::new_debouncer(
         Duration::from_millis(200),
         None,
         move |res: DebounceEventResult| match res {
             Ok(events) => {
                 debug!("a file was saved: {events:?}");
-                if !events
-                    .iter()
-                    .any(|e| matches.iter().any(|p| p.matches_path(&e.path)))
-                {
+                if !events.iter().any(|e| {
+                    let p = match e.path.strip_prefix(&debouncer_dir) {
+                        Ok(p) => p,
+                        Err(_) => &e.path,
+                    };
+
+                    let matches_positive = matches.iter().any(|pat| pat.matches_path(p));
+                    let matches_negative = not_matches.iter().any(|pat| pat.matches_path(p));
+
+                    matches_positive && !matches_negative
+                }) {
                     return;
                 }
 

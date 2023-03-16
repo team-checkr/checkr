@@ -15,6 +15,8 @@ pub struct RunOption {
     pub compile: Option<String>,
     #[serde(default)]
     pub watch: Vec<String>,
+    #[serde(default)]
+    pub ignore: Vec<String>,
 }
 
 impl RunOption {
