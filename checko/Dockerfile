@@ -2,7 +2,6 @@ FROM rustlang/rust:nightly-slim as checko
 
 ENV CARGO_TARGET_DIR=/.cargo-target
 
-COPY rust-toolchain.toml /root/
 WORKDIR /root/
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
