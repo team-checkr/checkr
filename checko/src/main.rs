@@ -206,15 +206,20 @@ async fn run() -> Result<()> {
             for g in &groups.groups {
                 let span = span!(Level::INFO, "Group", name = g.name);
                 let _enter = span.enter();
-                let data = GroupEnv::new(&submissions, g).latest_run()?;
-
-                for sec in data.sections {
-                    input
-                        .sections
-                        .entry(sec.analysis)
-                        .or_default()
-                        .entry(g.name.clone())
-                        .or_insert(sec.programs);
+                match GroupEnv::new(&submissions, g).latest_run() {
+                    Ok(data) => {
+                        for sec in data.sections {
+                            input
+                                .sections
+                                .entry(sec.analysis)
+                                .or_default()
+                                .entry(g.name.clone())
+                                .or_insert(sec.programs);
+                        }
+                    }
+                    Err(e) => {
+                        error!(err = format!("{e}"), "did not have a latest run")
+                    }
                 }
             }
 
