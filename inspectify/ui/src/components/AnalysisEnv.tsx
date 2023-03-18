@@ -49,6 +49,36 @@ export const AnalysisEnv = () => {
   const [dotReference, setDotReference] = useState<null | string>(null);
   const [dotGraph, setDotGraph] = useState<null | string>(null);
 
+  const [compilationStatus, setCompilationStatus] =
+    useState<null | CompilationStatus>(null);
+  useEffect(() => {
+    const aborts = [] as (() => void)[];
+
+    const interval = setInterval(() => {
+      aborts.forEach((a) => a());
+      aborts.slice(0, aborts.length);
+      const { abort, promise } = api.compilationStatus();
+      aborts.push(abort);
+      promise
+        .then((res) => {
+          setCompilationStatus((old) => {
+            if (deepEqual(old, res)) return old;
+            console.log("got new");
+            return res;
+          });
+        })
+        .catch((e) => {
+          if (e.name != "AbortError") console.error("analysis error:", e);
+        });
+    }, 200);
+
+    return () => {
+      aborts.forEach((a) => a());
+      aborts.splice(0, aborts.length);
+      clearInterval(interval);
+    };
+  }, []);
+
   useEffect(() => {
     setDotReference(wasm.dot(deterministic, src));
 
@@ -63,7 +93,7 @@ export const AnalysisEnv = () => {
       });
 
     return () => abort();
-  }, [deterministic, src]);
+  }, [compilationStatus?.state, deterministic, src]);
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_2fr] grid-rows-[1fr_auto_auto_1fr]">
@@ -165,7 +195,7 @@ export const AnalysisEnv = () => {
           </div>
         )}
       </div>
-      <Env env={env} src={src} />
+      <Env compilationStatus={compilationStatus} env={env} src={src} />
       <Toaster />
     </div>
   );
@@ -179,7 +209,12 @@ const RIGHT_TABS_LABEL = {
   validation: "Validation result",
 } satisfies Record<RightTab, string>;
 
-const Env = ({ env, src }: { env: Analysis; src: string }) => {
+type EnvProps = {
+  compilationStatus: CompilationStatus | null;
+  env: Analysis;
+  src: string;
+};
+const Env = ({ compilationStatus, env, src }: EnvProps) => {
   const [input, setInput] = useState<wasm.Input | null>(null);
   const [output, setOutput] = useState<wasm.Output | null>(null);
 
@@ -189,8 +224,6 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
   const [tab, setTab] = useState<RightTab>("reference");
   const [inFlight, setInFlight] = useState(false);
   const [response, setResponse] = useState<null | AnalysisResponse>(null);
-  const [compilationStatus, setCompilationStatus] =
-    useState<null | CompilationStatus>(null);
 
   const realReferenceOutputRef = useRef(realReferenceOutput);
   realReferenceOutputRef.current = realReferenceOutput;
@@ -205,34 +238,6 @@ const Env = ({ env, src }: { env: Analysis; src: string }) => {
       console.error(e);
     }
   }, [env, input]);
-
-  useEffect(() => {
-    const aborts = [] as (() => void)[];
-
-    const interval = setInterval(() => {
-      aborts.forEach((a) => a());
-      aborts.slice(0, aborts.length);
-      const { abort, promise } = api.compilationStatus();
-      aborts.push(abort);
-      promise
-        .then((res) => {
-          setCompilationStatus((old) => {
-            if (deepEqual(old, res)) return old;
-            console.log("got new");
-            return res;
-          });
-        })
-        .catch((e) => {
-          if (e.name != "AbortError") console.error("analysis error:", e);
-        });
-    }, 200);
-
-    return () => {
-      aborts.forEach((a) => a());
-      aborts.splice(0, aborts.length);
-      clearInterval(interval);
-    };
-  }, []);
 
   useEffect(() => {
     if (
