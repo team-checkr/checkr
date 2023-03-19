@@ -152,6 +152,7 @@ impl AExpr {
             }
             AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
             AExpr::Minus(n) => -n.semantics(m)?,
+            AExpr::Function(f) => return Err(todo!("evaluating functions {f}")),
         })
     }
 }
@@ -177,8 +178,12 @@ pub enum InterpreterError {
 impl AOp {
     pub fn semantic(&self, l: i64, r: i64) -> Result<i64, InterpreterError> {
         Ok(match self {
-            AOp::Plus => l + r,
-            AOp::Minus => l - r,
+            AOp::Plus => l
+                .checked_add(r)
+                .ok_or(InterpreterError::ArithmeticOverflow)?,
+            AOp::Minus => l
+                .checked_sub(r)
+                .ok_or(InterpreterError::ArithmeticOverflow)?,
             AOp::Times => l
                 .checked_mul(r)
                 .ok_or(InterpreterError::ArithmeticOverflow)?,
@@ -208,6 +213,7 @@ impl BExpr {
             BExpr::Rel(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?),
             BExpr::Logic(l, op, r) => op.semantic(l.semantics(m)?, || r.semantics(m))?,
             BExpr::Not(b) => !b.semantics(m)?,
+            BExpr::Quantified(_, _, _) => return Err(todo!("tried to evaluate quantifier")),
         })
     }
 }
@@ -241,6 +247,10 @@ impl LogicOp {
             LogicOp::Lor => {
                 let r = r()?;
                 l || r
+            }
+            LogicOp::Implies => {
+                let r = r()?;
+                !l || r
             }
         })
     }

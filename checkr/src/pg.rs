@@ -186,12 +186,13 @@ impl Command {
             }
             Command::Skip => vec![Edge(s, Action::Skip, t)],
             Command::If(guards) => guard_edges(det, guards, s, t),
-            Command::Loop(guards) => {
+            Command::Loop(guards) | Command::EnrichedLoop(_, guards) => {
                 let b = done(guards);
                 let mut edges = guard_edges(det, guards, s, s);
                 edges.push(Edge(s, Action::Condition(b), t));
                 edges
             }
+            Command::Annotated(_, c, _) => c.edges(det, s, t),
             Command::Break => todo!(),
             Command::Continue => todo!(),
         }

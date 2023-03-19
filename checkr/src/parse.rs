@@ -3,7 +3,7 @@ use once_cell::sync::Lazy;
 use thiserror::Error;
 
 use crate::{
-    ast::{BExpr, Commands},
+    ast::{BExpr, Commands, Predicate},
     gcl,
 };
 
@@ -73,6 +73,12 @@ pub fn parse_commands(src: &str) -> Result<Commands, ParseError> {
 
 pub fn parse_bexpr(src: &str) -> Result<BExpr, ParseError> {
     static PARSER: Lazy<gcl::BExprParser> = Lazy::new(gcl::BExprParser::new);
+
+    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
+}
+
+pub fn parse_predicate(src: &str) -> Result<Predicate, ParseError> {
+    static PARSER: Lazy<gcl::PredicateParser> = Lazy::new(gcl::PredicateParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }

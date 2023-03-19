@@ -1,5 +1,6 @@
 use std::collections::HashSet;
 
+use itertools::Either;
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -31,6 +32,12 @@ impl<Idx> Target<Idx> {
             (Target::Variable(a), Target::Variable(b)) => a == b,
             (Target::Array(a, _), Target::Array(b, _)) => a == b,
             _ => false,
+        }
+    }
+    pub fn is_logical(&self) -> bool {
+        match self {
+            Target::Variable(v) => v.is_logical(),
+            Target::Array(a, _) => a.is_logical(),
         }
     }
 }
@@ -70,6 +77,11 @@ impl<'de> serde::Deserialize<'de> for Target {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Variable(pub String);
+impl Variable {
+    pub fn is_logical(&self) -> bool {
+        self.0.starts_with('_')
+    }
+}
 
 impl std::fmt::Debug for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -79,6 +91,11 @@ impl std::fmt::Debug for Variable {
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Array(pub String);
+impl Array {
+    pub fn is_logical(&self) -> bool {
+        self.0.starts_with('_')
+    }
+}
 
 impl std::fmt::Debug for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -106,6 +123,10 @@ pub enum Command {
     If(Vec<Guard>),
     Loop(Vec<Guard>),
     /// **Extension**
+    EnrichedLoop(Predicate, Vec<Guard>),
+    /// **Extension**
+    Annotated(Predicate, Commands, Predicate),
+    /// **Extension**
     Break,
     /// **Extension**
     Continue,
@@ -120,6 +141,7 @@ pub enum AExpr {
     Reference(Target<Box<AExpr>>),
     Binary(Box<AExpr>, AOp, Box<AExpr>),
     Minus(Box<AExpr>),
+    Function(Function),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -132,11 +154,33 @@ pub enum AOp {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Function {
+    Division(Box<AExpr>, Box<AExpr>),
+    Min(Box<AExpr>, Box<AExpr>),
+    Max(Box<AExpr>, Box<AExpr>),
+    Count(Array, Box<AExpr>),
+    LogicalCount(Array, Box<AExpr>),
+    Length(Array),
+    LogicalLength(Array),
+    Fac(Box<AExpr>),
+    Fib(Box<AExpr>),
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BExpr {
     Bool(bool),
     Rel(AExpr, RelOp, AExpr),
     Logic(Box<BExpr>, LogicOp, Box<BExpr>),
     Not(Box<BExpr>),
+    Quantified(Quantifier, Target<()>, Box<BExpr>),
+}
+
+pub type Predicate = BExpr;
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Quantifier {
+    Exists,
+    Forall,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -155,6 +199,8 @@ pub enum LogicOp {
     Land,
     Or,
     Lor,
+    /// **Enriched**
+    Implies,
 }
 
 impl Commands {
@@ -169,6 +215,10 @@ impl Command {
             Command::Skip => HashSet::default(),
             Command::If(c) => guards_fv(c),
             Command::Loop(c) => guards_fv(c),
+            // TODO: Maybe the pred should also be looked at?
+            Command::EnrichedLoop(_, c) => guards_fv(c),
+            // TODO: Maybe the pred should also be looked at?
+            Command::Annotated(_, c, _) => c.fv(),
             Command::Break => HashSet::default(),
             Command::Continue => HashSet::default(),
         }
@@ -204,6 +254,35 @@ impl AExpr {
             AExpr::Reference(v) => v.fv(),
             AExpr::Binary(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             AExpr::Minus(x) => x.fv(),
+            AExpr::Function(f) => f.fv(),
+        }
+    }
+}
+impl Function {
+    pub fn exprs(&self) -> impl Iterator<Item = &AExpr> {
+        match self {
+            Function::Division(a, b) | Function::Min(a, b) | Function::Max(a, b) => {
+                Either::Left([a.as_ref(), b.as_ref()].into_iter())
+            }
+            Function::Count(_, x)
+            | Function::LogicalCount(_, x)
+            | Function::Fac(x)
+            | Function::Fib(x) => Either::Right(Either::Left([x.as_ref()].into_iter())),
+            Function::Length(_) | Function::LogicalLength(_) => {
+                Either::Right(Either::Right(std::iter::empty()))
+            }
+        }
+    }
+    pub fn fv(&self) -> HashSet<Target> {
+        match self {
+            Function::Count(a, x) | Function::LogicalCount(a, x) => [Target::Array(a.clone(), ())]
+                .into_iter()
+                .chain(x.fv())
+                .collect(),
+            Function::Length(a) | Function::LogicalLength(a) => {
+                [Target::Array(a.clone(), ())].into_iter().collect()
+            }
+            _ => self.exprs().flat_map(|x| x.fv()).collect(),
         }
     }
 }
@@ -220,6 +299,11 @@ impl BExpr {
             BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Not(x) => x.fv(),
+            BExpr::Quantified(_, x, b) => {
+                let mut fv = b.fv();
+                fv.remove(x);
+                fv
+            }
         }
     }
 }
