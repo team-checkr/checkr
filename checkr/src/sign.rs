@@ -339,6 +339,9 @@ impl BExpr {
             .map(|res| res.expect("this could not error"))
             .collect(),
             BExpr::Not(b) => b.semantics_sign(mem).into_iter().map(|i| !i).collect(),
+            BExpr::Quantified(_, _, _) => {
+                todo!("tried to compute signs of a quantified expression")
+            }
         }
     }
 }
@@ -408,6 +411,7 @@ impl AExpr {
                 }
             }
             AExpr::Minus(n) => n.semantics_sign(mem).into_iter().map(|x| -x).collect(),
+            AExpr::Function(_) => todo!("sign of a function"),
         }
     }
 }

@@ -60,7 +60,7 @@ impl Command {
             })
             .collect(),
             Command::Skip => HashSet::default(),
-            Command::If(c) | Command::Loop(c) => {
+            Command::If(c) | Command::Loop(c) | Command::EnrichedLoop(_, c) => {
                 c.iter()
                     .fold(
                         (implicit.clone(), HashSet::default()),
@@ -75,6 +75,7 @@ impl Command {
                     )
                     .1
             }
+            Command::Annotated(_, c, _) => c.sec(implicit),
             Command::Break => HashSet::default(),
             Command::Continue => HashSet::default(),
         }

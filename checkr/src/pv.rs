@@ -1,3 +1,5 @@
+use tracing::error;
+
 use crate::ast::{AExpr, AOp, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target};
 
 impl Commands {
@@ -24,6 +26,14 @@ impl Command {
             Command::Loop(_) => todo!(
                 "loops in program verification is not supported, please regenerate the program :)"
             ),
+            Command::EnrichedLoop(_, _) => todo!(
+                "loops in program verification is not supported, please regenerate the program :)"
+            ),
+            // TODO
+            Command::Annotated(_, _, _) => {
+                error!("weakest-pre of annotated");
+                q.clone()
+            }
             // TODO
             Command::Break => q.clone(),
             Command::Continue => q.clone(),
@@ -49,6 +59,7 @@ impl BExpr {
             BExpr::Rel(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
             BExpr::Logic(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
             BExpr::Not(e) => BExpr::Not(Box::new(e.well_defined())),
+            BExpr::Quantified(_, _, _) => todo!(),
         }
     }
     fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> BExpr {
@@ -57,6 +68,7 @@ impl BExpr {
             BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
+            BExpr::Quantified(_, _, _) => todo!(),
         }
     }
 
@@ -94,6 +106,7 @@ impl BExpr {
                     x => BExpr::Not(Box::new(x)),
                 }
             }
+            BExpr::Quantified(_, _, _) => todo!(),
         }
     }
 }
@@ -106,6 +119,7 @@ impl AExpr {
             AExpr::Reference(v) => AExpr::Reference(v.clone()),
             AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
             AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
+            AExpr::Function(_) => todo!(),
         }
     }
 
@@ -130,6 +144,7 @@ impl AExpr {
                 }
             }
             AExpr::Minus(e) => e.well_defined(),
+            AExpr::Function(_) => todo!(),
         }
     }
 
@@ -146,6 +161,7 @@ impl AExpr {
                 AExpr::Minus(inner) => inner.simplify(),
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
+            AExpr::Function(_) => todo!(),
         }
     }
 }
