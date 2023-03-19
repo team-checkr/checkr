@@ -8,6 +8,7 @@ authors = [
     "Oliver Bøving <oliver@bvng.dk>",
     "Camilla Færch <camilla_faerch@hotmail.com>",
 ]
+license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
 color-eyre = "0.6.2"
