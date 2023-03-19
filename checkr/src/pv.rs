@@ -1,54 +1,125 @@
-use tracing::error;
+use std::sync::atomic::AtomicU64;
 
-use crate::ast::{AExpr, AOp, BExpr, Command, Commands, Function, Guard, LogicOp, RelOp, Target};
+use crate::ast::{
+    AExpr, AOp, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp, Target,
+    Variable,
+};
 
 impl Commands {
-    pub fn wp(&self, q: &BExpr) -> BExpr {
-        self.0.iter().rfold(q.clone(), |q, s| s.wp(&q))
+    pub fn sp(&self, p: &BExpr) -> BExpr {
+        self.0.iter().fold(p.clone(), |acc, c| c.sp(&acc))
+    }
+    pub fn vc(&self, r: &BExpr) -> Vec<BExpr> {
+        self.0
+            .iter()
+            .scan(r.clone(), |acc, c| {
+                let vc = c.vc(acc);
+
+                *acc = c.sp(acc);
+
+                Some(vc)
+            })
+            .flatten()
+            .collect()
     }
 }
 
 impl Command {
-    pub fn wp(&self, q: &BExpr) -> BExpr {
+    pub fn sp(&self, p: &BExpr) -> BExpr {
         match self {
-            Command::Assignment(var @ Target::Variable(_), exp) => {
-                BExpr::logic(q.subst_var(var, exp), LogicOp::And, exp.well_defined())
+            Command::Assignment(x, e) => {
+                static FRESH_ID: AtomicU64 = AtomicU64::new(0);
+                fn fresh() -> Target<Box<AExpr>> {
+                    Target::Variable(Variable(format!(
+                        "_fresh_{}",
+                        FRESH_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed)
+                    )))
+                }
+
+                let y = fresh();
+                let y_expr = AExpr::Reference(y.clone());
+
+                BExpr::Quantified(
+                    Quantifier::Exists,
+                    y.unit(),
+                    Box::new(BExpr::logic(
+                        p.subst_var(x, &y_expr),
+                        LogicOp::Land,
+                        BExpr::rel(
+                            AExpr::Reference(x.clone()),
+                            RelOp::Eq,
+                            e.subst_var(x, &y_expr),
+                        ),
+                    )),
+                )
             }
-            // TODO
-            Command::Assignment(Target::Array(_, _), _) => todo!(),
-            Command::Skip => q.clone(),
-            Command::If(guards) => guards
+            Command::Skip => p.clone(),
+            Command::If(guards) => guards_sp(guards, p),
+            Command::Loop(guards) => guards
                 .iter()
-                .map(|g| g.wp(q))
-                .reduce(|l, r| BExpr::logic(l, LogicOp::And, r))
-                .unwrap_or_else(|| panic!("if-statement had no guards")),
-            // TODO
-            Command::Loop(_) => todo!(
-                "loops in program verification is not supported, please regenerate the program :)"
-            ),
-            Command::EnrichedLoop(_, _) => todo!(
-                "loops in program verification is not supported, please regenerate the program :)"
-            ),
-            // TODO
-            Command::Annotated(_, _, _) => {
-                error!("weakest-pre of annotated");
-                q.clone()
+                .map(|gc| BExpr::Not(gc.0.clone().into()))
+                .reduce(|a, b| BExpr::logic(a, LogicOp::Land, b))
+                .unwrap(),
+            Command::EnrichedLoop(i, guards) => {
+                let done = guards
+                    .iter()
+                    .map(|gc| BExpr::Not(gc.0.clone().into()))
+                    .reduce(|a, b| BExpr::logic(a, LogicOp::Land, b))
+                    .unwrap();
+                BExpr::logic(i.clone(), LogicOp::Land, done)
             }
-            // TODO
-            Command::Break => q.clone(),
-            Command::Continue => q.clone(),
+            // TODO: Does this even make sense? It should never be called anyway
+            Command::Annotated(_, _, q) => q.clone(),
+            Command::Break => todo!(),
+            Command::Continue => todo!(),
+        }
+    }
+    pub fn vc(&self, r: &BExpr) -> Vec<BExpr> {
+        match self {
+            Command::Assignment(_, _) => vec![],
+            Command::Skip => vec![],
+            Command::If(guards) => guards_vc(guards, r),
+            Command::Loop(_) => todo!(),
+            Command::EnrichedLoop(i, guards) => {
+                let mut conditions = vec![
+                    BExpr::logic(r.clone(), LogicOp::Implies, i.clone()),
+                    BExpr::logic(guards_sp(guards, i), LogicOp::Implies, i.clone()),
+                ];
+
+                conditions.extend_from_slice(&guards_vc(guards, i));
+
+                conditions
+            }
+            Command::Annotated(p, c, q) => {
+                let mut conditions = vec![BExpr::logic(c.sp(p), LogicOp::Implies, q.clone())];
+
+                conditions.extend_from_slice(&c.vc(p));
+
+                conditions
+            }
+            Command::Break => todo!(),
+            Command::Continue => todo!(),
         }
     }
 }
+fn guards_sp(guards: &[Guard], p: &BExpr) -> BExpr {
+    guards
+        .iter()
+        .map(|gc| gc.sp(p))
+        .reduce(|a, b| BExpr::logic(a, LogicOp::Lor, b))
+        .unwrap()
+}
+fn guards_vc(guards: &[Guard], r: &BExpr) -> Vec<BExpr> {
+    guards.iter().flat_map(|gc| gc.vc(r)).collect()
+}
 
 impl Guard {
-    pub fn wp(&self, q: &BExpr) -> BExpr {
-        let a = BExpr::logic(
-            BExpr::Not(Box::new(self.0.clone())),
-            LogicOp::Or,
-            self.1.wp(q),
-        );
-        BExpr::logic(a, LogicOp::And, self.0.well_defined())
+    pub fn sp(&self, p: &BExpr) -> BExpr {
+        self.1
+            .sp(&BExpr::logic(self.0.clone(), LogicOp::Land, p.clone()))
+    }
+    pub fn vc(&self, r: &BExpr) -> Vec<BExpr> {
+        self.1.vc(r)
     }
 }
 
