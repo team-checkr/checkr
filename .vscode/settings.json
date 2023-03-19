@@ -2,5 +2,6 @@
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
         "inspectify/wasm/Cargo.toml"
-    ]
+    ],
+    "FSharp.showExplorerOnStartup": false
 }
