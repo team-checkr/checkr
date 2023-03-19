@@ -54,7 +54,7 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
         table.add_rows(
             self.verification_conditions
                 .iter()
-                .map(|vc| [crate::parse::parse_predicate(vc).unwrap()]),
+                .map(|vc| [format!("`{}`", crate::parse::parse_predicate(vc).unwrap())]),
         );
         // table.add_row([camillaify(&format!(
         //     "``",
@@ -133,13 +133,16 @@ impl Environment for ProgramVerificationEnv {
     }
 
     fn run(&self, cmds: &Commands, _: &Self::Input) -> Self::Output {
-        let (p, q) = match &cmds.0[0] {
-            Command::Annotated(p, _, q) => (p, q),
-            _ => todo!(),
-        };
-        // let q = crate::parse::parse_bexpr(&input.post_condition).unwrap();
+        // let (p, q) = match &cmds.0[0] {
+        //     Command::Annotated(p, _, q) => (p, q),
+        //     _ => todo!(),
+        // };
+        let verification_conditions = cmds.vc(&BExpr::Bool(true));
         ProgramVerificationEnvOutput {
-            verification_conditions: vec![p.clone().to_string(), q.clone().to_string()],
+            verification_conditions: verification_conditions
+                .iter()
+                .map(|vc| vc.to_string())
+                .collect(),
         }
     }
 
