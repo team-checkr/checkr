@@ -1,6 +1,6 @@
 use tracing::error;
 
-use crate::ast::{AExpr, AOp, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target};
+use crate::ast::{AExpr, AOp, BExpr, Command, Commands, Function, Guard, LogicOp, RelOp, Target};
 
 impl Commands {
     pub fn wp(&self, q: &BExpr) -> BExpr {
@@ -68,7 +68,9 @@ impl BExpr {
             BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
-            BExpr::Quantified(_, _, _) => todo!(),
+            BExpr::Quantified(q, v, e) => {
+                BExpr::Quantified(*q, v.clone(), Box::new(e.subst_var(t, x)))
+            }
         }
     }
 
@@ -119,7 +121,7 @@ impl AExpr {
             AExpr::Reference(v) => AExpr::Reference(v.clone()),
             AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
             AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
-            AExpr::Function(_) => todo!(),
+            AExpr::Function(f) => AExpr::Function(f.subst_var(t, x)),
         }
     }
 
@@ -162,6 +164,32 @@ impl AExpr {
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
             AExpr::Function(_) => todo!(),
+        }
+    }
+}
+
+impl Function {
+    fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> Function {
+        match self {
+            Function::Division(a, b) => {
+                Function::Division(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Min(a, b) => {
+                Function::Min(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Max(a, b) => {
+                Function::Max(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Count(arr, idx) => {
+                Function::Count(arr.clone(), Box::new(idx.subst_var(t, x)))
+            }
+            Function::LogicalCount(arr, idx) => {
+                Function::LogicalCount(arr.clone(), Box::new(idx.subst_var(t, x)))
+            }
+            Function::Length(arr) => Function::Length(arr.clone()),
+            Function::LogicalLength(arr) => Function::LogicalLength(arr.clone()),
+            Function::Fac(x) => Function::Fac(Box::new(x.subst_var(t, x))),
+            Function::Fib(x) => Function::Fib(Box::new(x.subst_var(t, x))),
         }
     }
 }
