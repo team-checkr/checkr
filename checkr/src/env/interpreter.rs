@@ -1,4 +1,5 @@
 use itertools::{chain, Itertools};
+use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
@@ -35,7 +36,9 @@ impl Generate for InterpreterInput {
             },
         );
         InterpreterInput {
-            determinism: Determinism::Deterministic,
+            determinism: *[Determinism::Deterministic, Determinism::NonDeterministic]
+                .choose(rng)
+                .unwrap(),
             assignment,
             trace_length: rng.gen_range(10..=15),
         }
