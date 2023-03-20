@@ -4,6 +4,18 @@
 
 export type Markdown = string;
 
+export interface Input {
+	analysis: Analysis;
+	json: string;
+	markdown: Markdown;
+}
+
+export interface Output {
+	analysis: Analysis;
+	json: string;
+	markdown: Markdown;
+}
+
 export interface AnalysisRequest {
 	analysis: Analysis;
 	src: string;

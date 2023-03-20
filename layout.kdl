@@ -1,15 +1,10 @@
 layout {
     pane split_direction="vertical" {
         pane command="just" {
-            args "watch-wasm"
+            args "watch-web"
         }
-        pane split_direction="horizontal" {
-            pane command="just" {
-                args "watch-web"
-            }
-            pane command="just" {
-                args "serve-inspectify"
-            }
+        pane command="just" {
+            args "watch-inspectify"
         }
     }
 }

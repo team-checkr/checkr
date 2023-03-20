@@ -58,8 +58,7 @@ macro_rules! define_analysis {
         }
 
         #[typeshare::typeshare]
-        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, tsify::Tsify)]
-        #[tsify(into_wasm_abi, from_wasm_abi)]
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
         pub enum AnalysisInput {
             $( $name(<$env as Environment>::Input), )*
         }
@@ -73,8 +72,7 @@ macro_rules! define_analysis {
         }
 
         #[typeshare::typeshare]
-        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, tsify::Tsify)]
-        #[tsify(into_wasm_abi, from_wasm_abi)]
+        #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
         pub enum AnalysisOutput {
             $( $name(<$env as Environment>::Output), )*
         }
@@ -90,19 +88,8 @@ macro_rules! define_analysis {
 }
 #[typeshare::typeshare]
 #[derive(
-    Debug,
-    Clone,
-    PartialEq,
-    Eq,
-    PartialOrd,
-    Ord,
-    Hash,
-    Serialize,
-    Deserialize,
-    clap::ValueEnum,
-    tsify::Tsify,
+    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, clap::ValueEnum,
 )]
-#[tsify(into_wasm_abi, from_wasm_abi)]
 pub enum Analysis {
     Graph,
     Parse,
@@ -126,10 +113,7 @@ define_analysis!(
 );
 
 #[typeshare::typeshare]
-#[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, tsify::Tsify,
-)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 pub struct Markdown(String);
 
 impl From<String> for Markdown {

@@ -388,7 +388,9 @@ impl AExpr {
             .filter_map(|res| match res {
                 Ok(mem) => Some(mem),
                 Err(err) => match err {
-                    InterpreterError::DivisionByZero | InterpreterError::NegativeExponent => None,
+                    InterpreterError::DivisionByZero
+                    | InterpreterError::NegativeExponent
+                    | InterpreterError::EvaluateQuantifier => None,
                     InterpreterError::VariableNotFound { .. }
                     | InterpreterError::ArrayNotFound { .. }
                     | InterpreterError::IndexOutOfBound { .. }

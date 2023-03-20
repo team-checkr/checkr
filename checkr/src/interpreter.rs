@@ -173,6 +173,8 @@ pub enum InterpreterError {
     NoProgression,
     #[error("an arithmetic operation overflowed")]
     ArithmeticOverflow,
+    #[error("tried to evaluate a quantified expression")]
+    EvaluateQuantifier,
 }
 
 impl AOp {
@@ -213,7 +215,7 @@ impl BExpr {
             BExpr::Rel(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?),
             BExpr::Logic(l, op, r) => op.semantic(l.semantics(m)?, || r.semantics(m))?,
             BExpr::Not(b) => !b.semantics(m)?,
-            BExpr::Quantified(_, _, _) => return Err(todo!("tried to evaluate quantifier")),
+            BExpr::Quantified(_, _, _) => return Err(InterpreterError::EvaluateQuantifier),
         })
     }
 }

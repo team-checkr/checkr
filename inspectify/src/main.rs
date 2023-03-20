@@ -1,3 +1,5 @@
+mod core;
+
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use axum::{
@@ -392,6 +394,14 @@ async fn run() -> color_eyre::Result<()> {
         .route("/analyze", post(analyze))
         .route("/graph", post(graph))
         .route("/compilation-status", get(get_compilation_status))
+        .route("/core/generate_program", post(core::generate_program))
+        .route("/core/dot", post(core::dot))
+        .route(
+            "/core/complete_input_from_json",
+            post(core::complete_input_from_json),
+        )
+        .route("/core/generate_input_for", post(core::generate_input_for))
+        .route("/core/run_analysis", post(core::run_analysis))
         .with_state(ApplicationState {
             driver,
             compilation_status,

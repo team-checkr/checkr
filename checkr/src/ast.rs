@@ -1,4 +1,4 @@
-use std::collections::HashSet;
+use std::{collections::HashSet, str::FromStr};
 
 use itertools::Either;
 use serde::{Deserialize, Serialize};
@@ -88,6 +88,14 @@ impl std::fmt::Debug for Variable {
         write!(f, "{}", self.0)
     }
 }
+impl FromStr for Variable {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Variable(s.to_string()))
+    }
+}
+
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Array(pub String);
@@ -102,6 +110,14 @@ impl std::fmt::Debug for Array {
         write!(f, "{}", self.0)
     }
 }
+impl FromStr for Array {
+    type Err = ();
+
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Ok(Array(s.to_string()))
+    }
+}
+
 impl<Idx> From<Variable> for Target<Idx> {
     fn from(value: Variable) -> Self {
         Target::Variable(value)

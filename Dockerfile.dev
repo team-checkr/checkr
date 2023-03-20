@@ -10,8 +10,6 @@ RUN cargo binstall --no-confirm --quiet \
     just \
     typeshare-cli
 
-RUN curl https://rustwasm.github.io/wasm-pack/installer/init.sh -sSf | sh
-
 RUN mkdir -p /usr/local/n/versions && \
     curl -fsSL https://raw.githubusercontent.com/tj/n/master/bin/n | bash -s latest
 

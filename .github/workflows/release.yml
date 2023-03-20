@@ -104,18 +104,13 @@ jobs:
     steps:
       - uses: actions/checkout@v3
       - name: Install Rust
-        run: rustup update nightly --no-self-update && rustup default nightly && rustup target add wasm32-unknown-unknown
+        run: rustup update nightly --no-self-update && rustup default nightly
       - name: Install cargo-dist
         run: ${{ matrix.install-dist }}
       - name: Install just and typeshare
         uses: taiki-e/install-action@v2
         with:
           tool: just
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
-          version: 'latest'
       - name: Build UI
         run: just build-ui
       - name: Run cargo-dist

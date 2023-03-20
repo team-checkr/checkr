@@ -24,11 +24,14 @@ impl Commands {
     }
 }
 
+static FRESH_ID: AtomicU64 = AtomicU64::new(0);
 impl Command {
+    pub fn reset_sp_counter() {
+        FRESH_ID.store(0, std::sync::atomic::Ordering::Relaxed);
+    }
     pub fn sp(&self, p: &BExpr) -> BExpr {
         match self {
             Command::Assignment(x, e) => {
-                static FRESH_ID: AtomicU64 = AtomicU64::new(0);
                 fn fresh() -> Target<Box<AExpr>> {
                     Target::Variable(Variable(format!(
                         "_fresh_{}",
@@ -79,7 +82,8 @@ impl Command {
             Command::Assignment(_, _) => vec![],
             Command::Skip => vec![],
             Command::If(guards) => guards_vc(guards, r),
-            Command::Loop(_) => todo!(),
+            // TODO: Could we make something more useful/obvious here?
+            Command::Loop(_) => vec![],
             Command::EnrichedLoop(i, guards) => {
                 let mut conditions = vec![
                     BExpr::logic(r.clone(), LogicOp::Implies, i.clone()),
@@ -124,23 +128,18 @@ impl Guard {
 }
 
 impl BExpr {
-    fn well_defined(&self) -> BExpr {
-        match self {
-            BExpr::Bool(_) => BExpr::Bool(true),
-            BExpr::Rel(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
-            BExpr::Logic(l, _, r) => BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined()),
-            BExpr::Not(e) => BExpr::Not(Box::new(e.well_defined())),
-            BExpr::Quantified(_, _, _) => todo!(),
-        }
-    }
-    fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> BExpr {
+    pub fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> BExpr {
         match self {
             BExpr::Bool(b) => BExpr::Bool(*b),
             BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
             BExpr::Quantified(q, v, e) => {
-                BExpr::Quantified(*q, v.clone(), Box::new(e.subst_var(t, x)))
+                if v.same_name(t) {
+                    self.clone()
+                } else {
+                    BExpr::Quantified(*q, v.clone(), Box::new(e.subst_var(t, x)))
+                }
             }
         }
     }
@@ -193,31 +192,6 @@ impl AExpr {
             AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
             AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
             AExpr::Function(f) => AExpr::Function(f.subst_var(t, x)),
-        }
-    }
-
-    fn well_defined(&self) -> BExpr {
-        match self {
-            AExpr::Number(_) => BExpr::Bool(true),
-            AExpr::Reference(_) => BExpr::Bool(true),
-            AExpr::Binary(l, op, r) => {
-                let p = BExpr::logic(l.well_defined(), LogicOp::And, r.well_defined());
-                match op {
-                    AOp::Plus | AOp::Minus | AOp::Times => p,
-                    AOp::Divide => BExpr::logic(
-                        BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0)),
-                        LogicOp::And,
-                        p,
-                    ),
-                    AOp::Pow => BExpr::logic(
-                        BExpr::Rel(*r.clone(), RelOp::Ge, AExpr::Number(0)),
-                        LogicOp::And,
-                        p,
-                    ),
-                }
-            }
-            AExpr::Minus(e) => e.well_defined(),
-            AExpr::Function(_) => todo!(),
         }
     }
 

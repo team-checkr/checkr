@@ -1,40 +1,26 @@
+use axum::Json;
 use checkr::{
     ast::Commands,
-    env::{
-        graph::{GraphEnv, GraphEnvInput},
-        Analysis, Environment, Markdown,
-    },
+    env::{graph::GraphEnvInput, Analysis, Environment, GraphEnv, Markdown},
+    miette,
     pg::Determinism,
 };
 use serde::{Deserialize, Serialize};
 use tracing::error;
-use tsify::Tsify;
-use wasm_bindgen::prelude::*;
-
-// When the `wee_alloc` feature is enabled, use `wee_alloc` as the global
-// allocator.
-#[cfg(feature = "wee_alloc")]
-#[global_allocator]
-static ALLOC: wee_alloc::WeeAlloc = wee_alloc::WeeAlloc::INIT;
-
-#[wasm_bindgen]
-pub fn init_hook() {
-    console_error_panic_hook::set_once();
-    tracing_wasm::set_as_global_default();
-}
+use typeshare::typeshare;
 
 /// Returns a GCL string given an analysis
-#[wasm_bindgen]
-pub fn generate_program(analysis: Analysis) -> String {
+#[axum::debug_handler]
+pub async fn generate_program(Json(analysis): Json<Analysis>) -> Json<String> {
     let builder = analysis.setup_generation();
-    builder.build().cmds.to_string()
+    builder.build().cmds.to_string().into()
 }
 
 /// Returns a `string` in DOT format
-#[wasm_bindgen]
-pub fn dot(deterministic: bool, src: &str) -> String {
-    let Ok(cmds) = checkr::parse::parse_commands(src) else {
-        return "Parse error".to_string()
+#[axum::debug_handler]
+pub async fn dot(Json((deterministic, src)): Json<(bool, String)>) -> Json<String> {
+    let Ok(cmds) = checkr::parse::parse_commands(&src) else {
+        return "Parse error".to_string().into()
     };
     GraphEnv
         .run(
@@ -48,27 +34,32 @@ pub fn dot(deterministic: bool, src: &str) -> String {
             },
         )
         .dot
+        .into()
 }
 
-#[wasm_bindgen]
-pub fn complete_input_from_json(analysis: Analysis, input_json: String) -> Input {
+#[axum::debug_handler]
+pub async fn complete_input_from_json(
+    Json((analysis, input_json)): Json<(Analysis, String)>,
+) -> Json<Input> {
     let markdown = analysis
         .input_markdown(&input_json)
         .expect("failed to parse given json");
-    Input {
+    Json(Input {
         analysis,
         json: input_json,
         markdown,
-    }
+    })
 }
 
-#[wasm_bindgen]
-pub fn generate_input_for(src: &str, analysis: Analysis) -> Option<Input> {
-    let cmds = match checkr::parse::parse_commands(src) {
+#[axum::debug_handler]
+pub async fn generate_input_for(
+    Json((src, analysis)): Json<(String, Analysis)>,
+) -> Json<Option<Input>> {
+    let cmds = match checkr::parse::parse_commands(&src) {
         Ok(cmds) => cmds,
         Err(err) => {
             error!("Parse error: {:?}", miette::Error::new(err));
-            return None;
+            return None.into();
         }
     };
     let mut rng = Commands::builder().build().rng;
@@ -81,15 +72,16 @@ pub fn generate_input_for(src: &str, analysis: Analysis) -> Option<Input> {
         json,
         markdown,
     })
+    .into()
 }
 
-#[wasm_bindgen]
-pub fn run_analysis(src: &str, input: Input) -> Option<Output> {
-    let cmds = match checkr::parse::parse_commands(src) {
+#[axum::debug_handler]
+pub async fn run_analysis(Json((src, input)): Json<(String, Input)>) -> Json<Option<Output>> {
+    let cmds = match checkr::parse::parse_commands(&src) {
         Ok(cmds) => cmds,
         Err(err) => {
             error!("Parse error: {:?}", miette::Error::new(err));
-            return None;
+            return None.into();
         }
     };
     let json = input
@@ -105,18 +97,19 @@ pub fn run_analysis(src: &str, input: Input) -> Option<Output> {
         json,
         markdown,
     })
+    .into()
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Input {
     analysis: Analysis,
     json: String,
     markdown: Markdown,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize, Tsify)]
-#[tsify(into_wasm_abi, from_wasm_abi)]
+#[typeshare]
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct Output {
     analysis: Analysis,
     json: String,

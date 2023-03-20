@@ -23,8 +23,10 @@ tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 checkr = { path = "./checkr" }
 checko = { path = "./checko" }
-tsify = "0.4.3"
 typeshare = "1.0.0"
+
+[profile.test]
+opt-level = 1
 
 [workspace.metadata.release]
 publish = false

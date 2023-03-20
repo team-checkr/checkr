@@ -1,5 +1,4 @@
 import { defineConfig } from "astro/config";
-import wasm from "vite-plugin-wasm";
 
 // https://astro.build/config
 import tailwind from "@astrojs/tailwind";
@@ -23,15 +22,8 @@ export default defineConfig({
     format: "file",
   },
   vite: {
-    server: {
-      fs: {
-        strict: false,
-        // allow: ["../wasm/pkg"],
-      },
-    },
     build: {
       target: "esnext",
     },
-    plugins: [wasm()],
   },
 });
