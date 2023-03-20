@@ -460,6 +460,14 @@ async fn run() -> color_eyre::Result<()> {
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
 
+    use checkr::smtlib_lowlevel;
+
+    let mut driver = smtlib_lowlevel::Driver::new(smtlib_lowlevel::backend::Z3Static::new()?)?;
+    let result = driver.exec(&smtlib_lowlevel::ast::Command::Echo(
+        "\"Hello world\"".to_string(),
+    ))?;
+    dbg!(result);
+
     tracing_subscriber::Registry::default()
         .with(tracing_error::ErrorLayer::default())
         .with(
