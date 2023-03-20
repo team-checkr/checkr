@@ -35,6 +35,7 @@ use env::{Environment, ValidationResult};
 use generation::Generate;
 pub use miette;
 use rand::prelude::*;
+pub use smtlib_lowlevel;
 use tracing::debug;
 
 use crate::ast::Commands;
