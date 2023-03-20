@@ -42,9 +42,9 @@ impl Display for Command {
             Command::If(guards) => write!(f, "if {}\nfi", guards.iter().format("\n[] ")),
             Command::Loop(guards) => write!(f, "do {}\nod", guards.iter().format("\n[] ")),
             Command::EnrichedLoop(pred, guards) => {
-                write!(f, "do {{{pred}}} {}\nod", guards.iter().format("\n[] "))
+                write!(f, "do {{{pred}}}\n   {}\nod", guards.iter().format("\n[] "))
             }
-            Command::Annotated(p, c, q) => write!(f, "{{{p}}} {c} {{{q}}}"),
+            Command::Annotated(p, c, q) => write!(f, "{{{p}}}\n{c}\n{{{q}}}"),
             Command::Break => write!(f, "break"),
             Command::Continue => write!(f, "continue"),
             Command::Skip => write!(f, "skip"),
