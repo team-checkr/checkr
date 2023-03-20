@@ -1,8 +1,9 @@
-watch-wasm:
-    cd inspectify/wasm; watchexec -w src -e rs "wasm-pack build --dev --target bundler"
-
 watch-web:
     cd inspectify/ui; npm i && npm run dev
+
+watch-inspectify:
+    mkdir -p inspectify/ui/dist/
+    RUST_LOG=debug cargo watch -i inspectify/ui/ -x 'run -p inspectify'
 
 typeshare:
     #!/bin/bash
@@ -13,10 +14,7 @@ typeshare:
         echo "typeshare not run. to run install with 'cargo binstall typeshare-cli'"
     fi
 
-build-wasm:
-    cd inspectify/wasm; wasm-pack build --release --target bundler
-
-build-ui: build-wasm typeshare
+build-ui: typeshare
     cd inspectify/ui; npm i && npm run build
 
 build-inspectify: build-ui

@@ -58,16 +58,11 @@ jobs:
       uses: dtolnay/rust-toolchain@master
       with:
         toolchain: ${{ matrix.rust }}
-        targets: wasm32-unknown-unknown,${{ matrix.target }}
+        targets: ${{ matrix.target }}
 
     - uses: taiki-e/install-action@v2
       with:
         tool: just
-
-    - uses: jetli/wasm-pack-action@v0.4.0
-      with:
-        # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
-        version: 'latest'
 
     - name: Build UI
       run: just build-ui

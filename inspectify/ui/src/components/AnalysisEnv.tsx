@@ -1,6 +1,5 @@
-import React, { useRef } from "react";
-import { useEffect, useState } from "react";
-import * as wasm from "../../../wasm/pkg/wasm";
+import React, { useEffect, useState } from "react";
+import * as core from "../lib/core";
 import deepEqual from "deep-equal";
 import {
   ArrowPathRoundedSquareIcon,
@@ -10,19 +9,23 @@ import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import { parse } from "ansicolor";
 import remarkGfm from "remark-gfm";
-import rehypeRaw from "rehype-raw";
 import {
   Analysis,
   AnalysisResponse,
   CompilationStatus,
   CompilerState,
+  Input,
 } from "../lib/types";
 import { StretchEditor } from "./StretchEditor";
 import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";
 import { capitalCase } from "change-case";
 import { toast, Toaster } from "react-hot-toast";
-
-wasm.init_hook();
+import {
+  QueryClient,
+  QueryClientProvider,
+  useMutation,
+  useQuery,
+} from "react-query";
 
 const searchParams = new URL(document.location.toString()).searchParams;
 
@@ -38,63 +41,52 @@ const ANALYSIS_NAMES = Object.fromEntries(
 
 type GraphShown = "graph" | "reference" | "split";
 
+const queryClient = new QueryClient();
+
 export const AnalysisEnv = () => {
+  return (
+    <QueryClientProvider client={queryClient}>
+      <AnalysisEnvInner />
+    </QueryClientProvider>
+  );
+};
+export const AnalysisEnvInner = () => {
   const [deterministic, setDeterministic] = useState(true);
   const [env, setEnv] = useState<Analysis>(
     inputted.analysis && (ENVS as string[]).includes(inputted.analysis)
       ? (inputted.analysis as Analysis)
       : Analysis.Parse
   );
-  const [src, setSrc] = useState(inputted.src ?? wasm.generate_program(env));
+  const [src, setSrc] = useState(inputted.src ?? "skip");
   const [graphShown, setGraphShown] = useState<GraphShown>("graph");
-  const [dotReference, setDotReference] = useState<null | string>(null);
-  const [dotGraph, setDotGraph] = useState<null | string>(null);
 
-  const [compilationStatus, setCompilationStatus] =
-    useState<null | CompilationStatus>(null);
-  useEffect(() => {
-    const aborts = [] as (() => void)[];
+  const { data: dotReference } = useQuery(
+    ["dot-reference", deterministic, src],
+    async ({}) => core.async_dot(deterministic, src),
+    { keepPreviousData: true }
+  );
 
-    const interval = setInterval(() => {
-      aborts.forEach((a) => a());
-      aborts.slice(0, aborts.length);
-      const { abort, promise } = api.compilationStatus();
-      aborts.push(abort);
-      promise
-        .then((res) => {
-          setCompilationStatus((old) => {
-            if (deepEqual(old, res)) return old;
-            console.log("got new");
-            return res;
-          });
-        })
-        .catch((e) => {
-          if (e.name != "AbortError") console.error("analysis error:", e);
-        });
-    }, 200);
+  const { data: compilationStatus } = useQuery(
+    ["compilationStatus"],
+    ({ signal }) => api.compilationStatus({ signal }),
+    { refetchInterval: 200, isDataEqual: deepEqual }
+  );
 
-    return () => {
-      aborts.forEach((a) => a());
-      aborts.splice(0, aborts.length);
-      clearInterval(interval);
-    };
-  }, []);
+  const { data: dotGraph } = useQuery(
+    [
+      ["dotGraph", compilationStatus?.state, deterministic, src],
+      deterministic,
+      src,
+    ],
+    ({ signal }) =>
+      api.graph(signal, { deterministic, src }).then((res) => res.dot),
+    { keepPreviousData: true }
+  );
 
-  useEffect(() => {
-    setDotReference(wasm.dot(deterministic, src));
-
-    const { abort, promise } = api.graph({ deterministic, src });
-
-    promise
-      .then((res) => {
-        setDotGraph(res.dot ?? null);
-      })
-      .catch((e) => {
-        if (e.name != "AbortError") console.error("analysis error:", e);
-      });
-
-    return () => abort();
-  }, [compilationStatus?.state, deterministic, src]);
+  const generateProgram = useMutation(
+    (env: Analysis) => core.async_generate_program(env),
+    { onSuccess: (data) => setSrc(data) }
+  );
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_2fr] grid-rows-[1fr_auto_auto_1fr]">
@@ -102,9 +94,7 @@ export const AnalysisEnv = () => {
         <div className="grid grid-cols-3 divide-x divide-slate-600 border-r border-slate-600">
           <button
             className="flex items-center justify-center space-x-1 bg-slate-800 py-1 px-1.5 text-sm text-white transition hover:bg-slate-700 active:bg-slate-900"
-            onClick={() => {
-              setSrc(wasm.generate_program(env));
-            }}
+            onClick={() => generateProgram.mutate(env)}
           >
             <span>Generate</span>
             <ArrowPathRoundedSquareIcon className="w-4" />
@@ -142,8 +132,8 @@ export const AnalysisEnv = () => {
         <div className="absolute top-4 right-6 flex flex-col space-y-2">
           {(
             [
-              { graph: "graph", icon: "G", dot: dotGraph },
-              { graph: "reference", icon: "R", dot: dotReference },
+              { graph: "graph", icon: "G", dot: dotGraph ?? "" },
+              { graph: "reference", icon: "R", dot: dotReference ?? "" },
               { graph: "split", icon: "S", dot: null },
             ] satisfies {
               graph: GraphShown;
@@ -196,7 +186,7 @@ export const AnalysisEnv = () => {
           </div>
         )}
       </div>
-      <Env compilationStatus={compilationStatus} env={env} src={src} />
+      <Env compilationStatus={compilationStatus ?? null} env={env} src={src} />
       <Toaster />
     </div>
   );
@@ -216,28 +206,39 @@ type EnvProps = {
   src: string;
 };
 const Env = ({ compilationStatus, env, src }: EnvProps) => {
-  const [input, setInput] = useState<wasm.Input | null>(null);
-  const [output, setOutput] = useState<wasm.Output | null>(null);
+  const [input, setInput] = useState<Input | null>(null);
+  const { data: output } = useQuery(
+    ["runAnalysis", src, input],
+    ({}) => {
+      if (!input) return void 0;
 
-  const realReferenceOutput = output?.markdown ?? "";
+      return core.async_run_analysis(src, input);
+    },
+    {
+      keepPreviousData: true,
+    }
+  );
 
-  const [referenceOutput, setReferenceOutput] = useState(realReferenceOutput);
+  const referenceOutput = output?.markdown ?? "";
+
   const [tab, setTab] = useState<RightTab>("reference");
   const [inFlight, setInFlight] = useState(false);
   const [response, setResponse] = useState<null | AnalysisResponse>(null);
 
-  const realReferenceOutputRef = useRef(realReferenceOutput);
-  realReferenceOutputRef.current = realReferenceOutput;
-
   useEffect(() => {
     if (input || !inputted.input) return;
+    const json = inputted.input;
 
-    try {
-      const fullInput = wasm.complete_input_from_json(env, inputted.input);
-      setInput(fullInput);
-    } catch (e) {
-      console.error(e);
-    }
+    const run = async () => {
+      try {
+        const fullInput = await core.async_complete_input_from_json(env, json);
+        setInput(fullInput);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+
+    run();
   }, [env, input]);
 
   useEffect(() => {
@@ -257,7 +258,8 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
 
     setInFlight(true);
 
-    const { promise, abort } = api.analyze({
+    const controller = new AbortController();
+    const promise = api.analyze(controller.signal, {
       analysis: env,
       input: input.json,
       src,
@@ -267,13 +269,12 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
       .then((res) => {
         setInFlight(false);
         setResponse(res);
-        setReferenceOutput(realReferenceOutputRef.current);
       })
       .catch((e) => {
         if (e.name != "AbortError") console.error("analysis error:", e);
       });
 
-    return () => abort();
+    return () => controller.abort();
   }, [compilationStatus, src, input]);
 
   useEffect(() => {
@@ -281,25 +282,18 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
       (inputted.input ? input : true) &&
       (input ? input.analysis != env : true)
     ) {
-      try {
-        const input = wasm.generate_input_for(src, env);
-        setInput(input ?? null);
-      } catch (e) {
-        console.error(e);
-      }
+      const run = async () => {
+        try {
+          const input = await core.async_generate_input_for(src, env);
+          setInput(input ?? null);
+        } catch (e) {
+          console.error(e);
+        }
+      };
+
+      run();
     }
   }, [env, input, src]);
-
-  useEffect(() => {
-    if (!input) return;
-
-    try {
-      const output = wasm.run_analysis(src, input);
-      setOutput(output ?? null);
-    } catch (e) {
-      console.error(e);
-    }
-  }, [src, env, input]);
 
   const indicatorState =
     inFlight || compilationStatus?.state != CompilerState.Compiled
@@ -318,19 +312,28 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
         : IndicatorState.Error
       : IndicatorState.Error;
 
+  const generateInput = useMutation(
+    ({ src, env }: { src: string; env: Analysis }) =>
+      core.async_generate_input_for(src, env),
+    {
+      onSuccess: (data) => {
+        setInput(data ?? null);
+      },
+    }
+  );
+
   return (
     <>
       <div className="grid place-items-start border-t border-slate-500 bg-slate-800">
         <div className="prose prose-invert px-4 pt-3">
           <ReactMarkdown
             children={input?.markdown ?? ""}
-            rehypePlugins={[rehypeRaw]}
             remarkPlugins={[remarkGfm]}
           />
         </div>
         <button
           className="p-1.5 hover:bg-slate-600 transition text-slate-100 rounded-tr"
-          onClick={() => setInput(wasm.generate_input_for(src, env) ?? null)}
+          onClick={() => generateInput.mutate({ src, env })}
         >
           <ArrowPathRoundedSquareIcon className="w-3" />
         </button>
@@ -360,7 +363,6 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                 <div className="prose prose-invert w-full max-w-none prose-table:w-full">
                   <ReactMarkdown
                     children={response.parsed_markdown ?? ""}
-                    rehypePlugins={[rehypeRaw]}
                     remarkPlugins={[remarkGfm]}
                   />
                 </div>
@@ -394,21 +396,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                 {tab == "reference" ? (
                   <ReactMarkdown
                     children={referenceOutput}
-                    rehypePlugins={[rehypeRaw]}
                     remarkPlugins={[remarkGfm]}
-                    components={{
-                      code: ({ node, ...props }) => {
-                        // if (props.className?.includes("predicate")) {
-                        //   const predicate = React.Children.toArray(children)
-                        //     .map((x) => x.toString())
-                        //     .join(" ");
-                        //   return <PredicateEvaluation predicate={predicate} />;
-                        //   // return <code {...props}>{children} ✅❌⏳</code>;
-                        // } else {
-                        return <code {...props} />;
-                        // }
-                      },
-                    }}
                   />
                 ) : tab == "stderr" ? (
                   <pre className="whitespace-pre-wrap">

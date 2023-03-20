@@ -1,4 +1,3 @@
-import type * as wasm from "../../../wasm/pkg";
 import {
   Analysis,
   AnalysisRequest,
@@ -8,59 +7,50 @@ import {
   GraphResponse,
 } from "./types";
 
-export const analyze = (req: {
-  analysis: wasm.Analysis;
-  input: string;
-  src: string;
-}): { abort: () => void; promise: Promise<AnalysisResponse> } => {
+const request = async <T>(
+  signal: AbortSignal | null,
+  name: string,
+  body: unknown
+): Promise<T> => {
+  const headers = new Headers();
+  headers.append("Content-Type", "application/json");
+
+  const req = await fetch(`http://localhost:3000/${name}`, {
+    method: "POST",
+    headers,
+    body: JSON.stringify(body),
+    signal,
+  });
+  return req.json();
+};
+
+export const analyze = (
+  signal: AbortSignal | void,
+  req: {
+    analysis: Analysis;
+    input: string;
+    src: string;
+  }
+): Promise<AnalysisResponse> => {
   const internalRequest = {
     analysis: Analysis[req.analysis],
     input: req.input,
     src: req.src,
   } satisfies AnalysisRequest;
-  const headers = new Headers();
-  headers.append("Content-Type", "application/json");
-
-  const controller = new AbortController();
-
-  const promise = fetch("http://localhost:3000/analyze", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(internalRequest),
-    signal: controller.signal,
-  }).then((res) => res.json());
-
-  return { abort: () => controller.abort(), promise };
+  return request(signal ?? null, "analyze", internalRequest);
 };
 
 export const graph = (
+  signal: AbortSignal | undefined,
   req: GraphRequest
-): { abort: () => void; promise: Promise<GraphResponse> } => {
-  const headers = new Headers();
-  headers.append("Content-Type", "application/json");
+): Promise<GraphResponse> => request(signal ?? null, "graph", req);
 
-  const controller = new AbortController();
-
-  const promise = fetch("http://localhost:3000/graph", {
-    method: "POST",
-    headers,
-    body: JSON.stringify(req),
-    signal: controller.signal,
-  }).then((res) => res.json());
-
-  return { abort: () => controller.abort(), promise };
-};
-
-export const compilationStatus = (): {
-  abort: () => void;
-  promise: Promise<CompilationStatus>;
-} => {
-  const controller = new AbortController();
-
-  const promise = fetch("http://localhost:3000/compilation-status", {
+export const compilationStatus = ({
+  signal = null,
+}: {
+  signal: AbortSignal | null | undefined;
+}): Promise<CompilationStatus> =>
+  fetch("http://localhost:3000/compilation-status", {
     method: "GET",
-    signal: controller.signal,
+    signal,
   }).then((res) => res.json());
-
-  return { abort: () => controller.abort(), promise };
-};

@@ -38,11 +38,6 @@ async fn run() -> Result<()> {
         uses: taiki-e/install-action@v2
         with:
           tool: just
-      - name: Install wasm-pack
-        uses: jetli/wasm-pack-action@v0.4.0
-        with:
-          # Optional version of wasm-pack to install(eg. 'v0.9.1', 'latest')
-          version: 'latest'
       - name: Build UI
         run: just build-ui"#;
 
@@ -58,12 +53,7 @@ async fn run() -> Result<()> {
             let ci = ci
                 .replace(
                     "rustup update stable && rustup default stable",
-                    &[
-                        "rustup update nightly",
-                        "rustup default nightly",
-                        "rustup target add wasm32-unknown-unknown",
-                    ]
-                    .join(" && "),
+                    &["rustup update nightly", "rustup default nightly"].join(" && "),
                 )
                 .trim_end()
                 .to_string()

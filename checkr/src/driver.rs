@@ -21,7 +21,7 @@ pub struct Driver {
 pub enum DriverError {
     #[error("running compile failed")]
     RunCompile(#[source] std::io::Error),
-    #[error("failed to compile:\n  {}", std::str::from_utf8(&_0.stdout).unwrap())]
+    #[error("failed to compile:\n  {}\n\n  {}", std::str::from_utf8(&_0.stdout).unwrap(), std::str::from_utf8(&_0.stderr).unwrap())]
     CompileFailure(std::process::Output),
 }
 

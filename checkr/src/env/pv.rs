@@ -1,7 +1,9 @@
+use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     ast::{BExpr, Commands},
+    egg::EquivChecker,
     generation::Generate,
 };
 
@@ -46,11 +48,9 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
             .set_header(["Verification conditions"]);
 
+        // r#"<code class="predicate">`{}`</code>"#,
         table.add_rows(self.verification_conditions.iter().map(|vc| {
-            [format!(
-                r#"<code class="predicate">`{}`</code>"#,
-                crate::parse::parse_predicate(vc).unwrap()
-            )]
+            [format!("`{}`", crate::parse::parse_predicate(vc).unwrap()).replace('|', "\\|")]
         }));
 
         format!("{table}").into()
@@ -73,6 +73,8 @@ impl Environment for ProgramVerificationEnv {
     const ANALYSIS: Analysis = Analysis::ProgramVerification;
 
     fn setup_generation(&self) -> crate::ProgramGenerationBuilder {
+        crate::ast::Command::reset_sp_counter();
+
         crate::ProgramGenerationBuilder::default()
             .no_loop(true)
             .generate_annotated(true)
@@ -94,7 +96,77 @@ impl Environment for ProgramVerificationEnv {
         input: &Self::Input,
         output: &Self::Output,
     ) -> super::ValidationResult {
-        // let reference = self.run(cmds, input);
+        let reference = self.run(cmds, input);
+        let ref_vc: Result<Vec<_>, _> = reference
+            .verification_conditions
+            .iter()
+            .map(|vc| crate::parse::parse_predicate(vc).map(|pred| pred.renumber_quantifiers()))
+            .collect();
+        let rel_vc: Result<Vec<_>, _> = output
+            .verification_conditions
+            .iter()
+            .map(|vc| crate::parse::parse_predicate(vc).map(|pred| pred.renumber_quantifiers()))
+            .collect();
+
+        let ref_vc = match ref_vc {
+            Ok(ref_vc) => ref_vc,
+            Err(err) => {
+                return ValidationResult::Mismatch {
+                    reason: format!("failed to parse verification conditions: {err}"),
+                }
+            }
+        };
+        let rel_vc = match rel_vc {
+            Ok(rel_vc) => rel_vc,
+            Err(err) => {
+                return ValidationResult::Mismatch {
+                    reason: format!("failed to parse verification conditions: {err}"),
+                }
+            }
+        };
+
+        if ref_vc.len() != rel_vc.len() {
+            return ValidationResult::Mismatch {
+                reason: format!(
+                    "produced '{}' verification conditions, expected '{}'",
+                    rel_vc.len(),
+                    ref_vc.len()
+                ),
+            };
+        }
+
+        let mut checker = EquivChecker::default();
+
+        let mut ref_exprs = ref_vc.iter().map(|vc| checker.register(vc)).collect_vec();
+        let mut rel_exprs = rel_vc.iter().map(|vc| checker.register(vc)).collect_vec();
+
+        checker.run();
+
+        ref_exprs.retain(|ref_e| {
+            if let Some(rel_idx) = rel_exprs
+                .iter()
+                .position(|rel_e| checker.are_equivalent(ref_e, rel_e))
+            {
+                rel_exprs.remove(rel_idx);
+                false
+            } else {
+                true
+            }
+        });
+
+        if ref_exprs.is_empty() {
+            ValidationResult::CorrectTerminated
+        } else {
+            ValidationResult::Mismatch {
+                reason: format!(
+                    "{}. Left in the reference were [{}] and left in the given were [{}]",
+                    "some verification conditions were not found",
+                    ref_exprs.iter().format(", "),
+                    rel_exprs.iter().format(", "),
+                ),
+            }
+        }
+
         // let a = crate::parse::parse_bexpr(&reference.pre_condition).unwrap();
         // let b = crate::parse::parse_bexpr(&output.pre_condition)
         //     .expect("could not parse pre-condition");
@@ -113,7 +185,5 @@ impl Environment for ProgramVerificationEnv {
         //         };
         //     }
         // }
-
-        ValidationResult::CorrectTerminated
     }
 }
