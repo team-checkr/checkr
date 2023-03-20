@@ -58,6 +58,7 @@ pub struct ProgramGenerationBuilder {
     fuel: Option<u32>,
     seed: Option<u64>,
     no_loop: bool,
+    generate_annotated: bool,
 }
 
 impl Commands {
@@ -76,6 +77,13 @@ impl ProgramGenerationBuilder {
     pub fn no_loop(self, no_loop: bool) -> Self {
         ProgramGenerationBuilder { no_loop, ..self }
     }
+
+    pub fn generate_annotated(self, generate_annotated: bool) -> ProgramGenerationBuilder {
+        ProgramGenerationBuilder {
+            generate_annotated,
+            ..self
+        }
+    }
     fn internal_build(self, cmds: Option<Commands>) -> GeneratedProgram {
         let seed = match self.seed {
             Some(seed) => seed,
@@ -88,8 +96,15 @@ impl ProgramGenerationBuilder {
         let mut cx = generation::Context::new(fuel, &mut rng);
         cx.set_no_loop(self.no_loop);
 
+        let cmds = cmds.unwrap_or_else(|| Commands(cx.many(5, 10, &mut rng)));
+        let cmds = if self.generate_annotated {
+            Commands(vec![generation::annotate_cmds(cmds, &mut rng)])
+        } else {
+            cmds
+        };
+
         GeneratedProgram {
-            cmds: cmds.unwrap_or_else(|| Commands(cx.many(5, 10, &mut rng))),
+            cmds,
             fuel,
             seed,
             rng,

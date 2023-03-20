@@ -1,16 +1,11 @@
-use rand::{rngs::SmallRng, SeedableRng};
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{AExpr, BExpr, Command, Commands, LogicOp, RelOp},
+    ast::{BExpr, Commands},
     generation::Generate,
-    sign::Sign,
 };
 
-use super::{
-    interpreter::InterpreterInput, sign::SignAnalysisInput, Analysis, Environment, Markdown,
-    SignEnv, ToMarkdown, ValidationResult,
-};
+use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct ProgramVerificationEnv;
@@ -51,25 +46,12 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
             .load_preset(comfy_table::presets::ASCII_MARKDOWN)
             .set_header(["Verification conditions"]);
 
-        table.add_rows(
-            self.verification_conditions
-                .iter()
-                .map(|vc| [format!("`{}`", crate::parse::parse_predicate(vc).unwrap())]),
-        );
-        // table.add_row([camillaify(&format!(
-        //     "``",
-        //     crate::parse::parse_bexpr(&self.pre_condition)
-        //         .unwrap()
-        //         .simplify(),
-        // ))]);
-        // table.add_row([camillaify(&format!(
-        //     "`WP = {} {{{}}}`",
-        //     crate::parse::parse_bexpr(&self.pre_condition)
-        //         .unwrap()
-        //         .simplify()
-        //         .to_string(),
-        //     self.pre_condition
-        // ))]);
+        table.add_rows(self.verification_conditions.iter().map(|vc| {
+            [format!(
+                r#"<code class="predicate">`{}`</code>"#,
+                crate::parse::parse_predicate(vc).unwrap()
+            )]
+        }));
 
         format!("{table}").into()
     }
@@ -78,46 +60,8 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
 impl Generate for ProgramVerificationEnvInput {
     type Context = Commands;
 
-    fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        let input = SignAnalysisInput::gen(cx, rng);
-        let sign_result = SignEnv.run(cx, &input);
-
-        let final_assignment = &sign_result.nodes[&sign_result.final_node];
-
-        let final_signs = final_assignment
-            .iter()
-            .filter_map(|world| {
-                world
-                    .variables
-                    .iter()
-                    .map(|(v, s)| match s {
-                        Sign::Positive => BExpr::Rel(
-                            AExpr::Reference(v.clone().into()),
-                            RelOp::Gt,
-                            AExpr::Number(0),
-                        ),
-                        Sign::Zero => BExpr::Rel(
-                            AExpr::Reference(v.clone().into()),
-                            RelOp::Eq,
-                            AExpr::Number(0),
-                        ),
-                        Sign::Negative => BExpr::Rel(
-                            AExpr::Reference(v.clone().into()),
-                            RelOp::Lt,
-                            AExpr::Number(0),
-                        ),
-                    })
-                    .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
-            })
-            .reduce(|a, b| BExpr::logic(a, LogicOp::Or, b))
-            .unwrap_or(BExpr::Bool(true));
-
-        Self {
-            // post_condition: BExpr::Bool(true).to_string(),
-            // post_condition: BExpr::gen(&mut crate::generation::Context::new(10, rng), rng)
-            //     .to_string(),
-            // post_condition: final_signs.to_string(),
-        }
+    fn gen<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
+        Self {}
     }
 }
 
@@ -129,14 +73,12 @@ impl Environment for ProgramVerificationEnv {
     const ANALYSIS: Analysis = Analysis::ProgramVerification;
 
     fn setup_generation(&self) -> crate::ProgramGenerationBuilder {
-        crate::ProgramGenerationBuilder::default().no_loop(true)
+        crate::ProgramGenerationBuilder::default()
+            .no_loop(true)
+            .generate_annotated(true)
     }
 
     fn run(&self, cmds: &Commands, _: &Self::Input) -> Self::Output {
-        // let (p, q) = match &cmds.0[0] {
-        //     Command::Annotated(p, _, q) => (p, q),
-        //     _ => todo!(),
-        // };
         let verification_conditions = cmds.vc(&BExpr::Bool(true));
         ProgramVerificationEnvOutput {
             verification_conditions: verification_conditions

@@ -9,6 +9,7 @@ pub struct Context {
     recursion_limit: u32,
     negation_limit: u32,
     no_loops: bool,
+    no_division: bool,
     names: Vec<String>,
 }
 
@@ -19,12 +20,17 @@ impl Context {
             recursion_limit: fuel,
             negation_limit: fuel,
             no_loops: false,
+            no_division: false,
             names: ["a", "b", "c", "d"].map(Into::into).to_vec(),
         }
     }
 
     pub fn set_no_loop(&mut self, no_loops: bool) -> &mut Self {
         self.no_loops = no_loops;
+        self
+    }
+    pub fn set_no_division(&mut self, no_division: bool) -> &mut Self {
+        self.no_division = no_division;
         self
     }
 
@@ -102,6 +108,47 @@ impl Generate for Commands {
 
     fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         Commands(cx.many(1, 10, rng))
+    }
+}
+
+pub fn annotate_cmds<R: Rng>(mut cmds: Commands, rng: &mut R) -> Command {
+    use crate::{
+        env::{
+            sign::{SignAnalysisInput, SignEnv},
+            Environment,
+        },
+        sign::{Memory, Sign, Signs},
+    };
+    use std::collections::HashSet;
+
+    let input = SignAnalysisInput::gen(&mut cmds, rng);
+    let sign_result = SignEnv.run(&cmds, &input);
+
+    let pre = signs_in(&sign_result.nodes[&sign_result.initial_node]);
+    let post = signs_in(&sign_result.nodes[&sign_result.final_node]);
+
+    return Command::Annotated(pre, cmds, post);
+
+    fn signs_in(assignment: &HashSet<Memory<Sign, Signs>>) -> BExpr {
+        assignment
+            .iter()
+            .filter_map(|world| {
+                world
+                    .variables
+                    .iter()
+                    .map(|(v, s)| {
+                        let v = AExpr::Reference(v.clone().into());
+                        let op = match s {
+                            Sign::Positive => RelOp::Gt,
+                            Sign::Zero => RelOp::Eq,
+                            Sign::Negative => RelOp::Lt,
+                        };
+                        BExpr::Rel(v, op, AExpr::Number(0))
+                    })
+                    .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
+            })
+            .reduce(|a, b| BExpr::logic(a, LogicOp::Or, b))
+            .unwrap_or(BExpr::Bool(true))
     }
 }
 
@@ -185,7 +232,10 @@ impl Generate for AOp {
                 (0.4, Box::new(|_, _| AOp::Minus)),
                 (0.4, Box::new(|_, _| AOp::Times)),
                 (0.1, Box::new(|_, _| AOp::Pow)),
-                (0.3, Box::new(|_, _| AOp::Divide)),
+                (
+                    if cx.no_division { 0.0 } else { 0.3 },
+                    Box::new(|_, _| AOp::Divide),
+                ),
             ],
         )
     }

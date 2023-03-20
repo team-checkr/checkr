@@ -10,6 +10,7 @@ import * as api from "../lib/api";
 import ReactMarkdown from "react-markdown";
 import { parse } from "ansicolor";
 import remarkGfm from "remark-gfm";
+import rehypeRaw from "rehype-raw";
 import {
   Analysis,
   AnalysisResponse,
@@ -323,6 +324,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
         <div className="prose prose-invert px-4 pt-3">
           <ReactMarkdown
             children={input?.markdown ?? ""}
+            rehypePlugins={[rehypeRaw]}
             remarkPlugins={[remarkGfm]}
           />
         </div>
@@ -358,6 +360,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                 <div className="prose prose-invert w-full max-w-none prose-table:w-full">
                   <ReactMarkdown
                     children={response.parsed_markdown ?? ""}
+                    rehypePlugins={[rehypeRaw]}
                     remarkPlugins={[remarkGfm]}
                   />
                 </div>
@@ -391,7 +394,21 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                 {tab == "reference" ? (
                   <ReactMarkdown
                     children={referenceOutput}
+                    rehypePlugins={[rehypeRaw]}
                     remarkPlugins={[remarkGfm]}
+                    components={{
+                      code: ({ node, ...props }) => {
+                        // if (props.className?.includes("predicate")) {
+                        //   const predicate = React.Children.toArray(children)
+                        //     .map((x) => x.toString())
+                        //     .join(" ");
+                        //   return <PredicateEvaluation predicate={predicate} />;
+                        //   // return <code {...props}>{children} ✅❌⏳</code>;
+                        // } else {
+                        return <code {...props} />;
+                        // }
+                      },
+                    }}
                   />
                 ) : tab == "stderr" ? (
                   <pre className="whitespace-pre-wrap">
@@ -419,6 +436,19 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
       )}
     </>
   );
+};
+
+const PredicateEvaluation = ({ predicate }: { predicate: string }) => {
+  useEffect(() => {
+    const run = async () => {
+      const result = await import("../lib/z3");
+      console.log({ result });
+    };
+
+    run();
+  });
+
+  return <code>{predicate} ✅❌⏳</code>;
 };
 
 const AnsiSpans = ({ code }: { code: string }) => (
