@@ -1,3 +1,5 @@
+import { useEffect, useState } from "react";
+import type { QueryClient } from "react-query";
 import {
   Analysis,
   AnalysisRequest,
@@ -45,12 +47,54 @@ export const graph = (
   req: GraphRequest
 ): Promise<GraphResponse> => request(signal ?? null, "graph", req);
 
-export const compilationStatus = ({
-  signal = null,
+export const useCompilationStatus = ({
+  queryClient,
 }: {
-  signal: AbortSignal | null | undefined;
-}): Promise<CompilationStatus> =>
-  fetch("http://localhost:3000/compilation-status", {
-    method: "GET",
-    signal,
-  }).then((res) => res.json());
+  queryClient: QueryClient;
+}) => {
+  const [state, setState] = useState<CompilationStatus | null>(null);
+
+  useEffect(() => {
+    let ws: WebSocket | null = null;
+    let timeout: number = 0;
+
+    const connect = () => {
+      ws = new WebSocket("ws://localhost:3000/compilation-ws");
+
+      ws.onopen = () => {
+        console.info("WebSocket opened up!");
+      };
+
+      ws.onclose = () => {
+        console.info("WebSocket closed!");
+
+        setState({
+          compiled_at: 0,
+          state: { type: "Compiling", content: void 0 },
+        });
+
+        window.clearTimeout(timeout);
+        timeout = window.setTimeout(connect, 1000);
+      };
+
+      ws.onmessage = (rawMsg) => {
+        if (!(typeof rawMsg.data == "string")) return;
+        const msg = JSON.parse(rawMsg.data);
+        setState(msg);
+      };
+
+      return () => {
+        if (ws) ws.close();
+        if (timeout) window.clearTimeout(timeout);
+      };
+    };
+
+    const close = connect();
+
+    return () => {
+      close();
+    };
+  }, [queryClient]);
+
+  return state;
+};

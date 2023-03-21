@@ -1,6 +1,5 @@
 import React, { useEffect, useState } from "react";
 import * as core from "../lib/core";
-import deepEqual from "deep-equal";
 import {
   ArrowPathRoundedSquareIcon,
   ClipboardDocumentIcon,
@@ -13,7 +12,6 @@ import {
   Analysis,
   AnalysisResponse,
   CompilationStatus,
-  CompilerState,
   Input,
 } from "../lib/types";
 import { StretchEditor } from "./StretchEditor";
@@ -66,15 +64,7 @@ export const AnalysisEnvInner = () => {
     { keepPreviousData: true }
   );
 
-  const { data: compilationStatus } = useQuery(
-    ["compilationStatus"],
-    ({ signal }) =>
-      api.compilationStatus({ signal }).then((res) => {
-        console.info(res);
-        return res;
-      }),
-    { refetchInterval: 200, isDataEqual: deepEqual }
-  );
+  const compilationStatus = api.useCompilationStatus({ queryClient });
 
   const { data: dotGraph } = useQuery(
     [
@@ -297,7 +287,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
 
       run();
     }
-  }, [env, input, src]);
+  }, [env, compilationStatus, input, src]);
 
   const indicatorState = computeIndicatorState({
     inFlight,
@@ -349,7 +339,9 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
           }
         >
           <div className="w-full space-y-2 px-4 py-2">
-            <h3 className="text-lg font-bold italic text-white">Error</h3>
+            <h3 className="text-lg font-bold italic text-white">
+              Compilation Error
+            </h3>
             <div className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full">
               <pre className="whitespace-pre-wrap">
                 <AnsiSpans code={compilationStatus.state.content.stdout} />

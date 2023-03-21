@@ -1,7 +1,10 @@
 use std::time::Duration;
 
 use axum::{
-    extract::State,
+    extract::{
+        ws::{self, WebSocket},
+        State, WebSocketUpgrade,
+    },
     http::{header::CONTENT_TYPE, HeaderValue, Method, StatusCode},
     response::{Html, IntoResponse},
     routing::{get, post, IntoMakeService},
@@ -11,6 +14,7 @@ use checkr::{
     env::{graph::GraphEnvInput, Analysis, GraphEnv, Markdown},
     pg::Determinism,
 };
+use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 use tracing::error;
@@ -21,7 +25,7 @@ pub fn router(state: ApplicationState) -> IntoMakeService<Router<()>> {
     Router::new()
         .route("/analyze", post(analyze))
         .route("/graph", post(graph))
-        .route("/compilation-status", get(get_compilation_status))
+        .route("/compilation-ws", get(compilation_ws))
         .route("/core/generate_program", post(core::generate_program))
         .route("/core/dot", post(core::dot))
         .route(
@@ -72,10 +76,37 @@ pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoRespon
     }
 }
 
-pub async fn get_compilation_status(
+async fn compilation_ws(
+    ws: WebSocketUpgrade,
     State(state): State<ApplicationState>,
-) -> Json<CompilationStatus> {
-    Json(state.compilation_status.lock().await.clone())
+) -> impl IntoResponse {
+    ws.on_upgrade(|socket| websocket(socket, state))
+}
+
+async fn websocket(stream: WebSocket, state: ApplicationState) {
+    let (mut sender, _rx) = stream.split();
+
+    let mut rx = state.compilation.stream.subscribe();
+
+    tokio::spawn(async move {
+        let prepare = move |status: &CompilationStatus| {
+            ws::Message::Text(serde_json::to_string(status).unwrap())
+        };
+
+        if sender
+            .send(prepare(&*state.compilation.status.lock().await))
+            .await
+            .is_err()
+        {
+            return;
+        }
+
+        while let Ok(status) = rx.recv().await {
+            if sender.send(prepare(&status)).await.is_err() {
+                break;
+            }
+        }
+    });
 }
 
 #[typeshare::typeshare]
@@ -94,6 +125,7 @@ pub async fn graph(
     Json(body): Json<GraphRequest>,
 ) -> Json<GraphResponse> {
     match state
+        .compilation
         .driver
         .lock()
         .await
@@ -136,7 +168,7 @@ pub async fn analyze(
     Json(body): Json<AnalysisRequest>,
 ) -> Json<AnalysisResponse> {
     let cmds = body.src;
-    let driver = state.driver.lock().await;
+    let driver = state.compilation.driver.lock().await;
     let output = match driver
         .exec_dyn_raw_cmds(&body.analysis, &cmds, &body.input)
         .await

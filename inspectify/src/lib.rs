@@ -2,12 +2,8 @@ pub mod compilation;
 mod core;
 pub mod routes;
 
-use std::sync::Arc;
-
-use checkr::driver::Driver;
 use compilation::CompilationStatus;
 use serde::{Deserialize, Serialize};
-use tokio::sync::Mutex;
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
@@ -36,8 +32,7 @@ impl From<checkr::env::ValidationResult> for ValidationResult {
 
 #[derive(Clone)]
 pub struct ApplicationState {
-    pub driver: Arc<Mutex<Driver>>,
-    pub compilation_status: Arc<Mutex<CompilationStatus>>,
+    pub compilation: compilation::Compilation,
 }
 
 pub async fn do_self_update() -> color_eyre::Result<()> {
