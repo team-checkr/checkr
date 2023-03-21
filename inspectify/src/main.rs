@@ -1,11 +1,7 @@
 use clap::Parser;
 use color_eyre::eyre::Context;
-use inspectify::{
-    compilation::{self, CompilationStatus},
-    do_self_update, ApplicationState,
-};
-use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
-use tokio::sync::Mutex;
+use inspectify::{compilation::Compilation, do_self_update, ApplicationState};
+use std::{net::SocketAddr, path::PathBuf, time::Duration};
 use tracing_subscriber::prelude::*;
 
 #[tokio::main]
@@ -61,16 +57,9 @@ async fn run() -> color_eyre::Result<()> {
     let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
         .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
-    let driver = compilation::initialize_driver(&cli.dir, &run)?;
-    let driver = Arc::new(Mutex::new(driver));
-    let compilation_status = Arc::new(Mutex::new(CompilationStatus::compiled()));
+    let compilation = Compilation::initialize(cli.dir, run)?;
 
-    compilation::spawn_watcher(&driver, &compilation_status, cli.dir, run)?;
-
-    let app = inspectify::routes::router(ApplicationState {
-        driver,
-        compilation_status,
-    });
+    let app = inspectify::routes::router(ApplicationState { compilation });
     // NOTE: Enable for HTTP logging
     // .layer(TraceLayer::new_for_http());
 
