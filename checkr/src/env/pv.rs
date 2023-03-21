@@ -2,7 +2,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{BExpr, Commands},
+    ast::{BExpr, Commands, Predicate},
     egg::EquivChecker,
     generation::Generate,
 };
@@ -17,7 +17,32 @@ pub struct ProgramVerificationEnvInput {}
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct ProgramVerificationEnvOutput {
-    pub verification_conditions: Vec<String>,
+    pub verification_conditions: Vec<SerializedPredicate>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct SerializedPredicate {
+    predicate: String,
+}
+
+impl From<Predicate> for SerializedPredicate {
+    fn from(value: Predicate) -> Self {
+        SerializedPredicate {
+            predicate: value.to_string(),
+        }
+    }
+}
+impl From<&'_ Predicate> for SerializedPredicate {
+    fn from(value: &'_ Predicate) -> Self {
+        SerializedPredicate {
+            predicate: value.to_string(),
+        }
+    }
+}
+impl SerializedPredicate {
+    pub fn parse(&self) -> Result<Predicate, crate::parse::ParseError> {
+        crate::parse::parse_predicate(&self.predicate)
+    }
 }
 
 fn camillaify(s: &str) -> String {
@@ -49,9 +74,11 @@ impl ToMarkdown for ProgramVerificationEnvOutput {
             .set_header(["Verification conditions"]);
 
         // r#"<code class="predicate">`{}`</code>"#,
-        table.add_rows(self.verification_conditions.iter().map(|vc| {
-            [format!("`{}`", crate::parse::parse_predicate(vc).unwrap()).replace('|', "\\|")]
-        }));
+        table.add_rows(
+            self.verification_conditions
+                .iter()
+                .map(|vc| [format!("`{}`", vc.parse().unwrap()).replace('|', "\\|")]),
+        );
 
         format!("{table}").into()
     }
@@ -77,16 +104,14 @@ impl Environment for ProgramVerificationEnv {
 
         crate::ProgramGenerationBuilder::default()
             .no_loop(true)
+            .no_division(true)
             .generate_annotated(true)
     }
 
     fn run(&self, cmds: &Commands, _: &Self::Input) -> Self::Output {
         let verification_conditions = cmds.vc(&BExpr::Bool(true));
         ProgramVerificationEnvOutput {
-            verification_conditions: verification_conditions
-                .iter()
-                .map(|vc| vc.to_string())
-                .collect(),
+            verification_conditions: verification_conditions.iter().map(|vc| vc.into()).collect(),
         }
     }
 
@@ -100,12 +125,12 @@ impl Environment for ProgramVerificationEnv {
         let ref_vc: Result<Vec<_>, _> = reference
             .verification_conditions
             .iter()
-            .map(|vc| crate::parse::parse_predicate(vc).map(|pred| pred.renumber_quantifiers()))
+            .map(|vc| vc.parse().map(|pred| pred.renumber_quantifiers()))
             .collect();
         let rel_vc: Result<Vec<_>, _> = output
             .verification_conditions
             .iter()
-            .map(|vc| crate::parse::parse_predicate(vc).map(|pred| pred.renumber_quantifiers()))
+            .map(|vc| vc.parse().map(|pred| pred.renumber_quantifiers()))
             .collect();
 
         let ref_vc = match ref_vc {

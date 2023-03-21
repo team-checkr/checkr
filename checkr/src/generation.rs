@@ -10,6 +10,7 @@ pub struct Context {
     negation_limit: u32,
     no_loops: bool,
     no_division: bool,
+    no_unary_minus: bool,
     names: Vec<String>,
 }
 
@@ -21,6 +22,7 @@ impl Context {
             negation_limit: fuel,
             no_loops: false,
             no_division: false,
+            no_unary_minus: false,
             names: ["a", "b", "c", "d"].map(Into::into).to_vec(),
         }
     }
@@ -31,6 +33,10 @@ impl Context {
     }
     pub fn set_no_division(&mut self, no_division: bool) -> &mut Self {
         self.no_division = no_division;
+        self
+    }
+    pub fn set_no_unary_minus(&mut self, no_unary_minus: bool) -> &mut Self {
+        self.no_unary_minus = no_unary_minus;
         self
     }
 

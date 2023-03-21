@@ -35,7 +35,6 @@ use env::{Environment, ValidationResult};
 use generation::Generate;
 pub use miette;
 use rand::prelude::*;
-pub use smtlib_lowlevel;
 use tracing::debug;
 
 use crate::ast::Commands;
@@ -60,6 +59,7 @@ pub struct ProgramGenerationBuilder {
     fuel: Option<u32>,
     seed: Option<u64>,
     no_loop: bool,
+    no_division: bool,
     generate_annotated: bool,
 }
 
@@ -79,6 +79,12 @@ impl ProgramGenerationBuilder {
     pub fn no_loop(self, no_loop: bool) -> Self {
         ProgramGenerationBuilder { no_loop, ..self }
     }
+    pub fn no_division(self, no_division: bool) -> Self {
+        ProgramGenerationBuilder {
+            no_division,
+            ..self
+        }
+    }
 
     pub fn generate_annotated(self, generate_annotated: bool) -> ProgramGenerationBuilder {
         ProgramGenerationBuilder {
@@ -96,7 +102,8 @@ impl ProgramGenerationBuilder {
         let fuel = self.fuel.unwrap_or(10);
 
         let mut cx = generation::Context::new(fuel, &mut rng);
-        cx.set_no_loop(self.no_loop);
+        cx.set_no_loop(self.no_loop)
+            .set_no_division(self.no_division);
 
         let cmds = cmds.unwrap_or_else(|| Commands(cx.many(5, 10, &mut rng)));
         let cmds = if self.generate_annotated {
