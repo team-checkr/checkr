@@ -26,7 +26,9 @@ const { title } = Astro.props;
 </html>
 <style is:global>
   .prose :not(pre) > code {
-    @apply whitespace-nowrap;
+    /* TODO: There are some cases where this is nice, but in PV for example the
+            predicates get way too long and they need to be broken up */
+    /* @apply whitespace-nowrap; */
   }
   .prose code::before {
     content: "";

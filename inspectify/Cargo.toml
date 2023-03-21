@@ -19,6 +19,7 @@ color-eyre = { workspace = true }
 crossterm = "0.26.0"
 glob = "0.3.1"
 include_dir = { version = "0.7.3" }
+indicatif = "0.17.3"
 itertools = { workspace = true }
 mime = "0.3.16"
 mime_guess = "2.0.4"
