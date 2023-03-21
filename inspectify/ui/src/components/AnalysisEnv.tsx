@@ -68,7 +68,11 @@ export const AnalysisEnvInner = () => {
 
   const { data: compilationStatus } = useQuery(
     ["compilationStatus"],
-    ({ signal }) => api.compilationStatus({ signal }),
+    ({ signal }) =>
+      api.compilationStatus({ signal }).then((res) => {
+        console.info(res);
+        return res;
+      }),
     { refetchInterval: 200, isDataEqual: deepEqual }
   );
 
@@ -245,7 +249,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
     if (
       !input ||
       !compilationStatus ||
-      compilationStatus.state != CompilerState.Compiled
+      compilationStatus.state.type != "Compiled"
     )
       return;
 
@@ -295,22 +299,11 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
     }
   }, [env, input, src]);
 
-  const indicatorState =
-    inFlight || compilationStatus?.state != CompilerState.Compiled
-      ? IndicatorState.Working
-      : response
-      ? response.validation_result
-        ? response.validation_result.type == "CorrectTerminated"
-          ? IndicatorState.Correct
-          : response.validation_result.type == "CorrectNonTerminated"
-          ? IndicatorState.Correct
-          : response.validation_result.type == "Mismatch"
-          ? IndicatorState.Mismatch
-          : response.validation_result.type == "TimeOut"
-          ? IndicatorState.TimeOut
-          : IndicatorState.Working
-        : IndicatorState.Error
-      : IndicatorState.Error;
+  const indicatorState = computeIndicatorState({
+    inFlight,
+    compilationStatus,
+    response,
+  });
 
   const generateInput = useMutation(
     ({ src, env }: { src: string; env: Analysis }) =>
@@ -348,7 +341,31 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
           <Indicator state={indicatorState} />
         </div>
       </div>
-      {response ? (
+      {compilationStatus?.state.type == "CompileError" ? (
+        <div
+          className={
+            "relative col-span-2 grid grid-cols-2 transition duration-700 " +
+            (inFlight ? "blur-sm delay-100" : "")
+          }
+        >
+          <div className="w-full space-y-2 px-4 py-2">
+            <h3 className="text-lg font-bold italic text-white">Error</h3>
+            <div className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full">
+              <pre className="whitespace-pre-wrap">
+                <AnsiSpans code={compilationStatus.state.content.stdout} />
+              </pre>
+            </div>
+          </div>
+          <div className="w-full space-y-2 px-4 py-2">
+            <h3 className="text-lg font-bold italic text-transparent">Error</h3>
+            <div className="prose prose-invert w-full max-w-none prose-pre:whitespace-pre-wrap prose-table:w-full">
+              <pre className="whitespace-pre-wrap">
+                <AnsiSpans code={compilationStatus.state.content.stderr} />
+              </pre>
+            </div>
+          </div>
+        </div>
+      ) : response ? (
         <div
           className={
             "relative col-span-2 grid grid-cols-2 transition duration-700 " +
@@ -424,6 +441,39 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
       )}
     </>
   );
+};
+
+const computeIndicatorState = ({
+  inFlight,
+  compilationStatus,
+  response,
+}: {
+  inFlight: boolean;
+  compilationStatus: CompilationStatus | null;
+  response: AnalysisResponse | null;
+}) => {
+  if (inFlight || !compilationStatus) return IndicatorState.Working;
+
+  if (compilationStatus.state.type == "CompileError")
+    return IndicatorState.Error;
+
+  if (compilationStatus.state.type != "Compiled") return IndicatorState.Working;
+
+  if (!response || !response.validation_result) return IndicatorState.Error;
+
+  if (
+    response.validation_result.type == "CorrectTerminated" ||
+    response.validation_result.type == "CorrectNonTerminated"
+  )
+    return IndicatorState.Correct;
+
+  if (response.validation_result.type == "Mismatch")
+    return IndicatorState.Mismatch;
+
+  if (response.validation_result.type == "TimeOut")
+    return IndicatorState.TimeOut;
+
+  return IndicatorState.Working;
 };
 
 const PredicateEvaluation = ({ predicate }: { predicate: string }) => {

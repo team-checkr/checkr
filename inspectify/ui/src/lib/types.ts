@@ -63,9 +63,11 @@ export type ValidationResult =
 }}
 	| { type: "TimeOut", content?: undefined };
 
-export enum CompilerState {
-	Compiling = "Compiling",
-	Compiled = "Compiled",
-	CompileError = "CompileError",
-}
+export type CompilerState = 
+	| { type: "Compiling", content?: undefined }
+	| { type: "Compiled", content?: undefined }
+	| { type: "CompileError", content: {
+	stdout: string;
+	stderr: string;
+}};
 

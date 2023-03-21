@@ -111,7 +111,10 @@ impl Environment for ProgramVerificationEnv {
     fn run(&self, cmds: &Commands, _: &Self::Input) -> Self::Output {
         let verification_conditions = cmds.vc(&BExpr::Bool(true));
         ProgramVerificationEnvOutput {
-            verification_conditions: verification_conditions.iter().map(|vc| vc.into()).collect(),
+            verification_conditions: verification_conditions
+                .iter()
+                .map(|vc| vc.renumber_quantifiers().into())
+                .collect(),
         }
     }
 

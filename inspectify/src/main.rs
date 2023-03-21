@@ -20,11 +20,12 @@ use checkr::{
 };
 use clap::Parser;
 use color_eyre::eyre::Context;
+use indicatif::ProgressStyle;
 use notify_debouncer_mini::DebounceEventResult;
 use serde::{Deserialize, Serialize};
 use tokio::sync::Mutex;
 use tower_http::cors::CorsLayer;
-use tracing::{debug, error, info};
+use tracing::{error, info};
 use tracing_subscriber::prelude::*;
 
 #[typeshare::typeshare]
@@ -184,10 +185,11 @@ async fn graph(
 
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(tag = "type", content = "content")]
 enum CompilerState {
     Compiling,
     Compiled,
-    CompileError,
+    CompileError { stdout: String, stderr: String },
 }
 
 #[typeshare::typeshare]
@@ -293,7 +295,7 @@ fn spawn_watcher(
         None,
         move |res: DebounceEventResult| match res {
             Ok(events) => {
-                debug!("a file was saved: {events:?}");
+                // debug!("a file was saved: {events:?}");
                 if !events.iter().any(|e| {
                     let p = match e.path.strip_prefix(&debouncer_dir) {
                         Ok(p) => p,
@@ -319,25 +321,42 @@ fn spawn_watcher(
 
     tokio::spawn(async move {
         while let Some(()) = rx.recv().await {
-            info!("recompiling due to changes!");
+            let _ = clear_terminal();
+
+            let spinner = indicatif::ProgressBar::new_spinner();
+            spinner.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+            spinner.set_message("recompiling your code due to changes...");
+            spinner.enable_steady_tick(Duration::from_millis(50));
+
+            // info!("recompiling due to changes!");
             let compile_start = std::time::Instant::now();
             *compilation_status.lock().await = CompilationStatus::new(CompilerState::Compiling);
             let new_driver = if let Some(compile) = &run.compile {
-                match Driver::compile(&dir, compile, &run.run) {
+                let compile_result = Driver::compile(&dir, compile, &run.run);
+
+                spinner.finish_and_clear();
+
+                match compile_result {
                     Ok(driver) => driver,
                     Err(DriverError::CompileFailure(output)) => {
+                        let stdout = String::from_utf8(output.stdout.clone()).unwrap();
+                        let stderr = String::from_utf8(output.stderr.clone()).unwrap();
+
                         error!("failed to compile:");
-                        eprintln!("{}", std::str::from_utf8(&output.stderr).unwrap());
-                        eprintln!("{}", std::str::from_utf8(&output.stdout).unwrap());
+                        eprintln!("{stderr}");
+                        eprintln!("{stdout}");
                         *compilation_status.lock().await =
-                            CompilationStatus::new(CompilerState::CompileError);
+                            CompilationStatus::new(CompilerState::CompileError { stdout, stderr });
                         continue;
                     }
                     Err(DriverError::RunCompile(err)) => {
                         error!("run compile failed:");
                         eprintln!("{err}");
                         *compilation_status.lock().await =
-                            CompilationStatus::new(CompilerState::CompileError);
+                            CompilationStatus::new(CompilerState::CompileError {
+                                stdout: format!("{:?}", err),
+                                stderr: String::new(),
+                            });
                         continue;
                     }
                 }
@@ -367,6 +386,17 @@ async fn do_self_update() -> color_eyre::Result<()> {
     Ok(())
 }
 
+fn clear_terminal() -> std::io::Result<std::io::Stdout> {
+    use crossterm::{cursor, terminal, ExecutableCommand};
+    use std::io::stdout;
+
+    let mut stdout = stdout();
+    stdout
+        .execute(terminal::Clear(terminal::ClearType::All))?
+        .execute(cursor::MoveTo(0, 0))?;
+    Ok(stdout)
+}
+
 async fn run() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
@@ -380,8 +410,19 @@ async fn run() -> color_eyre::Result<()> {
         .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
     let driver = if let Some(compile) = &run.compile {
-        Driver::compile(&cli.dir, compile, &run.run)
-            .wrap_err_with(|| format!("compiling using config: {run:?}"))?
+        clear_terminal()?;
+
+        let spinner = indicatif::ProgressBar::new_spinner();
+        spinner.set_style(ProgressStyle::with_template("{spinner:.green} {msg}").unwrap());
+        spinner.set_message("compiling your code...");
+        spinner.enable_steady_tick(Duration::from_millis(50));
+
+        let driver = Driver::compile(&cli.dir, compile, &run.run)
+            .wrap_err_with(|| format!("compiling using config: {run:?}"))?;
+
+        spinner.finish();
+
+        driver
     } else {
         Driver::new(&cli.dir, &run.run)
     };

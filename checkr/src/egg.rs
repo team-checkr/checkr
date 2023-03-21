@@ -79,6 +79,14 @@ fn make_rules() -> Vec<Rewrite> {
         // rw!("desugar-and-land"; "(&& ?a ?b)" => "(& ?a ?b)"),
         // rw!("desugar-or-lor"; "(|| ?a ?b)" => "(| ?a ?b)"),
         // rw!("desugar-imp"; "(==> ?a ?b)" => "(| (! ?a) ?b)"),
+        rw!("comm-or";  "(|| ?a ?b)"        => "(|| ?b ?a)"),
+        rw!("comm-lor";  "(| ?a ?b)"        => "(| ?b ?a)"),
+        rw!("comm-and";  "(& ?a ?b)"        => "(& ?b ?a)"),
+        rw!("comm-land";  "(&& ?a ?b)"        => "(&& ?b ?a)"),
+        rw!("assoc-or"; "(|| ?a (|| ?b ?c))" => "(|| (|| ?a ?b) ?c)"),
+        rw!("assoc-lor"; "(| ?a (| ?b ?c))" => "(| (| ?a ?b) ?c)"),
+        rw!("assoc-and"; "(&& ?a (&& ?b ?c))" => "(&& (&& ?a ?b) ?c)"),
+        rw!("assoc-land"; "(& ?a (& ?b ?c))" => "(& (& ?a ?b) ?c)"),
     ]
 }
 
