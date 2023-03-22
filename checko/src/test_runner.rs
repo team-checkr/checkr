@@ -136,6 +136,7 @@ pub struct TestResult {
     pub input_json: String,
     pub result: TestResultType,
     pub time: Duration,
+    pub shown: bool,
 }
 
 impl TestResultType {
@@ -213,6 +214,7 @@ async fn generate_test_results<E: Environment>(
                 },
             },
             time: summary.time,
+            shown: program.shown,
         };
 
         results.push(result);

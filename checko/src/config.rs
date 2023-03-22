@@ -16,6 +16,8 @@ pub struct ProgramsConfig {
 pub struct ProgramConfig {
     pub seed: u64,
     pub src: Option<String>,
+    #[serde(default)]
+    pub shown: bool,
 }
 
 #[derive(Debug, Clone, Serialize, Deserialize)]

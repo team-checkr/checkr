@@ -172,7 +172,6 @@ async fn run() -> Result<()> {
                 let data = env.latest_run()?;
                 let report = IndividualMarkdown {
                     group_name: g.name.clone(),
-                    num_shown: 2,
                     data,
                 };
 

@@ -4,6 +4,11 @@
 
 export type Markdown = string;
 
+export interface CompilationStatus {
+	compiled_at: number;
+	state: CompilerState;
+}
+
 export interface Input {
 	analysis: Analysis;
 	json: string;
@@ -14,6 +19,15 @@ export interface Output {
 	analysis: Analysis;
 	json: string;
 	markdown: Markdown;
+}
+
+export interface GraphRequest {
+	src: string;
+	deterministic: boolean;
+}
+
+export interface GraphResponse {
+	dot?: string;
 }
 
 export interface AnalysisRequest {
@@ -30,20 +44,6 @@ export interface AnalysisResponse {
 	validation_result?: ValidationResult;
 }
 
-export interface GraphRequest {
-	src: string;
-	deterministic: boolean;
-}
-
-export interface GraphResponse {
-	dot?: string;
-}
-
-export interface CompilationStatus {
-	compiled_at: number;
-	state: CompilerState;
-}
-
 export enum Analysis {
 	Graph = "Graph",
 	Parse = "Parse",
@@ -52,6 +52,14 @@ export enum Analysis {
 	Sign = "Sign",
 	Security = "Security",
 }
+
+export type CompilerState = 
+	| { type: "Compiling", content?: undefined }
+	| { type: "Compiled", content?: undefined }
+	| { type: "CompileError", content: {
+	stdout: string;
+	stderr: string;
+}};
 
 export type ValidationResult = 
 	| { type: "CorrectTerminated", content?: undefined }
@@ -62,12 +70,4 @@ export type ValidationResult =
 	reason: string;
 }}
 	| { type: "TimeOut", content?: undefined };
-
-export type CompilerState = 
-	| { type: "Compiling", content?: undefined }
-	| { type: "Compiled", content?: undefined }
-	| { type: "CompileError", content: {
-	stdout: string;
-	stderr: string;
-}};
 

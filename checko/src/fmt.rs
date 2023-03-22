@@ -11,7 +11,6 @@ use crate::test_runner::{TestResult, TestResultType, TestRunResults};
 #[derive(Debug, Serialize, Deserialize)]
 pub struct IndividualMarkdown {
     pub group_name: String,
-    pub num_shown: usize,
     pub data: TestRunResults,
 }
 
@@ -39,7 +38,7 @@ impl std::fmt::Display for IndividualMarkdown {
                     }
                     .to_string(),
                     format!("{:?}", summary.time),
-                    if idx < self.num_shown {
+                    if summary.shown {
                         let mut target = String::new();
                         let mut serializer = url::form_urlencoded::Serializer::new(&mut target);
                         serializer
