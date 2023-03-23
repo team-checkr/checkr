@@ -52,6 +52,11 @@ impl Interpreter {
         let mut trace = vec![state.clone()];
 
         let termination = loop {
+            if steps < 2 {
+                break TerminationState::Running;
+            }
+            steps -= 1;
+
             let next = pg.outgoing(state.node).iter().find_map(|e| {
                 e.1.semantics(&state.memory)
                     .map(|m| Configuration {
@@ -66,11 +71,6 @@ impl Interpreter {
                 None => break TerminationState::Stuck,
             };
             trace.push(state.clone());
-
-            if steps == 0 {
-                break TerminationState::Running;
-            }
-            steps -= 1;
         };
 
         (trace, termination)
