@@ -12,6 +12,7 @@ pub enum ValidationResult {
     CorrectTerminated,
     CorrectNonTerminated { iterations: u32 },
     Mismatch { reason: String },
+    InvalidOutput { output: String, error: String },
     TimeOut,
 }
 
