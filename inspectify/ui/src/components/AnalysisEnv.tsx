@@ -72,8 +72,7 @@ export const AnalysisEnvInner = () => {
       deterministic,
       src,
     ],
-    ({ signal }) =>
-      api.graph(signal, { deterministic, src }).then((res) => res.dot),
+    ({ signal }) => api.graph(signal, { deterministic, src }),
     { keepPreviousData: true }
   );
 
@@ -126,7 +125,16 @@ export const AnalysisEnvInner = () => {
         <div className="absolute top-4 right-6 flex flex-col space-y-2">
           {(
             [
-              { graph: "graph", icon: "G", dot: dotGraph ?? "" },
+              {
+                graph: "graph",
+                icon: "G",
+                dot:
+                  dotGraph?.type == "Graph"
+                    ? dotGraph.content.dot
+                    : dotGraph?.type == "Error"
+                    ? dotGraph.content.error
+                    : "",
+              },
               { graph: "reference", icon: "R", dot: dotReference ?? "" },
               { graph: "split", icon: "S", dot: null },
             ] satisfies {
@@ -145,7 +153,7 @@ export const AnalysisEnvInner = () => {
               >
                 {g.icon}
               </button>
-              {graphShown == g.graph && g.dot && (
+              {g.dot && (
                 <button
                   onClick={() => {
                     if (!g.dot) return;
@@ -164,7 +172,7 @@ export const AnalysisEnvInner = () => {
           ))}
         </div>
         {graphShown == "graph" ? (
-          dotGraph && <Network dot={dotGraph} />
+          dotGraph?.type == "Graph" && <Network dot={dotGraph.content.dot} />
         ) : graphShown == "reference" ? (
           dotReference && <Network dot={dotReference} />
         ) : (
@@ -172,7 +180,9 @@ export const AnalysisEnvInner = () => {
             <div className="text-white px-1 py-2">Graph</div>
             <div className="text-white px-1 py-2">Reference</div>
             <div className="w-full h-full">
-              {dotGraph && <Network dot={dotGraph} />}
+              {dotGraph?.type == "Graph" && (
+                <Network dot={dotGraph.content.dot} />
+              )}
             </div>
             <div className="w-full h-full">
               {dotReference && <Network dot={dotReference} />}

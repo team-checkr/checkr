@@ -26,10 +26,6 @@ export interface GraphRequest {
 	deterministic: boolean;
 }
 
-export interface GraphResponse {
-	dot?: string;
-}
-
 export interface AnalysisRequest {
 	analysis: Analysis;
 	src: string;
@@ -74,4 +70,12 @@ export type ValidationResult =
 	error: string;
 }}
 	| { type: "TimeOut", content?: undefined };
+
+export type GraphResponse = 
+	| { type: "Graph", content: {
+	dot: string;
+}}
+	| { type: "Error", content: {
+	error: string;
+}};
 
