@@ -65,7 +65,7 @@ AExpr: AExpr = {
     "-" <AExpr> => AExpr::Minus(Box::new(<>)),
     "(" <AExpr_> ")",
 
-    #[precedence(level="2")] #[assoc(side="left")]
+    #[precedence(level="2")] #[assoc(side="right")]
     <l:AExpr> "^" <r:AExpr> => AExpr::binary(l, AOp::Pow, r),
 
     #[precedence(level="3")] #[assoc(side="left")]
@@ -192,7 +192,7 @@ EAExpr: AExpr = {
     "-" <EAExpr> => AExpr::Minus(Box::new(<>)),
     "(" <EAExpr_> ")",
 
-    #[precedence(level="2")] #[assoc(side="left")]
+    #[precedence(level="2")] #[assoc(side="right")]
     <l:EAExpr> "^" <r:EAExpr> => AExpr::binary(l, AOp::Pow, r),
 
     #[precedence(level="3")] #[assoc(side="left")]
