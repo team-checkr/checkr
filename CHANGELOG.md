@@ -2,6 +2,54 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.13] - 2023-03-23
+
+### Bug Fixes
+
+- Recompute the graph in inspectify after recompilation
+- Remove copy of removed rust-toolchain.toml into Dockerfile
+- Do not crash if one group did not produce a run result in checko
+- Update definition vc(b -> C) to include b
+- Produce the correct number of configurations in interpreter
+- Correct set spans in checko
+- Do not crash if pushing results to one group fails
+
+### Documentation
+
+- Update development requirements for inspectify
+- Change `typeshare` to `typeshare-cli` in unix setup script
+- Finish a sentence in inspectify readme
+
+### Features
+
+- Randomize determinism in interpreter input
+- Initial draft of predicates and enriched commands
+- Add substitution to enriched expressions
+- Implement SP and VC for program verification analysis
+- Generate annotated programs
+- Validation for PV and remove all WASM
+- Use WebSockets for compilation status in inspectify
+- Allow specifying which programs are shown in results individually
+- Display invalid output in inspectify
+- Improve graph debugging inspectify
+- Do not crash if we could not pull from the result branch
+
+### Miscellaneous Tasks
+
+- Add a license to Cargo.toml
+- Do not open F# panel on startup in VSCode
+- Test commit to see build times with smtlib and z3
+- Remove z3 dep again, and correct pv output format
+- Update fsharp-starter ref
+- Update Cargo.lock
+- Add a comment to the Justfile for running inspectify against fsharp-starter
+
+### Refactor
+
+- Improve inspectify internals
+- Split inspectify backend up into multiple files
+- Catch all errors from single groups to not crash when pushing results
+
 ## [0.1.12] - 2023-03-16
 
 ### Bug Fixes
@@ -23,6 +71,7 @@ All notable changes to this project will be documented in this file.
 - Add easy to use option to run inspectify against fsharp-starter
 - Update fsharp-starter ref
 - Prepare changelog for release
+- Release
 
 ## [0.1.11] - 2023-03-11
 
