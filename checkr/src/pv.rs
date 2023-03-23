@@ -123,7 +123,8 @@ impl Guard {
             .sp(&BExpr::logic(self.0.clone(), LogicOp::Land, p.clone()))
     }
     pub fn vc(&self, r: &BExpr) -> Vec<BExpr> {
-        self.1.vc(r)
+        self.1
+            .vc(&BExpr::logic(self.0.clone(), LogicOp::Land, r.clone()))
     }
 }
 
