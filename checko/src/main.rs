@@ -185,7 +185,11 @@ async fn run() -> Result<()> {
                 if execute {
                     info!("pushing to results branch");
                     cmd!(sh, "git commit -m {msg}").run()?;
-                    cmd!(sh, "git push --force --set-upstream origin results").run()?;
+                    if let Err(err) =
+                        cmd!(sh, "git push --force --set-upstream origin results").run()
+                    {
+                        error!(error = format!("{err:?}"), "failed to push results");
+                    }
                 } else {
                     info!("skipping push to results branch");
                     info!("(skipping) > git commit -m {msg:?}");
