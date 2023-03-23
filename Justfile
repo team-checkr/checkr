@@ -3,7 +3,8 @@ watch-web:
 
 watch-inspectify:
     mkdir -p inspectify/ui/dist/
-    RUST_LOG=debug cargo watch -i inspectify/ui/ -x 'run -p inspectify'
+    # RUST_LOG=debug cargo watch -i inspectify/ui/ -i starters/ -x 'run -p inspectify starters/fsharp-starter'
+    RUST_LOG=debug cargo watch -i inspectify/ui/ -i starters/ -x 'run -p inspectify'
 
 typeshare:
     #!/bin/bash
