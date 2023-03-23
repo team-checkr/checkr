@@ -26,6 +26,10 @@ curl https://get.volta.sh | bash
 volta install node
 ```
 
+### A note on development Windows
+
+The development scripts all use shell, and thus you need to have a shell installed. The most common ways are to use [Git Bash](https://git-scm.com/downloads) or [WSL](https://learn.microsoft.com/en-us/windows/wsl/install). If choose you use WSL then you should remember to run everything inside of that. If you choose to use Git Bash, then you need to install it, and make sure that `C:\Program Files\Git\bin` is in your `PATH` variable. If it isn't then add it to your `PATH` variable and restart you Windows, just to be sure. Once this is done, if it was successful, the following command `sh --version` should work in PowerShell and print your shell version. From this point on, you should use either a PowerShell command line or Git Bash.
+
 ### Building during development
 
 There are two main things that must be build: The frontend UI, and inspectify the backend.
