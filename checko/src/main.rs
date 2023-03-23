@@ -15,7 +15,7 @@ use checko::{
 
 use clap::Parser;
 use color_eyre::{eyre::Context, Result};
-use tracing::{error, info, span, Level};
+use tracing::{error, info, span, Instrument, Level};
 use tracing_subscriber::prelude::*;
 use xshell::{cmd, Shell};
 
@@ -119,36 +119,38 @@ async fn run() -> Result<()> {
             for g in groups.groups {
                 let task_permits = Arc::clone(&task_permits);
 
+                let name = g.name.clone();
                 let image = image.clone();
                 let submissions = submissions.clone();
                 let programs = programs.clone();
-                let task = tokio::spawn(async move {
-                    let _permit = task_permits.acquire().await.unwrap();
+                let task = tokio::spawn(
+                    async move {
+                        let _permit = task_permits.acquire().await.unwrap();
 
-                    let span = span!(Level::INFO, "Group", name = g.name);
-                    let _enter = span.enter();
-                    info!("evaluating group");
-                    let env = GroupEnv::new(&submissions, &g);
+                        info!("evaluating group");
+                        let env = GroupEnv::new(&submissions, &g);
 
-                    let result: Result<()> = try {
-                        let (sh, _) = env
-                            .shell_in_default_branch()
-                            .wrap_err("getting shell in default branch")?;
-                        let cwd = sh.current_dir();
-                        drop(sh);
-                        let output =
-                            TestRunInput::run_in_docker(&image, &cwd, programs.clone()).await?;
-                        info!(
-                            file = format!("{:?}", env.latest_run_path()),
-                            "writing result"
-                        );
-                        env.write_latest_run(&output)?;
-                    };
+                        let result: Result<()> = try {
+                            let (sh, _) = env
+                                .shell_in_default_branch()
+                                .wrap_err("getting shell in default branch")?;
+                            let cwd = sh.current_dir();
+                            drop(sh);
+                            let output =
+                                TestRunInput::run_in_docker(&image, &cwd, programs.clone()).await?;
+                            info!(
+                                file = format!("{:?}", env.latest_run_path()),
+                                "writing result"
+                            );
+                            env.write_latest_run(&output)?;
+                        };
 
-                    if let Err(e) = result {
-                        error!(error = e.to_string(), "errored");
+                        if let Err(e) = result {
+                            error!(error = e.to_string(), "errored");
+                        }
                     }
-                });
+                    .instrument(span!(Level::INFO, "Group", name = name)),
+                );
                 tasks.push(task);
             }
 
@@ -239,13 +241,17 @@ async fn run() -> Result<()> {
 async fn main() -> Result<()> {
     color_eyre::install()?;
 
-    tracing_subscriber::Registry::default()
+    tracing_subscriber::registry::Registry::default()
         .with(tracing_error::ErrorLayer::default())
-        .with(tracing_subscriber::EnvFilter::from_default_env())
+        .with(
+            tracing_subscriber::EnvFilter::builder()
+                .with_default_directive(tracing_subscriber::filter::LevelFilter::INFO.into())
+                .from_env_lossy(),
+        )
         .with(
             tracing_subscriber::fmt::layer()
                 .with_target(false)
-                .with_timer(tracing_subscriber::fmt::time::uptime()),
+                .without_time(),
         )
         .init();
 
