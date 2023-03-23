@@ -21,7 +21,7 @@ On a unix system, the following commands should get you up to speed:
 ```bash
 curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh
 cargo install cargo-binstall
-cargo binstall just typeshare
+cargo binstall just typeshare-cli
 curl https://get.volta.sh | bash
 volta install node
 ```
