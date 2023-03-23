@@ -117,8 +117,10 @@ pub struct GraphRequest {
 }
 #[typeshare::typeshare]
 #[derive(Debug, Clone, Serialize, Deserialize)]
-pub struct GraphResponse {
-    dot: Option<String>,
+#[serde(tag = "type", content = "content")]
+pub enum GraphResponse {
+    Graph { dot: String },
+    Error { error: String },
 }
 pub async fn graph(
     State(state): State<ApplicationState>,
@@ -140,10 +142,12 @@ pub async fn graph(
         )
         .await
     {
-        Ok(output) => Json(GraphResponse {
-            dot: Some(output.parsed.dot),
+        Ok(output) => Json(GraphResponse::Graph {
+            dot: output.parsed.dot,
         }),
-        Err(_) => Json(GraphResponse { dot: None }),
+        Err(err) => Json(GraphResponse::Error {
+            error: format!("{err:#?}"),
+        }),
     }
 }
 
