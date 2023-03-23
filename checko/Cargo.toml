@@ -9,6 +9,7 @@ repository = { workspace = true }
 
 [dependencies]
 checkr = { workspace = true }
+chrono = "0.4.24"
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }

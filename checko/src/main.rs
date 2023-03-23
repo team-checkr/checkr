@@ -166,35 +166,47 @@ async fn run() -> Result<()> {
             execute,
         } => {
             let groups = read_groups(groups)?;
+            let mut groups_with_errors = vec![];
 
             for g in &groups.groups {
                 let span = span!(Level::INFO, "Group", name = g.name);
                 let _enter = span.enter();
-                let env = GroupEnv::new(&submissions, g);
-                let data = env.latest_run()?;
-                let report = IndividualMarkdown {
-                    group_name: g.name.clone(),
-                    data,
+
+                let run = || -> Result<()> {
+                    let env = GroupEnv::new(&submissions, g);
+                    let data = env.latest_run()?;
+                    let report = IndividualMarkdown {
+                        group_name: g.name.clone(),
+                        data,
+                    };
+
+                    let (sh, _) = env.shell_in_results_branch()?;
+
+                    sh.write_file("README.md", report.to_string())?;
+                    cmd!(sh, "git add .").run()?;
+                    let now = chrono::DateTime::<chrono::Utc>::from(std::time::SystemTime::now());
+                    let msg = format!("Ran tests at {}", now.format("%+"));
+                    if execute {
+                        info!("pushing to results branch");
+                        cmd!(sh, "git commit -m {msg}").run()?;
+                        cmd!(sh, "git push --force --set-upstream origin results").run()?;
+                    } else {
+                        info!("skipping push to results branch");
+                        info!("(skipping) > git commit -m {msg:?}");
+                        info!("(skipping) > git push --force --set-upstream origin results");
+                    }
+                    Ok(())
                 };
 
-                let (sh, _) = env.shell_in_results_branch()?;
-
-                sh.write_file("README.md", report.to_string())?;
-                cmd!(sh, "git add .").run()?;
-                let msg = format!("Ran tests at {:?}", std::time::Instant::now());
-                if execute {
-                    info!("pushing to results branch");
-                    cmd!(sh, "git commit -m {msg}").run()?;
-                    if let Err(err) =
-                        cmd!(sh, "git push --force --set-upstream origin results").run()
-                    {
-                        error!(error = format!("{err:?}"), "failed to push results");
-                    }
-                } else {
-                    info!("skipping push to results branch");
-                    info!("(skipping) > git commit -m {msg:?}");
-                    info!("(skipping) > git push --force --set-upstream origin results");
+                if let Err(err) = run() {
+                    error!(error = format!("{err:?}"));
+                    groups_with_errors.push(g);
                 }
+            }
+
+            error!("{} groups errored", groups_with_errors.len());
+            for g in groups_with_errors {
+                error!(group = g.name, "errored");
             }
 
             Ok(())
