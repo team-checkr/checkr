@@ -17,7 +17,7 @@ use checkr::{
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
-use tracing::error;
+use tracing::{error, info};
 
 use crate::{core, ApplicationState, CompilationStatus, ValidationResult};
 
@@ -220,16 +220,23 @@ pub async fn analyze(
                 validation_result: None,
             },
             checkr::driver::ExecError::Parse {
-                inner: _,
+                inner,
                 run_output,
                 time,
-            } => AnalysisResponse {
-                stdout: String::from_utf8(run_output.stdout.clone()).unwrap(),
-                stderr: String::from_utf8(run_output.stderr.clone()).unwrap(),
-                parsed_markdown: None,
-                took: *time,
-                validation_result: None,
-            },
+            } => {
+                let stdout = String::from_utf8(run_output.stdout.clone()).unwrap();
+                let stderr = String::from_utf8(run_output.stderr.clone()).unwrap();
+                AnalysisResponse {
+                    stdout: stdout.clone(),
+                    stderr,
+                    parsed_markdown: None,
+                    took: *time,
+                    validation_result: Some(ValidationResult::InvalidOutput {
+                        output: stdout,
+                        error: inner.to_string(),
+                    }),
+                }
+            }
         },
     };
 

@@ -368,13 +368,40 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
           <div className="absolute inset-0 grid grid-cols-2 justify-center divide-slate-600 overflow-y-auto bg-slate-800">
             {response.validation_result ? (
               <div className="flex w-full max-w-prose flex-col space-y-2 bg-slate-800 px-4 py-2 text-xl text-white">
-                <h3 className="text-lg">Output</h3>
-                <div className="prose prose-invert w-full max-w-none prose-table:w-full">
-                  <ReactMarkdown
-                    children={response.parsed_markdown ?? ""}
-                    remarkPlugins={[remarkGfm]}
-                  />
-                </div>
+                {response.validation_result.type == "InvalidOutput" ? (
+                  <>
+                    <h3 className="text-lg">Invalid Output</h3>
+                    <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+                      <ReactMarkdown
+                        children={[
+                          "Failed to parse output. Make sure that it is valid JSON, and it has the correct structure.",
+
+                          "**Error:**",
+                          "```\n" +
+                            (response.validation_result.content.error ?? "") +
+                            "\n```",
+
+                          "**Your output:**",
+
+                          "```\n" +
+                            response.validation_result.content.output.trim() +
+                            "\n```",
+                        ].join("\n\n")}
+                        remarkPlugins={[remarkGfm]}
+                      />
+                    </div>
+                  </>
+                ) : (
+                  <>
+                    <h3 className="text-lg">Output</h3>
+                    <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+                      <ReactMarkdown
+                        children={response.parsed_markdown ?? ""}
+                        remarkPlugins={[remarkGfm]}
+                      />
+                    </div>
+                  </>
+                )}
               </div>
             ) : (
               <div className="flux w-full space-y-2 px-4 py-2">
@@ -460,6 +487,9 @@ const computeIndicatorState = ({
     return IndicatorState.Correct;
 
   if (response.validation_result.type == "Mismatch")
+    return IndicatorState.Mismatch;
+
+  if (response.validation_result.type == "InvalidOutput")
     return IndicatorState.Mismatch;
 
   if (response.validation_result.type == "TimeOut")
