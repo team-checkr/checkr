@@ -15,7 +15,7 @@ use checko::{
 
 use clap::Parser;
 use color_eyre::{eyre::Context, Result};
-use tracing::{error, info, span, Instrument, Level};
+use tracing::{error, info, span, warn, Instrument, Level};
 use tracing_subscriber::prelude::*;
 use xshell::{cmd, Shell};
 
@@ -331,7 +331,12 @@ impl<'a> GroupEnv<'a> {
         }
         cmd!(sh, "git reset --hard").run()?;
         cmd!(sh, "git clean -xdf").run()?;
-        cmd!(sh, "git pull").run()?;
+        if let Err(err) = cmd!(sh, "git pull").run() {
+            warn!(
+                error = format!("{err:?}"),
+                "failed to pull, but continuing anyway",
+            );
+        }
         Ok((sh, repo))
     }
 }
