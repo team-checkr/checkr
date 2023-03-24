@@ -151,9 +151,7 @@ impl AExpr {
                 }
             }
             AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
-            AExpr::Minus(n) => {
-                (n.semantics(m)?).checked_neg().ok_or(InterpreterError::ArithmeticOverflow)?
-            }
+            AExpr::Minus(n) => (n.semantics(m)?).checked_neg().ok_or(InterpreterError::ArithmeticOverflow)?,
             AExpr::Function(f) => return Err(todo!("evaluating functions {f}")),
         })
     }
