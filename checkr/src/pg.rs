@@ -179,7 +179,7 @@ impl Command {
             Command::Skip => vec![Edge(s, Action::Skip, t)],
             Command::If(guards) => guard_edges(det, guards, s, t),
             Command::Loop(guards) | Command::EnrichedLoop(_, guards) => {
-                let b = done(guards);
+                let b = done(det, guards);
                 let mut edges = guard_edges(det, guards, s, s);
                 edges.push(Edge(s, Action::Condition(b), t));
                 edges
@@ -191,12 +191,26 @@ impl Command {
     }
 }
 
-fn done(guards: &[Guard]) -> BExpr {
-    guards
+fn done(det: Determinism, guards: &[Guard]) -> BExpr {
+    match det {
+        Determinism::Deterministic => {
+            let mut prev : BExpr = BExpr::Bool(false);
+            
+            for g in guards {
+                prev = BExpr::logic(g.0.clone(), LogicOp::Or, prev);
+            }
+            
+            BExpr::Not(Box::new(prev))
+            
+        }
+        Determinism::NonDeterministic => {
+            guards
         .iter()
         .map(|g| BExpr::Not(Box::new(g.0.clone())))
         .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
         .unwrap_or(BExpr::Bool(true))
+        }
+    }
 }
 
 impl ProgramGraph {
