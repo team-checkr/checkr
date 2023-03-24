@@ -12,6 +12,7 @@ pub struct GroupsConfig {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProgramsConfig {
+    #[serde(default)]
     pub envs: IndexMap<Analysis, ProgramsEnvConfig>,
 }
 
@@ -32,6 +33,7 @@ pub struct ProgramConfig {
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CanonicalProgramsConfig {
+    #[serde(default)]
     pub envs: IndexMap<Analysis, CanonicalProgramsEnvConfig>,
 }
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
