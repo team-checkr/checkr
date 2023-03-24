@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -130,7 +128,8 @@ async fn run() -> Result<()> {
                         info!("evaluating group");
                         let env = GroupEnv::new(&submissions, &g);
 
-                        let result: Result<()> = try {
+                        // TODO: Replace this with a try-block when they are stable
+                        let result: Result<()> = (|| async {
                             let (sh, _) = env
                                 .shell_in_default_branch()
                                 .wrap_err("getting shell in default branch")?;
@@ -143,7 +142,9 @@ async fn run() -> Result<()> {
                                 "writing result"
                             );
                             env.write_latest_run(&output)?;
-                        };
+                            Ok(())
+                        })()
+                        .await;
 
                         if let Err(e) = result {
                             error!(error = e.to_string(), "errored");
