@@ -2,6 +2,31 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.14] - 2023-03-24
+
+### Bug Fixes
+
+- Change associativity of power to right (#30)
+- Make unary minus checked (#32)
+
+### Documentation
+
+- Add a note about developing on Windows
+
+### Features
+
+- Allow empty ProgramsConfig TOML files
+
+### Miscellaneous Tasks
+
+- Update fsharp-starter ref
+
+### Refactor
+
+- Unary minus refactor (#33)
+- Remove `#![feature(try_blocks)]` so we compile on stable!
+- Wrap untyped IO and program config allows per env input
+
 ## [0.1.13] - 2023-03-23
 
 ### Bug Fixes
@@ -43,6 +68,7 @@ All notable changes to this project will be documented in this file.
 - Update fsharp-starter ref
 - Update Cargo.lock
 - Add a comment to the Justfile for running inspectify against fsharp-starter
+- Release
 
 ### Refactor
 
