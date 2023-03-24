@@ -145,23 +145,15 @@ impl Commands {
 fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
     match det {
         Determinism::Deterministic => {
-            let mut prev: Option<BExpr> = None;
+            let mut prev: BExpr = BExpr::Bool(false); //This is done to comply with Page 25 of Formal Methods
 
             let mut edges = vec![];
 
             for g in guards {
                 let q = Node::fresh();
                 edges.extend(g.1.edges(det, q, t));
-
-                let cond = if let Some(p) = prev {
-                    prev = Some(BExpr::logic(p.clone(), LogicOp::Or, g.0.to_owned().clone()));
-                    BExpr::logic(BExpr::Not(Box::new(p)), LogicOp::And, g.0.clone())
-                } else {
-                    prev = Some(g.0.clone());
-                    g.0.clone()
-                };
-
-                edges.push(Edge(s, Action::Condition(cond), q));
+                edges.push(Edge(s, Action::Condition(BExpr::logic(g.0.clone(), LogicOp::And, BExpr::Not(Box::new(prev.clone())))), q));
+                prev = BExpr::logic(g.0.to_owned().clone(), LogicOp::Or, prev);
             }
 
             edges
