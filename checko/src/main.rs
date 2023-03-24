@@ -1,5 +1,3 @@
-#![feature(try_blocks)]
-
 use std::{
     fs,
     path::{Path, PathBuf},
@@ -7,7 +5,10 @@ use std::{
 };
 
 use checko::{
-    config::{GroupConfig, GroupsConfig, ProgramsConfig},
+    config::{
+        CanonicalProgramsConfig, CanonicalProgramsEnvConfig, GroupConfig, GroupsConfig,
+        ProgramsConfig,
+    },
     docker::DockerImage,
     fmt::{CompetitionMarkdown, IndividualMarkdown},
     test_runner::{TestRunInput, TestRunResults},
@@ -22,11 +23,17 @@ use xshell::{cmd, Shell};
 #[derive(Debug, Parser)]
 #[command(version)]
 enum Cli {
+    /// Parse all provided program TOML files and print out in a canonicalized format.
+    DumpPrograms {
+        /// The configs file specifying the programs to run in the competition.
+        #[clap(long, short)]
+        programs: Vec<PathBuf>,
+    },
     /// Run the programs for all groups and store the results.
     RunTests {
         /// The configs file specifying the programs to run in the competition.
         #[clap(long, short)]
-        programs: PathBuf,
+        programs: Vec<PathBuf>,
         /// The configs file specifying the groups which are part of the competition.
         #[clap(long, short)]
         groups: PathBuf,
@@ -83,9 +90,47 @@ fn read_groups(groups: impl AsRef<Path>) -> Result<GroupsConfig> {
         toml::from_str(&src).wrap_err_with(|| format!("error parsing groups from file {p:?}"))?;
     Ok(parsed)
 }
+fn collect_programs(
+    programs: impl IntoIterator<Item = impl AsRef<Path>>,
+) -> Result<ProgramsConfig> {
+    programs
+        .into_iter()
+        .map(read_programs)
+        .reduce(|acc, p| {
+            let mut acc = acc?;
+            acc.extend(p?);
+            Ok(acc)
+        })
+        .unwrap_or_else(|| Ok(Default::default()))
+}
 
 async fn run() -> Result<()> {
     match Cli::parse() {
+        Cli::DumpPrograms { programs } => {
+            let envs = collect_programs(programs)?
+                .envs
+                .iter()
+                .map(|(&analysis, env)| {
+                    (
+                        analysis,
+                        CanonicalProgramsEnvConfig {
+                            programs: env
+                                .programs
+                                .iter()
+                                .map(|p| p.canonicalize(analysis).unwrap())
+                                .collect(),
+                        },
+                    )
+                })
+                .collect();
+
+            println!(
+                "{}",
+                toml::to_string_pretty(&CanonicalProgramsConfig { envs })?
+            );
+
+            Ok(())
+        }
         Cli::RunTests {
             programs,
             groups,
@@ -93,7 +138,7 @@ async fn run() -> Result<()> {
             local_docker,
             concurrent,
         } => {
-            let programs = read_programs(programs)?;
+            let programs = collect_programs(programs)?;
             let groups = read_groups(groups)?;
 
             // NOTE: Check of docker daemon is running
@@ -130,7 +175,8 @@ async fn run() -> Result<()> {
                         info!("evaluating group");
                         let env = GroupEnv::new(&submissions, &g);
 
-                        let result: Result<()> = try {
+                        // TODO: Replace this with a try-block when they are stable
+                        let result: Result<()> = (|| async {
                             let (sh, _) = env
                                 .shell_in_default_branch()
                                 .wrap_err("getting shell in default branch")?;
@@ -143,7 +189,9 @@ async fn run() -> Result<()> {
                                 "writing result"
                             );
                             env.write_latest_run(&output)?;
-                        };
+                            Ok(())
+                        })()
+                        .await;
 
                         if let Err(e) = result {
                             error!(error = e.to_string(), "errored");

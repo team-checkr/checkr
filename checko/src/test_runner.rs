@@ -11,10 +11,7 @@ use std::{path::Path, time::Duration};
 
 use checkr::{
     driver::Driver,
-    env::{
-        Analysis, Environment, InterpreterEnv, ProgramVerificationEnv, SecurityEnv, SignEnv,
-        ValidationResult,
-    },
+    env::{self, Analysis, AnyEnvironment, Environment, ValidationResult},
 };
 use color_eyre::{
     eyre::{eyre, Context, ContextCompat},
@@ -163,10 +160,17 @@ impl GroupResults<'_> {
             sections: vec![],
         };
 
-        results.push(&InterpreterEnv).await;
-        results.push(&SignEnv).await;
-        results.push(&SecurityEnv).await;
-        results.push(&ProgramVerificationEnv).await;
+        for key in config.envs.keys() {
+            match key {
+                // NOTE: Skip graph
+                Analysis::Graph => {}
+                Analysis::Parse => results.push(&env::ParseEnv).await,
+                Analysis::Interpreter => results.push(&env::InterpreterEnv).await,
+                Analysis::ProgramVerification => results.push(&env::ProgramVerificationEnv).await,
+                Analysis::Sign => results.push(&env::SignEnv).await,
+                Analysis::Security => results.push(&env::SecurityEnv).await,
+            }
+        }
 
         Ok(TestRunResults {
             ran_at: std::time::SystemTime::now(),
@@ -188,13 +192,10 @@ async fn generate_test_results<E: Environment>(
 ) -> Vec<TestResult> {
     let mut results = vec![];
 
-    for program in &config.programs {
-        let builder = env.setup_generation().seed(Some(program.seed));
-        let generated = match program.src.as_ref() {
-            Some(src) => builder.from_cmds(checkr::parse::parse_commands(src).unwrap()),
-            None => builder.build(),
-        };
+    let Some(programs) = config.envs.get(&E::ANALYSIS) else { return vec![] };
 
+    for program in &programs.programs {
+        let generated = program.generated_program(env.analysis()).unwrap();
         let summary = generated.run_analysis(env, driver).await;
         let result = TestResult {
             analysis: E::ANALYSIS,

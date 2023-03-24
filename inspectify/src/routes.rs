@@ -17,7 +17,7 @@ use checkr::{
 use futures::{SinkExt, StreamExt};
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
-use tracing::{error, info};
+use tracing::error;
 
 use crate::{core, ApplicationState, CompilationStatus, ValidationResult};
 
@@ -171,10 +171,14 @@ pub async fn analyze(
     State(state): State<ApplicationState>,
     Json(body): Json<AnalysisRequest>,
 ) -> Json<AnalysisResponse> {
+    let input = body
+        .analysis
+        .input_from_str(&body.input)
+        .expect("failed to parse input");
     let cmds = body.src;
     let driver = state.compilation.driver.lock().await;
     let output = match driver
-        .exec_dyn_raw_cmds(&body.analysis, &cmds, &body.input)
+        .exec_dyn_raw_cmds(body.analysis, &cmds, &body.input)
         .await
     {
         Ok(exec_output) => {
@@ -193,14 +197,15 @@ pub async fn analyze(
             };
             let validation_res = body
                 .analysis
-                .validate(&cmds, &body.input, &exec_output.parsed.to_string())
+                .validate(&cmds, input, exec_output.parsed.clone())
                 .expect("serialization error");
             AnalysisResponse {
                 stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
                 stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
                 parsed_markdown: Some(
-                    body.analysis
-                        .output_markdown(&exec_output.parsed.to_string())
+                    exec_output
+                        .parsed
+                        .to_markdown()
                         .expect("serialization error during markdown generation"),
                 ),
                 took: exec_output.took,
