@@ -88,7 +88,17 @@ macro_rules! define_analysis {
 }
 #[typeshare::typeshare]
 #[derive(
-    Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize, clap::ValueEnum,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    Serialize,
+    Deserialize,
+    clap::ValueEnum,
 )]
 pub enum Analysis {
     Graph,
@@ -145,7 +155,7 @@ pub trait Environment {
     const ANALYSIS: Analysis;
 
     fn setup_generation(&self) -> ProgramGenerationBuilder {
-        Default::default()
+        ProgramGenerationBuilder::new(Self::ANALYSIS)
     }
 
     fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output;
@@ -166,27 +176,73 @@ pub enum ValidationResult {
     TimeOut,
 }
 
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Input {
+    analysis: Analysis,
+    json: serde_json::Value,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq)]
+pub struct Output {
+    analysis: Analysis,
+    json: serde_json::Value,
+}
+
+impl Input {
+    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Input, serde_json::Error> {
+        // TODO: Assert that E::ANALYSIS == self.analysis
+        serde_json::from_value(self.json)
+    }
+    pub fn to_markdown(&self) -> Result<Markdown, serde_json::Error> {
+        self.analysis.input_markdown(self.clone())
+    }
+}
+impl Output {
+    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Output, serde_json::Error> {
+        // TODO: Assert that E::ANALYSIS == self.analysis
+        serde_json::from_value(self.json)
+    }
+    pub fn to_markdown(&self) -> Result<Markdown, serde_json::Error> {
+        self.analysis.output_markdown(self.clone())
+    }
+}
+impl std::fmt::Display for Input {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.json.fmt(f)
+    }
+}
+impl std::fmt::Display for Output {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.json.fmt(f)
+    }
+}
+
 pub trait AnyEnvironment {
     fn analysis(&self) -> Analysis;
 
     fn setup_generation(&self) -> ProgramGenerationBuilder;
 
-    fn run(&self, cmds: &Commands, input: &str) -> Result<String, serde_json::Error>;
+    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, serde_json::Error>;
 
-    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> String;
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> Input;
 
     fn validate(
         &self,
         cmds: &Commands,
-        input: &str,
-        output: &str,
+        input: Input,
+        output: Output,
     ) -> Result<ValidationResult, serde_json::Error>;
 
-    fn input_markdown(&self, input: &str) -> Result<Markdown, serde_json::Error>;
-    fn output_markdown(&self, output: &str) -> Result<Markdown, serde_json::Error>;
+    fn input_markdown(&self, input: Input) -> Result<Markdown, serde_json::Error>;
+    fn output_markdown(&self, output: Output) -> Result<Markdown, serde_json::Error>;
+
+    fn input_from_str(&self, src: &str) -> Result<Input, serde_json::Error>;
+    fn input_from_slice(&self, src: &[u8]) -> Result<Input, serde_json::Error>;
+    fn output_from_str(&self, src: &str) -> Result<Output, serde_json::Error>;
+    fn output_from_slice(&self, src: &[u8]) -> Result<Output, serde_json::Error>;
 }
 
-impl<E: Environment> AnyEnvironment for E {
+impl<E: Environment + ?Sized> AnyEnvironment for E {
     fn analysis(&self) -> Analysis {
         E::ANALYSIS
     }
@@ -195,36 +251,66 @@ impl<E: Environment> AnyEnvironment for E {
         self.setup_generation()
     }
 
-    fn run(&self, cmds: &Commands, input: &str) -> Result<String, serde_json::Error> {
-        serde_json::to_string(&self.run(cmds, &serde_json::from_str(input)?))
+    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, serde_json::Error> {
+        Ok(Output {
+            analysis: self.analysis(),
+            json: serde_json::to_value(&self.run(cmds, &serde_json::from_value(input.json)?))?,
+        })
     }
 
-    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> String {
-        serde_json::to_string(&E::Input::gen(&mut cmds.clone(), rng))
-            .expect("failed to serialize input")
+    fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> Input {
+        Input {
+            analysis: self.analysis(),
+            json: serde_json::to_value(&E::Input::gen(&mut cmds.clone(), rng))
+                .expect("failed to serialize input"),
+        }
     }
 
     fn validate(
         &self,
         cmds: &Commands,
-        input: &str,
-        output: &str,
+        input: Input,
+        output: Output,
     ) -> Result<ValidationResult, serde_json::Error> {
-        Ok(self.validate(
-            cmds,
-            &serde_json::from_str(input)?,
-            &serde_json::from_str(output)?,
-        ))
+        Ok(self.validate(cmds, &input.parsed::<E>()?, &output.parsed::<E>()?))
     }
 
-    fn input_markdown(&self, input: &str) -> Result<Markdown, serde_json::Error> {
-        let input: E::Input = serde_json::from_str(input)?;
+    fn input_markdown(&self, input: Input) -> Result<Markdown, serde_json::Error> {
+        let input = input.parsed::<E>()?;
         Ok(input.to_markdown())
     }
 
-    fn output_markdown(&self, output: &str) -> Result<Markdown, serde_json::Error> {
-        let output: E::Output = serde_json::from_str(output)?;
+    fn output_markdown(&self, output: Output) -> Result<Markdown, serde_json::Error> {
+        let output = output.parsed::<E>()?;
         Ok(output.to_markdown())
+    }
+
+    fn input_from_str(&self, src: &str) -> Result<Input, serde_json::Error> {
+        Ok(Input {
+            analysis: self.analysis(),
+            json: serde_json::from_str(src)?,
+        })
+    }
+
+    fn input_from_slice(&self, src: &[u8]) -> Result<Input, serde_json::Error> {
+        Ok(Input {
+            analysis: self.analysis(),
+            json: serde_json::from_slice(src)?,
+        })
+    }
+
+    fn output_from_str(&self, src: &str) -> Result<Output, serde_json::Error> {
+        Ok(Output {
+            analysis: self.analysis(),
+            json: serde_json::from_str(src)?,
+        })
+    }
+
+    fn output_from_slice(&self, src: &[u8]) -> Result<Output, serde_json::Error> {
+        Ok(Output {
+            analysis: self.analysis(),
+            json: serde_json::from_slice(src)?,
+        })
     }
 }
 
