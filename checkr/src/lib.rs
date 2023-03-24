@@ -31,8 +31,7 @@
 use std::time::Duration;
 
 use driver::Driver;
-use env::{Environment, ValidationResult};
-use generation::Generate;
+use env::{Analysis, Environment, Input, ValidationResult};
 pub use miette;
 use rand::prelude::*;
 use tracing::debug;
@@ -54,8 +53,9 @@ pub mod pv;
 pub mod security;
 pub mod sign;
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 pub struct ProgramGenerationBuilder {
+    analysis: Analysis,
     fuel: Option<u32>,
     seed: Option<u64>,
     no_loop: bool,
@@ -64,12 +64,23 @@ pub struct ProgramGenerationBuilder {
 }
 
 impl Commands {
-    pub fn builder() -> ProgramGenerationBuilder {
-        ProgramGenerationBuilder::default()
+    pub fn builder(analysis: Analysis) -> ProgramGenerationBuilder {
+        ProgramGenerationBuilder::new(analysis)
     }
 }
 
 impl ProgramGenerationBuilder {
+    pub fn new(analysis: Analysis) -> ProgramGenerationBuilder {
+        ProgramGenerationBuilder {
+            analysis,
+            fuel: Default::default(),
+            seed: Default::default(),
+            no_loop: Default::default(),
+            no_division: Default::default(),
+            generate_annotated: Default::default(),
+        }
+    }
+
     pub fn fuel(self, fuel: Option<u32>) -> Self {
         ProgramGenerationBuilder { fuel, ..self }
     }
@@ -86,13 +97,13 @@ impl ProgramGenerationBuilder {
         }
     }
 
-    pub fn generate_annotated(self, generate_annotated: bool) -> ProgramGenerationBuilder {
+    pub fn generate_annotated(self, generate_annotated: bool) -> Self {
         ProgramGenerationBuilder {
             generate_annotated,
             ..self
         }
     }
-    fn internal_build(self, cmds: Option<Commands>) -> GeneratedProgram {
+    fn internal_build(self, cmds: Option<Commands>, input: Option<Input>) -> GeneratedProgram {
         let seed = match self.seed {
             Some(seed) => seed,
             None => rand::random(),
@@ -111,28 +122,32 @@ impl ProgramGenerationBuilder {
         } else {
             cmds
         };
+        let input = input.unwrap_or_else(|| self.analysis.gen_input(&cmds, &mut rng));
 
         GeneratedProgram {
             cmds,
+            input,
             fuel,
             seed,
-            rng,
         }
     }
     pub fn from_cmds(self, cmds: Commands) -> GeneratedProgram {
-        self.internal_build(Some(cmds))
+        self.internal_build(Some(cmds), None)
+    }
+    pub fn from_cmds_and_input(self, cmds: Commands, input: Input) -> GeneratedProgram {
+        self.internal_build(Some(cmds), Some(input))
     }
     pub fn build(self) -> GeneratedProgram {
-        self.internal_build(None)
+        self.internal_build(None, None)
     }
 }
 
 #[derive(Debug)]
 pub struct GeneratedProgram {
     pub cmds: Commands,
+    pub input: Input,
     pub fuel: u32,
     pub seed: u64,
-    pub rng: SmallRng,
 }
 
 impl GeneratedProgram {
@@ -145,12 +160,13 @@ impl GeneratedProgram {
 
         let GeneratedProgram {
             cmds,
+            input,
             fuel,
             seed,
-            mut rng,
         } = self;
 
-        let input = <E as Environment>::Input::gen(&mut cmds.clone(), &mut rng);
+        let input = input.parsed::<E>().unwrap();
+
         let exec_result = driver.exec::<E>(&cmds, &input).await;
         match exec_result {
             Ok(exec_result) => {
@@ -181,7 +197,7 @@ impl GeneratedProgram {
                     stderr: String::new(),
                     result: Err(err.into()),
                 },
-                driver::ExecError::RunExec { cmd, source } => AnalysisSummary {
+                driver::ExecError::RunExec { cmd: _, source } => AnalysisSummary {
                     fuel,
                     seed,
                     cmds,

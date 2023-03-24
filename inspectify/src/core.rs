@@ -1,6 +1,5 @@
 use axum::Json;
 use checkr::{
-    ast::Commands,
     env::{graph::GraphEnvInput, Analysis, Environment, GraphEnv, Markdown},
     miette,
     pg::Determinism,
@@ -41,9 +40,10 @@ pub async fn dot(Json((deterministic, src)): Json<(bool, String)>) -> Json<Strin
 pub async fn complete_input_from_json(
     Json((analysis, input_json)): Json<(Analysis, String)>,
 ) -> Json<Input> {
-    let markdown = analysis
-        .input_markdown(&input_json)
-        .expect("failed to parse given json");
+    let input = analysis
+        .input_from_str(&input_json)
+        .expect("failed to parse input json");
+    let markdown = input.to_markdown().expect("failed to parse given json");
     Json(Input {
         analysis,
         json: input_json,
@@ -62,14 +62,15 @@ pub async fn generate_input_for(
             return None.into();
         }
     };
-    let mut rng = Commands::builder().build().rng;
+    use rand::SeedableRng;
+    let mut rng = rand::rngs::SmallRng::from_entropy();
     let json = analysis.gen_input(&cmds, &mut rng);
-    let markdown = analysis
-        .input_markdown(&json)
+    let markdown = json
+        .to_markdown()
         .expect("we just generated it, so it should be fine");
     Some(Input {
         analysis,
-        json,
+        json: json.to_string(),
         markdown,
     })
     .into()
@@ -77,6 +78,10 @@ pub async fn generate_input_for(
 
 #[axum::debug_handler]
 pub async fn run_analysis(Json((src, input)): Json<(String, Input)>) -> Json<Option<Output>> {
+    let input_json = input
+        .analysis
+        .input_from_str(&input.json)
+        .expect("failed to parse input json");
     let cmds = match checkr::parse::parse_commands(&src) {
         Ok(cmds) => cmds,
         Err(err) => {
@@ -86,15 +91,14 @@ pub async fn run_analysis(Json((src, input)): Json<(String, Input)>) -> Json<Opt
     };
     let json = input
         .analysis
-        .run(&cmds, &input.json)
+        .run(&cmds, input_json)
         .expect("parsing input json failed");
-    let markdown = input
-        .analysis
-        .output_markdown(&json)
+    let markdown = json
+        .to_markdown()
         .expect("we just generated it, so it should be fine");
     Some(Output {
         analysis: input.analysis,
-        json,
+        json: json.to_string(),
         markdown,
     })
     .into()

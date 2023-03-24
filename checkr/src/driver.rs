@@ -8,7 +8,7 @@ use tracing::error;
 
 use crate::{
     ast::Commands,
-    env::{Analysis, Environment},
+    env::{Analysis, Environment, Output},
 };
 
 pub struct Driver {
@@ -89,10 +89,10 @@ impl Driver {
     }
     pub async fn exec_dyn_raw_cmds(
         &self,
-        analysis: &Analysis,
+        analysis: Analysis,
         cmds: &str,
         input: &str,
-    ) -> Result<ExecOutput<serde_json::Value>, ExecError> {
+    ) -> Result<ExecOutput<Output>, ExecError> {
         let mut cmd = self.new_command();
         cmd.arg(analysis.command());
         cmd.arg(cmds);
@@ -115,7 +115,7 @@ impl Driver {
             return Err(ExecError::CommandFailed(cmd_output, took));
         }
 
-        match serde_json::from_slice(&cmd_output.stdout) {
+        match analysis.output_from_slice(&cmd_output.stdout) {
             Ok(parsed) => Ok(ExecOutput {
                 output: cmd_output,
                 parsed,
@@ -134,17 +134,17 @@ impl Driver {
         input: &E::Input,
     ) -> Result<ExecOutput<E::Output>, ExecError>
     where
-        E: Environment,
+        E: Environment + ?Sized,
     {
         let output = self
             .exec_dyn_raw_cmds(
-                &E::ANALYSIS,
+                E::ANALYSIS,
                 cmds,
                 &serde_json::to_string(input).map_err(ExecError::Serialize)?,
             )
             .await?;
 
-        match serde_json::from_value(output.parsed) {
+        match output.parsed.parsed::<E>() {
             Ok(parsed) => Ok(ExecOutput {
                 output: output.output,
                 parsed,
@@ -163,7 +163,7 @@ impl Driver {
         input: &E::Input,
     ) -> Result<ExecOutput<E::Output>, ExecError>
     where
-        E: Environment,
+        E: Environment + ?Sized,
     {
         self.exec_raw_cmds::<E>(&cmds.to_string(), input).await
     }

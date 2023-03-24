@@ -102,7 +102,7 @@ impl Environment for ProgramVerificationEnv {
     fn setup_generation(&self) -> crate::ProgramGenerationBuilder {
         crate::ast::Command::reset_sp_counter();
 
-        crate::ProgramGenerationBuilder::default()
+        crate::ProgramGenerationBuilder::new(Self::ANALYSIS)
             .no_loop(true)
             .no_division(true)
             .generate_annotated(true)

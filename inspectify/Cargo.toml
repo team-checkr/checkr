@@ -14,6 +14,7 @@ axum-macros = "0.3.1"
 binswap-github = "0.1.6"
 checko = { workspace = true }
 checkr = { workspace = true }
+rand = { workspace = true }
 clap = { version = "4.1.1", features = ["derive"] }
 color-eyre = { workspace = true }
 crossterm = "0.26.0"

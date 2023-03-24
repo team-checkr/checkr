@@ -2317,6 +2317,7 @@ dependencies = [
  "notify",
  "notify-debouncer-mini",
  "open",
+ "rand",
  "serde",
  "serde_json",
  "tokio",
