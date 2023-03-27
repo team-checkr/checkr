@@ -1,10 +1,12 @@
-FROM rustlang/rust:nightly-slim as checko
+FROM rust:1.68.1-slim as checko
 
 ENV CARGO_TARGET_DIR=/.cargo-target
 
 WORKDIR /root/
 
 RUN apt-get update && apt-get install -y pkg-config libssl-dev
+
+ENV CARGO_REGISTRIES_CRATES_IO_PROTOCOL=sparse
 
 RUN cargo help
 

@@ -53,23 +53,25 @@ impl TestRunInput {
         ]);
         cmd.args(["checko", SINGLE_COMPETITION_CMD]).arg(input);
 
-        info!("spawning docker container: {}", format_cmd(&cmd));
+        let start = std::time::Instant::now();
+        info!(container_name = image.name(), "spawning docker container");
         let output = cmd
             .output()
             .await
             .wrap_err("Failed to spawn Docker container")?;
         info!(
             status = output.status.to_string(),
+            duration = format!("{:?}", start.elapsed()),
             "docker container finished"
         );
 
         if !output.status.success() {
             tracing::error!(
                 stdout = std::str::from_utf8(&output.stdout)?,
-                stderr = std::str::from_utf8(&output.stderr)?,
                 "running in docker failed"
             );
-            return Err(eyre!("Running in Docker failed: {cmd:?}"));
+            eprintln!("{}", std::str::from_utf8(&output.stderr)?);
+            return Err(eyre!("Running in Docker failed"));
         }
 
         let output = tokio::fs::read_to_string(cwd.join(Self::RESULT_FILE))
