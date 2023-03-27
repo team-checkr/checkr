@@ -209,7 +209,7 @@ impl AExpr {
                 AExpr::Minus(inner) => inner.simplify(),
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
-            AExpr::Function(_) => todo!(),
+            AExpr::Function(_) => self.clone(),
         }
     }
 }

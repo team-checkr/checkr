@@ -395,6 +395,7 @@ impl AExpr {
                     | InterpreterError::ArrayNotFound { .. }
                     | InterpreterError::IndexOutOfBound { .. }
                     | InterpreterError::NoProgression
+                    | InterpreterError::OutsideFunctionDomain
                     | InterpreterError::ArithmeticOverflow => unreachable!(),
                 },
             })

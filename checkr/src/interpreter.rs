@@ -154,7 +154,56 @@ impl AExpr {
             AExpr::Minus(n) => (n.semantics(m)?)
                 .checked_neg()
                 .ok_or(InterpreterError::ArithmeticOverflow)?,
-            AExpr::Function(f) => return Err(todo!("evaluating functions {f}")),
+            AExpr::Function(f) => match f {
+                Function::Division(l, r) => {
+                    AOp::Divide.semantic(l.semantics(m)?, r.semantics(m)?)?
+                }
+                Function::Min(x, y) => x.semantics(m)?.min(y.semantics(m)?),
+                Function::Max(x, y) => x.semantics(m)?.max(y.semantics(m)?),
+                Function::Count(arr, x) | Function::LogicalCount(arr, x) => {
+                    let data = if let Some(data) = m.arrays.get(arr) {
+                        data
+                    } else {
+                        return Err(InterpreterError::ArrayNotFound {
+                            name: arr.to_string(),
+                        });
+                    };
+                    let x = x.semantics(m)?;
+                    data.iter().filter(|e| **e == x).count() as _
+                }
+                Function::Length(arr) | Function::LogicalLength(arr) => {
+                    let data = if let Some(data) = m.arrays.get(arr) {
+                        data
+                    } else {
+                        return Err(InterpreterError::ArrayNotFound {
+                            name: arr.to_string(),
+                        });
+                    };
+                    data.len() as _
+                }
+                Function::Fac(x) => {
+                    let x = x.semantics(m)?;
+                    if x < 0 {
+                        return Err(InterpreterError::OutsideFunctionDomain);
+                    }
+                    (1..=x)
+                        .fold(Some(1 as Int), |acc, x| acc?.checked_mul(x))
+                        .ok_or(InterpreterError::ArithmeticOverflow)?
+                }
+                Function::Fib(x) => {
+                    let x = x.semantics(m)?;
+                    if x < 0 {
+                        return Err(InterpreterError::OutsideFunctionDomain);
+                    }
+                    (0..x)
+                        .fold(Some((0 as Int, 1)), |acc, _| {
+                            let (a, b) = acc?;
+                            Some((b, a.checked_add(b)?))
+                        })
+                        .map(|(x, _)| x)
+                        .ok_or(InterpreterError::ArithmeticOverflow)?
+                }
+            },
         })
     }
 }
@@ -177,6 +226,8 @@ pub enum InterpreterError {
     ArithmeticOverflow,
     #[error("tried to evaluate a quantified expression")]
     EvaluateQuantifier,
+    #[error("tried to evaluate function where argument was outside of domain")]
+    OutsideFunctionDomain,
 }
 
 impl AOp {
