@@ -1,6 +1,6 @@
 use egg::{define_language, rewrite as rw, FromOpError, Id, RecExpr, RecExprParseError};
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Quantifier, Target, Variable};
+use crate::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Target, Variable};
 
 type Runner = egg::Runner<Gcl, ()>;
 type Rewrite = egg::Rewrite<Gcl, ()>;
@@ -15,7 +15,7 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "^" = Pow([Id; 2]),
-        Number(i64),
+        Number(crate::ast::Int),
         Variable(Variable),
         Array(Array, Id),
         // Functions
@@ -253,6 +253,8 @@ fn egg() -> color_eyre::Result<()> {
 
 #[test]
 fn egg_quantifiers() -> color_eyre::Result<()> {
+    use crate::ast::Quantifier;
+
     color_eyre::install()?;
 
     let mut checker = EquivChecker::default();

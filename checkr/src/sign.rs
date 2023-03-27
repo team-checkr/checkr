@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{Direction, MonotoneFramework},
-    ast::{AExpr, Array, BExpr, Target, Variable},
+    ast::{AExpr, Array, BExpr, Int, Target, Variable},
     interpreter::InterpreterError,
     pg::{Action, Edge, ProgramGraph},
 };
@@ -40,7 +40,7 @@ impl std::fmt::Display for Sign {
 }
 
 impl Sign {
-    fn representative(self) -> impl Iterator<Item = i64> + Clone {
+    fn representative(self) -> impl Iterator<Item = Int> + Clone {
         match self {
             Sign::Positive => itertools::Either::Left([1, 2]),
             Sign::Zero => itertools::Either::Right([0]),
@@ -346,7 +346,7 @@ impl BExpr {
     }
 }
 
-fn sign_of(n: i64) -> Sign {
+fn sign_of(n: Int) -> Sign {
     match n {
         _ if n > 0 => Sign::Positive,
         _ if n < 0 => Sign::Negative,

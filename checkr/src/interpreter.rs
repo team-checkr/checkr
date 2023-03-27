@@ -1,14 +1,14 @@
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{AExpr, AOp, BExpr, LogicOp, RelOp, Target},
+    ast::{AExpr, AOp, BExpr, Function, Int, LogicOp, RelOp, Target},
     pg::{Action, Node, ProgramGraph},
     sign::Memory,
 };
 
 pub struct Interpreter {}
 
-pub type InterpreterMemory = Memory<i64, Vec<i64>>;
+pub type InterpreterMemory = Memory<Int, Vec<Int>>;
 
 impl InterpreterMemory {
     pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
@@ -120,7 +120,7 @@ impl Action {
 }
 
 impl AExpr {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Result<i64, InterpreterError> {
+    pub fn semantics(&self, m: &InterpreterMemory) -> Result<Int, InterpreterError> {
         Ok(match self {
             AExpr::Number(n) => *n,
             AExpr::Reference(Target::Variable(x)) => {
@@ -170,7 +170,7 @@ pub enum InterpreterError {
     #[error("array '{name}' not found")]
     ArrayNotFound { name: String },
     #[error("index {index} in '{name}' is out-of-bounds")]
-    IndexOutOfBound { name: String, index: i64 },
+    IndexOutOfBound { name: String, index: Int },
     #[error("no progression")]
     NoProgression,
     #[error("an arithmetic operation overflowed")]
@@ -180,7 +180,7 @@ pub enum InterpreterError {
 }
 
 impl AOp {
-    pub fn semantic(&self, l: i64, r: i64) -> Result<i64, InterpreterError> {
+    pub fn semantic(&self, l: Int, r: Int) -> Result<Int, InterpreterError> {
         Ok(match self {
             AOp::Plus => l
                 .checked_add(r)
@@ -223,7 +223,7 @@ impl BExpr {
 }
 
 impl RelOp {
-    pub fn semantic(&self, l: i64, r: i64) -> bool {
+    pub fn semantic(&self, l: Int, r: Int) -> bool {
         match self {
             RelOp::Eq => l == r,
             RelOp::Ne => l != r,

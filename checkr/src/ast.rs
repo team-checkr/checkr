@@ -151,9 +151,11 @@ pub enum Command {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Guard(pub BExpr, pub Commands);
 
+pub type Int = i64;
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AExpr {
-    Number(i64),
+    Number(Int),
     Reference(Target<Box<AExpr>>),
     Binary(Box<AExpr>, AOp, Box<AExpr>),
     Minus(Box<AExpr>),
