@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.15] - 2023-03-27
+
+### Features
+
+- Implement evaluation of `AExpr::Function`s
+
+### Miscellaneous Tasks
+
+- Cleanup the Justfile and remove Dockerfile.dev
+
+### Refactor
+
+- Abstract integer type into a common `Int` type
+- Improve checko logging and reliability
+
 ## [0.1.14] - 2023-03-24
 
 ### Bug Fixes
@@ -20,6 +35,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update fsharp-starter ref
+- Release
 
 ### Refactor
 
