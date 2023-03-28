@@ -1,6 +1,6 @@
 use egg::{define_language, rewrite as rw, FromOpError, Id, RecExpr, RecExprParseError};
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Quantifier, Target, Variable};
+use crate::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Target, Variable};
 
 type Runner = egg::Runner<Gcl, ()>;
 type Rewrite = egg::Rewrite<Gcl, ()>;
@@ -15,7 +15,7 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "^" = Pow([Id; 2]),
-        Number(i64),
+        Number(crate::ast::Int),
         Variable(Variable),
         Array(Array, Id),
         // Functions
@@ -106,7 +106,7 @@ impl IntoEgg for AExpr {
             AExpr::Number(n) => format!("{n}"),
             AExpr::Reference(t) => match t {
                 Target::Variable(v) => format!("{v}"),
-                Target::Array(arr, idx) => format!("(array {arr} {})", idx.egg()),
+                Target::Array(arr, idx) => format!("({arr} {})", idx.egg()),
             },
             AExpr::Binary(lhs, AOp::Divide, rhs) => {
                 format!("(division {} {})", lhs.egg(), rhs.egg())
@@ -148,9 +148,16 @@ impl IntoEgg for BExpr {
 
 impl BExpr {
     pub fn renumber_quantifiers(&self) -> BExpr {
-        self.renumber_quantifiers_inner(&mut 0)
+        // NOTE: We do two passes, otherwise expressions like these wouldn't be equal:
+        //   exists _f0 :: exists _f1 :: _f0 = _f1
+        //   exists _f1 :: exists _f0 :: _f1 = _f0
+        //
+        // By constructing identifiers with invalid names, we are sure that
+        // we don't interfere with anything already defined.
+        self.renumber_quantifiers_inner("not a valid ident", &mut 0)
+            .renumber_quantifiers_inner("f", &mut 0)
     }
-    pub fn renumber_quantifiers_inner(&self, count: &mut u64) -> BExpr {
+    fn renumber_quantifiers_inner(&self, f: &str, count: &mut u64) -> BExpr {
         match self
             .semantics(&Default::default())
             .map(BExpr::Bool)
@@ -159,8 +166,8 @@ impl BExpr {
             BExpr::Bool(b) => BExpr::Bool(b),
             BExpr::Rel(l, op, r) => BExpr::Rel(l.simplify(), op, r.simplify()),
             BExpr::Logic(l, op, r) => {
-                let l = l.renumber_quantifiers_inner(count);
-                let r = r.renumber_quantifiers_inner(count);
+                let l = l.renumber_quantifiers_inner(f, count);
+                let r = r.renumber_quantifiers_inner(f, count);
 
                 match (l, op, r) {
                     (BExpr::Bool(true), LogicOp::And, x) | (x, LogicOp::And, BExpr::Bool(true)) => {
@@ -178,21 +185,21 @@ impl BExpr {
                 }
             }
             BExpr::Not(x) => {
-                let x = x.renumber_quantifiers_inner(count);
+                let x = x.renumber_quantifiers_inner(f, count);
                 match x {
                     BExpr::Bool(b) => BExpr::Bool(!b),
                     x => BExpr::Not(Box::new(x)),
                 }
             }
             BExpr::Quantified(q, t, e) => {
-                let x = Target::Variable(Variable(format!("_f{count}")));
+                let x = Target::Variable(Variable(format!("_{f}{count}")));
                 *count += 1;
                 BExpr::Quantified(
                     q,
                     x.clone().unit(),
                     Box::new(
                         e.subst_var(&t, &AExpr::Reference(x))
-                            .renumber_quantifiers_inner(count),
+                            .renumber_quantifiers_inner(f, count),
                     ),
                 )
             }
@@ -222,37 +229,15 @@ impl Default for EquivChecker {
     fn default() -> Self {
         EquivChecker {
             rules: make_rules(),
-            runner: Runner::default(),
+            runner: Runner::default(), //.with_explanations_enabled(),
         }
     }
 }
 
 #[test]
-fn egg() -> color_eyre::Result<()> {
-    color_eyre::install()?;
-
-    let a = AExpr::binary(AExpr::Number(12), AOp::Plus, AExpr::Number(0));
-    assert_eq!(a.egg(), "(+ 12 0)");
-    let a = a.rec_expr()?;
-
-    let b = AExpr::binary(AExpr::Number(1), AOp::Times, AExpr::Number(12));
-    assert_eq!(b.egg(), "(* 1 12)");
-    let b = b.rec_expr()?;
-
-    let mut runner = Runner::default(); //.with_explanations_enabled();
-
-    runner.egraph.add_expr(&a);
-    runner.egraph.add_expr(&b);
-
-    let runner = runner.run(&make_rules());
-
-    assert_eq!(runner.egraph.equivs(&a, &b).len(), 1);
-
-    Ok(())
-}
-
-#[test]
 fn egg_quantifiers() -> color_eyre::Result<()> {
+    use crate::ast::Quantifier;
+
     color_eyre::install()?;
 
     let mut checker = EquivChecker::default();
@@ -280,6 +265,26 @@ fn egg_quantifiers() -> color_eyre::Result<()> {
     checker.run();
 
     assert!(!checker.are_equivalent(&forall_expr, &exists_expr));
+
+    Ok(())
+}
+
+#[test]
+fn egg_arrays() -> color_eyre::Result<()> {
+    use pretty_assertions::assert_eq;
+
+    color_eyre::install()?;
+
+    let mut checker = EquivChecker::default();
+    let a = AExpr::Reference(Target::Array(
+        Array("a".to_string()),
+        Box::new(AExpr::Number(0)),
+    ));
+    a.rec_expr().unwrap();
+    let a_expr = checker.register(&a);
+    assert_eq!(a_expr.to_string(), "(a 0)");
+    let a_re: RecExpr<Gcl> = a_expr.to_string().parse()?;
+    assert_eq!(a_expr, a_re);
 
     Ok(())
 }

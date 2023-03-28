@@ -121,7 +121,7 @@ RelOp: RelOp = {
 Var: String = r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 LogicalVar: String = r"_[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 
-Int: i64 = r"[0-9]+" => i64::from_str(<>).unwrap();
+Int: Int = r"[0-9]+" => Int::from_str(<>).unwrap();
 
 
 // Security lattice

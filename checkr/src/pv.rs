@@ -1,8 +1,7 @@
 use std::sync::atomic::AtomicU64;
 
 use crate::ast::{
-    AExpr, AOp, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp, Target,
-    Variable,
+    AExpr, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp, Target, Variable,
 };
 
 impl Commands {
@@ -209,7 +208,7 @@ impl AExpr {
                 AExpr::Minus(inner) => inner.simplify(),
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
-            AExpr::Function(_) => todo!(),
+            AExpr::Function(_) => self.clone(),
         }
     }
 }
@@ -234,8 +233,8 @@ impl Function {
             }
             Function::Length(arr) => Function::Length(arr.clone()),
             Function::LogicalLength(arr) => Function::LogicalLength(arr.clone()),
-            Function::Fac(x) => Function::Fac(Box::new(x.subst_var(t, x))),
-            Function::Fib(x) => Function::Fib(Box::new(x.subst_var(t, x))),
+            Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
+            Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
         }
     }
 }

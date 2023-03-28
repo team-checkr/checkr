@@ -2,6 +2,50 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.17] - 2023-03-28
+
+### Bug Fixes
+
+- Fix array lowering into egg
+- Correctly substitute in `fac` and `fib`
+
+### Refactor
+
+- Improve error reporting in checko a bit more
+- Print errors using debug in checko for backtrace
+
+## [0.1.16] - 2023-03-28
+
+### Bug Fixes
+
+- Ensure quantifier normalization does not use already present names
+
+### Features
+
+- Print out errors with context in checko evaluation
+
+### Miscellaneous Tasks
+
+- Fix clippy warnings
+- Update lalrpop
+- Release
+
+## [0.1.15] - 2023-03-27
+
+### Features
+
+- Implement evaluation of `AExpr::Function`s
+
+### Miscellaneous Tasks
+
+- Cleanup the Justfile and remove Dockerfile.dev
+- Release
+
+### Refactor
+
+- Abstract integer type into a common `Int` type
+- Improve checko logging and reliability
+
 ## [0.1.14] - 2023-03-24
 
 ### Bug Fixes
@@ -20,6 +64,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update fsharp-starter ref
+- Release
 
 ### Refactor
 

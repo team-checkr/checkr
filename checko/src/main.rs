@@ -1,7 +1,9 @@
 use std::{
     fs,
+    num::NonZeroUsize,
     path::{Path, PathBuf},
     sync::Arc,
+    time::Duration,
 };
 
 use checko::{
@@ -161,7 +163,8 @@ async fn run() -> Result<()> {
 
             let task_permits = Arc::new(tokio::sync::Semaphore::new(concurrent));
 
-            for g in groups.groups {
+            let num_groups = groups.groups.len();
+            for (g_idx, g) in groups.groups.into_iter().enumerate() {
                 let task_permits = Arc::clone(&task_permits);
 
                 let name = g.name.clone();
@@ -177,7 +180,7 @@ async fn run() -> Result<()> {
 
                         // TODO: Replace this with a try-block when they are stable
                         let result: Result<()> = (|| async {
-                            let (sh, _) = env
+                            let sh = env
                                 .shell_in_default_branch()
                                 .wrap_err("getting shell in default branch")?;
                             let cwd = sh.current_dir();
@@ -185,7 +188,7 @@ async fn run() -> Result<()> {
                             let output =
                                 TestRunInput::run_in_docker(&image, &cwd, programs.clone()).await?;
                             info!(
-                                file = format!("{:?}", env.latest_run_path()),
+                                file = env.latest_run_path().display().to_string(),
                                 "writing result"
                             );
                             env.write_latest_run(&output)?;
@@ -195,9 +198,15 @@ async fn run() -> Result<()> {
 
                         if let Err(e) = result {
                             error!(error = e.to_string(), "errored");
+                            eprintln!("{e:?}");
                         }
                     }
-                    .instrument(span!(Level::INFO, "Group", name = name)),
+                    .instrument(span!(
+                        Level::INFO,
+                        "Group",
+                        name = name,
+                        nr = format!("{}/{num_groups}", g_idx + 1)
+                    )),
                 );
                 tasks.push(task);
             }
@@ -228,7 +237,7 @@ async fn run() -> Result<()> {
                         data,
                     };
 
-                    let (sh, _) = env.shell_in_results_branch()?;
+                    let sh = env.shell_in_results_branch()?;
 
                     sh.write_file("README.md", report.to_string())?;
                     cmd!(sh, "git add .").run()?;
@@ -237,7 +246,11 @@ async fn run() -> Result<()> {
                     if execute {
                         info!("pushing to results branch");
                         cmd!(sh, "git commit -m {msg}").run()?;
-                        cmd!(sh, "git push --force --set-upstream origin results").run()?;
+                        retry(
+                            5.try_into().expect("it's positive"),
+                            Duration::from_millis(500),
+                            || cmd!(sh, "git push --force --set-upstream origin results").run(),
+                        )?;
                     } else {
                         info!("skipping push to results branch");
                         info!("(skipping) > git commit -m {msg:?}");
@@ -247,7 +260,8 @@ async fn run() -> Result<()> {
                 };
 
                 if let Err(err) = run() {
-                    error!(error = format!("{err:?}"));
+                    error!("failed to push");
+                    eprintln!("{err:?}");
                     groups_with_errors.push(g);
                 }
             }
@@ -283,7 +297,8 @@ async fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        error!(err = format!("{e}"), "did not have a latest run")
+                        error!("did not have a latest run");
+                        eprintln!("{e:?}");
                     }
                 }
             }
@@ -362,41 +377,72 @@ impl<'a> GroupEnv<'a> {
         sh.change_dir(&g_dir);
         Ok(sh)
     }
-    fn shell_in_default_branch(&self) -> Result<(Shell, gix::Repository)> {
+    fn shell_in_default_branch(&self) -> Result<Shell> {
         let sh = self.shell_in_folder()?;
         sh.remove_path("repo")?;
 
-        info!(repo = self.config.git, "cloning repo");
-        let (mut prepare_checkout, _) = gix::prepare_clone(
-            gix::Url::try_from(&*self.config.git)?,
-            sh.current_dir().join("repo"),
-        )?
-        .fetch_then_checkout(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-
-        let (repo, _) = prepare_checkout
-            .main_worktree(gix::progress::Discard, &gix::interrupt::IS_INTERRUPTED)?;
-        info!(repo = self.config.git, "cloned");
+        let before_clone = std::time::Instant::now();
+        let git = &self.config.git;
+        let dst = sh.current_dir().join("repo");
+        info!(repo = git, dst = dst.display().to_string(), "cloning");
+        cmd!(sh, "git clone --filter=blob:none --no-checkout {git} {dst}")
+            .ignore_stdout()
+            .ignore_stderr()
+            .quiet()
+            .run()?;
 
         sh.change_dir("repo");
 
+        // TODO: This should not be hardcoded to master, but rather look up the default branch
+        cmd!(sh, "git checkout master")
+            .ignore_stdout()
+            .ignore_stderr()
+            .quiet()
+            .run()?;
+        info!(took = format!("{:?}", before_clone.elapsed()), "cloned");
+
         // TODO: possibly change to the latest commit just before a deadline
 
-        Ok((sh, repo))
+        Ok(sh)
     }
-    fn shell_in_results_branch(&self) -> Result<(Shell, gix::Repository)> {
-        let (sh, repo) = self.shell_in_default_branch()?;
+    fn shell_in_results_branch(&self) -> Result<Shell> {
+        let sh = self.shell_in_default_branch()?;
 
-        if cmd!(sh, "git checkout results").run().is_err() {
-            cmd!(sh, "git switch --orphan results").run()?;
-        }
-        cmd!(sh, "git reset --hard").run()?;
-        cmd!(sh, "git clean -xdf").run()?;
-        if let Err(err) = cmd!(sh, "git pull").run() {
-            warn!(
-                error = format!("{err:?}"),
-                "failed to pull, but continuing anyway",
-            );
-        }
-        Ok((sh, repo))
+        retry(
+            5.try_into().expect("it's positive"),
+            Duration::from_millis(500),
+            || -> Result<()> {
+                if cmd!(sh, "git checkout results").run().is_err() {
+                    cmd!(sh, "git switch --orphan results").run()?;
+                }
+                cmd!(sh, "git reset --hard").run()?;
+                cmd!(sh, "git clean -xdf").run()?;
+                if let Err(err) = cmd!(sh, "git pull").run() {
+                    warn!("failed to pull, but continuing anyway");
+                    eprintln!("{err:?}");
+                }
+                Ok(())
+            },
+        )?;
+
+        Ok(sh)
     }
+}
+
+fn retry<T, E>(
+    tries: NonZeroUsize,
+    delay: Duration,
+    mut f: impl FnMut() -> Result<T, E>,
+) -> Result<T, E> {
+    let mut error = None;
+
+    for _ in 0..tries.get() {
+        match f() {
+            Ok(res) => return Ok(res),
+            Err(err) => error = Some(err),
+        }
+        std::thread::sleep(delay);
+    }
+
+    Err(error.unwrap())
 }

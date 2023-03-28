@@ -17,7 +17,7 @@ egg = "0.9.3"
 graphviz-rust = "0.6.1"
 indexmap = { version = "1.9.2", features = ["serde"] }
 itertools = { workspace = true }
-lalrpop-util = { version = "0.19.8", features = ["lexer"] }
+lalrpop-util = { version = "0.19.9", features = ["lexer"] }
 miette = { version = "5.5.0", features = ["fancy"] }
 once_cell = "1.17.0"
 petgraph = { version = "0.6.3" }
@@ -29,5 +29,8 @@ tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
 typeshare = { workspace = true }
 
+[dev-dependencies]
+pretty_assertions = "1.3.0"
+
 [build-dependencies]
-lalrpop = { version = "0.19.8", features = ["lexer"] }
+lalrpop = { version = "0.19.9", features = ["lexer"] }
