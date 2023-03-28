@@ -45,6 +45,7 @@ impl SerializedPredicate {
     }
 }
 
+#[allow(dead_code)]
 fn camillaify(s: &str) -> String {
     s.replace(" | ", " ∨ ")
         .replace("<=", "≤")

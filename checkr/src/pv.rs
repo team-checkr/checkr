@@ -1,8 +1,7 @@
 use std::sync::atomic::AtomicU64;
 
 use crate::ast::{
-    AExpr, AOp, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp, Target,
-    Variable,
+    AExpr, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp, Target, Variable,
 };
 
 impl Commands {

@@ -14,6 +14,8 @@ pub struct Context {
     names: Vec<String>,
 }
 
+type GenerationOptions<R, Ctx, G> = Vec<(f32, Box<dyn Fn(&mut Ctx, &mut R) -> G>)>;
+
 impl Context {
     pub fn new<R: Rng>(fuel: u32, _rng: &mut R) -> Self {
         Context {
@@ -70,7 +72,7 @@ impl Context {
     fn sample<G: Generate<Context = Self>, R: Rng>(
         &mut self,
         rng: &mut R,
-        options: Vec<(f32, Box<dyn Fn(&mut Self, &mut R) -> G>)>,
+        options: GenerationOptions<R, Self, G>,
     ) -> G {
         let f = options.choose_weighted(rng, |o| o.0).unwrap();
         f.1(self, rng)

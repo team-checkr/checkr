@@ -17,7 +17,6 @@ use color_eyre::{
     eyre::{eyre, Context, ContextCompat},
     Result,
 };
-use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 use tracing::info;
 use xshell::Shell;
@@ -92,19 +91,6 @@ impl TestRunInput {
 
         Ok(())
     }
-}
-
-fn format_cmd(cmd: &tokio::process::Command) -> impl std::fmt::Display + '_ {
-    let cmd = cmd.as_std();
-
-    let program = Either::Left(Path::new(cmd.get_program()).display());
-
-    let program_args = cmd
-        .get_args()
-        .map(std::ffi::OsStr::to_string_lossy)
-        .map(Either::Right);
-
-    std::iter::once(program).chain(program_args).format(" ")
 }
 
 #[derive(Debug, Serialize, Deserialize)]
