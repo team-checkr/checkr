@@ -198,6 +198,7 @@ async fn run() -> Result<()> {
 
                         if let Err(e) = result {
                             error!(error = e.to_string(), "errored");
+                            eprintln!("{e}");
                         }
                     }
                     .instrument(span!(
