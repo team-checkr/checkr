@@ -260,7 +260,8 @@ async fn run() -> Result<()> {
                 };
 
                 if let Err(err) = run() {
-                    error!(error = format!("{err:?}"));
+                    error!("failed to push");
+                    eprintln!("{err}");
                     groups_with_errors.push(g);
                 }
             }
@@ -296,7 +297,8 @@ async fn run() -> Result<()> {
                         }
                     }
                     Err(e) => {
-                        error!(err = format!("{e}"), "did not have a latest run")
+                        error!("did not have a latest run");
+                        eprintln!("{e}");
                     }
                 }
             }
@@ -416,10 +418,8 @@ impl<'a> GroupEnv<'a> {
                 cmd!(sh, "git reset --hard").run()?;
                 cmd!(sh, "git clean -xdf").run()?;
                 if let Err(err) = cmd!(sh, "git pull").run() {
-                    warn!(
-                        error = format!("{err:?}"),
-                        "failed to pull, but continuing anyway",
-                    );
+                    warn!("failed to pull, but continuing anyway");
+                    eprintln!("{err}");
                 }
                 Ok(())
             },
