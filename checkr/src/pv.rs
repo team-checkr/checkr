@@ -233,8 +233,8 @@ impl Function {
             }
             Function::Length(arr) => Function::Length(arr.clone()),
             Function::LogicalLength(arr) => Function::LogicalLength(arr.clone()),
-            Function::Fac(x) => Function::Fac(Box::new(x.subst_var(t, x))),
-            Function::Fib(x) => Function::Fib(Box::new(x.subst_var(t, x))),
+            Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
+            Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
         }
     }
 }
