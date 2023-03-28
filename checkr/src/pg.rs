@@ -145,7 +145,7 @@ impl Commands {
 fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
     match det {
         Determinism::Deterministic => {
-            let mut prev: BExpr = BExpr::Bool(false); //This is done to comply with Page 25 of Formal Methods
+            let mut prev: BExpr = BExpr::Bool(false); //This is done to comply with Page 25 of Formal Methods, regarding the point that the first argument that must be passed to each function is "false"
 
             let mut edges = vec![];
 
@@ -156,12 +156,12 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge
                     s,
                     Action::Condition(BExpr::logic(
                         g.0.clone(),
-                        LogicOp::And,
+                        LogicOp::Land,
                         BExpr::Not(Box::new(prev.clone())),
                     )),
                     q,
                 ));
-                prev = BExpr::logic(g.0.to_owned().clone(), LogicOp::Or, prev);
+                prev = BExpr::logic(g.0.to_owned().clone(), LogicOp::Lor, prev);
             }
 
             edges
@@ -205,7 +205,7 @@ fn done(det: Determinism, guards: &[Guard]) -> BExpr {
             let mut prev: BExpr = BExpr::Bool(false);
 
             for g in guards {
-                prev = BExpr::logic(g.0.clone(), LogicOp::Or, prev);
+                prev = BExpr::logic(g.0.clone(), LogicOp::Lor, prev);
             }
 
             BExpr::Not(Box::new(prev))
@@ -213,7 +213,7 @@ fn done(det: Determinism, guards: &[Guard]) -> BExpr {
         Determinism::NonDeterministic => guards
             .iter()
             .map(|g| BExpr::Not(Box::new(g.0.clone())))
-            .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
+            .reduce(|a, b| BExpr::logic(a, LogicOp::Land, b))
             .unwrap_or(BExpr::Bool(true)),
     }
 }
