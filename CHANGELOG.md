@@ -2,6 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.16] - 2023-03-28
+
+### Bug Fixes
+
+- Ensure quantifier normalization does not use already present names
+
+### Features
+
+- Print out errors with context in checko evaluation
+
+### Miscellaneous Tasks
+
+- Fix clippy warnings
+- Update lalrpop
+
 ## [0.1.15] - 2023-03-27
 
 ### Features
@@ -11,6 +26,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Cleanup the Justfile and remove Dockerfile.dev
+- Release
 
 ### Refactor
 
