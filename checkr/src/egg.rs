@@ -148,9 +148,16 @@ impl IntoEgg for BExpr {
 
 impl BExpr {
     pub fn renumber_quantifiers(&self) -> BExpr {
-        self.renumber_quantifiers_inner(&mut 0)
+        // NOTE: We do two passes, otherwise expressions like these wouldn't be equal:
+        //   exists _f0 :: exists _f1 :: _f0 = _f1
+        //   exists _f1 :: exists _f0 :: _f1 = _f0
+        //
+        // By constructing identifiers with invalid names, we are sure that
+        // we don't interfere with anything already defined.
+        self.renumber_quantifiers_inner("not a valid ident", &mut 0)
+            .renumber_quantifiers_inner("f", &mut 0)
     }
-    pub fn renumber_quantifiers_inner(&self, count: &mut u64) -> BExpr {
+    fn renumber_quantifiers_inner(&self, f: &str, count: &mut u64) -> BExpr {
         match self
             .semantics(&Default::default())
             .map(BExpr::Bool)
@@ -159,8 +166,8 @@ impl BExpr {
             BExpr::Bool(b) => BExpr::Bool(b),
             BExpr::Rel(l, op, r) => BExpr::Rel(l.simplify(), op, r.simplify()),
             BExpr::Logic(l, op, r) => {
-                let l = l.renumber_quantifiers_inner(count);
-                let r = r.renumber_quantifiers_inner(count);
+                let l = l.renumber_quantifiers_inner(f, count);
+                let r = r.renumber_quantifiers_inner(f, count);
 
                 match (l, op, r) {
                     (BExpr::Bool(true), LogicOp::And, x) | (x, LogicOp::And, BExpr::Bool(true)) => {
@@ -178,21 +185,21 @@ impl BExpr {
                 }
             }
             BExpr::Not(x) => {
-                let x = x.renumber_quantifiers_inner(count);
+                let x = x.renumber_quantifiers_inner(f, count);
                 match x {
                     BExpr::Bool(b) => BExpr::Bool(!b),
                     x => BExpr::Not(Box::new(x)),
                 }
             }
             BExpr::Quantified(q, t, e) => {
-                let x = Target::Variable(Variable(format!("_f{count}")));
+                let x = Target::Variable(Variable(format!("_{f}{count}")));
                 *count += 1;
                 BExpr::Quantified(
                     q,
                     x.clone().unit(),
                     Box::new(
                         e.subst_var(&t, &AExpr::Reference(x))
-                            .renumber_quantifiers_inner(count),
+                            .renumber_quantifiers_inner(f, count),
                     ),
                 )
             }

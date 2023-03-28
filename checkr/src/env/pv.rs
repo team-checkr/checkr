@@ -215,3 +215,28 @@ impl Environment for ProgramVerificationEnv {
         // }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use pretty_assertions::assert_eq;
+
+    #[test]
+    fn normalization_simple() -> miette::Result<()> {
+        let a = "exists _f0 :: exists _f1 :: _f0 = _f1";
+        let b = "exists _f1 :: exists _f0 :: _f1 = _f0";
+        let a = crate::parse::parse_predicate(a)?.renumber_quantifiers();
+        let b = crate::parse::parse_predicate(b)?.renumber_quantifiers();
+        assert_eq!(a, b);
+        Ok(())
+    }
+    #[test]
+    fn normalization_large() -> miette::Result<()> {
+        let a = "((exists _f2 :: (((d <= d) & (exists _f1 :: ((exists _f0 :: (((((a > 0) && (_f1 = 0)) && (_f2 = 0)) && (_f0 < 0)) & (d = _f1))) & (b = d)))) & (c = -77))) ==> ((((a = 0) && (b = 0)) && (c > 0)) && (d = 0)))";
+        let b = "((exists _f0 :: (((d <= d) & (exists _f1 :: ((exists _f2 :: (((((a > 0) && (_f1 = 0)) && (_f0 = 0)) && (_f2 < 0)) & (d = _f1))) & (b = d)))) & (c = -77))) ==> ((((a = 0) && (b = 0)) && (c > 0)) && (d = 0)))";
+        let a = crate::parse::parse_predicate(a)?.renumber_quantifiers();
+        let b = crate::parse::parse_predicate(b)?.renumber_quantifiers();
+        assert_eq!(a, b);
+
+        Ok(())
+    }
+}
