@@ -145,13 +145,14 @@ impl Commands {
 fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
     match det {
         Determinism::Deterministic => {
-            let mut prev: BExpr = BExpr::Bool(false); //This is done to comply with Page 25 of Formal Methods, regarding the point that the first argument that must be passed to each function is "false"
+            let mut prev: BExpr = BExpr::Bool(false); //See the "if" and "do" Commands on Page 25 of Formal Methods
 
             let mut edges = vec![];
 
             for g in guards {
                 let q = Node::fresh();
-                edges.extend(g.1.edges(det, q, t));
+
+                //The order of the two functions below (edges.push and edges.extend) was chosen, such that the insertion order into "edges" would match that seen in the first guard rule on Page 25 of Formal Methods
                 edges.push(Edge(
                     s,
                     Action::Condition(BExpr::logic(
@@ -161,6 +162,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge
                     )),
                     q,
                 ));
+                edges.extend(g.1.edges(det, q, t));
                 prev = BExpr::logic(g.0.to_owned().clone(), LogicOp::Lor, prev);
             }
 
