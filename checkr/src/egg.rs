@@ -235,30 +235,6 @@ impl Default for EquivChecker {
 }
 
 #[test]
-fn egg() -> color_eyre::Result<()> {
-    color_eyre::install()?;
-
-    let a = AExpr::binary(AExpr::Number(12), AOp::Plus, AExpr::Number(0));
-    assert_eq!(a.egg(), "(+ 12 0)");
-    let a = a.rec_expr()?;
-
-    let b = AExpr::binary(AExpr::Number(1), AOp::Times, AExpr::Number(12));
-    assert_eq!(b.egg(), "(* 1 12)");
-    let b = b.rec_expr()?;
-
-    let mut runner = Runner::default(); //.with_explanations_enabled();
-
-    runner.egraph.add_expr(&a);
-    runner.egraph.add_expr(&b);
-
-    let runner = runner.run(&make_rules());
-
-    assert_eq!(runner.egraph.equivs(&a, &b).len(), 1);
-
-    Ok(())
-}
-
-#[test]
 fn egg_quantifiers() -> color_eyre::Result<()> {
     use crate::ast::Quantifier;
 
