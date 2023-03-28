@@ -106,7 +106,7 @@ impl IntoEgg for AExpr {
             AExpr::Number(n) => format!("{n}"),
             AExpr::Reference(t) => match t {
                 Target::Variable(v) => format!("{v}"),
-                Target::Array(arr, idx) => format!("(array {arr} {})", idx.egg()),
+                Target::Array(arr, idx) => format!("({arr} {})", idx.egg()),
             },
             AExpr::Binary(lhs, AOp::Divide, rhs) => {
                 format!("(division {} {})", lhs.egg(), rhs.egg())
@@ -229,7 +229,7 @@ impl Default for EquivChecker {
     fn default() -> Self {
         EquivChecker {
             rules: make_rules(),
-            runner: Runner::default(),
+            runner: Runner::default(), //.with_explanations_enabled(),
         }
     }
 }
@@ -265,6 +265,26 @@ fn egg_quantifiers() -> color_eyre::Result<()> {
     checker.run();
 
     assert!(!checker.are_equivalent(&forall_expr, &exists_expr));
+
+    Ok(())
+}
+
+#[test]
+fn egg_arrays() -> color_eyre::Result<()> {
+    use pretty_assertions::assert_eq;
+
+    color_eyre::install()?;
+
+    let mut checker = EquivChecker::default();
+    let a = AExpr::Reference(Target::Array(
+        Array("a".to_string()),
+        Box::new(AExpr::Number(0)),
+    ));
+    a.rec_expr().unwrap();
+    let a_expr = checker.register(&a);
+    assert_eq!(a_expr.to_string(), "(a 0)");
+    let a_re: RecExpr<Gcl> = a_expr.to_string().parse()?;
+    assert_eq!(a_expr, a_re);
 
     Ok(())
 }
