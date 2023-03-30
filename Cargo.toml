@@ -11,6 +11,8 @@ authors = [
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
+axum = { version = "0.6.2", features = ["macros", "ws"] }
+axum-macros = "0.3.1"
 color-eyre = "0.6.2"
 comfy-table = { version = "6.1.4", default-features = false }
 itertools = "0.10.5"

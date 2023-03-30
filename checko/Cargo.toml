@@ -8,11 +8,15 @@ repository = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum = { workspace = true }
+axum-macros = { workspace = true }
 checkr = { workspace = true }
 chrono = "0.4.24"
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }
+dioxus = "0.3.2"
+dioxus-liveview = { version = "0.3.0", features = ["axum"] }
 indexmap = { version = "1.9.2", features = ["serde"] }
 itertools = { workspace = true }
 serde = { workspace = true }

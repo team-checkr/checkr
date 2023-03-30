@@ -9,8 +9,8 @@ authors = { workspace = true }
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-axum = { version = "0.6.2", features = ["macros", "ws"] }
-axum-macros = "0.3.1"
+axum = { workspace = true }
+axum-macros = { workspace = true }
 binswap-github = "0.1.6"
 checkr = { workspace = true }
 rand = { workspace = true }
