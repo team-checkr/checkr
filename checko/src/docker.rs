@@ -8,8 +8,8 @@ use tokio::io::AsyncWriteExt;
 
 #[derive(Debug, Clone)]
 pub enum ImageKind {
-    GitHub,
-    Local,
+    ReuseHost,
+    Build,
 }
 
 #[derive(Clone)]
@@ -19,15 +19,16 @@ pub struct DockerImage {
 }
 
 impl DockerImage {
+    /// Build a docker image where checko is not included, and must be mounted
+    /// as a volume when running.
     pub async fn build() -> Result<DockerImage> {
-        const IMAGE_NAME: &str = "checko-github";
+        const IMAGE_NAME: &str = "checko-reuse-host";
 
-        let dockerfile_src = include_str!("../Dockerfile.github");
+        let dockerfile_src = include_str!("../Dockerfile.reuse-host");
 
-        // cat Dockerfile.github | docker build --platform linux/x86_64 -t checko-github
+        // cat Dockerfile.reuse-host | docker build -t checko-reuse-host
         let mut child = tokio::process::Command::new("docker")
             .arg("build")
-            .args(["--platform", "linux/x86_64"])
             .args(["-t", IMAGE_NAME])
             .arg("-")
             .stdout(Stdio::inherit())
@@ -45,13 +46,15 @@ impl DockerImage {
         }
 
         Ok(DockerImage {
-            kind: ImageKind::GitHub,
+            kind: ImageKind::ReuseHost,
             name: IMAGE_NAME.to_string(),
         })
     }
 
+    /// Build a docker image where checko is build as part of the process. This
+    /// requires the command to be built in the root of the project.
     pub async fn build_in_tree() -> Result<DockerImage> {
-        const IMAGE_NAME: &str = "checko-local";
+        const IMAGE_NAME: &str = "checko-build";
 
         let mut child = tokio::process::Command::new("docker")
             .arg("build")
@@ -69,7 +72,7 @@ impl DockerImage {
         }
 
         Ok(DockerImage {
-            kind: ImageKind::Local,
+            kind: ImageKind::Build,
             name: IMAGE_NAME.to_string(),
         })
     }
@@ -82,10 +85,13 @@ impl DockerImage {
         let mut cmd = tokio::process::Command::new("docker");
         cmd.arg("run").arg("--rm");
         match &self.kind {
-            ImageKind::GitHub => {
-                cmd.args(["--platform", "linux/x86_64"]);
+            ImageKind::ReuseHost => {
+                cmd.args([
+                    "-v",
+                    &format!("{}:/bin/checko", std::env::current_exe().unwrap().display()),
+                ]);
             }
-            ImageKind::Local => {}
+            ImageKind::Build => {}
         }
         cmd.args(flags).args([self.name()]);
         cmd

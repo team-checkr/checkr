@@ -293,9 +293,8 @@ async fn run() -> Result<()> {
                 let _enter = span.enter();
                 match GroupEnv::new(&submissions, g).latest_run() {
                     Ok(data) => match data.data {
-                        checko::test_runner::TestRunData::CompileError(msg) => {
-                            error!("did not have a latest run (they failed to compile)");
-                            eprintln!("{msg}");
+                        checko::test_runner::TestRunData::CompileError(_) => {
+                            error!("did not have a latest run (they failed to compile)")
                         }
                         checko::test_runner::TestRunData::Sections(sections) => {
                             for sec in sections {

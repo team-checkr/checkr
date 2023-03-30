@@ -32,8 +32,6 @@ pub struct TestRunInput {
 }
 
 impl TestRunInput {
-    const RESULT_FILE: &'static str = "result.json";
-
     pub async fn run_in_docker(
         image: &DockerImage,
         cwd: &Path,
@@ -76,9 +74,7 @@ impl TestRunInput {
             return Err(eyre!("Running in Docker failed"));
         }
 
-        let output = tokio::fs::read_to_string(cwd.join(Self::RESULT_FILE))
-            .await
-            .wrap_err("failed to read result file")?;
+        let output = String::from_utf8(output.stdout)?;
 
         Ok(serde_json::from_str(&output)?)
     }
@@ -107,7 +103,7 @@ impl TestRunInput {
             }
         };
 
-        sh.write_file(Self::RESULT_FILE, serde_json::to_string(&results)?)?;
+        println!("{}", serde_json::to_string(&results)?);
 
         Ok(())
     }
