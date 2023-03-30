@@ -6,7 +6,7 @@ use std::{
 use color_eyre::{eyre::eyre, Result};
 use tokio::io::AsyncWriteExt;
 
-#[derive(Debug, Clone)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub enum ImageKind {
     ReuseHost,
     Build,
@@ -14,7 +14,7 @@ pub enum ImageKind {
 
 #[derive(Clone)]
 pub struct DockerImage {
-    kind: ImageKind,
+    pub kind: ImageKind,
     name: String,
 }
 
@@ -84,15 +84,6 @@ impl DockerImage {
     pub fn run_cmd(&self, flags: &[impl AsRef<std::ffi::OsStr>]) -> tokio::process::Command {
         let mut cmd = tokio::process::Command::new("docker");
         cmd.arg("run").arg("--rm");
-        match &self.kind {
-            ImageKind::ReuseHost => {
-                cmd.args([
-                    "-v",
-                    &format!("{}:/bin/checko", std::env::current_exe().unwrap().display()),
-                ]);
-            }
-            ImageKind::Build => {}
-        }
         cmd.args(flags).args([self.name()]);
         cmd
     }

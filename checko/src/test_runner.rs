@@ -41,6 +41,16 @@ impl TestRunInput {
 
         const SINGLE_COMPETITION_CMD: &str = "internal-single-competition";
 
+        let checko_bin = cwd.join("checko-bin");
+
+        let checko_run = match image.kind {
+            crate::docker::ImageKind::ReuseHost => {
+                tokio::fs::copy(std::env::current_exe().unwrap(), &checko_bin).await?;
+                "./checko-bin"
+            }
+            crate::docker::ImageKind::Build => "checko",
+        };
+
         let mut cmd = image.run_cmd(&[
             "-w",
             "/root/code",
@@ -51,7 +61,7 @@ impl TestRunInput {
                     .wrap_err("failed to create a str from cwd when spawning docker")?
             ),
         ]);
-        cmd.args(["checko", SINGLE_COMPETITION_CMD]).arg(input);
+        cmd.args([checko_run, SINGLE_COMPETITION_CMD]).arg(input);
 
         let start = std::time::Instant::now();
         info!(container_name = image.name(), "spawning docker container");
@@ -64,6 +74,13 @@ impl TestRunInput {
             duration = format!("{:?}", start.elapsed()),
             "docker container finished"
         );
+
+        match image.kind {
+            crate::docker::ImageKind::ReuseHost => {
+                tokio::fs::remove_file(&checko_bin).await?;
+            }
+            crate::docker::ImageKind::Build => {}
+        }
 
         if !output.status.success() {
             tracing::error!(
