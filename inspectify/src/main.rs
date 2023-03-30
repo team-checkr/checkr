@@ -54,7 +54,7 @@ async fn run() -> color_eyre::Result<()> {
         return Ok(());
     }
 
-    let run = checko::RunOption::from_file(cli.dir.join("run.toml"))
+    let run = run_options_from_file(cli.dir.join("run.toml"))
         .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
     let compilation = Compilation::initialize(cli.dir, run)?;
@@ -98,4 +98,15 @@ async fn run() -> color_eyre::Result<()> {
     axum::Server::bind(&addr).serve(app).await.unwrap();
 
     Ok(())
+}
+
+fn run_options_from_file(
+    path: impl AsRef<std::path::Path>,
+) -> color_eyre::Result<checkr::config::RunOption> {
+    let p = path.as_ref();
+    let src = std::fs::read_to_string(p)
+        .wrap_err_with(|| format!("could not read run options at {p:?}"))?;
+    let parsed = toml::from_str(&src)
+        .wrap_err_with(|| format!("error parsing run options from file {p:?}"))?;
+    Ok(parsed)
 }

@@ -40,6 +40,7 @@ use crate::ast::Commands;
 
 pub mod analysis;
 pub mod ast;
+pub mod config;
 pub mod driver;
 pub mod egg;
 pub mod env;

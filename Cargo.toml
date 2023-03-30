@@ -22,9 +22,10 @@ tokio = { version = "1.25.0", features = ["full"] }
 tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
+typeshare = "1.0.0"
+toml = { version = "0.7.0", features = ["indexmap"] }
 checkr = { path = "./checkr" }
 checko = { path = "./checko" }
-typeshare = "1.0.0"
 
 [profile.test]
 opt-level = 1

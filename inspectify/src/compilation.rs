@@ -4,8 +4,10 @@ use std::{
     time::Duration,
 };
 
-use checko::RunOption;
-use checkr::driver::{Driver, DriverError};
+use checkr::{
+    config::RunOption,
+    driver::{Driver, DriverError},
+};
 use color_eyre::eyre::Context;
 use indicatif::ProgressStyle;
 use notify_debouncer_mini::DebounceEventResult;
@@ -73,7 +75,7 @@ impl Compilation {
         Ok(compilation)
     }
 
-    fn spawn_watcher(self, dir: PathBuf, run: checko::RunOption) -> Result<(), color_eyre::Report> {
+    fn spawn_watcher(self, dir: PathBuf, run: RunOption) -> Result<(), color_eyre::Report> {
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
         let matches = run

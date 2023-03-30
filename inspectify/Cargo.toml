@@ -12,7 +12,6 @@ authors = { workspace = true }
 axum = { version = "0.6.2", features = ["macros", "ws"] }
 axum-macros = "0.3.1"
 binswap-github = "0.1.6"
-checko = { workspace = true }
 checkr = { workspace = true }
 rand = { workspace = true }
 clap = { version = "4.1.1", features = ["derive"] }
@@ -35,4 +34,5 @@ tower-http = { version = "0.3.4", features = ["cors", "fs"] }
 tracing = { workspace = true }
 tracing-error = { workspace = true }
 tracing-subscriber = { workspace = true }
+toml = { workspace = true }
 typeshare = { workspace = true }
