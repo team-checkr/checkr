@@ -7,7 +7,10 @@
 //! a file within the container and are read from the outside to produce the
 //! final [`TestRunResults`].
 
-use std::{path::Path, time::Duration};
+use std::{
+    path::Path,
+    time::{Duration, SystemTime},
+};
 
 use checkr::{
     driver::Driver,
@@ -83,9 +86,26 @@ impl TestRunInput {
         let input: Self = serde_json::from_str(input)?;
 
         let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
-        let driver = run.driver(sh.current_dir())?;
-
-        let results = GroupResults::generate(&input.programs, &driver).await?;
+        let results = match run.driver(sh.current_dir()) {
+            Ok(driver) => GroupResults::generate(&input.programs, &driver).await?,
+            Err(err) => {
+                let msg = match err {
+                    checkr::driver::DriverError::RunCompile(output) => format!(
+                        "running '{}' failed:\n  {output}",
+                        run.compile.as_deref().unwrap_or("compiler"),
+                    ),
+                    checkr::driver::DriverError::CompileFailure(output) => format!(
+                        "failed to compile:\n  {}\n\n  {}",
+                        std::str::from_utf8(&output.stdout).unwrap(),
+                        std::str::from_utf8(&output.stderr).unwrap()
+                    ),
+                };
+                TestRunResults {
+                    ran_at: SystemTime::now(),
+                    data: TestRunData::CompileError(msg),
+                }
+            }
+        };
 
         sh.write_file(Self::RESULT_FILE, serde_json::to_string(&results)?)?;
 
@@ -95,8 +115,14 @@ impl TestRunInput {
 
 #[derive(Debug, Serialize, Deserialize)]
 pub struct TestRunResults {
-    pub ran_at: std::time::SystemTime,
-    pub sections: Vec<TestRunResultsSection>,
+    pub ran_at: SystemTime,
+    pub data: TestRunData,
+}
+
+#[derive(Debug, Serialize, Deserialize)]
+pub enum TestRunData {
+    CompileError(String),
+    Sections(Vec<TestRunResultsSection>),
 }
 
 #[derive(Debug, Serialize, Deserialize)]
@@ -161,8 +187,8 @@ impl GroupResults<'_> {
         }
 
         Ok(TestRunResults {
-            ran_at: std::time::SystemTime::now(),
-            sections: results.sections,
+            ran_at: SystemTime::now(),
+            data: TestRunData::Sections(results.sections),
         })
     }
     async fn push<E: Environment>(&mut self, env: &E) {

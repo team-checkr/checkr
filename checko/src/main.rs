@@ -187,6 +187,12 @@ async fn run() -> Result<()> {
                             drop(sh);
                             let output =
                                 TestRunInput::run_in_docker(&image, &cwd, programs.clone()).await?;
+                            match &output.data {
+                                checko::test_runner::TestRunData::CompileError(_) => {
+                                    warn!("failed to compile. compile error saved")
+                                }
+                                checko::test_runner::TestRunData::Sections(_) => {}
+                            }
                             info!(
                                 file = env.latest_run_path().display().to_string(),
                                 "writing result"
@@ -286,16 +292,22 @@ async fn run() -> Result<()> {
                 let span = span!(Level::INFO, "Group", name = g.name);
                 let _enter = span.enter();
                 match GroupEnv::new(&submissions, g).latest_run() {
-                    Ok(data) => {
-                        for sec in data.sections {
-                            input
-                                .sections
-                                .entry(sec.analysis)
-                                .or_default()
-                                .entry(g.name.clone())
-                                .or_insert(sec.programs);
+                    Ok(data) => match data.data {
+                        checko::test_runner::TestRunData::CompileError(msg) => {
+                            error!("did not have a latest run (they failed to compile)");
+                            eprintln!("{msg}");
                         }
-                    }
+                        checko::test_runner::TestRunData::Sections(sections) => {
+                            for sec in sections {
+                                input
+                                    .sections
+                                    .entry(sec.analysis)
+                                    .or_default()
+                                    .entry(g.name.clone())
+                                    .or_insert(sec.programs);
+                            }
+                        }
+                    },
                     Err(e) => {
                         error!("did not have a latest run");
                         eprintln!("{e:?}");
