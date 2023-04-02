@@ -142,39 +142,46 @@ impl Commands {
     }
 }
 
-fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
+/// Computes the edges and the condition which is true iff all guards are false
+fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edge>, BExpr) {
     match det {
         Determinism::Deterministic => {
-            let mut prev: Option<BExpr> = None;
+            // See the "if" and "do" Commands on Page 25 of Formal Methods
+            let mut prev = BExpr::Bool(false);
 
             let mut edges = vec![];
 
-            for g in guards {
+            for Guard(b, c) in guards {
                 let q = Node::fresh();
-                edges.extend(g.1.edges(det, q, t));
 
-                let cond = if let Some(p) = prev {
-                    prev = Some(BExpr::logic(p.clone(), LogicOp::Or, g.0.to_owned().clone()));
-                    BExpr::logic(BExpr::Not(Box::new(p)), LogicOp::And, g.0.clone())
-                } else {
-                    prev = Some(g.0.clone());
-                    g.0.clone()
-                };
-
-                edges.push(Edge(s, Action::Condition(cond), q));
+                edges.push(Edge(
+                    s,
+                    Action::Condition(BExpr::logic(
+                        b.clone(),
+                        LogicOp::Land,
+                        BExpr::Not(Box::new(prev.clone())),
+                    )),
+                    q,
+                ));
+                edges.extend(c.edges(det, q, t));
+                prev = BExpr::logic(b.to_owned().clone(), LogicOp::Lor, prev);
             }
 
-            edges
+            // Wraps in "not" so that the "d" part can be used directly by "do"
+            (edges, BExpr::Not(Box::new(prev)))
         }
-        Determinism::NonDeterministic => guards
-            .iter()
-            .flat_map(|g| {
-                let q = Node::fresh();
-                let mut edges = g.1.edges(det, q, t);
-                edges.push(Edge(s, Action::Condition(g.0.clone()), q));
-                edges
-            })
-            .collect(),
+        Determinism::NonDeterministic => {
+            let e = guards
+                .iter()
+                .flat_map(|Guard(b, c)| {
+                    let q = Node::fresh();
+                    let mut edges = c.edges(det, q, t);
+                    edges.push(Edge(s, Action::Condition(b.clone()), q));
+                    edges
+                })
+                .collect();
+            (e, done(guards))
+        }
     }
 }
 
@@ -185,10 +192,9 @@ impl Command {
                 vec![Edge(s, Action::Assignment(v.clone(), expr.clone()), t)]
             }
             Command::Skip => vec![Edge(s, Action::Skip, t)],
-            Command::If(guards) => guard_edges(det, guards, s, t),
+            Command::If(guards) => guard_edges(det, guards, s, t).0,
             Command::Loop(guards) | Command::EnrichedLoop(_, guards) => {
-                let b = done(guards);
-                let mut edges = guard_edges(det, guards, s, s);
+                let (mut edges, b) = guard_edges(det, guards, s, s);
                 edges.push(Edge(s, Action::Condition(b), t));
                 edges
             }
@@ -202,8 +208,8 @@ impl Command {
 fn done(guards: &[Guard]) -> BExpr {
     guards
         .iter()
-        .map(|g| BExpr::Not(Box::new(g.0.clone())))
-        .reduce(|a, b| BExpr::logic(a, LogicOp::And, b))
+        .map(|Guard(b, _c)| BExpr::Not(Box::new(b.clone())))
+        .reduce(|a, b| BExpr::logic(a, LogicOp::Land, b))
         .unwrap_or(BExpr::Bool(true))
 }
 
