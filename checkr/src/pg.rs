@@ -145,35 +145,35 @@ impl Commands {
 fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> Vec<Edge> {
     match det {
         Determinism::Deterministic => {
-            let mut prev: BExpr = BExpr::Bool(false); //See the "if" and "do" Commands on Page 25 of Formal Methods
+            //See the "if" and "do" Commands on Page 25 of Formal Methods
+            let mut prev = BExpr::Bool(false);
 
             let mut edges = vec![];
 
-            for g in guards {
+            for Guard(b, c) in guards {
                 let q = Node::fresh();
 
-                //The order of the two functions below (edges.push and edges.extend) was chosen, such that the insertion order into "edges" would match that seen in the first guard rule on Page 25 of Formal Methods
                 edges.push(Edge(
                     s,
                     Action::Condition(BExpr::logic(
-                        g.0.clone(),
+                        b.clone(),
                         LogicOp::Land,
                         BExpr::Not(Box::new(prev.clone())),
                     )),
                     q,
                 ));
-                edges.extend(g.1.edges(det, q, t));
-                prev = BExpr::logic(g.0.to_owned().clone(), LogicOp::Lor, prev);
+                edges.extend(c.edges(det, q, t));
+                prev = BExpr::logic(b.to_owned().clone(), LogicOp::Lor, prev);
             }
 
             edges
         }
         Determinism::NonDeterministic => guards
             .iter()
-            .flat_map(|g| {
+            .flat_map(|Guard(b, c)| {
                 let q = Node::fresh();
-                let mut edges = g.1.edges(det, q, t);
-                edges.push(Edge(s, Action::Condition(g.0.clone()), q));
+                let mut edges = c.edges(det, q, t);
+                edges.push(Edge(s, Action::Condition(b.clone()), q));
                 edges
             })
             .collect(),
@@ -206,15 +206,15 @@ fn done(det: Determinism, guards: &[Guard]) -> BExpr {
         Determinism::Deterministic => {
             let mut prev: BExpr = BExpr::Bool(false);
 
-            for g in guards {
-                prev = BExpr::logic(g.0.clone(), LogicOp::Lor, prev);
+            for Guard(b, _c) in guards {
+                prev = BExpr::logic(b.clone(), LogicOp::Lor, prev);
             }
 
             BExpr::Not(Box::new(prev))
         }
         Determinism::NonDeterministic => guards
             .iter()
-            .map(|g| BExpr::Not(Box::new(g.0.clone())))
+            .map(|Guard(b, _c)| BExpr::Not(Box::new(b.clone())))
             .reduce(|a, b| BExpr::logic(a, LogicOp::Land, b))
             .unwrap_or(BExpr::Bool(true)),
     }
