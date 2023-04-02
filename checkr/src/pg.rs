@@ -142,10 +142,11 @@ impl Commands {
     }
 }
 
+/// Computes the edges and the condition which is true iff all guards are false
 fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edge>, BExpr) {
     match det {
         Determinism::Deterministic => {
-            //See the "if" and "do" Commands on Page 25 of Formal Methods
+            // See the "if" and "do" Commands on Page 25 of Formal Methods
             let mut prev = BExpr::Bool(false);
 
             let mut edges = vec![];
@@ -166,7 +167,8 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
                 prev = BExpr::logic(b.to_owned().clone(), LogicOp::Lor, prev);
             }
 
-            (edges, BExpr::Not(Box::new(prev))) //Wraps in "not" so that the "d" part can be used directly by "do"
+            // Wraps in "not" so that the "d" part can be used directly by "do"
+            (edges, BExpr::Not(Box::new(prev)))
         }
         Determinism::NonDeterministic => {
             let e = guards
