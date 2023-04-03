@@ -22,20 +22,24 @@ use color_eyre::{
 };
 use serde::{Deserialize, Serialize};
 use tracing::info;
-use xshell::Shell;
+use xshell::{cmd, Shell};
 
-use crate::{config::ProgramsConfig, docker::DockerImage, RunOption};
+use crate::{
+    config::{CanonicalProgramsConfig, ProgramId},
+    docker::DockerImage,
+    RunOption,
+};
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct TestRunInput {
-    programs: ProgramsConfig,
+    programs: CanonicalProgramsConfig,
 }
 
 impl TestRunInput {
     pub async fn run_in_docker(
         image: &DockerImage,
         cwd: &Path,
-        programs: ProgramsConfig,
+        programs: CanonicalProgramsConfig,
     ) -> Result<TestRunResults> {
         let input = serde_json::to_string(&TestRunInput { programs }).unwrap();
 
@@ -91,15 +95,19 @@ impl TestRunInput {
             return Err(eyre!("Running in Docker failed"));
         }
 
-        let output = String::from_utf8(output.stdout)?;
+        let output = String::from_utf8(output.stdout)?
+            .lines()
+            .last()
+            .unwrap()
+            .to_string();
 
-        Ok(serde_json::from_str(&output)?)
+        serde_json::from_str(&output).wrap_err_with(|| format!("failed to deserialize {output:?}"))
     }
     pub async fn run_from_within_docker(sh: &Shell, input: &str) -> Result<()> {
         let input: Self = serde_json::from_str(input)?;
 
         let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
-        let results = match run.driver(sh.current_dir()) {
+        let data = match run.driver(sh.current_dir()) {
             Ok(driver) => GroupResults::generate(&input.programs, &driver).await?,
             Err(err) => {
                 let msg = match err {
@@ -113,11 +121,15 @@ impl TestRunInput {
                         std::str::from_utf8(&output.stderr).unwrap()
                     ),
                 };
-                TestRunResults {
-                    ran_at: SystemTime::now(),
-                    data: TestRunData::CompileError(msg),
-                }
+                TestRunData::CompileError(msg)
             }
+        };
+
+        let hash = cmd!(sh, "git rev-parse HEAD").quiet().read()?;
+        let results = TestRunResults {
+            ran_at: SystemTime::now(),
+            hash,
+            data,
         };
 
         println!("{}", serde_json::to_string(&results)?);
@@ -126,25 +138,26 @@ impl TestRunInput {
     }
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct TestRunResults {
     pub ran_at: SystemTime,
+    pub hash: String,
     pub data: TestRunData,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub enum TestRunData {
     CompileError(String),
     Sections(Vec<TestRunResultsSection>),
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct TestRunResultsSection {
     pub analysis: Analysis,
     pub programs: Vec<TestResult>,
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub enum TestResultType {
     CorrectTerminated,
     CorrectNonTerminated { iterations: u64 },
@@ -153,11 +166,10 @@ pub enum TestResultType {
     Error { description: String },
 }
 
-#[derive(Debug, Serialize, Deserialize)]
+#[derive(Debug, Clone, Hash, Serialize, Deserialize)]
 pub struct TestResult {
     pub analysis: Analysis,
-    pub src: String,
-    pub input_json: String,
+    pub id: ProgramId,
     pub result: TestResultType,
     pub time: Duration,
     pub shown: bool,
@@ -173,14 +185,14 @@ impl TestResultType {
 }
 
 struct GroupResults<'a> {
-    config: &'a ProgramsConfig,
+    config: &'a CanonicalProgramsConfig,
     driver: &'a Driver,
 
     sections: Vec<TestRunResultsSection>,
 }
 
 impl GroupResults<'_> {
-    async fn generate(config: &ProgramsConfig, driver: &Driver) -> Result<TestRunResults> {
+    async fn generate(config: &CanonicalProgramsConfig, driver: &Driver) -> Result<TestRunData> {
         let mut results = GroupResults {
             config,
             driver,
@@ -199,10 +211,7 @@ impl GroupResults<'_> {
             }
         }
 
-        Ok(TestRunResults {
-            ran_at: SystemTime::now(),
-            data: TestRunData::Sections(results.sections),
-        })
+        Ok(TestRunData::Sections(results.sections))
     }
     async fn push<E: Environment>(&mut self, env: &E) {
         self.sections.push(TestRunResultsSection {
@@ -213,7 +222,7 @@ impl GroupResults<'_> {
 }
 
 async fn generate_test_results<E: Environment>(
-    config: &ProgramsConfig,
+    config: &CanonicalProgramsConfig,
     env: &E,
     driver: &Driver,
 ) -> Vec<TestResult> {
@@ -221,13 +230,12 @@ async fn generate_test_results<E: Environment>(
 
     let Some(programs) = config.envs.get(&E::ANALYSIS) else { return vec![] };
 
-    for program in &programs.programs {
+    for (pid, program) in programs.programs() {
         let generated = program.generated_program(env.analysis()).unwrap();
         let summary = generated.run_analysis(env, driver).await;
         let result = TestResult {
             analysis: E::ANALYSIS,
-            src: summary.cmds.to_string(),
-            input_json: serde_json::to_string(&summary.input).expect("failed to serialize input"),
+            id: pid,
             result: match summary.result {
                 Ok(r) => match r {
                     ValidationResult::CorrectTerminated => TestResultType::CorrectTerminated,

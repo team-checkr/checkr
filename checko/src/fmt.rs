@@ -4,29 +4,32 @@ use std::{cmp::Reverse, collections::BTreeMap, time::Duration};
 
 use checkr::env::Analysis;
 use itertools::Itertools;
-use serde::{Deserialize, Serialize};
 
-use crate::test_runner::{TestResult, TestResultType, TestRunResults};
+use crate::{
+    config::CanonicalProgramsConfig,
+    test_runner::{TestResult, TestResultType, TestRunData, TestRunResults},
+};
 
-#[derive(Debug, Serialize, Deserialize)]
-pub struct IndividualMarkdown {
+#[derive(Debug)]
+pub struct IndividualMarkdown<'a> {
+    pub programs_config: &'a CanonicalProgramsConfig,
     pub group_name: String,
     pub data: TestRunResults,
 }
 
-impl std::fmt::Display for IndividualMarkdown {
+impl std::fmt::Display for IndividualMarkdown<'_> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, "# {}", self.group_name)?;
 
         match &self.data.data {
-            crate::test_runner::TestRunData::CompileError(msg) => {
+            TestRunData::CompileError(msg) => {
                 writeln!(f, "## Failed to compile")?;
                 writeln!(f)?;
                 writeln!(f, "```")?;
                 writeln!(f, "{}", msg.trim())?;
                 writeln!(f, "```")?;
             }
-            crate::test_runner::TestRunData::Sections(sections) => {
+            TestRunData::Sections(sections) => {
                 for sec in sections {
                     writeln!(f, "## {}", sec.analysis)?;
 
@@ -53,10 +56,12 @@ impl std::fmt::Display for IndividualMarkdown {
                                 let mut target = String::new();
                                 let mut serializer =
                                     url::form_urlencoded::Serializer::new(&mut target);
+                                let program =
+                                    self.programs_config.get(summary.analysis, summary.id);
                                 serializer
                                     .append_pair("analysis", sec.analysis.command())
-                                    .append_pair("src", &summary.src)
-                                    .append_pair("input", &summary.input_json);
+                                    .append_pair("src", &program.src)
+                                    .append_pair("input", &program.input);
                                 format!("[Link](http://localhost:3000/?{target})")
                             } else {
                                 "Hidden".to_string()

@@ -36,10 +36,37 @@ pub struct CanonicalProgramsConfig {
     #[serde(default)]
     pub envs: IndexMap<Analysis, CanonicalProgramsEnvConfig>,
 }
+#[derive(
+    Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub struct ProgramId(usize);
+impl CanonicalProgramsConfig {
+    pub(crate) fn get(&self, analysis: Analysis, input: ProgramId) -> &CanonicalProgramConfig {
+        &self.envs[&analysis].programs[input.0]
+    }
+}
+
+impl CanonicalProgramConfig {
+    pub fn generated_program(&self, analysis: Analysis) -> Result<GeneratedProgram> {
+        let builder = analysis.setup_generation();
+        Ok(builder.from_cmds_and_input(
+            checkr::parse::parse_commands(&self.src).unwrap(),
+            analysis.input_from_str(&self.input)?,
+        ))
+    }
+}
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct CanonicalProgramsEnvConfig {
     pub programs: Vec<CanonicalProgramConfig>,
+}
+impl CanonicalProgramsEnvConfig {
+    pub(crate) fn programs(&self) -> impl Iterator<Item = (ProgramId, &CanonicalProgramConfig)> {
+        self.programs
+            .iter()
+            .enumerate()
+            .map(|(idx, p)| (ProgramId(idx), p))
+    }
 }
 #[derive(Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalProgramConfig {
@@ -57,9 +84,29 @@ impl ProgramsConfig {
                 .extend_from_slice(&env.programs);
         }
     }
+    pub fn canonicalize(&self) -> Result<CanonicalProgramsConfig> {
+        let envs = self
+            .envs
+            .iter()
+            .map(|(&analysis, env)| {
+                (
+                    analysis,
+                    CanonicalProgramsEnvConfig {
+                        programs: env
+                            .programs
+                            .iter()
+                            .map(|p| p.canonicalize(analysis).unwrap())
+                            .collect(),
+                    },
+                )
+            })
+            .collect();
+
+        Ok(CanonicalProgramsConfig { envs })
+    }
 }
 impl ProgramConfig {
-    pub fn generated_program(&self, analysis: Analysis) -> Result<GeneratedProgram> {
+    fn generated_program(&self, analysis: Analysis) -> Result<GeneratedProgram> {
         Ok(match self {
             ProgramConfig {
                 seed: Some(seed),
@@ -101,7 +148,7 @@ impl ProgramConfig {
     }
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, Hash, Serialize, Deserialize)]
 pub struct GroupConfig {
     pub name: String,
     pub git: String,

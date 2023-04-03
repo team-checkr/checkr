@@ -28,7 +28,7 @@
 //! Similarly, the inputs of [`Environment`] implementations must too implement
 //! [`Generate`].
 
-use std::time::Duration;
+use std::{borrow::Cow, time::Duration};
 
 use driver::Driver;
 use env::{Analysis, Environment, Input, ValidationResult};
@@ -117,11 +117,16 @@ impl ProgramGenerationBuilder {
         cx.set_no_loop(self.no_loop)
             .set_no_division(self.no_division);
 
-        let cmds = cmds.unwrap_or_else(|| Commands(cx.many(5, 10, &mut rng)));
-        let cmds = if self.generate_annotated {
-            Commands(vec![generation::annotate_cmds(cmds, &mut rng)])
-        } else {
-            cmds
+        let cmds = match cmds {
+            Some(cmds) => cmds,
+            None => {
+                let cmds = Commands(cx.many(5, 10, &mut rng));
+                if self.generate_annotated {
+                    Commands(vec![generation::annotate_cmds(cmds, &mut rng)])
+                } else {
+                    cmds
+                }
+            }
         };
         let input = input.unwrap_or_else(|| self.analysis.gen_input(&cmds, &mut rng));
 
@@ -179,10 +184,8 @@ impl GeneratedProgram {
                     time: exec_result.took,
                     input,
                     output: Some(exec_result.parsed),
-                    stdout: String::from_utf8(exec_result.output.stdout)
-                        .expect("failed to parse stdout"),
-                    stderr: String::from_utf8(exec_result.output.stderr)
-                        .expect("failed to parse stderr"),
+                    stdout: truncated_from_utf8(exec_result.output.stdout),
+                    stderr: truncated_from_utf8(exec_result.output.stderr),
                     result: Ok(validation_result),
                 }
             }
@@ -216,10 +219,8 @@ impl GeneratedProgram {
                     input,
                     output: None,
                     time,
-                    stdout: String::from_utf8(output.stdout.clone())
-                        .expect("stdout should be valid utf8"),
-                    stderr: String::from_utf8(output.stderr.clone())
-                        .expect("stderr should be valid utf8"),
+                    stdout: truncated_from_utf8(&output.stdout),
+                    stderr: truncated_from_utf8(&output.stderr),
                     result: Err(driver::ExecError::CommandFailed(output, time).into()),
                 },
                 driver::ExecError::Parse {
@@ -233,15 +234,25 @@ impl GeneratedProgram {
                     input,
                     output: None,
                     time,
-                    stdout: String::from_utf8(run_output.stdout.clone())
-                        .expect("stdout should be valid utf8"),
-                    stderr: String::from_utf8(run_output.stderr)
-                        .expect("stderr should be valid utf8"),
+                    stdout: truncated_from_utf8(run_output.stdout),
+                    stderr: truncated_from_utf8(run_output.stderr),
                     result: Err(inner.into()),
                 },
             },
         }
     }
+}
+
+fn truncated_from_utf8<'a>(bytes: impl Into<Cow<'a, [u8]>>) -> String {
+    const MAX_SIZE: usize = 10_000;
+    let bytes = match bytes.into() {
+        Cow::Borrowed(bytes) => bytes.get(0..MAX_SIZE).unwrap_or(bytes).to_vec(),
+        Cow::Owned(mut bytes) => {
+            bytes.truncate(MAX_SIZE);
+            bytes
+        }
+    };
+    String::from_utf8(bytes).expect("should be valid utf8")
 }
 
 #[derive(Debug)]

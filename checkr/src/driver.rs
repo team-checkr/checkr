@@ -35,7 +35,7 @@ pub enum ExecError {
         #[source]
         source: std::io::Error,
     },
-    #[error("command failed:\n{:?}", _0.stdout)]
+    #[error("command failed:\n  {}\n\n  {}", std::str::from_utf8(&_0.stdout).unwrap(), std::str::from_utf8(&_0.stderr).unwrap())]
     CommandFailed(std::process::Output, Duration),
     #[error("parse failed")]
     Parse {

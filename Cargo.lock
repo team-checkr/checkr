@@ -551,8 +551,10 @@ dependencies = [
  "comfy-table",
  "dioxus",
  "dioxus-liveview",
+ "dioxus-ssr",
  "indexmap",
  "itertools",
+ "once_cell",
  "serde",
  "serde_json",
  "tokio",
@@ -1155,6 +1157,15 @@ dependencies = [
  "quote",
  "serde",
  "syn 1.0.109",
+]
+
+[[package]]
+name = "dioxus-ssr"
+version = "0.3.0"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "d66715940895b1c285ef8ea203955db0e3c8c53c96c0b8ada0b42677f485a381"
+dependencies = [
+ "dioxus-core",
 ]
 
 [[package]]
