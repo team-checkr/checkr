@@ -14,7 +14,7 @@ import mdx from "@astrojs/mdx";
 import compress from "astro-compress";
 
 const commitHash =
-  process.env.GITHUB_REF ??
+  process.env.GITHUB_REF_NAME ??
   execSync("git describe --dirty").toString().trimEnd();
 process.env.INSPECTIFY_VERSION = commitHash;
 
