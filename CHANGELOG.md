@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.19] - 2023-04-04
+
+### Bug Fixes
+
+- Try to use GITHUB_REF env for determining version number
+
 ## [0.1.18] - 2023-04-04
 
 ### Bug Fixes
@@ -16,6 +22,10 @@ All notable changes to this project will be documented in this file.
 - Display input parse errors in inspectify instead of crashing
 - Display invalid input and output in more cases
 - Include version number in inspectify
+
+### Miscellaneous Tasks
+
+- Release
 
 ### Refactor
 
