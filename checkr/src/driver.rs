@@ -8,7 +8,7 @@ use tracing::error;
 
 use crate::{
     ast::Commands,
-    env::{Analysis, Environment, Output},
+    env::{Analysis, EnvError, Environment, Output},
 };
 
 pub struct Driver {
@@ -40,7 +40,7 @@ pub enum ExecError {
     #[error("parse failed")]
     Parse {
         #[source]
-        inner: serde_json::Error,
+        inner: EnvError,
         run_output: std::process::Output,
         time: Duration,
     },

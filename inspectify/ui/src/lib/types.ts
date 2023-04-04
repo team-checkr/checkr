@@ -67,6 +67,7 @@ export type ValidationResult =
 }}
 	| { type: "InvalidOutput", content: {
 	output: string;
+	expected_output_format?: string;
 	error: string;
 }}
 	| { type: "TimeOut", content?: undefined };

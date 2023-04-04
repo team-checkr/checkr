@@ -1,5 +1,6 @@
 use std::{ops::Deref, str::FromStr};
 
+use itertools::Either;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
@@ -189,20 +190,26 @@ pub struct Output {
 }
 
 impl Input {
-    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Input, serde_json::Error> {
+    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Input, EnvError> {
         // TODO: Assert that E::ANALYSIS == self.analysis
-        serde_json::from_value(self.json)
+        serde_json::from_value(self.json.clone()).map_err(|source| EnvError::ParseInput {
+            source,
+            json: Either::Left(self.json),
+        })
     }
-    pub fn to_markdown(&self) -> Result<Markdown, serde_json::Error> {
+    pub fn to_markdown(&self) -> Result<Markdown, EnvError> {
         self.analysis.input_markdown(self.clone())
     }
 }
 impl Output {
-    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Output, serde_json::Error> {
+    pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Output, EnvError> {
         // TODO: Assert that E::ANALYSIS == self.analysis
-        serde_json::from_value(self.json)
+        serde_json::from_value(self.json.clone()).map_err(|source| EnvError::ParseOutput {
+            source,
+            json: Either::Left(self.json),
+        })
     }
-    pub fn to_markdown(&self) -> Result<Markdown, serde_json::Error> {
+    pub fn to_markdown(&self) -> Result<Markdown, EnvError> {
         self.analysis.output_markdown(self.clone())
     }
 }
@@ -231,15 +238,15 @@ pub trait AnyEnvironment {
         cmds: &Commands,
         input: Input,
         output: Output,
-    ) -> Result<ValidationResult, serde_json::Error>;
+    ) -> Result<ValidationResult, EnvError>;
 
-    fn input_markdown(&self, input: Input) -> Result<Markdown, serde_json::Error>;
-    fn output_markdown(&self, output: Output) -> Result<Markdown, serde_json::Error>;
+    fn input_markdown(&self, input: Input) -> Result<Markdown, EnvError>;
+    fn output_markdown(&self, output: Output) -> Result<Markdown, EnvError>;
 
-    fn input_from_str(&self, src: &str) -> Result<Input, serde_json::Error>;
-    fn input_from_slice(&self, src: &[u8]) -> Result<Input, serde_json::Error>;
-    fn output_from_str(&self, src: &str) -> Result<Output, serde_json::Error>;
-    fn output_from_slice(&self, src: &[u8]) -> Result<Output, serde_json::Error>;
+    fn input_from_str(&self, src: &str) -> Result<Input, EnvError>;
+    fn input_from_slice(&self, src: &[u8]) -> Result<Input, EnvError>;
+    fn output_from_str(&self, src: &str) -> Result<Output, EnvError>;
+    fn output_from_slice(&self, src: &[u8]) -> Result<Output, EnvError>;
 }
 
 impl<E: Environment + ?Sized> AnyEnvironment for E {
@@ -271,47 +278,81 @@ impl<E: Environment + ?Sized> AnyEnvironment for E {
         cmds: &Commands,
         input: Input,
         output: Output,
-    ) -> Result<ValidationResult, serde_json::Error> {
+    ) -> Result<ValidationResult, EnvError> {
         Ok(self.validate(cmds, &input.parsed::<E>()?, &output.parsed::<E>()?))
     }
 
-    fn input_markdown(&self, input: Input) -> Result<Markdown, serde_json::Error> {
+    fn input_markdown(&self, input: Input) -> Result<Markdown, EnvError> {
         let input = input.parsed::<E>()?;
         Ok(input.to_markdown())
     }
 
-    fn output_markdown(&self, output: Output) -> Result<Markdown, serde_json::Error> {
+    fn output_markdown(&self, output: Output) -> Result<Markdown, EnvError> {
         let output = output.parsed::<E>()?;
         Ok(output.to_markdown())
     }
 
-    fn input_from_str(&self, src: &str) -> Result<Input, serde_json::Error> {
+    fn input_from_str(&self, src: &str) -> Result<Input, EnvError> {
         Ok(Input {
             analysis: self.analysis(),
-            json: serde_json::from_str(src)?,
+            json: serde_json::from_str(src).map_err(|source| EnvError::ParseInput {
+                source,
+                json: Either::Right(src.to_string()),
+            })?,
         })
     }
 
-    fn input_from_slice(&self, src: &[u8]) -> Result<Input, serde_json::Error> {
+    fn input_from_slice(&self, src: &[u8]) -> Result<Input, EnvError> {
         Ok(Input {
             analysis: self.analysis(),
-            json: serde_json::from_slice(src)?,
+            json: serde_json::from_slice(src).map_err(|source| EnvError::ParseInput {
+                source,
+                json: Either::Right(
+                    std::str::from_utf8(src)
+                        .expect("input should be valid utf8")
+                        .to_string(),
+                ),
+            })?,
         })
     }
 
-    fn output_from_str(&self, src: &str) -> Result<Output, serde_json::Error> {
+    fn output_from_str(&self, src: &str) -> Result<Output, EnvError> {
         Ok(Output {
             analysis: self.analysis(),
-            json: serde_json::from_str(src)?,
+            json: serde_json::from_str(src).map_err(|source| EnvError::ParseOutput {
+                source,
+                json: Either::Right(src.to_string()),
+            })?,
         })
     }
 
-    fn output_from_slice(&self, src: &[u8]) -> Result<Output, serde_json::Error> {
+    fn output_from_slice(&self, src: &[u8]) -> Result<Output, EnvError> {
         Ok(Output {
             analysis: self.analysis(),
-            json: serde_json::from_slice(src)?,
+            json: serde_json::from_slice(src).map_err(|source| EnvError::ParseOutput {
+                source,
+                json: Either::Right(
+                    std::str::from_utf8(src)
+                        .expect("input should be valid utf8")
+                        .to_string(),
+                ),
+            })?,
         })
     }
+}
+
+#[derive(Debug, thiserror::Error)]
+pub enum EnvError {
+    #[error("failed to parse json input: {source}")]
+    ParseInput {
+        source: serde_json::Error,
+        json: Either<serde_json::Value, String>,
+    },
+    #[error("failed to parse json output: {source}")]
+    ParseOutput {
+        source: serde_json::Error,
+        json: Either<serde_json::Value, String>,
+    },
 }
 
 impl Analysis {

@@ -396,6 +396,17 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                           "```\n" +
                             response.validation_result.content.output.trim() +
                             "\n```",
+
+                          ...(response.validation_result.content
+                            .expected_output_format
+                            ? [
+                                "**Expected output format:**",
+
+                                "```\n" +
+                                  response.validation_result.content.expected_output_format.trim() +
+                                  "\n```",
+                              ]
+                            : []),
                         ].join("\n\n")}
                         remarkPlugins={[remarkGfm]}
                       />

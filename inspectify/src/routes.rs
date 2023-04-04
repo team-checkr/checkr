@@ -195,10 +195,31 @@ pub async fn analyze(
                     });
                 }
             };
-            let validation_res = body
-                .analysis
-                .validate(&cmds, input, exec_output.parsed.clone())
-                .expect("serialization error");
+            let validation_res =
+                match body
+                    .analysis
+                    .validate(&cmds, input.clone(), exec_output.parsed.clone())
+                {
+                    Ok(res) => res,
+                    Err(err) => {
+                        let stdout = String::from_utf8(exec_output.output.stdout).unwrap();
+                        return Json(AnalysisResponse {
+                            stdout: stdout.clone(),
+                            stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
+                            parsed_markdown: None,
+                            took: exec_output.took,
+                            validation_result: Some(ValidationResult::InvalidOutput {
+                                output: stdout,
+                                expected_output_format: body
+                                    .analysis
+                                    .run(&cmds, input)
+                                    .ok()
+                                    .map(|v| v.to_string()),
+                                error: err.to_string(),
+                            }),
+                        });
+                    }
+                };
             AnalysisResponse {
                 stdout: String::from_utf8(exec_output.output.stdout).unwrap(),
                 stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
@@ -242,6 +263,7 @@ pub async fn analyze(
                     took: *time,
                     validation_result: Some(ValidationResult::InvalidOutput {
                         output: stdout,
+                        expected_output_format: None,
                         error: inner.to_string(),
                     }),
                 }

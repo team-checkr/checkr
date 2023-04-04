@@ -10,9 +10,17 @@ use serde::{Deserialize, Serialize};
 #[serde(tag = "type", content = "content")]
 pub enum ValidationResult {
     CorrectTerminated,
-    CorrectNonTerminated { iterations: u32 },
-    Mismatch { reason: String },
-    InvalidOutput { output: String, error: String },
+    CorrectNonTerminated {
+        iterations: u32,
+    },
+    Mismatch {
+        reason: String,
+    },
+    InvalidOutput {
+        output: String,
+        expected_output_format: Option<String>,
+        error: String,
+    },
     TimeOut,
 }
 

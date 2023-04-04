@@ -86,7 +86,9 @@ impl Action {
                     m2.variables.insert(x.clone(), a.semantics(m)?);
                     Ok(m2)
                 } else {
-                    todo!("variable '{x}' is not in memory")
+                    Err(InterpreterError::VariableNotFound {
+                        name: x.to_string(),
+                    })
                 }
             }
             Action::Assignment(Target::Array(arr, idx), a) => {
