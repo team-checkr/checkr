@@ -7,7 +7,7 @@ use crate::{
     generation::Generate,
 };
 
-use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
+use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct ProgramVerificationEnv;
@@ -109,14 +109,14 @@ impl Environment for ProgramVerificationEnv {
             .generate_annotated(true)
     }
 
-    fn run(&self, cmds: &Commands, _: &Self::Input) -> Self::Output {
+    fn run(&self, cmds: &Commands, _: &Self::Input) -> Result<Self::Output, EnvError> {
         let verification_conditions = cmds.vc(&BExpr::Bool(true));
-        ProgramVerificationEnvOutput {
+        Ok(ProgramVerificationEnvOutput {
             verification_conditions: verification_conditions
                 .iter()
                 .map(|vc| vc.renumber_quantifiers().into())
                 .collect(),
-        }
+        })
     }
 
     fn validate(
@@ -124,8 +124,8 @@ impl Environment for ProgramVerificationEnv {
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> super::ValidationResult {
-        let reference = self.run(cmds, input);
+    ) -> Result<super::ValidationResult, EnvError> {
+        let reference = self.run(cmds, input)?;
         let ref_vc: Result<Vec<_>, _> = reference
             .verification_conditions
             .iter()
@@ -140,28 +140,28 @@ impl Environment for ProgramVerificationEnv {
         let ref_vc = match ref_vc {
             Ok(ref_vc) => ref_vc,
             Err(err) => {
-                return ValidationResult::Mismatch {
+                return Ok(ValidationResult::Mismatch {
                     reason: format!("failed to parse verification conditions: {err}"),
-                }
+                })
             }
         };
         let rel_vc = match rel_vc {
             Ok(rel_vc) => rel_vc,
             Err(err) => {
-                return ValidationResult::Mismatch {
+                return Ok(ValidationResult::Mismatch {
                     reason: format!("failed to parse verification conditions: {err}"),
-                }
+                })
             }
         };
 
         if ref_vc.len() != rel_vc.len() {
-            return ValidationResult::Mismatch {
+            return Ok(ValidationResult::Mismatch {
                 reason: format!(
                     "produced '{}' verification conditions, expected '{}'",
                     rel_vc.len(),
                     ref_vc.len()
                 ),
-            };
+            });
         }
 
         let mut checker = EquivChecker::default();
@@ -184,16 +184,16 @@ impl Environment for ProgramVerificationEnv {
         });
 
         if ref_exprs.is_empty() {
-            ValidationResult::CorrectTerminated
+            Ok(ValidationResult::CorrectTerminated)
         } else {
-            ValidationResult::Mismatch {
+            Ok(ValidationResult::Mismatch {
                 reason: format!(
                     "{}. Left in the reference were [{}] and left in the given were [{}]",
                     "some verification conditions were not found",
                     ref_exprs.iter().format(", "),
                     rel_exprs.iter().format(", "),
                 ),
-            }
+            })
         }
 
         // let a = crate::parse::parse_bexpr(&reference.pre_condition).unwrap();

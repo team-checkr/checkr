@@ -159,14 +159,14 @@ pub trait Environment {
         ProgramGenerationBuilder::new(Self::ANALYSIS)
     }
 
-    fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output;
+    fn run(&self, cmds: &Commands, input: &Self::Input) -> Result<Self::Output, EnvError>;
 
     fn validate(
         &self,
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ValidationResult;
+    ) -> Result<ValidationResult, EnvError>;
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
@@ -190,6 +190,12 @@ pub struct Output {
 }
 
 impl Input {
+    pub fn from_concrete<E: Environment + ?Sized>(input: &E::Input) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(input).expect("input is always valid json"),
+        }
+    }
     pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Input, EnvError> {
         // TODO: Assert that E::ANALYSIS == self.analysis
         serde_json::from_value(self.json.clone()).map_err(|source| EnvError::ParseInput {
@@ -202,6 +208,12 @@ impl Input {
     }
 }
 impl Output {
+    pub fn from_concrete<E: Environment + ?Sized>(output: &E::Output) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(output).expect("output is always valid json"),
+        }
+    }
     pub fn parsed<E: Environment + ?Sized>(self) -> Result<E::Output, EnvError> {
         // TODO: Assert that E::ANALYSIS == self.analysis
         serde_json::from_value(self.json.clone()).map_err(|source| EnvError::ParseOutput {
@@ -229,7 +241,7 @@ pub trait AnyEnvironment {
 
     fn setup_generation(&self) -> ProgramGenerationBuilder;
 
-    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, serde_json::Error>;
+    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, EnvError>;
 
     fn gen_input(&self, cmds: &Commands, rng: &mut SmallRng) -> Input;
 
@@ -258,10 +270,11 @@ impl<E: Environment + ?Sized> AnyEnvironment for E {
         self.setup_generation()
     }
 
-    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, serde_json::Error> {
+    fn run(&self, cmds: &Commands, input: Input) -> Result<Output, EnvError> {
         Ok(Output {
             analysis: self.analysis(),
-            json: serde_json::to_value(&self.run(cmds, &serde_json::from_value(input.json)?))?,
+            json: serde_json::to_value(&self.run(cmds, &input.parsed::<E>()?)?)
+                .expect("all output should be serializable"),
         })
     }
 
@@ -279,7 +292,7 @@ impl<E: Environment + ?Sized> AnyEnvironment for E {
         input: Input,
         output: Output,
     ) -> Result<ValidationResult, EnvError> {
-        Ok(self.validate(cmds, &input.parsed::<E>()?, &output.parsed::<E>()?))
+        self.validate(cmds, &input.parsed::<E>()?, &output.parsed::<E>()?)
     }
 
     fn input_markdown(&self, input: Input) -> Result<Markdown, EnvError> {
@@ -353,6 +366,8 @@ pub enum EnvError {
         source: serde_json::Error,
         json: Either<serde_json::Value, String>,
     },
+    #[error("input is not valid for the current program: {message}")]
+    InvalidInputForProgram { input: Input, message: String },
 }
 
 impl Analysis {

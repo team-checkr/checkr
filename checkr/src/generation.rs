@@ -130,7 +130,9 @@ pub fn annotate_cmds<R: Rng>(mut cmds: Commands, rng: &mut R) -> Command {
     use std::collections::HashSet;
 
     let input = SignAnalysisInput::gen(&mut cmds, rng);
-    let sign_result = SignEnv.run(&cmds, &input);
+    let sign_result = SignEnv
+        .run(&cmds, &input)
+        .expect("the input was just generated, so it should be valid");
 
     let pre = signs_in(&sign_result.nodes[&sign_result.initial_node]);
     let post = signs_in(&sign_result.nodes[&sign_result.final_node]);

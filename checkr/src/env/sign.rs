@@ -9,13 +9,13 @@ use tracing::error;
 
 use crate::{
     analysis::{mono_analysis, FiFo, NodeOrder},
-    ast::Commands,
+    ast::{Commands, Target},
     generation::Generate,
     pg::{Determinism, Node, ProgramGraph},
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
 };
 
-use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
+use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SignEnv;
@@ -162,9 +162,31 @@ impl Environment for SignEnv {
 
     const ANALYSIS: Analysis = Analysis::Sign;
 
-    fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
+    fn run(&self, cmds: &Commands, input: &Self::Input) -> Result<Self::Output, EnvError> {
         let pg = ProgramGraph::new(input.determinism, cmds);
-        SignAnalysisOutput {
+
+        for t in pg.fv() {
+            match t {
+                Target::Variable(var) => {
+                    if input.assignment.get_var(&var).is_none() {
+                        return Err(EnvError::InvalidInputForProgram {
+                            input: super::Input::from_concrete::<Self>(input),
+                            message: format!("variable `{var}` was not in the given input"),
+                        });
+                    }
+                }
+                Target::Array(arr, _) => {
+                    if input.assignment.get_arr(&arr).is_none() {
+                        return Err(EnvError::InvalidInputForProgram {
+                            input: super::Input::from_concrete::<Self>(input),
+                            message: format!("array `{arr}` was not in the given input"),
+                        });
+                    }
+                }
+            }
+        }
+
+        Ok(SignAnalysisOutput {
             initial_node: Node::Start.to_string(),
             final_node: Node::End.to_string(),
             nodes: mono_analysis::<_, FiFo>(
@@ -177,7 +199,7 @@ impl Environment for SignEnv {
             .into_iter()
             .map(|(k, v)| (format!("{k}"), v))
             .collect(),
-        }
+        })
     }
 
     fn validate(
@@ -185,11 +207,11 @@ impl Environment for SignEnv {
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ValidationResult
+    ) -> Result<ValidationResult, EnvError>
     where
         Self::Output: PartialEq + std::fmt::Debug,
     {
-        let reference = self.run(cmds, input);
+        let reference = self.run(cmds, input)?;
 
         let mut pool = reference.nodes.values().collect_vec();
 
@@ -198,21 +220,21 @@ impl Environment for SignEnv {
                 pool.remove(idx);
             } else {
                 error!(not_in_reference = format!("{o:?}"), "damn...");
-                return ValidationResult::Mismatch {
+                return Ok(ValidationResult::Mismatch {
                     reason: format!(
                         "Produced world which did not exist in reference: {n:?} ~> {o:?}"
                     ),
-                };
+                });
             }
         }
 
         if pool.is_empty() {
-            ValidationResult::CorrectTerminated
+            Ok(ValidationResult::CorrectTerminated)
         } else {
             error!(missing = format!("{pool:?}"), "oh no...");
-            ValidationResult::Mismatch {
+            Ok(ValidationResult::Mismatch {
                 reason: "Reference had world which was not present".to_string(),
-            }
+            })
         }
     }
 }

@@ -186,7 +186,7 @@ impl GeneratedProgram {
                     output: Some(exec_result.parsed),
                     stdout: truncated_from_utf8(exec_result.output.stdout),
                     stderr: truncated_from_utf8(exec_result.output.stderr),
-                    result: Ok(validation_result),
+                    result: validation_result.map_err(|err| err.into()),
                 }
             }
             Err(err) => match err {

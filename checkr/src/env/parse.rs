@@ -2,7 +2,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::{ast::Commands, generation::Generate};
 
-use super::{Analysis, Environment, ToMarkdown, ValidationResult};
+use super::{Analysis, EnvError, Environment, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct ParseEnv;
@@ -20,8 +20,8 @@ impl Environment for ParseEnv {
 
     const ANALYSIS: Analysis = Analysis::Parse;
 
-    fn run(&self, cmds: &Commands, _input: &Self::Input) -> Self::Output {
-        ParseOutput(cmds.to_string())
+    fn run(&self, cmds: &Commands, _input: &Self::Input) -> Result<Self::Output, EnvError> {
+        Ok(ParseOutput(cmds.to_string()))
     }
 
     fn validate(
@@ -29,8 +29,8 @@ impl Environment for ParseEnv {
         _cmds: &Commands,
         _input: &Self::Input,
         _output: &Self::Output,
-    ) -> ValidationResult {
-        ValidationResult::CorrectTerminated
+    ) -> Result<ValidationResult, EnvError> {
+        Ok(ValidationResult::CorrectTerminated)
     }
 }
 

@@ -412,6 +412,29 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
                       />
                     </div>
                   </>
+                ) : response.validation_result.type == "InvalidInput" ? (
+                  <>
+                    <h3 className="text-lg">Invalid Input</h3>
+                    <div className="prose prose-invert w-full max-w-none prose-table:w-full">
+                      <ReactMarkdown
+                        children={[
+                          "The input was invalid. Consider regenerating it.",
+
+                          "**Error:**",
+                          "```\n" +
+                            (response.validation_result.content.error ?? "") +
+                            "\n```",
+
+                          "**Given input:**",
+
+                          "```\n" +
+                            response.validation_result.content.input.trim() +
+                            "\n```",
+                        ].join("\n\n")}
+                        remarkPlugins={[remarkGfm]}
+                      />
+                    </div>
+                  </>
                 ) : (
                   <>
                     <h3 className="text-lg">Output</h3>
@@ -511,6 +534,9 @@ const computeIndicatorState = ({
     return IndicatorState.Mismatch;
 
   if (response.validation_result.type == "InvalidOutput")
+    return IndicatorState.Mismatch;
+
+  if (response.validation_result.type == "InvalidInput")
     return IndicatorState.Mismatch;
 
   if (response.validation_result.type == "TimeOut")

@@ -11,7 +11,7 @@ use axum::{
     Json, Router,
 };
 use checkr::{
-    env::{graph::GraphEnvInput, Analysis, GraphEnv, Markdown},
+    env::{graph::GraphEnvInput, Analysis, EnvError, GraphEnv, Markdown},
     pg::Determinism,
 };
 use futures::{SinkExt, StreamExt};
@@ -208,14 +208,26 @@ pub async fn analyze(
                             stderr: String::from_utf8(exec_output.output.stderr).unwrap(),
                             parsed_markdown: None,
                             took: exec_output.took,
-                            validation_result: Some(ValidationResult::InvalidOutput {
-                                output: stdout,
-                                expected_output_format: body
-                                    .analysis
-                                    .run(&cmds, input)
-                                    .ok()
-                                    .map(|v| v.to_string()),
-                                error: err.to_string(),
+                            validation_result: Some(match &err {
+                                EnvError::ParseInput { .. } => ValidationResult::InvalidInput {
+                                    input: input.to_string(),
+                                    error: err.to_string(),
+                                },
+                                EnvError::ParseOutput { .. } => ValidationResult::InvalidOutput {
+                                    output: stdout,
+                                    expected_output_format: body
+                                        .analysis
+                                        .run(&cmds, input)
+                                        .ok()
+                                        .map(|v| v.to_string()),
+                                    error: err.to_string(),
+                                },
+                                EnvError::InvalidInputForProgram { input, .. } => {
+                                    ValidationResult::InvalidInput {
+                                        input: input.to_string(),
+                                        error: err.to_string(),
+                                    }
+                                }
                             }),
                         });
                     }

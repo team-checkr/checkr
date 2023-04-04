@@ -65,6 +65,10 @@ export type ValidationResult =
 	| { type: "Mismatch", content: {
 	reason: string;
 }}
+	| { type: "InvalidInput", content: {
+	input: string;
+	error: string;
+}}
 	| { type: "InvalidOutput", content: {
 	output: string;
 	expected_output_format?: string;

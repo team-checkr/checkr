@@ -11,7 +11,7 @@ use crate::{
     pg::{Determinism, ProgramGraph},
 };
 
-use super::{Analysis, Environment, Markdown, ToMarkdown};
+use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown};
 
 #[derive(Debug)]
 pub struct GraphEnv;
@@ -55,9 +55,13 @@ impl Environment for GraphEnv {
 
     const ANALYSIS: Analysis = Analysis::Graph;
 
-    fn run(&self, cmds: &crate::ast::Commands, input: &Self::Input) -> Self::Output {
+    fn run(
+        &self,
+        cmds: &crate::ast::Commands,
+        input: &Self::Input,
+    ) -> Result<Self::Output, EnvError> {
         let pg = ProgramGraph::new(input.determinism, cmds);
-        GraphEnvOutput { dot: pg.dot() }
+        Ok(GraphEnvOutput { dot: pg.dot() })
     }
 
     fn validate(
@@ -65,8 +69,8 @@ impl Environment for GraphEnv {
         cmds: &crate::ast::Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> super::ValidationResult {
-        let reference = self.run(cmds, input);
+    ) -> Result<super::ValidationResult, EnvError> {
+        let reference = self.run(cmds, input)?;
 
         let (a_data, _a_node_mapping, a_graph) = dot_to_petgraph(&reference.dot);
         let (b_data, _b_node_mapping, b_graph) = dot_to_petgraph(&output.dot);

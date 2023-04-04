@@ -16,6 +16,10 @@ pub enum ValidationResult {
     Mismatch {
         reason: String,
     },
+    InvalidInput {
+        input: String,
+        error: String,
+    },
     InvalidOutput {
         output: String,
         expected_output_format: Option<String>,

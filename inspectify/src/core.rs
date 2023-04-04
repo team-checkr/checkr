@@ -32,6 +32,7 @@ pub async fn dot(Json((deterministic, src)): Json<(bool, String)>) -> Json<Strin
                 },
             },
         )
+        .expect("the input was just given, so it should work")
         .dot
         .into()
 }
@@ -89,10 +90,11 @@ pub async fn run_analysis(Json((src, input)): Json<(String, Input)>) -> Json<Opt
             return None.into();
         }
     };
-    let json = input
-        .analysis
-        .run(&cmds, input_json)
-        .expect("parsing input json failed");
+    let json = if let Ok(json) = input.analysis.run(&cmds, input_json) {
+        json
+    } else {
+        return Json(None);
+    };
     let markdown = json
         .to_markdown()
         .expect("we just generated it, so it should be fine");

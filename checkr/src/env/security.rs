@@ -2,7 +2,6 @@ use itertools::Itertools;
 
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
-use tracing::debug;
 
 use crate::{
     ast::Commands,
@@ -11,7 +10,7 @@ use crate::{
     sign::Memory,
 };
 
-use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
+use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct SecurityEnv;
@@ -146,9 +145,13 @@ impl Environment for SecurityEnv {
 
     const ANALYSIS: Analysis = Analysis::Security;
 
-    fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
+    fn run(&self, cmds: &Commands, input: &Self::Input) -> Result<Self::Output, EnvError> {
         let lattice = SecurityLattice::new(&input.lattice.0);
-        SecurityAnalysisOutput::run(&input.classification, &lattice, cmds)
+        Ok(SecurityAnalysisOutput::run(
+            &input.classification,
+            &lattice,
+            cmds,
+        ))
     }
 
     fn validate(
@@ -156,11 +159,11 @@ impl Environment for SecurityEnv {
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ValidationResult
+    ) -> Result<ValidationResult, EnvError>
     where
         Self::Output: PartialEq + std::fmt::Debug,
     {
-        let mut reference = self.run(cmds, input);
+        let mut reference = self.run(cmds, input)?;
         reference.actual.sort();
         reference.allowed.sort();
         reference.violations.sort();
@@ -169,17 +172,12 @@ impl Environment for SecurityEnv {
         output.allowed.sort();
         output.violations.sort();
 
-        debug!(
-            reference = format!("{reference:?}"),
-            output = format!("{output:?}")
-        );
-
         if reference == output {
-            ValidationResult::CorrectTerminated
+            Ok(ValidationResult::CorrectTerminated)
         } else {
-            ValidationResult::Mismatch {
+            Ok(ValidationResult::Mismatch {
                 reason: format!("{input:?}\n{cmds}\n{reference:#?} != {output:#?}"),
-            }
+            })
         }
     }
 }

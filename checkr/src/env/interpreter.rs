@@ -10,7 +10,7 @@ use crate::{
     sign::{Memory, MemoryRef},
 };
 
-use super::{Analysis, Environment, Markdown, ToMarkdown, ValidationResult};
+use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
 
 #[derive(Debug)]
 pub struct InterpreterEnv;
@@ -151,7 +151,7 @@ impl Environment for InterpreterEnv {
 
     const ANALYSIS: Analysis = Analysis::Interpreter;
 
-    fn run(&self, cmds: &Commands, input: &Self::Input) -> Self::Output {
+    fn run(&self, cmds: &Commands, input: &Self::Input) -> Result<Self::Output, EnvError> {
         let pg = ProgramGraph::new(input.determinism, cmds);
         let (execution_sequence, final_state) =
             Interpreter::evaluate(input.trace_length, input.assignment.clone(), &pg);
@@ -160,10 +160,10 @@ impl Environment for InterpreterEnv {
             .map(|t| t.map_node(|n| n.to_string()))
             .collect();
 
-        InterpreterOutput {
+        Ok(InterpreterOutput {
             execution_sequence,
             final_state,
-        }
+        })
     }
 
     fn validate(
@@ -171,19 +171,19 @@ impl Environment for InterpreterEnv {
         cmds: &Commands,
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ValidationResult
+    ) -> Result<ValidationResult, EnvError>
     where
         Self::Output: PartialEq,
     {
         if let TerminationState::Running = output.final_state {
             if output.execution_sequence.len() < input.trace_length as usize {
-                return ValidationResult::Mismatch {
+                return Ok(ValidationResult::Mismatch {
                     reason: format!(
                         "Not enough traces were produced. Expected '{}' found '{}'",
                         input.trace_length,
                         output.execution_sequence.len()
                     ),
-                };
+                });
             }
         }
 
@@ -192,15 +192,15 @@ impl Environment for InterpreterEnv {
 
         if let Some(first_cfg) = output.execution_sequence.first() {
             if first_cfg.memory != input.assignment {
-                return ValidationResult::Mismatch {
+                return Ok(ValidationResult::Mismatch {
                     reason: "The initial configuration did not match the starting memory"
                         .to_string(),
-                };
+                });
             }
         } else if input.trace_length > 0 {
-            return ValidationResult::Mismatch {
+            return Ok(ValidationResult::Mismatch {
                 reason: "Did not produce any execution sequences".to_string(),
-            };
+            });
         }
 
         for (idx, trace) in output.execution_sequence.iter().skip(1).enumerate() {
@@ -224,20 +224,20 @@ impl Environment for InterpreterEnv {
                     break;
                 } else {
                     // NOTE: We could not continue, while they had more execution steps left
-                    return ValidationResult::Mismatch {
+                    return Ok(ValidationResult::Mismatch {
                         reason: format!("The traces do not match after {idx} iterations"),
-                    };
+                    });
                 }
             }
             mem = next_mem;
         }
 
         if output.execution_sequence.len() < input.trace_length as usize {
-            ValidationResult::CorrectTerminated
+            Ok(ValidationResult::CorrectTerminated)
         } else {
-            ValidationResult::CorrectNonTerminated {
+            Ok(ValidationResult::CorrectNonTerminated {
                 iterations: output.execution_sequence.len() as _,
-            }
+            })
         }
     }
 }
