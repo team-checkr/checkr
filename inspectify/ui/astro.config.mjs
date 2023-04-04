@@ -1,4 +1,5 @@
 import { defineConfig } from "astro/config";
+import { execSync } from "child_process";
 
 // https://astro.build/config
 import tailwind from "@astrojs/tailwind";
@@ -11,6 +12,9 @@ import mdx from "@astrojs/mdx";
 
 // https://astro.build/config
 import compress from "astro-compress";
+
+const commitHash = execSync("git describe --dirty").toString().trimEnd();
+process.env.INSPECTIFY_VERSION = commitHash;
 
 // https://astro.build/config
 export default defineConfig({

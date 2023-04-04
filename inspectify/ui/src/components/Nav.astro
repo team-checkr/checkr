@@ -7,7 +7,10 @@ import {
 ---
 
 <nav class="flex items-center bg-slate-900 px-2 text-slate-200">
-  <a href="/" class="flex items-center space-x-2 p-2 text-2xl font-thin italic">
+  <a
+    href="/"
+    class="flex items-center space-x-2 p-2 pr-0 text-2xl font-thin italic"
+  >
     <div class="relative">
       <CommandLineIcon
         className="absolute inset-0 left-0.5 top-0.5 w-6 animate-pulse text-teal-500/50"
@@ -16,6 +19,13 @@ import {
     </div>
     <span>Inspectify</span>
   </a>
+  {
+    process.env.INSPECTIFY_VERSION && (
+      <span class="text-xs place-self-end mb-2 text-slate-400 italic font-light">
+        {import.meta.env.INSPECTIFY_VERSION}
+      </span>
+    )
+  }
 
   <div class="flex-1"></div>
   <a
