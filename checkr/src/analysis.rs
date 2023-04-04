@@ -215,3 +215,32 @@ where
         })
     }
 }
+
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
+pub enum NodeOrder<'a> {
+    First,
+    Middle(i32),
+    Random(&'a str),
+    Last,
+}
+
+impl<'a> NodeOrder<'a> {
+    pub fn parse(n: &'a str) -> Self {
+        match n {
+            _ if n.contains('▷') => NodeOrder::First,
+            "qS" => NodeOrder::First,
+
+            _ if n.contains('◀') => NodeOrder::Last,
+            "qF" => NodeOrder::Last,
+
+            _ if n.contains(|c: char| c.is_numeric()) => NodeOrder::Middle(
+                n.chars()
+                    .filter(|c| c.is_numeric())
+                    .collect::<String>()
+                    .parse()
+                    .unwrap_or_default(),
+            ),
+            _ => NodeOrder::Random(n),
+        }
+    }
+}

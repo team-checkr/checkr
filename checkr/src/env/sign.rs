@@ -8,7 +8,7 @@ use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{
-    analysis::{mono_analysis, FiFo},
+    analysis::{mono_analysis, FiFo, NodeOrder},
     ast::Commands,
     generation::Generate,
     pg::{Determinism, Node, ProgramGraph},
@@ -116,7 +116,11 @@ impl ToMarkdown for SignAnalysisOutput {
                 arrays.iter().map(|v| v.to_string())
             ));
 
-        for (n, worlds) in &self.nodes {
+        for (n, worlds) in self
+            .nodes
+            .iter()
+            .sorted_by_key(|(n, _)| NodeOrder::parse(n))
+        {
             let mut first = true;
             for w in worlds {
                 let is_first = first;
