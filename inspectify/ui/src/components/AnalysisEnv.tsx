@@ -60,7 +60,7 @@ export const AnalysisEnvInner = () => {
 
   const { data: dotReference } = useQuery(
     ["dot-reference", deterministic, src],
-    async ({}) => core.async_dot(deterministic, src),
+    async ({}) => core.dot(deterministic, src),
     { keepPreviousData: true }
   );
 
@@ -77,9 +77,19 @@ export const AnalysisEnvInner = () => {
   );
 
   const generateProgram = useMutation(
-    (env: Analysis) => core.async_generate_program(env),
-    { onSuccess: (data) => setSrc(data) }
+    async (env: Analysis) => {
+      const src = await core.generate_program(env);
+      const input = await core.generate_input_for(src, env);
+      return { src, input };
+    },
+    {
+      onSuccess: ({ src, input }) => {
+        setSrc(src);
+        setInput(input ?? null);
+      },
+    }
   );
+  const [input, setInput] = useState<Input | null>(null);
 
   return (
     <div className="grid min-h-0 grid-cols-[1fr_2fr] grid-rows-[1fr_auto_auto_1fr]">
@@ -190,7 +200,13 @@ export const AnalysisEnvInner = () => {
           </div>
         )}
       </div>
-      <Env compilationStatus={compilationStatus ?? null} env={env} src={src} />
+      <Env
+        compilationStatus={compilationStatus ?? null}
+        env={env}
+        src={src}
+        input={input}
+        setInput={setInput}
+      />
       <Toaster />
     </div>
   );
@@ -208,15 +224,16 @@ type EnvProps = {
   compilationStatus: CompilationStatus | null;
   env: Analysis;
   src: string;
+  input: Input | null;
+  setInput: (input: Input | null) => void;
 };
-const Env = ({ compilationStatus, env, src }: EnvProps) => {
-  const [input, setInput] = useState<Input | null>(null);
+const Env = ({ compilationStatus, env, src, input, setInput }: EnvProps) => {
   const { data: output } = useQuery(
     ["runAnalysis", src, input],
     ({}) => {
       if (!input) return void 0;
 
-      return core.async_run_analysis(src, input);
+      return core.run_analysis(src, input);
     },
     {
       keepPreviousData: true,
@@ -235,7 +252,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
 
     const run = async () => {
       try {
-        const fullInput = await core.async_complete_input_from_json(env, json);
+        const fullInput = await core.complete_input_from_json(env, json);
         setInput(fullInput);
       } catch (e) {
         console.error(e);
@@ -288,7 +305,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
     ) {
       const run = async () => {
         try {
-          const input = await core.async_generate_input_for(src, env);
+          const input = await core.generate_input_for(src, env);
           setInput(input ?? null);
         } catch (e) {
           console.error(e);
@@ -307,7 +324,7 @@ const Env = ({ compilationStatus, env, src }: EnvProps) => {
 
   const generateInput = useMutation(
     ({ src, env }: { src: string; env: Analysis }) =>
-      core.async_generate_input_for(src, env),
+      core.generate_input_for(src, env),
     {
       onSuccess: (data) => {
         setInput(data ?? null);

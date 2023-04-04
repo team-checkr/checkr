@@ -17,23 +17,23 @@ const request = async <T>(
   return req.json();
 };
 
-export const async_generate_program = async (env: Analysis): Promise<string> =>
+export const generate_program = async (env: Analysis): Promise<string> =>
   request(null, "generate_program", env);
-export const async_dot = async (
+export const dot = async (
   deterministic: boolean,
   src: string
 ): Promise<string> => request(null, "dot", [deterministic, src]);
-export const async_complete_input_from_json = async (
+export const complete_input_from_json = async (
   analysis: Analysis,
   input_json: string
 ): Promise<Input> =>
   request(null, "complete_input_from_json", [analysis, input_json]);
-export const async_generate_input_for = async (
+export const generate_input_for = async (
   src: string,
   analysis: Analysis
 ): Promise<Input | undefined> =>
   request(null, "generate_input_for", [src, analysis]);
-export const async_run_analysis = async (
+export const run_analysis = async (
   src: string,
   input: Input
 ): Promise<Output | undefined> => request(null, "run_analysis", [src, input]);
