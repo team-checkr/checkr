@@ -2,12 +2,39 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.18] - 2023-04-04
+
+### Bug Fixes
+
+- Mount a copy of checko to prevent writing to it from the container
+
+### Features
+
+- Improve logging and reporting of compile errors in failing groups
+- Introduce batches an organized way to run tests
+- Consistently number nodes
+- Display input parse errors in inspectify instead of crashing
+- Display invalid input and output in more cases
+- Include version number in inspectify
+
+### Refactor
+
+- Make graph construction follow the book more closely (#39)
+- Use host checko binary in docker
+- Remove checko dep from inspectify
+- Move CLI out of checkr main
+- Regenerate input on generate program
+
 ## [0.1.17] - 2023-03-28
 
 ### Bug Fixes
 
 - Fix array lowering into egg
 - Correctly substitute in `fac` and `fib`
+
+### Miscellaneous Tasks
+
+- Release
 
 ### Refactor
 
