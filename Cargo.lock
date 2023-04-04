@@ -540,7 +540,7 @@ checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
 name = "checko"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "axum",
  "axum-macros",
@@ -568,7 +568,7 @@ dependencies = [
 
 [[package]]
 name = "checkr"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "bitflags",
  "clap",
@@ -1967,7 +1967,7 @@ dependencies = [
 
 [[package]]
 name = "inspectify"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "axum",
  "axum-macros",
@@ -4429,7 +4429,7 @@ checksum = "1dbabb1cbd15a1d6d12d9ed6b35cc6777d4af87ab3ba155ea37215f20beab80c"
 
 [[package]]
 name = "xtask"
-version = "0.1.19"
+version = "0.1.20"
 dependencies = [
  "binswap-github",
  "clap",

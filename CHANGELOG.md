@@ -2,11 +2,21 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.20] - 2023-04-04
+
+### Miscellaneous Tasks
+
+- Use just the ref name instead of path for displaying version in inspectify
+
 ## [0.1.19] - 2023-04-04
 
 ### Bug Fixes
 
 - Try to use GITHUB_REF env for determining version number
+
+### Miscellaneous Tasks
+
+- Release
 
 ## [0.1.18] - 2023-04-04
 
