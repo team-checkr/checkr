@@ -1,9 +1,11 @@
 use std::{
+    ffi::OsStr,
     path::{Path, PathBuf},
     process::Command,
     time::Duration,
 };
 
+use itertools::Either;
 use tracing::error;
 
 use crate::{
@@ -46,6 +48,17 @@ pub enum ExecError {
     },
 }
 
+fn canonicalize_exe<'exe>(
+    dir: &Path,
+    exe: &'exe str,
+) -> Result<impl AsRef<OsStr> + 'exe, std::io::Error> {
+    if exe.starts_with('.') {
+        dir.join(exe).canonicalize().map(Either::Left)
+    } else {
+        Ok(Either::Right(exe))
+    }
+}
+
 impl Driver {
     pub fn new(dir: impl AsRef<Path>, run_cmd: &str) -> Driver {
         Driver {
@@ -59,12 +72,14 @@ impl Driver {
         compile: &str,
         run_cmd: &str,
     ) -> Result<Driver, DriverError> {
+        let dir = dir.as_ref();
         let mut args = compile.split(' ');
-        let program = args.next().unwrap();
+        let program =
+            canonicalize_exe(dir, args.next().unwrap()).map_err(DriverError::RunCompile)?;
 
         let mut cmd = Command::new(program);
         cmd.args(args);
-        cmd.current_dir(&dir);
+        cmd.current_dir(dir);
 
         let compile_output = cmd.output().map_err(DriverError::RunCompile)?;
 
@@ -73,19 +88,25 @@ impl Driver {
         }
 
         Ok(Driver {
-            dir: dir.as_ref().to_owned(),
+            dir: dir.to_owned(),
             run_cmd: run_cmd.to_string(),
             compile_output: Some(compile_output),
         })
     }
-    fn new_command(&self) -> Command {
+    fn new_command(&self) -> Result<Command, ExecError> {
         let mut args = self.run_cmd.split(' ');
 
-        let mut cmd = Command::new(args.next().unwrap());
+        let exe = canonicalize_exe(&self.dir, args.next().unwrap()).map_err(|source| {
+            ExecError::RunExec {
+                cmd: self.run_cmd.clone(),
+                source,
+            }
+        })?;
+        let mut cmd = Command::new(exe);
         cmd.args(args);
         cmd.current_dir(&self.dir);
 
-        cmd
+        Ok(cmd)
     }
     pub async fn exec_dyn_raw_cmds(
         &self,
@@ -93,7 +114,7 @@ impl Driver {
         cmds: &str,
         input: &str,
     ) -> Result<ExecOutput<Output>, ExecError> {
-        let mut cmd = self.new_command();
+        let mut cmd = self.new_command()?;
         cmd.arg(analysis.command());
         cmd.arg(cmds);
 
