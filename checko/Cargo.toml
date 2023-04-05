@@ -19,6 +19,7 @@ dioxus = "0.3.2"
 dioxus-liveview = { version = "0.3.0", features = ["axum"] }
 dioxus-ssr = "0.3.0"
 indexmap = { version = "1.9.2", features = ["serde"] }
+indicatif = "0.17.3"
 itertools = { workspace = true }
 once_cell = "1.17.1"
 serde = { workspace = true }

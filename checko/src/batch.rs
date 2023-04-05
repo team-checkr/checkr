@@ -259,6 +259,14 @@ impl BatchCli {
                     DockerImage::build().await?
                 };
 
+                let spinner = indicatif::ProgressBar::new(batch.groups.len() as _);
+                spinner.set_style(
+                    indicatif::ProgressStyle::with_template(
+                        "[{elapsed_precise}] {bar:120.cyan/blue} {pos:>7}/{len:7} {msg}",
+                    )
+                    .unwrap(),
+                );
+
                 let task_permits = Arc::new(tokio::sync::Semaphore::new(concurrent));
                 let mut tasks = JoinSet::new();
 
@@ -288,7 +296,11 @@ impl BatchCli {
                     tokio::spawn(ui::start_web_ui(batch));
                 }
 
-                while tasks.join_next().await.is_some() {}
+                while tasks.join_next().await.is_some() {
+                    spinner.inc(1);
+                }
+
+                spinner.finish();
             }
             BatchCli::Reset {
                 batch_path,

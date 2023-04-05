@@ -1,18 +1,43 @@
-CHECKO := "cargo run --release -p checko --"
+# This can be set when calling by doing for example `just LOCAL_CHECKO=true full-run`
+LOCAL_CHECKO := "true"
+
+checko := if LOCAL_CHECKO == "true" { "cargo run --release -p checko --" } else { "checko" }
 
 export RUST_LOG := "debug"
 
-clean:
-    rm -rf submissions/
+# This will download the latest checko from GitHub and put it in $HOME/.cargo/bin
+# download-checko:
+#     #!/bin/bash
+#     set -euxo pipefail
+#     export CHECKO_VERSION=$(basename $(curl -Ls -o /dev/null -w %{url_effective} https://github.com/team-checkr/checkr/releases/latest))
+#     curl --proto '=https' --tlsv1.2 -LsSf https://github.com/team-checkr/checkr/releases/download/$CHECKO_VERSION/checko-$CHECKO_VERSION-installer.sh | sh
 
-run-tests:
-    {{CHECKO}} run-tests -p programs.toml -g groups.toml -s submissions/ -l
+init-batch:
+    mkdir -p batches
+    cd batches; {{checko}} batch init \
+        -g ../groups.toml \
+        -p ../programs.toml
 
-push-results:
-    {{CHECKO}} push-results-to-repos -g groups.toml -s submissions/
+BATCH := `ls batches/batch* | sort | tail -n 1`
+COMPETITION_DIR := "competition-path"
 
-push-results-execute:
-    {{CHECKO}} push-results-to-repos -g groups.toml -s submissions/ --execute
+reset-group *groups:
+    {{checko}} batch reset {{BATCH}} {{groups}}
 
-generate-competition:
-    {{CHECKO}} generate-competition -g groups.toml -s submissions/ -o competition-results.md
+reset-all:
+    {{checko}} batch reset {{BATCH}} --all
+
+work:
+    time {{checko}} batch work {{BATCH}} -c 4 {{ if LOCAL_CHECKO == "true" { "-l" } else { "" } }}
+
+publish:
+    # This task does nothing in this setup
+    # time {{checko}} batch publish {{BATCH}}
+
+competition:
+    # This task does nothing in this setup
+    # cd {{COMPETITION_DIR}} && git pull
+    # {{checko}} batch competition {{BATCH}} {{COMPETITION_DIR}}/competition-results.md
+    # cd {{COMPETITION_DIR}} && git add . && git commit -am 'Update competition' && git push
+
+full-run: reset-all work publish competition

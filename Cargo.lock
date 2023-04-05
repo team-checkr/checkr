@@ -553,6 +553,7 @@ dependencies = [
  "dioxus-liveview",
  "dioxus-ssr",
  "indexmap",
+ "indicatif",
  "itertools",
  "once_cell",
  "serde",
