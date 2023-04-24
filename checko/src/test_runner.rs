@@ -107,7 +107,7 @@ impl TestRunInput {
         let input: Self = serde_json::from_str(input)?;
 
         let run: RunOption = toml::from_str(&sh.read_file("run.toml")?)?;
-        let data = match run.driver(sh.current_dir()) {
+        let data = match run.driver(sh.current_dir()).await {
             Ok(driver) => GroupResults::generate(&input.programs, &driver).await?,
             Err(err) => {
                 let msg = match err {

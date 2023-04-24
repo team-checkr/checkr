@@ -56,8 +56,8 @@ pub struct Compilation {
 }
 
 impl Compilation {
-    pub fn initialize(dir: PathBuf, run: RunOption) -> color_eyre::Result<Self> {
-        let driver = initialize_driver(&dir, &run)?;
+    pub async fn initialize(dir: PathBuf, run: RunOption) -> color_eyre::Result<Self> {
+        let driver = initialize_driver(&dir, &run).await?;
 
         let driver = Arc::new(Mutex::new(driver));
         let status = Arc::new(Mutex::new(CompilationStatus::compiled()));
@@ -136,9 +136,7 @@ impl Compilation {
                     let compile_result = {
                         let dir = dir.clone();
                         let run = run.run.clone();
-                        tokio::task::spawn_blocking(move || Driver::compile(dir, &compile, &run))
-                            .await
-                            .unwrap()
+                        Driver::compile(dir, &compile, &run).await
                     };
 
                     spinner.finish_and_clear();
@@ -189,7 +187,7 @@ impl Compilation {
     }
 }
 
-fn initialize_driver(dir: &Path, run: &RunOption) -> color_eyre::Result<Driver> {
+async fn initialize_driver(dir: &Path, run: &RunOption) -> color_eyre::Result<Driver> {
     if let Some(compile) = &run.compile {
         clear_terminal()?;
 
@@ -199,6 +197,7 @@ fn initialize_driver(dir: &Path, run: &RunOption) -> color_eyre::Result<Driver> 
         spinner.enable_steady_tick(Duration::from_millis(50));
 
         let driver = Driver::compile(dir, compile, &run.run)
+            .await
             .wrap_err_with(|| format!("compiling using config: {run:?}"))?;
 
         spinner.finish();

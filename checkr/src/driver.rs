@@ -1,9 +1,9 @@
 use std::{
     path::{Path, PathBuf},
-    process::Command,
     time::Duration,
 };
 
+use tokio::process::Command;
 use tracing::error;
 
 use crate::{
@@ -54,7 +54,7 @@ impl Driver {
             compile_output: None,
         }
     }
-    pub fn compile(
+    pub async fn compile(
         dir: impl AsRef<Path>,
         compile: &str,
         run_cmd: &str,
@@ -66,7 +66,7 @@ impl Driver {
         cmd.args(args);
         cmd.current_dir(&dir);
 
-        let compile_output = cmd.output().map_err(DriverError::RunCompile)?;
+        let compile_output = cmd.output().await.map_err(DriverError::RunCompile)?;
 
         if !compile_output.status.success() {
             return Err(DriverError::CompileFailure(compile_output));
@@ -100,7 +100,7 @@ impl Driver {
         cmd.arg(input);
 
         let before = std::time::Instant::now();
-        let cmd_output = cmd.output().map_err(|source| ExecError::RunExec {
+        let cmd_output = cmd.output().await.map_err(|source| ExecError::RunExec {
             cmd: self.run_cmd.clone(),
             source,
         })?;

@@ -15,9 +15,9 @@ pub struct RunOption {
 }
 
 impl RunOption {
-    pub fn driver(&self, dir: impl AsRef<Path>) -> Result<Driver, DriverError> {
+    pub async fn driver(&self, dir: impl AsRef<Path>) -> Result<Driver, DriverError> {
         if let Some(compile) = &self.compile {
-            Driver::compile(dir, compile, &self.run)
+            Driver::compile(dir, compile, &self.run).await
         } else {
             Ok(Driver::new(dir, &self.run))
         }

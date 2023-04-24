@@ -57,7 +57,7 @@ async fn run() -> color_eyre::Result<()> {
     let run = run_options_from_file(cli.dir.join("run.toml"))
         .wrap_err_with(|| format!("could not read {:?}", cli.dir.join("run.toml")))?;
 
-    let compilation = Compilation::initialize(cli.dir, run)?;
+    let compilation = Compilation::initialize(cli.dir, run).await?;
 
     let app = inspectify::routes::router(ApplicationState { compilation });
     // NOTE: Enable for HTTP logging

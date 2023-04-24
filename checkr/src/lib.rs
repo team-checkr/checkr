@@ -173,9 +173,22 @@ impl GeneratedProgram {
 
         let input = input.parsed::<E>().unwrap();
 
-        let exec_result = driver.exec::<E>(&cmds, &input).await;
+        let timeout_duration = Duration::from_secs(10);
+        let exec_result =
+            tokio::time::timeout(timeout_duration, driver.exec::<E>(&cmds, &input)).await;
         match exec_result {
-            Ok(exec_result) => {
+            Err(_) => AnalysisSummary {
+                fuel,
+                seed,
+                cmds,
+                input,
+                output: None,
+                time: timeout_duration,
+                stdout: String::new(),
+                stderr: String::new(),
+                result: Ok(ValidationResult::TimeOut),
+            },
+            Ok(Ok(exec_result)) => {
                 let validation_result = env.validate(&cmds, &input, &exec_result.parsed);
                 AnalysisSummary {
                     fuel,
@@ -189,7 +202,7 @@ impl GeneratedProgram {
                     result: validation_result.map_err(|err| err.into()),
                 }
             }
-            Err(err) => match err {
+            Ok(Err(err)) => match err {
                 driver::ExecError::Serialize(err) => AnalysisSummary {
                     fuel,
                     seed,
