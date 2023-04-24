@@ -9,6 +9,7 @@
 
 use std::{
     path::Path,
+    process::Stdio,
     time::{Duration, SystemTime},
 };
 
@@ -21,6 +22,7 @@ use color_eyre::{
     Result,
 };
 use serde::{Deserialize, Serialize};
+use tokio::io::AsyncWriteExt;
 use tracing::info;
 use xshell::{cmd, Shell};
 
@@ -65,14 +67,24 @@ impl TestRunInput {
                     .wrap_err("failed to create a str from cwd when spawning docker")?
             ),
         ]);
-        cmd.args([checko_run, SINGLE_COMPETITION_CMD]).arg(input);
+        cmd.args([checko_run, SINGLE_COMPETITION_CMD]);
+        cmd.stdin(Stdio::piped())
+            .stdout(Stdio::piped())
+            .stderr(Stdio::piped());
 
         let start = std::time::Instant::now();
         info!(container_name = image.name(), "spawning docker container");
-        let output = cmd
-            .output()
+        let mut child = cmd.spawn().wrap_err("Failed to spawn Docker container")?;
+        let mut child_stdin = child.stdin.take().unwrap();
+        child_stdin
+            .write_all(input.as_bytes())
             .await
-            .wrap_err("Failed to spawn Docker container")?;
+            .wrap_err("Faild to write input to container")?;
+        drop(child_stdin);
+        let output = child
+            .wait_with_output()
+            .await
+            .wrap_err("Failed to complete Docker container")?;
         info!(
             status = output.status.to_string(),
             duration = format!("{:?}", start.elapsed()),

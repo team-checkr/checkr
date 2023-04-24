@@ -22,7 +22,7 @@ pub enum Cli {
     },
     /// The command used within the docker container to generate competition
     /// results of a single group. This is not intended to be used by humans.
-    InternalSingleCompetition { input: String },
+    InternalSingleCompetition,
 }
 
 impl Cli {
@@ -37,8 +37,10 @@ impl Cli {
                 Ok(())
             }
             Cli::Batch { cmd } => cmd.run().await,
-            Cli::InternalSingleCompetition { input } => {
+            Cli::InternalSingleCompetition => {
                 let sh = Shell::new()?;
+                let mut input = String::new();
+                std::io::stdin().read_line(&mut input)?;
                 TestRunInput::run_from_within_docker(&sh, &input).await?;
                 Ok(())
             }

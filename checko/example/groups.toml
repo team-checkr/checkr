@@ -1,6 +1,6 @@
 [[groups]]
 name = "01"
-git = "git@gitlab.gbar.dtu.dk:s184229/FsLexYacc-Starter.git"
+git = "git@github.com:team-checkr/fsharp-starter.git"
 
 [[groups]]
 name = "02"

@@ -83,7 +83,7 @@ impl DockerImage {
 
     pub fn run_cmd(&self, flags: &[impl AsRef<std::ffi::OsStr>]) -> tokio::process::Command {
         let mut cmd = tokio::process::Command::new("docker");
-        cmd.arg("run").arg("--rm");
+        cmd.arg("run").arg("--rm").arg("-i");
         cmd.args(flags).args([self.name()]);
         cmd
     }
