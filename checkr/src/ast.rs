@@ -18,6 +18,12 @@ impl Target<()> {
     }
 }
 impl<Idx> Target<Idx> {
+    pub fn name(&self) -> &str {
+        match self {
+            Target::Variable(x) => &x.0,
+            Target::Array(a, _) => &a.0,
+        }
+    }
     pub fn map_idx<T>(self, f: impl FnOnce(Idx) -> T) -> Target<T> {
         match self {
             Target::Variable(var) => Target::Variable(var),

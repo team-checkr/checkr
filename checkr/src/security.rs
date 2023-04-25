@@ -16,6 +16,15 @@ pub struct Flow<T> {
     pub into: T,
 }
 
+impl<T> Flow<T> {
+    pub fn map<'a, S>(&'a self, f: impl Fn(&'a T) -> S) -> Flow<S> {
+        Flow {
+            from: f(&self.from),
+            into: f(&self.into),
+        }
+    }
+}
+
 impl<T> std::fmt::Debug for Flow<T>
 where
     T: std::fmt::Debug,

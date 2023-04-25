@@ -4,7 +4,7 @@ use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::Commands,
+    ast::{Commands, Target},
     generation::Generate,
     security::{Flow, SecurityAnalysisOutput, SecurityClass, SecurityLattice},
     sign::Memory,
@@ -163,16 +163,25 @@ impl Environment for SecurityEnv {
     where
         Self::Output: PartialEq + std::fmt::Debug,
     {
-        let mut reference = self.run(cmds, input)?;
-        reference.actual.sort();
-        reference.allowed.sort();
-        reference.violations.sort();
-        let mut output = output.clone();
-        output.actual.sort();
-        output.allowed.sort();
-        output.violations.sort();
+        fn stringify(flows: &[Flow<Target>]) -> Vec<Flow<&str>> {
+            let mut f = flows.iter().map(|f| f.map(|t| t.name())).collect_vec();
+            f.sort();
+            f
+        }
 
-        if reference == output {
+        let reference = self.run(cmds, input)?;
+        let reference_actual = stringify(&reference.actual);
+        let reference_allowed = stringify(&reference.allowed);
+        let reference_violations = stringify(&reference.violations);
+        let output = output.clone();
+        let output_actual = stringify(&output.actual);
+        let output_allowed = stringify(&output.allowed);
+        let output_violations = stringify(&output.violations);
+
+        if reference_actual == output_actual
+            && reference_allowed == output_allowed
+            && reference_violations == output_violations
+        {
             Ok(ValidationResult::CorrectTerminated)
         } else {
             Ok(ValidationResult::Mismatch {
