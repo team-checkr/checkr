@@ -189,9 +189,7 @@ impl Row {
                                     }
                                     TestResultType::Error { description } => (
                                         if show {
-                                            let mut d = description.to_string();
-                                            d.truncate(10_000);
-                                            d
+                                            description.to_string()
                                         } else {
                                             "Error".to_string()
                                         },
