@@ -2,11 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.1.21] - 2023-04-25
+
+### Bug Fixes
+
+- Do short-circuiting correctly in sign analysis
+- Comparing validating security results without target
+
+### Features
+
+- Add progress bar to checko
+- Make test execution async and add a timeout
+- Show entire error description in checko UI
+
+### Refactor
+
+- Pass input to test container over stdin instead of args
+
 ## [0.1.20] - 2023-04-04
 
 ### Miscellaneous Tasks
 
 - Use just the ref name instead of path for displaying version in inspectify
+- Release
 
 ## [0.1.19] - 2023-04-04
 
