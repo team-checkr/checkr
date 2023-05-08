@@ -1,6 +1,10 @@
 //! Formatting of primarily Markdown files.
 
-use std::{cmp::Reverse, collections::BTreeMap, time::Duration};
+use std::{
+    cmp::{self, Reverse},
+    collections::BTreeMap,
+    time::Duration,
+};
 
 use checkr::env::Analysis;
 use itertools::Itertools;
@@ -91,23 +95,48 @@ impl std::fmt::Display for IndividualMarkdown<'_> {
     }
 }
 
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord)]
+pub enum CompetitionListing<T = Vec<TestResult>> {
+    Results(T),
+    CompileError,
+    CriticalError,
+}
+
+impl From<Vec<TestResult>> for CompetitionListing {
+    fn from(value: Vec<TestResult>) -> Self {
+        CompetitionListing::Results(value)
+    }
+}
+
 #[derive(Debug, Default)]
 pub struct CompetitionMarkdown {
-    pub sections: BTreeMap<Analysis, BTreeMap<String, Vec<TestResult>>>,
+    pub sections: BTreeMap<Analysis, BTreeMap<String, CompetitionListing>>,
 }
 
 impl std::fmt::Display for CompetitionMarkdown {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let mut num_tests = 0;
         for (analysis, groups) in &self.sections {
             let sorted_groups = groups
                 .iter()
                 .map(|(g, test_results)| {
-                    let num_correct = test_results
-                        .iter()
-                        .filter(|t| t.result.is_correct())
-                        .count();
-                    let time: Duration = test_results.iter().map(|t| t.time).sum();
-                    (Reverse(num_correct), test_results.len(), time, g)
+                    let num_correct_rev = match test_results {
+                        CompetitionListing::Results(results) => {
+                            num_tests = cmp::max(num_tests, results.len());
+                            CompetitionListing::Results(Reverse(
+                                results.iter().filter(|t| t.result.is_correct()).count(),
+                            ))
+                        }
+                        CompetitionListing::CompileError => CompetitionListing::CompileError,
+                        CompetitionListing::CriticalError => CompetitionListing::CriticalError,
+                    };
+                    let time: Duration = match test_results {
+                        CompetitionListing::Results(results) => {
+                            results.iter().map(|t| t.time).sum()
+                        }
+                        _ => Duration::MAX,
+                    };
+                    (num_correct_rev, time, g)
                 })
                 .sorted();
 
@@ -118,17 +147,42 @@ impl std::fmt::Display for CompetitionMarkdown {
                 .load_preset(comfy_table::presets::ASCII_MARKDOWN)
                 .set_header(["Rank", "Group", "Result", "Time"]);
 
-            for (rank_0, (Reverse(num_correct), num_tests, time, g)) in sorted_groups.enumerate() {
-                table.add_row([
-                    format!("{}", rank_0 + 1),
-                    g.to_string(),
-                    format!("{num_correct}/{num_tests} passed"),
-                    format!("{time:?}"),
-                ]);
+            for (rank_0, (data, time, g)) in sorted_groups.enumerate() {
+                let (data, time) = match data {
+                    CompetitionListing::Results(Reverse(num_correct)) => (
+                        format!("{num_correct}/{num_tests} passed"),
+                        format!("{time:?}"),
+                    ),
+                    CompetitionListing::CompileError => {
+                        ("Compile error*".to_string(), "---".to_string())
+                    }
+                    CompetitionListing::CriticalError => {
+                        ("Critical error*".to_string(), "---".to_string())
+                    }
+                };
+                table.add_row([format!("{}", rank_0 + 1), g.to_string(), data, time]);
             }
 
-            writeln!(f, "\n{table}")?;
+            writeln!(f, "\n{table}\n")?;
         }
+
+        let mut table = comfy_table::Table::new();
+        table
+            .load_preset(comfy_table::presets::ASCII_MARKDOWN)
+            .set_header(["Error", "Explanation"])
+            .add_row([
+                "Compile error",
+                "Your code failed to compile. \
+                 Check the `results` branch on your repository for details.",
+            ])
+            .add_row([
+                "Critical error",
+                "This was caused by a critical error during your test run. \
+                 Often this is the result of producing too much output and \
+                 overflowing the internal buffers.",
+            ]);
+        writeln!(f, "\n## Error explanations")?;
+        writeln!(f, "\n{table}")?;
 
         Ok(())
     }

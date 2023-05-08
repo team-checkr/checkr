@@ -13,14 +13,14 @@ use color_eyre::{
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use tokio::task::JoinSet;
-use tracing::{error, info, span, warn, Instrument, Level};
+use tracing::{debug, error, info, span, warn, Instrument, Level};
 use xshell::{cmd, Shell};
 
 use crate::{
     collect_programs,
-    config::{CanonicalProgramsConfig, GroupConfig},
+    config::{CanonicalProgramsConfig, GroupConfig, ProgramsConfig},
     docker::DockerImage,
-    fmt::{CompetitionMarkdown, IndividualMarkdown},
+    fmt::{CompetitionListing, CompetitionMarkdown, IndividualMarkdown},
     group_env::{set_checko_git_account, GroupEnv},
     read_groups, retry,
     test_runner::{TestRunData, TestRunInput, TestRunResults},
@@ -152,6 +152,13 @@ pub enum BatchCli {
         #[clap(short, long, default_value_t = default_batch_name())]
         name: String,
     },
+    Test {
+        #[clap(long, short, default_value_t = false)]
+        local_docker: bool,
+        #[clap(long, short)]
+        group_path: PathBuf,
+        programs_path: Vec<PathBuf>,
+    },
     Work {
         /// When set will build the docker image from the source
         #[clap(long, short, default_value_t = false)]
@@ -235,6 +242,57 @@ impl BatchCli {
                 info!("batch written to {}", write_path.display());
                 println!("{}", write_path.display());
             }
+            BatchCli::Test {
+                local_docker,
+                programs_path,
+                group_path,
+            } => {
+                // NOTE: Check of docker daemon is running
+                {
+                    let sh = Shell::new()?;
+                    cmd!(sh, "docker ps")
+                        .quiet()
+                        .ignore_stdout()
+                        .run()
+                        .wrap_err("docker does not seem to be running")?;
+                }
+
+                let programs = programs_path
+                    .into_iter()
+                    .map(|p| -> Result<ProgramsConfig> {
+                        debug!("Parsing {}", p.display());
+                        let config: ProgramsConfig = toml::from_str(&std::fs::read_to_string(&p)?)
+                            .with_context(|| format!("parsing {}", p.display()))?;
+                        config
+                            .canonicalize()
+                            .with_context(|| format!("canonicalizing {}", p.display()))?;
+                        Ok(config)
+                    })
+                    .try_fold(
+                        ProgramsConfig::default(),
+                        |mut acc, x| -> Result<ProgramsConfig> {
+                            acc.extend(x?);
+                            Ok(acc)
+                        },
+                    )?
+                    .canonicalize()?;
+
+                let image = if local_docker {
+                    DockerImage::build_in_tree().await?
+                } else {
+                    DockerImage::build().await?
+                };
+
+                let output = TestRunInput::run_in_docker(&image, &group_path, programs).await?;
+                match &output.data {
+                    TestRunData::CompileError(_) => {
+                        warn!("failed to compile. compile error saved")
+                    }
+                    TestRunData::Sections(_) => {}
+                }
+
+                println!("{}", serde_json::to_string(&output)?);
+            }
             BatchCli::Work {
                 local_docker,
                 concurrent,
@@ -271,7 +329,6 @@ impl BatchCli {
                 let mut tasks = JoinSet::new();
 
                 for g in batch.groups.values().cloned() {
-                    let batch = batch.clone();
                     let programs = Arc::clone(&batch.programs);
                     let image = image.clone();
                     let task_permits = task_permits.clone();
@@ -286,17 +343,18 @@ impl BatchCli {
                                 // nr = format!("{}/{num_groups}", g_idx + 1)
                             ))
                             .await;
-                        batch.write_to_disk().await.unwrap();
                     });
                 }
 
                 if keep_alive {
+                    let batch = batch.clone();
                     tasks.spawn(async { ui::start_web_ui(batch).await.unwrap() });
                 } else {
-                    tokio::spawn(ui::start_web_ui(batch));
+                    tokio::spawn(ui::start_web_ui(batch.clone()));
                 }
 
                 while tasks.join_next().await.is_some() {
+                    batch.write_to_disk().await.unwrap();
                     spinner.inc(1);
                 }
 
@@ -395,6 +453,7 @@ impl BatchCli {
                 let batch = Batch::from_path(batch_path)?;
 
                 let mut input = CompetitionMarkdown::default();
+                let mut errored_groups = vec![];
 
                 for g in batch.groups.values() {
                     let span = span!(Level::INFO, "Group", name = g.config.name);
@@ -409,7 +468,7 @@ impl BatchCli {
                         } => match results {
                             Ok(r) => match &r.data {
                                 TestRunData::CompileError(_) => {
-                                    error!("did not have a latest run (they failed to compile)")
+                                    errored_groups.push((g, CompetitionListing::CompileError));
                                 }
                                 TestRunData::Sections(sections) => {
                                     for sec in sections {
@@ -418,15 +477,22 @@ impl BatchCli {
                                             .entry(sec.analysis)
                                             .or_default()
                                             .entry(g.config.name.clone())
-                                            .or_insert(sec.programs.clone());
+                                            .or_insert_with(|| sec.programs.clone().into());
                                     }
                                 }
                             },
-                            Err(e) => {
+                            Err(_e) => {
+                                errored_groups.push((g, CompetitionListing::CriticalError));
                                 warn!("did not have a latest run");
-                                eprintln!("{e}");
                             }
                         },
+                    }
+                }
+
+                for (g, err) in errored_groups {
+                    for x in input.sections.values_mut() {
+                        x.entry(g.config.name.clone())
+                            .or_insert_with(|| err.clone());
                     }
                 }
 

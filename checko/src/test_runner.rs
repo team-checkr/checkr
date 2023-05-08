@@ -63,7 +63,8 @@ impl TestRunInput {
             "-v",
             &format!(
                 "{}:/root/code",
-                cwd.to_str()
+                cwd.canonicalize()?
+                    .to_str()
                     .wrap_err("failed to create a str from cwd when spawning docker")?
             ),
         ]);
