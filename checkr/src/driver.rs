@@ -136,8 +136,12 @@ impl Driver {
     }
 
     fn new_command(&self) -> Command {
-        let new_cmd: String =
-            Driver::format_cmd(self.run_cmd.clone(), self.dir.to_str().unwrap().to_string()); //new cmd with directory path pre-pended to it.
+        let new_cmd: String = match std::env::consts::OS {
+            "windows" => {
+                Driver::format_cmd(self.run_cmd.clone(), self.dir.to_str().unwrap().to_string())
+            } //new cmd with directory path pre-pended to it.
+            _ => self.run_cmd.clone(),
+        };
 
         let mut args = new_cmd.split(' ');
         let mut cmd = Command::new(args.next().unwrap());
