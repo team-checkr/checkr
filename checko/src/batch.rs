@@ -90,7 +90,7 @@ impl Group {
                 let env = GroupEnv::new(&self.config).unwrap();
 
                 // TODO: Replace this with a try-block when they are stable
-                let result: Result<TestRunResults> = (|| async {
+                let result: Result<TestRunResults> = async {
                     let sh = env
                         .shell_in_default_branch()
                         .wrap_err("getting shell in default branch")?;
@@ -105,7 +105,7 @@ impl Group {
                         TestRunData::Sections(_) => {}
                     }
                     Ok(output)
-                })()
+                }
                 .await;
 
                 info!("done!");

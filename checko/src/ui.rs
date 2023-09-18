@@ -1,3 +1,6 @@
+#![allow(non_snake_case)]
+#![allow(unused_braces)]
+
 use std::{cmp::Reverse, time::Duration};
 
 use axum::{extract::WebSocketUpgrade, response::Html, routing::get, Router};
@@ -18,7 +21,7 @@ pub struct AppState {
 static APP_STATE: once_cell::sync::OnceCell<AppState> = once_cell::sync::OnceCell::new();
 impl AppState {
     pub fn set_global(state: Self) {
-        APP_STATE.set(state);
+        let _ = APP_STATE.set(state);
     }
     pub fn global() -> Option<Self> {
         APP_STATE.get().cloned()
@@ -102,12 +105,13 @@ impl Color {
     }
 }
 
+type RowDetails = Vec<(String, Vec<(usize, (String, Color))>)>;
 #[derive(Debug, Clone, PartialEq, Hash)]
 pub struct Row {
     pub name: String,
     pub status: String,
     pub colors: Vec<Color>,
-    pub details: Result<Vec<(String, Vec<(usize, (String, Color))>)>, String>,
+    pub details: Result<RowDetails, String>,
 }
 
 impl Row {
@@ -239,7 +243,7 @@ impl Row {
                                 format!("{correct:>5}/{}", x.programs.len())
                             })
                             .join(" | ");
-                        format!("{result}")
+                        result.to_string()
                     }
                 },
                 Err(_) => "Errored".to_string(),
@@ -336,6 +340,7 @@ const WIDTH: usize = 15;
 const HEIGHT: usize = 20;
 
 #[inline_props]
+#[allow(unused)]
 pub fn SvgRow(cx: Scope, row: Row, no_details: Option<bool>, dedup: bool, open: bool) -> Element {
     cx.render(rsx!(
         g {
@@ -378,7 +383,7 @@ pub fn SvgTable(cx: Scope, rows: Vec<Row>) -> Element {
 }
 
 fn app(cx: Scope) -> Element {
-    let rows = use_state(cx, || vec![]);
+    let rows = use_state(cx, Vec::new);
 
     use_coroutine(cx, |_rx: dioxus::prelude::UnboundedReceiver<()>| {
         let jobs = rows.to_owned();

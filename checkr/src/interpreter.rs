@@ -189,7 +189,7 @@ impl AExpr {
                         return Err(InterpreterError::OutsideFunctionDomain);
                     }
                     (1..=x)
-                        .fold(Some(1 as Int), |acc, x| acc?.checked_mul(x))
+                        .try_fold(1 as Int, |acc, x| acc.checked_mul(x))
                         .ok_or(InterpreterError::ArithmeticOverflow)?
                 }
                 Function::Fib(x) => {
@@ -198,10 +198,7 @@ impl AExpr {
                         return Err(InterpreterError::OutsideFunctionDomain);
                     }
                     (0..x)
-                        .fold(Some((0 as Int, 1)), |acc, _| {
-                            let (a, b) = acc?;
-                            Some((b, a.checked_add(b)?))
-                        })
+                        .try_fold((0 as Int, 1), |(a, b), _| Some((b, a.checked_add(b)?)))
                         .map(|(x, _)| x)
                         .ok_or(InterpreterError::ArithmeticOverflow)?
                 }

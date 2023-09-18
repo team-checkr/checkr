@@ -54,7 +54,6 @@ bitflags::bitflags! {
     #[derive(Serialize, Deserialize)]
     #[serde(into = "Vec<Sign>", try_from = "Vec<Sign>")]
     pub struct Signs: u8 {
-        const NONE = 0b000;
         const POSITIVE = 0b001;
         const ZERO = 0b010;
         const NEGATIVE = 0b100;
@@ -64,7 +63,7 @@ bitflags::bitflags! {
 
 impl Default for Signs {
     fn default() -> Self {
-        Self::NONE
+        Self::empty()
     }
 }
 
@@ -116,14 +115,14 @@ impl Signs {
 }
 impl FromIterator<Sign> for Signs {
     fn from_iter<T: IntoIterator<Item = Sign>>(iter: T) -> Self {
-        iter.into_iter().fold(Signs::NONE, |acc, s| acc | s.into())
+        iter.into_iter()
+            .fold(Signs::empty(), |acc, s| acc | s.into())
     }
 }
 bitflags::bitflags! {
     #[derive(Serialize, Deserialize)]
     #[serde(into = "Vec<bool>", try_from = "Vec<bool>")]
     pub struct Bools: u8 {
-        const NONE = 0b00;
         const FALSE = 0b01;
         const TRUE = 0b10;
         const ALL = Self::TRUE.bits | Self::FALSE.bits;
@@ -132,7 +131,7 @@ bitflags::bitflags! {
 
 impl Default for Bools {
     fn default() -> Self {
-        Self::NONE
+        Self::empty()
     }
 }
 
@@ -183,7 +182,8 @@ impl Bools {
 }
 impl FromIterator<bool> for Bools {
     fn from_iter<T: IntoIterator<Item = bool>>(iter: T) -> Self {
-        iter.into_iter().fold(Bools::NONE, |acc, s| acc | s.into())
+        iter.into_iter()
+            .fold(Bools::empty(), |acc, s| acc | s.into())
     }
 }
 
@@ -383,7 +383,7 @@ where
     } else {
         Either::Right(
             l.into_iter()
-                .cartesian_product(r.into_iter())
+                .cartesian_product(r)
                 .map(move |(a, b)| f(a, Some(b))),
         )
     }
