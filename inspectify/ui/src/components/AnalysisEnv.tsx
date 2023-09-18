@@ -10,9 +10,9 @@ import { parse } from "ansicolor";
 import remarkGfm from "remark-gfm";
 import {
   Analysis,
-  AnalysisResponse,
-  CompilationStatus,
-  Input,
+  type AnalysisResponse,
+  type CompilationStatus,
+  type Input,
 } from "../lib/types";
 import { StretchEditor } from "./StretchEditor";
 import { Indicator, IndicatorState, INDICATOR_TEXT_COLOR } from "./Indicator";

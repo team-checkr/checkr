@@ -2,11 +2,11 @@ import { useEffect, useState } from "react";
 import type { QueryClient } from "react-query";
 import {
   Analysis,
-  AnalysisRequest,
-  AnalysisResponse,
-  CompilationStatus,
-  GraphRequest,
-  GraphResponse,
+  type AnalysisRequest,
+  type AnalysisResponse,
+  type CompilationStatus,
+  type GraphRequest,
+  type GraphResponse,
 } from "./types";
 
 const request = async <T>(

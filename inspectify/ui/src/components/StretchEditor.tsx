@@ -2,7 +2,6 @@ import React from "react";
 import * as monaco from "monaco-editor";
 
 import "monaco-editor/esm/vs/editor/editor.all.js";
-import "monaco-editor/esm/vs/editor/standalone/browser/accessibilityHelp/accessibilityHelp.js";
 
 export type AnalysisError = {
   loc: { start: number; end: number };

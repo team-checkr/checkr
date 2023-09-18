@@ -1,7 +1,7 @@
 /// <reference path="z3-wrapper.d.ts" />
 
 import { Mutex } from "async-mutex";
-import { init, Z3_context } from "z3-solver/build/low-level";
+import { init, type Z3_context } from "z3-solver/build/low-level";
 import initZ3 from "z3-solver/build/z3-built";
 
 type Z3Instance = Awaited<ReturnType<typeof init>>;
