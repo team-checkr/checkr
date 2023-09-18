@@ -106,7 +106,7 @@ pub enum ParseError {
     },
     #[error("Unrecognized EOF")]
     #[diagnostic(help("Expected tokens in this context are:\n{expected}"))]
-    UnrecognizedEOF {
+    UnrecognizedEof {
         #[source_code]
         src: String,
         #[label = "The document ends too early. Are you missing a token?"]
@@ -119,7 +119,7 @@ pub enum ParseError {
 //         match self {
 //             ParseError::InvalidToken { err_span, .. }
 //             | ParseError::UnrecognizedToken { err_span, .. }
-//             | ParseError::UnrecognizedEOF { err_span, .. } => Span {
+//             | ParseError::UnrecognizedEof { err_span, .. } => Span {
 //                 start: err_span.offset(),
 //                 end: err_span.offset() + err_span.len(),
 //             },
@@ -139,8 +139,8 @@ impl ParseError {
                 src: prep_src(),
                 err_span: (location, 0).into(),
             },
-            lalrpop_util::ParseError::UnrecognizedEOF { location, expected } => {
-                ParseError::UnrecognizedEOF {
+            lalrpop_util::ParseError::UnrecognizedEof { location, expected } => {
+                ParseError::UnrecognizedEof {
                     src: prep_src(),
                     err_span: (location, 0).into(),
                     expected: expected.join(", "),
