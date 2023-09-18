@@ -1,4 +1,5 @@
 [workspace]
+resolver = "2"
 members = ["xtask", "checkr", "inspectify", "checko"]
 
 [workspace.package]
@@ -14,8 +15,8 @@ license = "MIT OR Apache-2.0"
 axum = { version = "0.6.2", features = ["macros", "ws"] }
 axum-macros = "0.3.1"
 color-eyre = "0.6.2"
-comfy-table = { version = "6.1.4", default-features = false }
-itertools = "0.10.5"
+comfy-table = { version = "7.0.1", default-features = false }
+itertools = "0.11.0"
 serde = { version = "1.0.152", features = ["derive", "rc"] }
 serde_json = "1.0.91"
 rand = { version = "0.8.5", features = ["small_rng"] }
@@ -25,7 +26,7 @@ tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
 typeshare = "1.0.0"
-toml = { version = "0.7.0", features = ["indexmap"] }
+toml = { version = "0.8.0", features = ["indexmap"] }
 checkr = { path = "./checkr" }
 checko = { path = "./checko" }
 

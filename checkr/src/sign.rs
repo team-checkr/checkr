@@ -51,13 +51,13 @@ impl Sign {
 }
 
 bitflags::bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(into = "Vec<Sign>", try_from = "Vec<Sign>")]
     pub struct Signs: u8 {
         const POSITIVE = 0b001;
         const ZERO = 0b010;
         const NEGATIVE = 0b100;
-        const ALL = Self::POSITIVE.bits | Self::ZERO.bits | Self::NEGATIVE.bits;
+        const ALL = Self::POSITIVE.bits() | Self::ZERO.bits() | Self::NEGATIVE.bits();
     }
 }
 
@@ -75,7 +75,7 @@ impl std::fmt::Display for Signs {
 
 impl From<Signs> for Vec<Sign> {
     fn from(value: Signs) -> Self {
-        value.iter().collect()
+        value.signs().collect()
     }
 }
 impl From<Vec<Sign>> for Signs {
@@ -104,13 +104,13 @@ impl From<Sign> for Signs {
 }
 
 impl Signs {
-    pub fn iter(self) -> impl Iterator<Item = Sign> + Clone {
+    pub fn signs(self) -> impl Iterator<Item = Sign> + Clone {
         [Sign::Positive, Sign::Zero, Sign::Negative]
             .into_iter()
             .filter(move |&s| self.contains(s.into()))
     }
     pub fn map(self, f: impl FnMut(Sign) -> Sign) -> Signs {
-        self.iter().map(f).collect()
+        self.signs().map(f).collect()
     }
 }
 impl FromIterator<Sign> for Signs {
@@ -120,12 +120,12 @@ impl FromIterator<Sign> for Signs {
     }
 }
 bitflags::bitflags! {
-    #[derive(Serialize, Deserialize)]
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(into = "Vec<bool>", try_from = "Vec<bool>")]
     pub struct Bools: u8 {
         const FALSE = 0b01;
         const TRUE = 0b10;
-        const ALL = Self::TRUE.bits | Self::FALSE.bits;
+        const ALL = Self::TRUE.bits() | Self::FALSE.bits();
     }
 }
 
@@ -143,7 +143,7 @@ impl std::fmt::Display for Bools {
 
 impl From<Bools> for Vec<bool> {
     fn from(value: Bools) -> Self {
-        value.iter().collect()
+        value.bools().collect()
     }
 }
 impl From<Vec<bool>> for Bools {
@@ -171,13 +171,13 @@ impl From<bool> for Bools {
 }
 
 impl Bools {
-    pub fn iter(self) -> impl Iterator<Item = bool> + Clone {
-        [false, true]
+    pub fn bools(self) -> impl Iterator<Item = bool> + Clone {
+        [true, false]
             .into_iter()
             .filter(move |&s| self.contains(s.into()))
     }
     pub fn map(self, f: impl FnMut(bool) -> bool) -> Bools {
-        self.iter().map(f).collect()
+        self.bools().map(f).collect()
     }
 }
 impl FromIterator<bool> for Bools {
@@ -313,7 +313,7 @@ impl MonotoneFramework for SignAnalysis {
         match e.action() {
             Action::Assignment(Target::Variable(var), x) => prev
                 .iter()
-                .flat_map(|mem| x.semantics_sign(mem).iter().map(move |s| (mem, s)))
+                .flat_map(|mem| x.semantics_sign(mem).signs().map(move |s| (mem, s)))
                 .map(|(mem, s)| mem.clone().with_var(var, s))
                 .collect(),
             Action::Assignment(Target::Array(arr, idx), expr) => prev
@@ -333,10 +333,10 @@ impl MonotoneFramework for SignAnalysis {
                         for s in std::iter::once(None).chain(array_signs.iter().map(Some)) {
                             let mut signs = array_signs;
                             if let Some(s) = s {
-                                signs.remove(s.into());
+                                signs.remove(s);
                             }
                             for new_sign in expr.semantics_sign(mem).iter() {
-                                let new_signs = signs | new_sign.into();
+                                let new_signs = signs | new_sign;
                                 let mut new_mem = mem.clone();
                                 new_mem.arrays.insert(arr.clone(), new_signs);
                                 new_possible.insert(new_mem);
@@ -397,8 +397,8 @@ impl BExpr {
                 let l = l.semantics_sign(mem);
                 let r = r.semantics_sign(mem);
                 cartesian_flat_map(
-                    l.iter().flat_map(|s| s.representative()),
-                    r.iter().flat_map(|s| s.representative()),
+                    l.signs().flat_map(|s| s.representative()),
+                    r.signs().flat_map(|s| s.representative()),
                     |l, r| Some(op.semantic(l, r?)),
                 )
                 .flatten()
@@ -407,7 +407,7 @@ impl BExpr {
             BExpr::Logic(l, op, r) => {
                 let l = l.semantics_sign(mem);
                 let r = r.semantics_sign(mem);
-                cartesian_flat_map(l.iter(), r.iter(), |l, r| {
+                cartesian_flat_map(l.bools(), r.bools(), |l, r| {
                     op.semantic(l, || r.ok_or(InterpreterError::NoProgression))
                 })
                 .flatten()
@@ -453,10 +453,10 @@ impl AExpr {
             .collect(),
             AExpr::Binary(l, op, r) => cartesian_flat_map(
                 l.semantics_sign(mem)
-                    .iter()
+                    .signs()
                     .flat_map(|x| x.representative()),
                 r.semantics_sign(mem)
-                    .iter()
+                    .signs()
                     .flat_map(|x| x.representative()),
                 |l, r| Some(op.semantic(l, r?)),
             )
