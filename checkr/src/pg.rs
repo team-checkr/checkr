@@ -7,7 +7,7 @@ use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::warn;
 
-use crate::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
+use gcl::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
 
 #[derive(Debug, Clone)]
 pub struct ProgramGraph {
@@ -126,7 +126,11 @@ impl std::fmt::Display for Action {
     }
 }
 
-impl Commands {
+trait Edges {
+    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge>;
+}
+
+impl Edges for Commands {
     fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         let mut edges = vec![];
 
@@ -185,7 +189,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
     }
 }
 
-impl Command {
+impl Edges for Command {
     fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         match self {
             Command::Assignment(v, expr) => {

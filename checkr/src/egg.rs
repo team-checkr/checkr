@@ -1,6 +1,8 @@
 use egg::{define_language, rewrite as rw, FromOpError, Id, RecExpr, RecExprParseError};
 
-use crate::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Target, Variable};
+use gcl::ast::{AExpr, AOp, Array, BExpr, Function, LogicOp, Target, Variable};
+
+use crate::interpreter::InterpreterMemory;
 
 type Runner = egg::Runner<Gcl, ()>;
 type Rewrite = egg::Rewrite<Gcl, ()>;
@@ -15,7 +17,7 @@ define_language! {
         "-" = Sub([Id; 2]),
         "*" = Mul([Id; 2]),
         "^" = Pow([Id; 2]),
-        Number(crate::ast::Int),
+        Number(gcl::ast::Int),
         Variable(Variable),
         Array(Array, Id),
         // Functions
@@ -146,28 +148,24 @@ impl IntoEgg for BExpr {
     }
 }
 
-impl BExpr {
-    pub fn renumber_quantifiers(&self) -> BExpr {
-        // NOTE: We do two passes, otherwise expressions like these wouldn't be equal:
-        //   exists _f0 :: exists _f1 :: _f0 = _f1
-        //   exists _f1 :: exists _f0 :: _f1 = _f0
-        //
-        // By constructing identifiers with invalid names, we are sure that
-        // we don't interfere with anything already defined.
-        self.renumber_quantifiers_inner("not a valid ident", &mut 0)
-            .renumber_quantifiers_inner("f", &mut 0)
-    }
-    fn renumber_quantifiers_inner(&self, f: &str, count: &mut u64) -> BExpr {
-        match self
-            .semantics(&Default::default())
+pub fn renumber_quantifiers(bexpr: &BExpr) -> BExpr {
+    // NOTE: We do two passes, otherwise expressions like these wouldn't be equal:
+    //   exists _f0 :: exists _f1 :: _f0 = _f1
+    //   exists _f1 :: exists _f0 :: _f1 = _f0
+    //
+    // By constructing identifiers with invalid names, we are sure that
+    // we don't interfere with anything already defined.
+    fn renum(bexpr: &BExpr, f: &str, count: &mut u64) -> BExpr {
+        match bexpr
+            .semantics(&InterpreterMemory::default())
             .map(BExpr::Bool)
-            .unwrap_or_else(|_| self.clone())
+            .unwrap_or_else(|_| bexpr.clone())
         {
             BExpr::Bool(b) => BExpr::Bool(b),
             BExpr::Rel(l, op, r) => BExpr::Rel(l.simplify(), op, r.simplify()),
             BExpr::Logic(l, op, r) => {
-                let l = l.renumber_quantifiers_inner(f, count);
-                let r = r.renumber_quantifiers_inner(f, count);
+                let l = renum(&l, f, count);
+                let r = renum(&r, f, count);
 
                 match (l, op, r) {
                     (BExpr::Bool(true), LogicOp::And, x) | (x, LogicOp::And, BExpr::Bool(true)) => {
@@ -185,7 +183,7 @@ impl BExpr {
                 }
             }
             BExpr::Not(x) => {
-                let x = x.renumber_quantifiers_inner(f, count);
+                let x = renum(&x, f, count);
                 match x {
                     BExpr::Bool(b) => BExpr::Bool(!b),
                     x => BExpr::Not(Box::new(x)),
@@ -197,14 +195,13 @@ impl BExpr {
                 BExpr::Quantified(
                     q,
                     x.clone().unit(),
-                    Box::new(
-                        e.subst_var(&t, &AExpr::Reference(x))
-                            .renumber_quantifiers_inner(f, count),
-                    ),
+                    Box::new(renum(&e.subst_var(&t, &AExpr::Reference(x)), f, count)),
                 )
             }
         }
     }
+
+    renum(&renum(bexpr, "not a valid ident", &mut 0), "f", &mut 0)
 }
 
 pub struct EquivChecker {
@@ -236,7 +233,7 @@ impl Default for EquivChecker {
 
 #[test]
 fn egg_quantifiers() -> color_eyre::Result<()> {
-    use crate::ast::Quantifier;
+    use gcl::ast::Quantifier;
 
     color_eyre::install()?;
 

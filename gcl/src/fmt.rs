@@ -1,10 +1,10 @@
-use std::fmt::Display;
+use std::fmt::{Debug, Display};
 
 use itertools::Itertools;
 
 use crate::ast::{
-    AExpr, AOp, Array, BExpr, Command, Commands, Function, Guard, LogicOp, Quantifier, RelOp,
-    Target, Variable,
+    AExpr, AOp, Array, BExpr, Command, Commands, Flow, Function, Guard, LogicOp, Quantifier, RelOp,
+    SecurityClass, Target, Variable,
 };
 
 impl Display for Variable {
@@ -21,7 +21,7 @@ impl Display for Array {
 impl std::fmt::Display for Target<Box<AExpr>> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Variable(v) => v.fmt(f),
+            Self::Variable(v) => Display::fmt(v, f),
             Self::Array(a, idx) => write!(f, "{a}[{idx}]"),
         }
     }
@@ -29,8 +29,8 @@ impl std::fmt::Display for Target<Box<AExpr>> {
 impl std::fmt::Display for Target<()> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Variable(v) => v.fmt(f),
-            Self::Array(a, ()) => a.fmt(f),
+            Self::Variable(v) => Display::fmt(v, f),
+            Self::Array(a, ()) => Display::fmt(a, f),
         }
     }
 }
@@ -150,5 +150,33 @@ impl Display for LogicOp {
             LogicOp::Lor => write!(f, "|"),
             LogicOp::Implies => write!(f, "==>"),
         }
+    }
+}
+
+impl<T> Debug for Flow<T>
+where
+    T: Debug,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "Flow({:?} -> {:?})", self.from, self.into)
+    }
+}
+impl<T> Display for Flow<T>
+where
+    T: Display,
+{
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{} -> {}", self.from, self.into)
+    }
+}
+
+impl Debug for SecurityClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "SecurityClass({})", self.0)
+    }
+}
+impl Display for SecurityClass {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
     }
 }

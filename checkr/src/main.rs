@@ -1,6 +1,6 @@
 use clap::Parser;
 
-use checkr::{env::Analysis, parse};
+use checkr::env::Analysis;
 
 #[derive(Debug, Parser)]
 #[command(version)]
@@ -28,7 +28,7 @@ fn main() -> color_eyre::Result<()> {
             src,
             input,
         } => {
-            let cmds = parse::parse_commands(&src)?;
+            let cmds = gcl::parse::parse_commands(&src)?;
             let output = analysis.run(&cmds, analysis.input_from_str(&input)?)?;
 
             println!("{output}");

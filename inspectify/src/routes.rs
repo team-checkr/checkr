@@ -182,7 +182,7 @@ pub async fn analyze(
         .await
     {
         Ok(exec_output) => {
-            let cmds = match checkr::parse::parse_commands(&cmds) {
+            let cmds = match gcl::parse::parse_commands(&cmds) {
                 Ok(cmds) => cmds,
                 Err(err) => {
                     error!("Parse error: {:?}", checkr::miette::Error::new(err));

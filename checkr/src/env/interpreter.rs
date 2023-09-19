@@ -1,9 +1,9 @@
+use gcl::ast::Commands;
 use itertools::{chain, Itertools};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::Commands,
     generation::Generate,
     interpreter::{Configuration, Interpreter, InterpreterMemory, TerminationState},
     pg::{Determinism, Node, ProgramGraph},

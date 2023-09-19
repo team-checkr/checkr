@@ -1,0 +1,20 @@
+[package]
+name = "gcl"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+itertools.workspace = true
+lalrpop-util = { version = "0.20.0", features = ["lexer"] }
+miette.workspace = true
+once_cell.workspace = true
+serde.workspace = true
+thiserror.workspace = true
+
+[build-dependencies]
+lalrpop = { version = "0.20.0", features = ["lexer"] }

@@ -2,10 +2,7 @@ use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;
 
-use crate::{
-    ast::{BExpr, Commands, Predicate},
-    gcl,
-};
+use crate::ast::{BExpr, Commands, Flow, Predicate, SecurityClass};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceSpan {
@@ -66,19 +63,26 @@ impl From<(usize, usize)> for SourceSpan {
 }
 
 pub fn parse_commands(src: &str) -> Result<Commands, ParseError> {
-    static PARSER: Lazy<gcl::CommandsParser> = Lazy::new(gcl::CommandsParser::new);
+    static PARSER: Lazy<crate::gcl::CommandsParser> = Lazy::new(crate::gcl::CommandsParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }
 
 pub fn parse_bexpr(src: &str) -> Result<BExpr, ParseError> {
-    static PARSER: Lazy<gcl::BExprParser> = Lazy::new(gcl::BExprParser::new);
+    static PARSER: Lazy<crate::gcl::BExprParser> = Lazy::new(crate::gcl::BExprParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }
 
 pub fn parse_predicate(src: &str) -> Result<Predicate, ParseError> {
-    static PARSER: Lazy<gcl::PredicateParser> = Lazy::new(gcl::PredicateParser::new);
+    static PARSER: Lazy<crate::gcl::PredicateParser> = Lazy::new(crate::gcl::PredicateParser::new);
+
+    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
+}
+
+pub fn parse_security_lattice(src: &str) -> Result<Vec<Flow<SecurityClass>>, ParseError> {
+    static PARSER: Lazy<crate::gcl::SecurityLatticeParser> =
+        Lazy::new(crate::gcl::SecurityLatticeParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }

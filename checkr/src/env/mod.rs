@@ -1,10 +1,11 @@
 use std::{ops::Deref, str::FromStr};
 
+use gcl::ast::Commands;
 use itertools::Either;
 use rand::rngs::SmallRng;
 use serde::{Deserialize, Serialize};
 
-use crate::{ast::Commands, generation::Generate, sign::Memory, ProgramGenerationBuilder};
+use crate::{generation::Generate, sign::Memory, ProgramGenerationBuilder};
 pub use graph::GraphEnv;
 pub use interpreter::InterpreterEnv;
 pub use parse::ParseEnv;

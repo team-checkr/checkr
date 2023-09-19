@@ -1,58 +1,25 @@
-use std::{collections::HashSet, fmt::Display};
+use std::collections::HashSet;
 
+use gcl::ast::{Command, Commands, Flow, Guard, SecurityClass, Target};
 use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    ast::{Command, Commands, Guard, Target},
-    gcl,
-    parse::ParseError,
-    sign::Memory,
-};
+use crate::sign::Memory;
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct Flow<T> {
-    pub from: T,
-    pub into: T,
-}
-
-impl<T> Flow<T> {
-    pub fn map<'a, S>(&'a self, f: impl Fn(&'a T) -> S) -> Flow<S> {
-        Flow {
-            from: f(&self.from),
-            into: f(&self.into),
-        }
-    }
-}
-
-impl<T> std::fmt::Debug for Flow<T>
-where
-    T: std::fmt::Debug,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "Flow({:?} -> {:?})", self.from, self.into)
-    }
-}
-
-impl<T> Display for Flow<T>
-where
-    T: Display,
-{
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{} -> {}", self.from, self.into)
-    }
-}
-
-impl Commands {
-    pub fn flows(&self) -> HashSet<Flow<Target>> {
+trait SecurityFlows {
+    fn flows(&self) -> HashSet<Flow<Target>> {
         self.sec(&Default::default())
     }
+    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>>;
+}
+
+impl SecurityFlows for Commands {
     fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
         self.0.iter().flat_map(|c| c.sec(implicit)).collect()
     }
 }
 
-impl Command {
+impl SecurityFlows for Command {
     fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
         match self {
             Command::Assignment(t, a) => chain!(
@@ -74,7 +41,7 @@ impl Command {
                     .fold(
                         (implicit.clone(), HashSet::default()),
                         |(implicit, flows), guard| {
-                            let (new_implicit, new_flows) = guard.sec2(&implicit);
+                            let (new_implicit, new_flows) = guard_sec2(guard, &implicit);
 
                             (
                                 implicit.union(&new_implicit).cloned().collect(),
@@ -91,26 +58,13 @@ impl Command {
     }
 }
 
-impl Guard {
-    fn sec2(&self, implicit: &HashSet<Target>) -> (HashSet<Target>, HashSet<Flow<Target>>) {
-        let implicit = implicit.iter().cloned().chain(self.0.fv()).collect();
-        let flows = self.1.sec(&implicit);
-        (implicit, flows)
-    }
-}
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-pub struct SecurityClass(pub String);
-
-impl std::fmt::Debug for SecurityClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "SecurityClass({})", self.0)
-    }
-}
-impl std::fmt::Display for SecurityClass {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        write!(f, "{}", self.0)
-    }
+fn guard_sec2(
+    guard: &Guard,
+    implicit: &HashSet<Target>,
+) -> (HashSet<Target>, HashSet<Flow<Target>>) {
+    let implicit = implicit.iter().cloned().chain(guard.0.fv()).collect();
+    let flows = guard.1.sec(&implicit);
+    (implicit, flows)
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
@@ -152,10 +106,7 @@ impl SecurityLattice {
         SecurityLattice { allowed }
     }
     pub fn parse(src: &str) -> color_eyre::Result<SecurityLattice> {
-        let flows = gcl::SecurityLatticeParser::new()
-            .parse(src)
-            .map_err(|e| ParseError::new(src, e))?;
-
+        let flows = gcl::parse::parse_security_lattice(src)?;
         Ok(Self::new(&flows))
     }
     pub fn allows(&self, f: &Flow<SecurityClass>) -> bool {

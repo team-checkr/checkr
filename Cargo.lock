@@ -258,6 +258,15 @@ dependencies = [
 ]
 
 [[package]]
+name = "backtrace-ext"
+version = "0.2.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "537beee3be4a18fb023b570f80e3ae28003db9167a751266b259926e25539d50"
+dependencies = [
+ "backtrace",
+]
+
+[[package]]
 name = "base64"
 version = "0.13.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -539,6 +548,7 @@ dependencies = [
  "dioxus",
  "dioxus-liveview",
  "dioxus-ssr",
+ "gcl",
  "indexmap 2.0.0",
  "indicatif",
  "itertools 0.11.0",
@@ -563,11 +573,10 @@ dependencies = [
  "color-eyre",
  "comfy-table",
  "egg",
+ "gcl",
  "graphviz-rust",
  "indexmap 2.0.0",
  "itertools 0.11.0",
- "lalrpop",
- "lalrpop-util",
  "miette",
  "once_cell",
  "petgraph",
@@ -1548,6 +1557,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "gcl"
+version = "0.1.21"
+dependencies = [
+ "itertools 0.11.0",
+ "lalrpop",
+ "lalrpop-util",
+ "miette",
+ "once_cell",
+ "serde",
+ "thiserror",
+]
+
+[[package]]
 name = "generic-array"
 version = "0.14.7"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -1912,6 +1934,7 @@ dependencies = [
  "color-eyre",
  "crossterm 0.27.0",
  "futures",
+ "gcl",
  "glob",
  "include_dir",
  "indicatif",
@@ -2285,11 +2308,12 @@ checksum = "2dffe52ecf27772e601905b7522cb4ef790d2cc203488bbd0e2fe85fcb74566d"
 
 [[package]]
 name = "miette"
-version = "5.6.0"
+version = "5.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "07749fb52853e739208049fb513287c6f448de9103dfa78b05ae01f2fc5809bb"
+checksum = "59bb584eaeeab6bd0226ccf3509a69d7936d148cf3d036ad350abe35e8c6856e"
 dependencies = [
  "backtrace",
+ "backtrace-ext",
  "is-terminal",
  "miette-derive",
  "once_cell",
@@ -2305,13 +2329,13 @@ dependencies = [
 
 [[package]]
 name = "miette-derive"
-version = "5.6.0"
+version = "5.10.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "2a07ad93a80d1b92bb44cb42d7c49b49c9aab1778befefad49cceb5e4c5bf460"
+checksum = "49e7bc1560b95a3c4a25d03de42fe76ca718ab92d1a22a55b9b4cf67b3ae635c"
 dependencies = [
  "proc-macro2",
  "quote",
- "syn 1.0.109",
+ "syn 2.0.37",
 ]
 
 [[package]]
@@ -2476,9 +2500,9 @@ dependencies = [
 
 [[package]]
 name = "once_cell"
-version = "1.17.1"
+version = "1.18.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "b7e5500299e16ebb147ae15a00a942af264cf3688f47923b8fc2cd5858f23ad3"
+checksum = "dd8b5dd2ae5ed71462c540258bedcb51965123ad7e7ccf4b9a8cafaa4a63576d"
 
 [[package]]
 name = "open"
@@ -3263,9 +3287,9 @@ dependencies = [
 
 [[package]]
 name = "siphasher"
-version = "0.3.10"
+version = "0.3.11"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7bd3e3206899af3f8b12af284fafc038cc1dc2b41d1b89dd17297221c5d225de"
+checksum = "38b58827f4464d87d377d175e90bf58eb00fd8716ff0a62f80356b5e61555d0d"
 
 [[package]]
 name = "slab"
