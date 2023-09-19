@@ -1,13 +1,14 @@
-use std::{collections::HashSet, str::FromStr};
+use std::{collections::HashSet, fmt::Debug, str::FromStr};
 
 use itertools::Either;
-use serde::{Deserialize, Serialize};
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Target<Idx = ()> {
-    Variable(Variable),
-    Array(Array, Idx),
-}
+use crate::{
+    ast::{
+        AExpr, AOp, Array, BExpr, Command, Commands, Flow, Function, Guard, LogicOp, RelOp, Target,
+        Variable,
+    },
+    semantics::EmptySemanticsContext,
+};
 
 impl Target<()> {
     pub fn promote_to_array(self) -> Target<()> {
@@ -48,13 +49,13 @@ impl<Idx> Target<Idx> {
     }
 }
 
-impl<Idx> std::fmt::Debug for Target<Idx>
+impl<Idx> Debug for Target<Idx>
 where
-    Idx: std::fmt::Debug,
+    Idx: Debug,
 {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
-            Self::Variable(v) => v.fmt(f),
+            Self::Variable(v) => Debug::fmt(&v, f),
             Self::Array(a, idx) => write!(f, "Array({a}, {idx:?})"),
         }
     }
@@ -79,17 +80,13 @@ impl<'de> serde::Deserialize<'de> for Target {
         Ok(Target::Variable(Variable::deserialize(deserializer)?))
     }
 }
-
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Variable(pub String);
 impl Variable {
     pub fn is_logical(&self) -> bool {
         self.0.starts_with('_')
     }
 }
 
-impl std::fmt::Debug for Variable {
+impl Debug for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -102,16 +99,13 @@ impl FromStr for Variable {
     }
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
-#[serde(transparent)]
-pub struct Array(pub String);
 impl Array {
     pub fn is_logical(&self) -> bool {
         self.0.starts_with('_')
     }
 }
 
-impl std::fmt::Debug for Array {
+impl Debug for Array {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
     }
@@ -133,98 +127,6 @@ impl From<Array> for Target<()> {
     fn from(value: Array) -> Self {
         Target::Array(value, ())
     }
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Commands(pub Vec<Command>);
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Command {
-    Assignment(Target<Box<AExpr>>, AExpr),
-    Skip,
-    If(Vec<Guard>),
-    Loop(Vec<Guard>),
-    /// **Extension**
-    EnrichedLoop(Predicate, Vec<Guard>),
-    /// **Extension**
-    Annotated(Predicate, Commands, Predicate),
-    /// **Extension**
-    Break,
-    /// **Extension**
-    Continue,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Guard(pub BExpr, pub Commands);
-
-pub type Int = i64;
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AExpr {
-    Number(Int),
-    Reference(Target<Box<AExpr>>),
-    Binary(Box<AExpr>, AOp, Box<AExpr>),
-    Minus(Box<AExpr>),
-    Function(Function),
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum AOp {
-    Plus,
-    Minus,
-    Times,
-    Divide,
-    Pow,
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Function {
-    Division(Box<AExpr>, Box<AExpr>),
-    Min(Box<AExpr>, Box<AExpr>),
-    Max(Box<AExpr>, Box<AExpr>),
-    Count(Array, Box<AExpr>),
-    LogicalCount(Array, Box<AExpr>),
-    Length(Array),
-    LogicalLength(Array),
-    Fac(Box<AExpr>),
-    Fib(Box<AExpr>),
-}
-
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum BExpr {
-    Bool(bool),
-    Rel(AExpr, RelOp, AExpr),
-    Logic(Box<BExpr>, LogicOp, Box<BExpr>),
-    Not(Box<BExpr>),
-    Quantified(Quantifier, Target<()>, Box<BExpr>),
-}
-
-pub type Predicate = BExpr;
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum Quantifier {
-    Exists,
-    Forall,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum RelOp {
-    Eq,
-    Ne,
-    Gt,
-    Ge,
-    Lt,
-    Le,
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum LogicOp {
-    And,
-    Land,
-    Or,
-    Lor,
-    /// **Enriched**
-    Implies,
 }
 
 impl Commands {
@@ -328,6 +230,138 @@ impl BExpr {
                 fv.remove(x);
                 fv
             }
+        }
+    }
+}
+
+impl BExpr {
+    pub fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> BExpr {
+        match self {
+            BExpr::Bool(b) => BExpr::Bool(*b),
+            BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
+            BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
+            BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
+            BExpr::Quantified(q, v, e) => {
+                if v.same_name(t) {
+                    self.clone()
+                } else {
+                    BExpr::Quantified(*q, v.clone(), Box::new(e.subst_var(t, x)))
+                }
+            }
+        }
+    }
+
+    pub fn simplify(&self) -> BExpr {
+        match self
+            .semantics(&EmptySemanticsContext)
+            .map(BExpr::Bool)
+            .unwrap_or_else(|_| self.clone())
+        {
+            BExpr::Bool(b) => BExpr::Bool(b),
+            BExpr::Rel(l, op, r) => BExpr::Rel(l.simplify(), op, r.simplify()),
+            BExpr::Logic(l, op, r) => {
+                let l = l.simplify();
+                let r = r.simplify();
+
+                match (l, op, r) {
+                    (BExpr::Bool(true), LogicOp::And, x) | (x, LogicOp::And, BExpr::Bool(true)) => {
+                        x
+                    }
+                    (BExpr::Bool(false), LogicOp::And, _)
+                    | (_, LogicOp::And, BExpr::Bool(false)) => BExpr::Bool(false),
+                    (BExpr::Bool(false), LogicOp::Or, x) | (x, LogicOp::Or, BExpr::Bool(false)) => {
+                        x
+                    }
+                    (BExpr::Bool(true), LogicOp::Or, _) | (_, LogicOp::Or, BExpr::Bool(true)) => {
+                        BExpr::Bool(true)
+                    }
+                    (l, op, r) => BExpr::logic(l, op, r),
+                }
+            }
+            BExpr::Not(x) => {
+                let x = x.simplify();
+                match x {
+                    BExpr::Bool(b) => BExpr::Bool(!b),
+                    x => BExpr::Not(Box::new(x)),
+                }
+            }
+            BExpr::Quantified(_, _, _) => todo!(),
+        }
+    }
+}
+
+impl AExpr {
+    pub fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> AExpr {
+        match self {
+            AExpr::Number(n) => AExpr::Number(*n),
+            AExpr::Reference(v) if v.same_name(t) => x.clone(),
+            AExpr::Reference(v) => AExpr::Reference(v.clone()),
+            AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
+            AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
+            AExpr::Function(f) => AExpr::Function(f.subst_var(t, x)),
+        }
+    }
+
+    pub fn simplify(&self) -> AExpr {
+        match self
+            .semantics(&EmptySemanticsContext)
+            .map(AExpr::Number)
+            .unwrap_or_else(|_| self.clone())
+        {
+            AExpr::Number(n) => AExpr::Number(n),
+            AExpr::Reference(v) => AExpr::Reference(v.simplify()),
+            AExpr::Binary(l, op, r) => AExpr::binary(l.simplify(), op, r.simplify()),
+            AExpr::Minus(e) => match &*e {
+                AExpr::Minus(inner) => inner.simplify(),
+                _ => AExpr::Minus(Box::new(e.simplify())),
+            },
+            AExpr::Function(_) => self.clone(),
+        }
+    }
+}
+
+impl Function {
+    pub fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> Function {
+        match self {
+            Function::Division(a, b) => {
+                Function::Division(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Min(a, b) => {
+                Function::Min(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Max(a, b) => {
+                Function::Max(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
+            Function::Count(arr, idx) => {
+                Function::Count(arr.clone(), Box::new(idx.subst_var(t, x)))
+            }
+            Function::LogicalCount(arr, idx) => {
+                Function::LogicalCount(arr.clone(), Box::new(idx.subst_var(t, x)))
+            }
+            Function::Length(arr) => Function::Length(arr.clone()),
+            Function::LogicalLength(arr) => Function::LogicalLength(arr.clone()),
+            Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
+            Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
+        }
+    }
+}
+
+impl Target<Box<AExpr>> {
+    pub fn simplify(&self) -> Self {
+        match self {
+            Target::Variable(v) => Target::Variable(v.clone()),
+            Target::Array(arr, idx) => Target::Array(arr.clone(), Box::new(idx.simplify())),
+        }
+    }
+}
+
+// Security
+
+impl<T> Flow<T> {
+    pub fn map<'a, S>(&'a self, f: impl Fn(&'a T) -> S) -> Flow<S> {
+        Flow {
+            from: f(&self.from),
+            into: f(&self.into),
         }
     }
 }

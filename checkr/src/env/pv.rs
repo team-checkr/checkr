@@ -1,10 +1,11 @@
+use gcl::ast::{BExpr, Commands, Predicate};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::{BExpr, Commands, Predicate},
-    egg::EquivChecker,
+    egg::{renumber_quantifiers, EquivChecker},
     generation::Generate,
+    pv::{StrongestPostcondition, StrongestPostconditionCounter},
 };
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
@@ -40,8 +41,8 @@ impl From<&'_ Predicate> for SerializedPredicate {
     }
 }
 impl SerializedPredicate {
-    pub fn parse(&self) -> Result<Predicate, crate::parse::ParseError> {
-        crate::parse::parse_predicate(&self.predicate)
+    pub fn parse(&self) -> Result<Predicate, gcl::parse::ParseError> {
+        gcl::parse::parse_predicate(&self.predicate)
     }
 }
 
@@ -101,7 +102,7 @@ impl Environment for ProgramVerificationEnv {
     const ANALYSIS: Analysis = Analysis::ProgramVerification;
 
     fn setup_generation(&self) -> crate::ProgramGenerationBuilder {
-        crate::ast::Command::reset_sp_counter();
+        StrongestPostconditionCounter::reset_sp_counter();
 
         crate::ProgramGenerationBuilder::new(Self::ANALYSIS)
             .no_loop(true)
@@ -114,7 +115,7 @@ impl Environment for ProgramVerificationEnv {
         Ok(ProgramVerificationEnvOutput {
             verification_conditions: verification_conditions
                 .iter()
-                .map(|vc| vc.renumber_quantifiers().into())
+                .map(|vc| renumber_quantifiers(vc).into())
                 .collect(),
         })
     }
@@ -129,12 +130,12 @@ impl Environment for ProgramVerificationEnv {
         let ref_vc: Result<Vec<_>, _> = reference
             .verification_conditions
             .iter()
-            .map(|vc| vc.parse().map(|pred| pred.renumber_quantifiers()))
+            .map(|vc| vc.parse().map(|pred| renumber_quantifiers(&pred)))
             .collect();
         let rel_vc: Result<Vec<_>, _> = output
             .verification_conditions
             .iter()
-            .map(|vc| vc.parse().map(|pred| pred.renumber_quantifiers()))
+            .map(|vc| vc.parse().map(|pred| renumber_quantifiers(&pred)))
             .collect();
 
         let ref_vc = match ref_vc {
@@ -221,12 +222,14 @@ impl Environment for ProgramVerificationEnv {
 mod tests {
     use pretty_assertions::assert_eq;
 
+    use crate::egg::renumber_quantifiers;
+
     #[test]
     fn normalization_simple() -> miette::Result<()> {
         let a = "exists _f0 :: exists _f1 :: _f0 = _f1";
         let b = "exists _f1 :: exists _f0 :: _f1 = _f0";
-        let a = crate::parse::parse_predicate(a)?.renumber_quantifiers();
-        let b = crate::parse::parse_predicate(b)?.renumber_quantifiers();
+        let a = renumber_quantifiers(&gcl::parse::parse_predicate(a)?);
+        let b = renumber_quantifiers(&gcl::parse::parse_predicate(b)?);
         assert_eq!(a, b);
         Ok(())
     }
@@ -234,8 +237,8 @@ mod tests {
     fn normalization_large() -> miette::Result<()> {
         let a = "((exists _f2 :: (((d <= d) & (exists _f1 :: ((exists _f0 :: (((((a > 0) && (_f1 = 0)) && (_f2 = 0)) && (_f0 < 0)) & (d = _f1))) & (b = d)))) & (c = -77))) ==> ((((a = 0) && (b = 0)) && (c > 0)) && (d = 0)))";
         let b = "((exists _f0 :: (((d <= d) & (exists _f1 :: ((exists _f2 :: (((((a > 0) && (_f1 = 0)) && (_f0 = 0)) && (_f2 < 0)) & (d = _f1))) & (b = d)))) & (c = -77))) ==> ((((a = 0) && (b = 0)) && (c > 0)) && (d = 0)))";
-        let a = crate::parse::parse_predicate(a)?.renumber_quantifiers();
-        let b = crate::parse::parse_predicate(b)?.renumber_quantifiers();
+        let a = renumber_quantifiers(&gcl::parse::parse_predicate(a)?);
+        let b = renumber_quantifiers(&gcl::parse::parse_predicate(b)?);
         assert_eq!(a, b);
 
         Ok(())

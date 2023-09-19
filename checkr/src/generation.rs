@@ -1,6 +1,6 @@
 use rand::{seq::SliceRandom, Rng};
 
-use crate::ast::{
+use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
 };
 

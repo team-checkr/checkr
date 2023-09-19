@@ -1,15 +1,14 @@
 use std::collections::HashSet;
 
+use gcl::ast::{Commands, Target};
 use indexmap::IndexMap;
 use itertools::{chain, Itertools};
-
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
 use crate::{
     analysis::{mono_analysis, FiFo, NodeOrder},
-    ast::{Commands, Target},
     generation::Generate,
     pg::{Determinism, Node, ProgramGraph},
     sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},

@@ -18,8 +18,8 @@ pub async fn generate_program(Json(analysis): Json<Analysis>) -> Json<String> {
 /// Returns a `string` in DOT format
 #[axum::debug_handler]
 pub async fn dot(Json((deterministic, src)): Json<(bool, String)>) -> Json<String> {
-    let Ok(cmds) = checkr::parse::parse_commands(&src) else {
-        return "Parse error".to_string().into()
+    let Ok(cmds) = gcl::parse::parse_commands(&src) else {
+        return "Parse error".to_string().into();
     };
     GraphEnv
         .run(
@@ -56,7 +56,7 @@ pub async fn complete_input_from_json(
 pub async fn generate_input_for(
     Json((src, analysis)): Json<(String, Analysis)>,
 ) -> Json<Option<Input>> {
-    let cmds = match checkr::parse::parse_commands(&src) {
+    let cmds = match gcl::parse::parse_commands(&src) {
         Ok(cmds) => cmds,
         Err(err) => {
             error!("Parse error: {:?}", miette::Error::new(err));
@@ -83,7 +83,7 @@ pub async fn run_analysis(Json((src, input)): Json<(String, Input)>) -> Json<Opt
         .analysis
         .input_from_str(&input.json)
         .expect("failed to parse input json");
-    let cmds = match checkr::parse::parse_commands(&src) {
+    let cmds = match gcl::parse::parse_commands(&src) {
         Ok(cmds) => cmds,
         Err(err) => {
             error!("Parse error: {:?}", miette::Error::new(err));

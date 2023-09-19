@@ -3,13 +3,15 @@ use std::{
     hash::Hash,
 };
 
+use gcl::{
+    ast::{AExpr, Array, BExpr, Int, Target, Variable},
+    semantics::SemanticsError,
+};
 use itertools::{chain, Either, Itertools};
 use serde::{Deserialize, Serialize};
 
 use crate::{
     analysis::{Direction, MonotoneFramework},
-    ast::{AExpr, Array, BExpr, Int, Target, Variable},
-    interpreter::InterpreterError,
     pg::{Action, Edge, ProgramGraph},
 };
 
@@ -389,7 +391,15 @@ where
     }
 }
 
-impl BExpr {
+trait SemanticSign {
+    type Items;
+
+    fn semantics_sign(&self, mem: &SignMemory) -> Self::Items;
+}
+
+impl SemanticSign for BExpr {
+    type Items = Bools;
+
     fn semantics_sign(&self, mem: &SignMemory) -> Bools {
         match self {
             BExpr::Bool(b) => [*b].into_iter().collect(),
@@ -408,7 +418,7 @@ impl BExpr {
                 let l = l.semantics_sign(mem);
                 let r = r.semantics_sign(mem);
                 cartesian_flat_map(l.bools(), r.bools(), |l, r| {
-                    op.semantic(l, || r.ok_or(InterpreterError::NoProgression))
+                    op.semantic(l, || r.ok_or(SemanticsError::NoProgression))
                 })
                 .flatten()
                 .collect()
@@ -441,7 +451,9 @@ impl std::ops::Neg for Sign {
     }
 }
 
-impl AExpr {
+impl SemanticSign for AExpr {
+    type Items = Signs;
+
     fn semantics_sign(&self, mem: &SignMemory) -> Signs {
         match self {
             AExpr::Number(n) => [sign_of(*n)].into_iter().collect(),
@@ -464,15 +476,15 @@ impl AExpr {
             .filter_map(|res| match res {
                 Ok(mem) => Some(mem),
                 Err(err) => match err {
-                    InterpreterError::DivisionByZero
-                    | InterpreterError::NegativeExponent
-                    | InterpreterError::EvaluateQuantifier => None,
-                    InterpreterError::VariableNotFound { .. }
-                    | InterpreterError::ArrayNotFound { .. }
-                    | InterpreterError::IndexOutOfBound { .. }
-                    | InterpreterError::NoProgression
-                    | InterpreterError::OutsideFunctionDomain
-                    | InterpreterError::ArithmeticOverflow => unreachable!(),
+                    SemanticsError::DivisionByZero
+                    | SemanticsError::NegativeExponent
+                    | SemanticsError::EvaluateQuantifier => None,
+                    SemanticsError::VariableNotFound { .. }
+                    | SemanticsError::ArrayNotFound { .. }
+                    | SemanticsError::IndexOutOfBound { .. }
+                    | SemanticsError::NoProgression
+                    | SemanticsError::OutsideFunctionDomain
+                    | SemanticsError::ArithmeticOverflow => unreachable!(),
                 },
             })
             .map(sign_of)

@@ -36,19 +36,15 @@ pub use miette;
 use rand::prelude::*;
 use tracing::debug;
 
-use crate::ast::Commands;
+use gcl::ast::Commands;
 
 pub mod analysis;
-pub mod ast;
 pub mod config;
 pub mod driver;
 pub mod egg;
 pub mod env;
-pub mod fmt;
-mod gcl;
 pub mod generation;
 pub mod interpreter;
-pub mod parse;
 pub mod pg;
 pub mod pv;
 pub mod security;
@@ -62,12 +58,6 @@ pub struct ProgramGenerationBuilder {
     no_loop: bool,
     no_division: bool,
     generate_annotated: bool,
-}
-
-impl Commands {
-    pub fn builder(analysis: Analysis) -> ProgramGenerationBuilder {
-        ProgramGenerationBuilder::new(analysis)
-    }
 }
 
 impl ProgramGenerationBuilder {
