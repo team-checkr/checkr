@@ -120,13 +120,12 @@ impl Generate for Commands {
 }
 
 pub fn annotate_cmds<R: Rng>(mut cmds: Commands, rng: &mut R) -> Command {
-    use crate::{
-        env::{
-            sign::{SignAnalysisInput, SignEnv},
-            Environment,
-        },
-        sign::{Memory, Sign, Signs},
+    use crate::env::{
+        sign::{SignAnalysisInput, SignEnv},
+        Environment,
     };
+    use ce_sign::{Sign, Signs};
+    use gcl::memory::Memory;
     use std::collections::HashSet;
 
     let input = SignAnalysisInput::gen(&mut cmds, rng);

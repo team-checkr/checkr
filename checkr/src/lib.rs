@@ -38,17 +38,14 @@ use tracing::debug;
 
 use gcl::ast::Commands;
 
-pub mod analysis;
 pub mod config;
 pub mod driver;
 pub mod egg;
 pub mod env;
 pub mod generation;
 pub mod interpreter;
-pub mod pg;
 pub mod pv;
 pub mod security;
-pub mod sign;
 
 #[derive(Debug)]
 pub struct ProgramGenerationBuilder {

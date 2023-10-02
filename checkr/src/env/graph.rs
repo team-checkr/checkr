@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
-use gcl::ast::Commands;
+use gcl::{
+    ast::Commands,
+    pg::{Determinism, ProgramGraph},
+};
 use graphviz_rust::dot_structures::{Attribute, Id};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::{
-    generation::Generate,
-    pg::{Determinism, ProgramGraph},
-};
+use crate::generation::Generate;
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown};
 

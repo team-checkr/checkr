@@ -1,13 +1,15 @@
 use itertools::Itertools;
 
-use gcl::ast::{Commands, Flow, SecurityClass, Target};
+use gcl::{
+    ast::{Commands, Flow, SecurityClass, Target},
+    memory::Memory,
+};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
     generation::Generate,
     security::{SecurityAnalysisOutput, SecurityLattice},
-    sign::Memory,
 };
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};

@@ -1,15 +1,12 @@
 use clap::Parser;
 
-use checkr::env::Analysis;
-
 #[derive(Debug, Parser)]
 #[command(version)]
 enum Cli {
     /// Reference subcommand
     Reference {
         #[arg(value_enum)]
-        analysis: Analysis,
-        src: String,
+        analysis: ce_shell::Analysis,
         input: String,
     },
 }
@@ -22,15 +19,15 @@ fn main() -> color_eyre::Result<()> {
         .without_time()
         .init();
 
-    match Cli::parse() {
-        Cli::Reference {
-            analysis,
-            src,
-            input,
-        } => {
-            let cmds = gcl::parse::parse_commands(&src)?;
-            let output = analysis.run(&cmds, analysis.input_from_str(&input)?)?;
+    // for i in 0..3 {
+    //     eprintln!("Hello from stderr! {i} xD>--<");
+    //     std::thread::sleep(std::time::Duration::from_secs(1));
+    // }
 
+    match Cli::parse() {
+        Cli::Reference { analysis, input } => {
+            let input = analysis.parse_input(&input);
+            let output = input.reference_output()?;
             println!("{output}");
 
             Ok(())

@@ -1,4 +1,7 @@
-use crate::ast::{AExpr, AOp, Array, BExpr, Function, Int, LogicOp, RelOp, Target, Variable};
+use crate::{
+    ast::{AExpr, AOp, Array, BExpr, Function, Int, LogicOp, RelOp, Target, Variable},
+    pg::Action,
+};
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SemanticsError {
@@ -22,13 +25,21 @@ pub enum SemanticsError {
     OutsideFunctionDomain,
 }
 
-pub trait SemanticsContext {
+pub trait SemanticsContext: Sized + Clone {
     fn variable(&self, var: &Variable) -> Result<Int, SemanticsError>;
     fn array_element(&self, array: &Array, index: Int) -> Result<Int, SemanticsError>;
+    fn set_variable(&self, var: &Variable, value: Int) -> Result<Self, SemanticsError>;
+    fn set_array_element(
+        &self,
+        array: &Array,
+        index: Int,
+        value: Int,
+    ) -> Result<Self, SemanticsError>;
     fn array_length(&self, array: &Array) -> Result<Int, SemanticsError>;
     fn array_count(&self, array: &Array, element: Int) -> Result<Int, SemanticsError>;
 }
 
+#[derive(Clone)]
 pub struct EmptySemanticsContext;
 
 impl SemanticsContext for EmptySemanticsContext {
@@ -38,10 +49,23 @@ impl SemanticsContext for EmptySemanticsContext {
         })
     }
 
+    fn set_variable(&self, _var: &Variable, _value: Int) -> Result<Self, SemanticsError> {
+        Ok(self.clone())
+    }
+
     fn array_element(&self, array: &Array, _index: Int) -> Result<Int, SemanticsError> {
         Err(SemanticsError::ArrayNotFound {
             name: array.to_string(),
         })
+    }
+
+    fn set_array_element(
+        &self,
+        _array: &Array,
+        _index: Int,
+        _value: Int,
+    ) -> Result<Self, SemanticsError> {
+        Ok(self.clone())
     }
 
     fn array_length(&self, array: &Array) -> Result<Int, SemanticsError> {
@@ -178,5 +202,29 @@ impl LogicOp {
                 !l || r
             }
         })
+    }
+}
+
+impl Action {
+    pub fn semantics<S: SemanticsContext>(&self, cx: &S) -> Result<S, SemanticsError> {
+        match self {
+            Action::Assignment(Target::Variable(x), a) => {
+                let value = a.semantics(cx)?;
+                cx.set_variable(x, value)
+            }
+            Action::Assignment(Target::Array(arr, idx), a) => {
+                let idx = idx.semantics(cx)?;
+                let value = a.semantics(cx)?;
+                cx.set_array_element(arr, idx, value)
+            }
+            Action::Skip => Ok(cx.clone()),
+            Action::Condition(b) => {
+                if b.semantics(cx)? {
+                    Ok(cx.clone())
+                } else {
+                    Err(SemanticsError::NoProgression)
+                }
+            }
+        }
     }
 }

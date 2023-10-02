@@ -1,0 +1,16 @@
+[package]
+name = "ce-parse"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+ce-core.workspace = true
+dioxus.workspace = true
+gcl.workspace = true
+serde.workspace = true
+serde_json.workspace = true

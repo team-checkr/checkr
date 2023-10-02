@@ -1,3 +1,5 @@
+pub mod analysis;
+
 use std::{
     collections::{BTreeMap, HashMap, HashSet, VecDeque},
     sync::atomic::AtomicU64,
@@ -5,9 +7,8 @@ use std::{
 
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
-use tracing::warn;
 
-use gcl::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
+use crate::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
 
 #[derive(Debug, Clone)]
 pub struct ProgramGraph {
@@ -304,7 +305,7 @@ impl ProgramGraph {
         let initial_node = if let Some(n) = node_mapping.get(&Node::Start) {
             *n
         } else {
-            warn!("graph did not have a start node");
+            tracing::warn!("graph did not have a start node");
             return self.clone();
         };
         let mut dfs = petgraph::visit::DfsPostOrder::new(&g, initial_node);
