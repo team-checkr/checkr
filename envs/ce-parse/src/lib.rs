@@ -1,4 +1,5 @@
 use ce_core::{
+    basic_env_test,
     components::{GclEditor, StandardLayout},
     rand, Env, Generate, RenderProps, ValidationResult,
 };
@@ -64,3 +65,5 @@ impl Generate for ParseInput {
         }
     }
 }
+
+basic_env_test!(ParseEnv);

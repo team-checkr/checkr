@@ -67,3 +67,28 @@ pub enum ValidationResult {
     Mismatch { reason: String },
     TimeOut,
 }
+
+#[macro_export]
+macro_rules! basic_env_test {
+    ($env:path) => {
+        #[test]
+        fn env_roundtrip() {
+            let mut rng =
+                <$crate::rand::rngs::SmallRng as $crate::rand::SeedableRng>::seed_from_u64(0xCEC34);
+            for _ in 0..1000 {
+                let input =
+                    <<$env as $crate::Env>::Input as $crate::Generate>::gen(&mut (), &mut rng);
+                let output = <$env as $crate::Env>::run(&input).unwrap();
+                let validation_result =
+                    <$env as $crate::Env>::validate(&input, &output).expect("failed to validate");
+                match validation_result {
+                    $crate::ValidationResult::CorrectTerminated
+                    | $crate::ValidationResult::CorrectNonTerminated { .. } => {
+                        // Ok!
+                    }
+                    res => panic!("validation failed! {res:?}"),
+                }
+            }
+        }
+    };
+}

@@ -1,4 +1,6 @@
-use ce_core::{components::StandardLayout, rand, Env, Generate, RenderProps, ValidationResult};
+use ce_core::{
+    basic_env_test, components::StandardLayout, rand, Env, Generate, RenderProps, ValidationResult,
+};
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
@@ -43,3 +45,5 @@ impl Generate for TemplateInput {
         Self {}
     }
 }
+
+basic_env_test!(TemplateEnv);
