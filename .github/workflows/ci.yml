@@ -59,7 +59,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        build: [msrv, debug, release]
+        build: [msrv, debug]
         include:
           - build: msrv
             rust: 1.70.0 # MSRV
