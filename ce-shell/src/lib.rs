@@ -6,7 +6,7 @@ mod io;
 pub use io::{Input, Output};
 
 define_shell!(
-    ce_parse::ParseEnv[Parse, "Parse"],
     ce_graph::GraphEnv[Graph, "Graph"],
+    ce_parse::ParseEnv[Parse, "Parse"],
     ce_sign::SignEnv[Sign, "Sign Analysis"],
 );

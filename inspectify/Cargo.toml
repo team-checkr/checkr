@@ -10,7 +10,6 @@ license.workspace = true
 
 [dependencies]
 axum.workspace = true
-backtrace-on-stack-overflow = "0.3.0"
 ce-core.workspace = true
 ce-shell.workspace = true
 color-eyre.workspace = true
