@@ -2,7 +2,6 @@
 
 use std::{
     collections::HashSet,
-    future::Future,
     str::FromStr,
     sync::{Arc, Mutex},
     time::Duration,
@@ -25,9 +24,6 @@ type Job = driver::Job<()>;
 #[tokio::main]
 async fn main() -> color_eyre::Result<()> {
     color_eyre::install()?;
-    unsafe {
-        backtrace_on_stack_overflow::enable();
-    }
 
     tracing_subscriber::Registry::default()
         .with(tracing_error::ErrorLayer::default())
