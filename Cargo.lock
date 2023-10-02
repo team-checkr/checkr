@@ -2046,6 +2046,28 @@ dependencies = [
 ]
 
 [[package]]
+name = "inspectify"
+version = "0.1.21"
+dependencies = [
+ "axum",
+ "backtrace-on-stack-overflow",
+ "ce-core",
+ "ce-shell",
+ "color-eyre",
+ "dioxus",
+ "dioxus-liveview",
+ "driver",
+ "glob",
+ "itertools 0.11.0",
+ "notify",
+ "notify-debouncer-mini",
+ "tokio",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
+]
+
+[[package]]
 name = "instant"
 version = "0.1.12"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -4051,28 +4073,6 @@ name = "ucd-trie"
 version = "0.1.5"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "9e79c4d996edb816c91e4308506774452e55e95c3c9de07b6729e17e15a5ef81"
-
-[[package]]
-name = "ui"
-version = "0.1.21"
-dependencies = [
- "axum",
- "backtrace-on-stack-overflow",
- "ce-core",
- "ce-shell",
- "color-eyre",
- "dioxus",
- "dioxus-liveview",
- "driver",
- "glob",
- "itertools 0.11.0",
- "notify",
- "notify-debouncer-mini",
- "tokio",
- "tracing",
- "tracing-error",
- "tracing-subscriber",
-]
 
 [[package]]
 name = "unicode-bidi"
