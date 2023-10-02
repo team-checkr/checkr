@@ -26,7 +26,7 @@
 //! source of randomness. It also implements this trait for all of the GCL
 //! constructs, which allows programs to be generated in a programmatic way.
 //! Similarly, the inputs of [`Environment`] implementations must too implement
-//! [`Generate`].
+//! [`Generate`](generation::Generate).
 
 use std::{borrow::Cow, time::Duration};
 
