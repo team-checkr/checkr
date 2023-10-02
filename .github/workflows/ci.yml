@@ -49,11 +49,13 @@ jobs:
         uses: dtolnay/rust-toolchain@stable
         with:
           toolchain: ${{ matrix.rust }}
+      - name: Install nextest
+        uses: taiki-e/install-action@nextest
       - uses: Swatinem/rust-cache@v2
       - name: Build
         run: cargo build
       - name: Test
-        run: cargo test
+        run: cargo nextest run
   check:
     name: Check
     runs-on: ubuntu-latest
