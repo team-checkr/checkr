@@ -1,3 +1,8 @@
+# Inspectify
+
+inspectify-dev:
+    RUST_BACKTRACE=full RUST_LOG=debug cargo watch -cx 'run -p inspectify'
+
 # CI/Release
 
 release-patch args="":
@@ -5,7 +10,7 @@ release-patch args="":
     cargo release patch {{args}}
 
 build-ci:
-    cargo build -p ui
+    cargo build -p inspectify
     cargo build -p checko
 
 release-hook:

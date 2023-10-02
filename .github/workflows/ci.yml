@@ -1,71 +1,149 @@
-name: ci
+# Based on: https://github.com/clap-rs/clap/blob/master/.github/workflows/ci.yml
+
+name: CI
+
+permissions:
+  contents: read
+
 on:
   pull_request:
   push:
-    branches:
-    - main
+
+env:
+  RUST_BACKTRACE: 1
+  CARGO_TERM_COLOR: always
+  CLICOLOR: 1
+
 jobs:
-  build:
-    name: build
-    env:
-      TARGET_DIR: ./target
-      RUST_BACKTRACE: 1
-      GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-    runs-on: ${{ matrix.os }}
-    strategy:
-       matrix:
-        build: [linux, linux-arm, macos, win-msvc]
-        include:
-        - build: linux
-          os: ubuntu-22.04
-          rust: nightly
-          target: x86_64-unknown-linux-musl
-        - build: linux-arm
-          os: ubuntu-22.04
-          rust: nightly
-          target: arm-unknown-linux-gnueabihf
-        - build: macos
-          os: macos-12
-          rust: nightly
-          target: x86_64-apple-darwin
-        - build: win-msvc
-          os: windows-2022
-          rust: nightly
-          target: x86_64-pc-windows-msvc
+  ci:
+    permissions:
+      contents: none
+    name: CI
+    needs: [test, check, docs, rustfmt, clippy]
+    runs-on: ubuntu-latest
     steps:
-    - name: Checkout repository
-      uses: actions/checkout@v3
-      with:
-        persist-credentials: false
-        fetch-depth: 0
-
-    - name: ⚡ Cache Rust
-      uses: actions/cache@v2
-      with:
-        path: |
-          ~/.cargo/registry
-          ~/.cargo/git
-          target
-        key: ${{ runner.os }}-cargo-${{ hashFiles('**/Cargo.lock') }}
-
-    - name: ⚡ Cache Node
-      uses: actions/cache@v2
-      with:
-        path: inspectify/ui/node_modules/
-        key: ${{ runner.os }}-node-${{ hashFiles('**/package-lock.json') }}
-
-    - name: Install Rust
-      uses: dtolnay/rust-toolchain@master
-      with:
-        toolchain: ${{ matrix.rust }}
-        targets: ${{ matrix.target }}
-
-    - uses: taiki-e/install-action@v2
-      with:
-        tool: just
-
-    - name: Build UI
-      run: just build-ui
-
-    - name: Build inspectify and checko
-      run: just build-ci
+      - name: Done
+        run: exit 0
+  test:
+    name: Test
+    strategy:
+      matrix:
+        build: [linux, windows, mac]
+        include:
+          - build: linux
+            os: ubuntu-latest
+            rust: "stable"
+          - build: windows
+            os: windows-latest
+            rust: "stable"
+          - build: mac
+            os: macos-latest
+            rust: "stable"
+    continue-on-error: ${{ matrix.rust != 'stable' }}
+    runs-on: ${{ matrix.os }}
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Build
+        run: cargo build
+      - name: Test
+        run: cargo test
+  check:
+    name: Check
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        build: [msrv, debug, release]
+        include:
+          - build: linux
+            os: ubuntu-22.04
+            rust: nightly
+            target: x86_64-unknown-linux-musl
+          - build: linux-arm
+            os: ubuntu-22.04
+            rust: nightly
+            target: arm-unknown-linux-gnueabihf
+          - build: macos
+            os: macos-12
+            rust: nightly
+            target: x86_64-apple-darwin
+          - build: win-msvc
+            os: windows-2022
+            rust: nightly
+            target: x86_64-pc-windows-msvc
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: ${{ matrix.rust }}
+          targets: ${{ matrix.target }}
+      - uses: Swatinem/rust-cache@v2
+      - name: Check
+        run: cargo check
+        env:
+          TOOLCHAIN_TARGET: ${{ matrix.target }}
+  lockfile:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: stable
+      - uses: Swatinem/rust-cache@v2
+      - name: "Is lockfile updated?"
+        run: cargo fetch --locked
+  docs:
+    name: Docs
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.70.0 # MSRV
+      - uses: Swatinem/rust-cache@v2
+      - name: Check documentation
+        env:
+          RUSTDOCFLAGS: -D warnings
+        run: cargo doc --workspace --all-features --no-deps --document-private-items
+  rustfmt:
+    name: rustfmt
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          # Not MSRV because its harder to jump between versions and people are
+          # more likely to have stable
+          toolchain: stable
+          components: rustfmt
+      - uses: Swatinem/rust-cache@v2
+      - name: Check formatting
+        run: cargo fmt --all -- --check
+  clippy:
+    name: clippy
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout repository
+        uses: actions/checkout@v3
+      - name: Install Rust
+        uses: dtolnay/rust-toolchain@stable
+        with:
+          toolchain: 1.70.0 # MSRV
+          components: clippy
+      - uses: Swatinem/rust-cache@v2
+      - name: Lint
+        run: cargo clippy
