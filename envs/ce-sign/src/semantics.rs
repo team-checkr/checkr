@@ -90,7 +90,7 @@ fn signs_as_json() {
     use std::collections::BTreeSet;
     assert_eq!(
         serde_json::to_string(&Signs::ALL).unwrap(),
-        serde_json::to_string(&Signs::ALL.iter().collect::<BTreeSet<_>>()).unwrap()
+        serde_json::to_string(&Signs::ALL.signs().collect::<BTreeSet<_>>()).unwrap()
     );
 }
 
@@ -124,8 +124,8 @@ bitflags::bitflags! {
     #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(into = "Vec<bool>", try_from = "Vec<bool>")]
     pub struct Bools: u8 {
-        const FALSE = 0b01;
         const TRUE = 0b10;
+        const FALSE = 0b01;
         const ALL = Self::TRUE.bits() | Self::FALSE.bits();
     }
 }
@@ -158,7 +158,7 @@ fn bools_as_json() {
     use std::collections::BTreeSet;
     assert_eq!(
         serde_json::to_string(&Bools::ALL).unwrap(),
-        serde_json::to_string(&Bools::ALL.iter().collect::<BTreeSet<_>>()).unwrap()
+        serde_json::to_string(&Bools::ALL.bools().collect::<BTreeSet<_>>()).unwrap()
     );
 }
 
@@ -173,7 +173,7 @@ impl From<bool> for Bools {
 
 impl Bools {
     pub fn bools(self) -> impl Iterator<Item = bool> + Clone {
-        [true, false]
+        [false, true]
             .into_iter()
             .filter(move |&s| self.contains(s.into()))
     }

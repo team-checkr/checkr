@@ -5,6 +5,7 @@ mod semantics;
 use std::{collections::HashSet, fmt::Display, hash::Hash};
 
 use ce_core::{
+    basic_env_test,
     components::{GclEditor, Network, StandardLayout},
     rand::{self, seq::SliceRandom, SeedableRng},
     Env, EnvError, Generate, RenderProps, ValidationResult,
@@ -335,3 +336,5 @@ impl Generate for Signs {
         [Sign::gen(cx, rng)].into_iter().collect()
     }
 }
+
+basic_env_test!(SignEnv);

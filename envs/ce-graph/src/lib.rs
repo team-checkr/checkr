@@ -1,4 +1,5 @@
 use ce_core::{
+    basic_env_test,
     components::{GclEditor, Network, StandardLayout},
     Env, Generate, ValidationResult,
 };
@@ -71,3 +72,5 @@ impl Generate for GraphInput {
         }
     }
 }
+
+basic_env_test!(GraphEnv);
