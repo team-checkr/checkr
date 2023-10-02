@@ -1,10 +1,11 @@
 use std::collections::HashSet;
 
-use gcl::ast::{Command, Commands, Flow, Guard, SecurityClass, Target};
+use gcl::{
+    ast::{Command, Commands, Flow, Guard, SecurityClass, Target},
+    memory::Memory,
+};
 use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
-
-use crate::sign::Memory;
 
 trait SecurityFlows {
     fn flows(&self) -> HashSet<Flow<Target>> {

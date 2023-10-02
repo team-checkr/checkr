@@ -10,11 +10,9 @@ use axum::{
     routing::{get, post, IntoMakeService},
     Json, Router,
 };
-use checkr::{
-    env::{graph::GraphEnvInput, Analysis, EnvError, GraphEnv, Markdown},
-    pg::Determinism,
-};
+use checkr::env::{graph::GraphEnvInput, Analysis, EnvError, GraphEnv, Markdown};
 use futures::{SinkExt, StreamExt};
+use gcl::pg::Determinism;
 use serde::{Deserialize, Serialize};
 use tower_http::cors::CorsLayer;
 use tracing::error;

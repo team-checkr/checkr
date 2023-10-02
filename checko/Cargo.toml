@@ -15,8 +15,8 @@ chrono = "0.4.24"
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }
-dioxus = "0.4.0"
-dioxus-liveview = { version = "0.4.0", features = ["axum"] }
+dioxus.workspace = true
+dioxus-liveview.workspace = true
 dioxus-ssr = "0.4.0"
 gcl.workspace = true
 indexmap = { version = "2.0.0", features = ["serde"] }

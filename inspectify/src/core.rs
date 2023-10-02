@@ -2,8 +2,8 @@ use axum::Json;
 use checkr::{
     env::{graph::GraphEnvInput, Analysis, Environment, GraphEnv, Markdown},
     miette,
-    pg::Determinism,
 };
+use gcl::pg::Determinism;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 use typeshare::typeshare;

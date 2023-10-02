@@ -13,8 +13,10 @@ itertools.workspace = true
 lalrpop-util = { version = "0.20.0", features = ["lexer"] }
 miette.workspace = true
 once_cell.workspace = true
+petgraph.workspace = true
 serde.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 [build-dependencies]
 lalrpop = { version = "0.20.0", features = ["lexer"] }

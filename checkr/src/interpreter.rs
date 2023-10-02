@@ -1,21 +1,33 @@
 use gcl::{
-    ast::{Int, Target},
+    ast::{Array, Int, Variable},
+    memory::Memory,
+    pg::{Node, ProgramGraph},
     semantics::{SemanticsContext, SemanticsError},
 };
 use serde::{Deserialize, Serialize};
 
-use crate::{
-    pg::{Action, Node, ProgramGraph},
-    sign::Memory,
-};
-
 pub struct Interpreter {}
 
-pub type InterpreterMemory = Memory<Int, Vec<Int>>;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InterpreterMemory(Memory<Int, Vec<Int>>);
 
-impl InterpreterMemory {
-    pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
-        Memory::from_targets(pg.fv(), |_| 0, |_| vec![])
+impl From<Memory<Int, Vec<Int>>> for InterpreterMemory {
+    fn from(mem: Memory<Int, Vec<Int>>) -> Self {
+        InterpreterMemory(mem)
+    }
+}
+
+impl std::ops::Deref for InterpreterMemory {
+    type Target = Memory<Int, Vec<Int>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for InterpreterMemory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -82,7 +94,7 @@ impl Interpreter {
 
 fn lookup_array<'a>(
     mem: &'a InterpreterMemory,
-    array: &gcl::ast::Array,
+    array: &Array,
 ) -> Result<&'a [Int], SemanticsError> {
     mem.arrays
         .get(array)
@@ -93,7 +105,7 @@ fn lookup_array<'a>(
 }
 
 impl SemanticsContext for InterpreterMemory {
-    fn variable(&self, var: &gcl::ast::Variable) -> Result<Int, SemanticsError> {
+    fn variable(&self, var: &Variable) -> Result<Int, SemanticsError> {
         self.variables
             .get(var)
             .ok_or_else(|| SemanticsError::VariableNotFound {
@@ -102,7 +114,19 @@ impl SemanticsContext for InterpreterMemory {
             .copied()
     }
 
-    fn array_element(&self, array: &gcl::ast::Array, index: Int) -> Result<Int, SemanticsError> {
+    fn set_variable(&self, var: &Variable, value: Int) -> Result<Self, SemanticsError> {
+        if self.variables.contains_key(var) {
+            let mut m2 = self.clone();
+            m2.variables.insert(var.clone(), value);
+            Ok(m2)
+        } else {
+            Err(SemanticsError::VariableNotFound {
+                name: var.to_string(),
+            })
+        }
+    }
+
+    fn array_element(&self, array: &Array, index: Int) -> Result<Int, SemanticsError> {
         let data = lookup_array(self, array)?;
         data.get(index as usize)
             .ok_or_else(|| SemanticsError::IndexOutOfBound {
@@ -112,57 +136,36 @@ impl SemanticsContext for InterpreterMemory {
             .copied()
     }
 
-    fn array_length(&self, array: &gcl::ast::Array) -> Result<Int, SemanticsError> {
+    fn set_array_element(
+        &self,
+        array: &Array,
+        index: Int,
+        value: Int,
+    ) -> Result<Self, SemanticsError> {
+        match self.get_arr(array) {
+            Some(data) if 0 <= index && index < data.len() as _ => {
+                let mut m2 = self.clone();
+                let data = m2.arrays.get_mut(array).unwrap();
+                data[index as usize] = value;
+                Ok(m2)
+            }
+            Some(_) => Err(SemanticsError::ArrayNotFound {
+                name: array.to_string(),
+            }),
+            None => Err(SemanticsError::IndexOutOfBound {
+                name: array.to_string(),
+                index,
+            }),
+        }
+    }
+
+    fn array_length(&self, array: &Array) -> Result<Int, SemanticsError> {
         let data = lookup_array(self, array)?;
         Ok(data.len() as _)
     }
 
-    fn array_count(&self, array: &gcl::ast::Array, element: Int) -> Result<Int, SemanticsError> {
+    fn array_count(&self, array: &Array, element: Int) -> Result<Int, SemanticsError> {
         let data = lookup_array(self, array)?;
         Ok(data.iter().filter(|e| **e == element).count() as _)
-    }
-}
-
-impl Action {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Result<InterpreterMemory, SemanticsError> {
-        match self {
-            Action::Assignment(Target::Variable(x), a) => {
-                if m.variables.contains_key(x) {
-                    let mut m2 = m.clone();
-                    m2.variables.insert(x.clone(), a.semantics(m)?);
-                    Ok(m2)
-                } else {
-                    Err(SemanticsError::VariableNotFound {
-                        name: x.to_string(),
-                    })
-                }
-            }
-            Action::Assignment(Target::Array(arr, idx), a) => {
-                let idx = idx.semantics(m)?;
-                match m.get_arr(arr) {
-                    Some(data) if 0 <= idx && idx < data.len() as _ => {
-                        let mut m2 = m.clone();
-                        let data = m2.arrays.get_mut(arr).unwrap();
-                        data[idx as usize] = a.semantics(m)?;
-                        Ok(m2)
-                    }
-                    Some(_) => Err(SemanticsError::ArrayNotFound {
-                        name: arr.to_string(),
-                    }),
-                    None => Err(SemanticsError::IndexOutOfBound {
-                        name: arr.to_string(),
-                        index: idx,
-                    }),
-                }
-            }
-            Action::Skip => Ok(m.clone()),
-            Action::Condition(b) => {
-                if b.semantics(m)? {
-                    Ok(m.clone())
-                } else {
-                    Err(SemanticsError::NoProgression)
-                }
-            }
-        }
     }
 }

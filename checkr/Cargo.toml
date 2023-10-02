@@ -10,6 +10,8 @@ publish = false
 
 [dependencies]
 bitflags = "2.4.0"
+ce-shell.workspace = true
+ce-sign.workspace = true
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }
@@ -20,7 +22,7 @@ indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = { workspace = true }
 miette = { workspace = true }
 once_cell = { workspace = true }
-petgraph = { version = "0.6.3" }
+petgraph.workspace = true
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
