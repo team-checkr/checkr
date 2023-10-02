@@ -235,7 +235,7 @@ impl Default for EquivChecker {
 fn egg_quantifiers() -> color_eyre::Result<()> {
     use gcl::ast::Quantifier;
 
-    color_eyre::install()?;
+    let _ = color_eyre::install();
 
     let mut checker = EquivChecker::default();
 
@@ -270,7 +270,7 @@ fn egg_quantifiers() -> color_eyre::Result<()> {
 fn egg_arrays() -> color_eyre::Result<()> {
     use pretty_assertions::assert_eq;
 
-    color_eyre::install()?;
+    let _ = color_eyre::install();
 
     let mut checker = EquivChecker::default();
     let a = AExpr::Reference(Target::Array(
