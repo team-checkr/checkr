@@ -1,11 +1,10 @@
 use std::{marker::PhantomData, sync::Arc};
 
-use ce_core::{Env, RenderProps};
+use ce_core::{AnalysisResult, Env, RenderProps, ValidationResult};
 
 use crate::io::{Input, Output};
 use dioxus::prelude::*;
 use futures_util::StreamExt;
-use itertools::Itertools;
 
 #[macro_export]
 macro_rules! define_shell {
@@ -88,17 +87,15 @@ macro_rules! define_shell {
             pub fn render<'a, R>(
                 self,
                 cx: Scope<'a, R>,
-                set_input: UseState<Input>,
-                reference_output: Output,
-                real_output: Output,
+                input: &'a Input,
+                set_input: Coroutine<Input>,
+                real_output: &'a Option<Output>,
             ) -> Element<'a> {
-                let input = set_input.get().clone();
                 match self {
                     $(Analysis::$name => cx.render(rsx!(def::RenderEnv::<$krate> {
                         analysis: self,
                         set_input: set_input,
                         input: input,
-                        reference_output: reference_output,
                         real_output: real_output,
                     }))),*
                 }
@@ -137,57 +134,103 @@ macro_rules! define_shell {
     };
 }
 
-#[inline_props]
-pub fn RenderEnv<E: Env + 'static>(
-    cx: Scope,
-    _marker: Option<PhantomData<E>>,
+#[derive(Props)]
+pub struct RenderEnvProps<'a, E: Env + 'static> {
+    _marker: Option<PhantomData<&'a E>>,
     analysis: crate::Analysis,
-    set_input: UseState<Input>,
-    input: Input,
-    reference_output: Output,
-    real_output: Output,
-) -> Element<'a> {
-    let analysis = *analysis;
+    input: &'a Input,
+    set_input: Coroutine<Input>,
+    #[props(!optional)]
+    real_output: &'a Option<Output>,
+}
+
+pub fn RenderEnv<'a, E: Env + 'static>(cx: Scope<'a, RenderEnvProps<'a, E>>) -> Element<'a> {
+    let props = &cx.props;
+    let analysis = props.analysis;
 
     let tx = use_coroutine(cx, |mut rx| {
-        to_owned![set_input];
+        to_owned![props.set_input];
         async move {
             while let Some(new) = rx.next().await {
                 let json = Arc::new(serde_json::to_value(new).expect("input is always valid json"));
                 let new = Input { analysis, json };
-                set_input.set(new);
+                set_input.send(new);
             }
         }
     });
 
-    if ![
-        analysis,
-        input.analysis,
-        reference_output.analysis,
-        real_output.analysis,
-    ]
-    .iter()
-    .all_equal()
-    {
-        return cx.render(rsx!(div { "Loading..." }));
+    let all_same_analysis = analysis == props.input.analysis();
+
+    let input: &E::Input = use_memo(cx, (props.input,), |(input,)| {
+        serde_json::from_value((*input.json).clone()).unwrap()
+    });
+
+    let real_result =
+        use_memo(
+            cx,
+            (input, props.real_output),
+            |(input, real_output)| match real_output {
+                None => AnalysisResult::Nothing,
+                Some(real) => {
+                    let real = serde_json::from_value((*real.json).clone()).unwrap();
+                    let reference = E::run(&input).unwrap();
+                    let validation = E::validate(&input, &real).unwrap();
+                    AnalysisResult::Active {
+                        reference,
+                        real,
+                        validation,
+                    }
+                }
+            },
+        );
+
+    let result = use_state::<AnalysisResult<E>>(cx, || real_result.clone());
+
+    use_effect(cx, (real_result,), |(real_result,)| {
+        to_owned![result];
+        async move {
+            match (real_result, &*result) {
+                (
+                    AnalysisResult::Nothing,
+                    AnalysisResult::Active {
+                        reference,
+                        real,
+                        validation,
+                    },
+                ) => result.set(AnalysisResult::Stale {
+                    reference: reference.clone(),
+                    real: real.clone(),
+                    validation: validation.clone(),
+                }),
+                (AnalysisResult::Nothing, _) => {}
+                (next, _) => result.set(next),
+            };
+        }
+    });
+
+    use_shared_state_provider::<Option<ValidationResult>>(cx, || None);
+    let validation_result = use_shared_state::<Option<ValidationResult>>(cx).unwrap();
+    use_effect(cx, (&**result,), |(result,)| {
+        to_owned![validation_result];
+        async move {
+            match result {
+                AnalysisResult::Nothing | AnalysisResult::Stale { .. } => {
+                    *validation_result.write() = None
+                }
+                AnalysisResult::Active { validation, .. } => {
+                    *validation_result.write() = Some(validation.clone())
+                }
+            }
+        }
+    });
+
+    let render_props = use_memo(cx, (tx, input, &**result), |(tx, input, result)| {
+        RenderProps::new(tx.clone(), input, result)
+    });
+
+    if !all_same_analysis {
+        return cx.render(rsx!(div { class: "grid place-items-center text-xl", "Loading..." }));
     }
 
-    let props = use_memo(
-        cx,
-        (tx, input, reference_output, real_output),
-        |(tx, input, reference_output, real_output)| {
-            let input = serde_json::from_value((*input.json).clone()).unwrap();
-            let reference_output =
-                serde_json::from_value((*reference_output.json).clone()).unwrap();
-            let real_output = serde_json::from_value((*real_output.json).clone()).unwrap();
-            RenderProps {
-                set_input: tx,
-                input: Arc::new(input),
-                reference_output: Arc::new(reference_output),
-                real_output: Arc::new(real_output),
-                marker: Default::default(),
-            }
-        },
-    );
-    E::render(cx, props)
+    E::render(cx, render_props)
 }

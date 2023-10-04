@@ -1,14 +1,12 @@
 use ce_core::{
-    basic_env_test,
     components::{GclEditor, StandardLayout},
-    rand, Env, Generate, RenderProps, ValidationResult,
+    define_env, rand, Env, Generate, RenderProps, ValidationResult,
 };
 use dioxus::prelude::*;
 use gcl::ast::Commands;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
-pub struct ParseEnv;
+define_env!(ParseEnv);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseInput {
@@ -38,20 +36,26 @@ impl Env for ParseEnv {
     fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a> {
         cx.render(rsx!(StandardLayout {
             input: cx.render(rsx!(GclEditor {
-                commands: props.input.commands.clone(),
+                commands: props.input().commands.clone(),
                 on_change: move |commands| props.set_input(ParseInput { commands }),
             })),
-            output: cx.render(rsx!(div {
-                class: "grid grid-rows-2",
-                pre {
-                    class: "rounded border shadow p-2 overflow-auto text-xs ml-2",
-                    "{props.real_output.formatted}"
+            output: props.with_result(cx, |res| cx.render(rsx!(div {
+                class: "grid grid-rows-2 divide-y",
+                div {
+                    h2 { class: "italic font-semibold px-2 py-1", "Real" }
+                    pre {
+                        class: "p-2 overflow-auto text-xs",
+                        "{res.real().formatted}"
+                    }
                 }
-                pre {
-                    class: "rounded border shadow p-2 overflow-auto text-xs mr-2",
-                    "{props.reference_output.formatted}"
+                div {
+                    h2 { class: "italic font-semibold px-2 py-1", "Reference" }
+                    pre {
+                        class: "p-2 overflow-auto text-xs",
+                        "{res.reference().formatted}"
+                    }
                 }
-            })),
+            }))),
         }))
     }
 }
@@ -65,5 +69,3 @@ impl Generate for ParseInput {
         }
     }
 }
-
-basic_env_test!(ParseEnv);

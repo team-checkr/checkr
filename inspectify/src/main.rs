@@ -9,12 +9,13 @@ use std::{
 
 use axum::{extract::WebSocketUpgrade, response::Html, routing::get, Router};
 use ce_core::rand::{self, SeedableRng};
-use ce_shell::Analysis;
+use ce_shell::{Analysis, Input};
 use dioxus::prelude::*;
 use driver::{
     ansi::{self, Color, Span},
     Driver, Hub, JobId, JobState,
 };
+use futures_util::StreamExt;
 use itertools::Itertools;
 use tracing::Instrument;
 use tracing_subscriber::prelude::*;
@@ -506,7 +507,6 @@ fn JobRow<'a>(cx: Scope<'a, JobRowProps<'a>>) -> Element<'a> {
     }))
 }
 
-#[inline_props]
 fn ViewEnv(cx: Scope) -> Element {
     let analysis = use_analysis(cx);
 
@@ -516,18 +516,24 @@ fn ViewEnv(cx: Scope) -> Element {
     let input = use_state(cx, || {
         analysis.gen_input(&mut rand::rngs::SmallRng::from_entropy())
     });
+    let real_output = use_state(cx, || None);
 
-    use_effect(cx, (&analysis,), |(analysis,)| {
-        to_owned![input];
+    let set_input = use_coroutine::<Input, _, _>(cx, |mut rx| {
+        to_owned![input, real_output];
         async move {
-            input.set(analysis.gen_input(&mut rand::rngs::SmallRng::from_entropy()));
+            while let Some(new) = rx.next().await {
+                input.set(new);
+                real_output.set(None);
+            }
         }
     });
 
-    let reference_output = use_memo(cx, (input.get(),), |(input,)| input.reference_output())
-        .as_ref()
-        .unwrap();
-    let real_output = use_state(cx, || None);
+    use_effect(cx, (&analysis,), |(analysis,)| {
+        to_owned![set_input];
+        async move {
+            set_input.send(analysis.gen_input(&mut rand::rngs::SmallRng::from_entropy()));
+        }
+    });
 
     let last_job = use_state::<Option<Job>>(cx, || None);
 
@@ -550,7 +556,6 @@ fn ViewEnv(cx: Scope) -> Element {
                 if stdout.is_empty() {
                     return;
                 }
-                tracing::debug!(?stdout);
                 let output = input.analysis().parse_output(&stdout);
                 real_output.set(Some(output));
             }
@@ -558,18 +563,5 @@ fn ViewEnv(cx: Scope) -> Element {
         },
     );
 
-    let validation_result = use_memo(cx, (input, &**real_output), |(input, real_output)| {
-        Some(input.validate_output(&real_output?))
-    });
-
-    if let Some(real_output) = real_output.get() {
-        analysis.render(
-            cx,
-            input.clone(),
-            reference_output.clone(),
-            real_output.clone(),
-        )
-    } else {
-        cx.render(rsx!("generating output..."))
-    }
+    analysis.render(cx, input, set_input.clone(), real_output)
 }
