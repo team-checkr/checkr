@@ -1,18 +1,33 @@
-use serde::{Deserialize, Serialize};
-
-use crate::{
-    ast::{AExpr, AOp, BExpr, Function, Int, LogicOp, RelOp, Target},
-    pg::{Action, Node, ProgramGraph},
-    sign::Memory,
+use gcl::{
+    ast::{Array, Int, Variable},
+    memory::Memory,
+    pg::{Node, ProgramGraph},
+    semantics::{SemanticsContext, SemanticsError},
 };
+use serde::{Deserialize, Serialize};
 
 pub struct Interpreter {}
 
-pub type InterpreterMemory = Memory<Int, Vec<Int>>;
+#[derive(Debug, Default, Clone, PartialEq, Eq, Serialize, Deserialize)]
+pub struct InterpreterMemory(Memory<Int, Vec<Int>>);
 
-impl InterpreterMemory {
-    pub fn zero(pg: &ProgramGraph) -> InterpreterMemory {
-        Memory::from_targets(pg.fv(), |_| 0, |_| vec![])
+impl From<Memory<Int, Vec<Int>>> for InterpreterMemory {
+    fn from(mem: Memory<Int, Vec<Int>>) -> Self {
+        InterpreterMemory(mem)
+    }
+}
+
+impl std::ops::Deref for InterpreterMemory {
+    type Target = Memory<Int, Vec<Int>>;
+
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
+impl std::ops::DerefMut for InterpreterMemory {
+    fn deref_mut(&mut self) -> &mut Self::Target {
+        &mut self.0
     }
 }
 
@@ -77,235 +92,80 @@ impl Interpreter {
     }
 }
 
-impl Action {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Result<InterpreterMemory, InterpreterError> {
-        match self {
-            Action::Assignment(Target::Variable(x), a) => {
-                if m.variables.contains_key(x) {
-                    let mut m2 = m.clone();
-                    m2.variables.insert(x.clone(), a.semantics(m)?);
-                    Ok(m2)
-                } else {
-                    Err(InterpreterError::VariableNotFound {
-                        name: x.to_string(),
-                    })
-                }
-            }
-            Action::Assignment(Target::Array(arr, idx), a) => {
-                let idx = idx.semantics(m)?;
-                match m.get_arr(arr) {
-                    Some(data) if 0 <= idx && idx < data.len() as _ => {
-                        let mut m2 = m.clone();
-                        let data = m2.arrays.get_mut(arr).unwrap();
-                        data[idx as usize] = a.semantics(m)?;
-                        Ok(m2)
-                    }
-                    Some(_) => Err(InterpreterError::ArrayNotFound {
-                        name: arr.to_string(),
-                    }),
-                    None => Err(InterpreterError::IndexOutOfBound {
-                        name: arr.to_string(),
-                        index: idx,
-                    }),
-                }
-            }
-            Action::Skip => Ok(m.clone()),
-            Action::Condition(b) => {
-                if b.semantics(m)? {
-                    Ok(m.clone())
-                } else {
-                    Err(InterpreterError::NoProgression)
-                }
-            }
+fn lookup_array<'a>(
+    mem: &'a InterpreterMemory,
+    array: &Array,
+) -> Result<&'a [Int], SemanticsError> {
+    mem.arrays
+        .get(array)
+        .ok_or_else(|| SemanticsError::ArrayNotFound {
+            name: array.to_string(),
+        })
+        .map(|data| &**data)
+}
+
+impl SemanticsContext for InterpreterMemory {
+    fn variable(&self, var: &Variable) -> Result<Int, SemanticsError> {
+        self.variables
+            .get(var)
+            .ok_or_else(|| SemanticsError::VariableNotFound {
+                name: var.to_string(),
+            })
+            .copied()
+    }
+
+    fn set_variable(&self, var: &Variable, value: Int) -> Result<Self, SemanticsError> {
+        if self.variables.contains_key(var) {
+            let mut m2 = self.clone();
+            m2.variables.insert(var.clone(), value);
+            Ok(m2)
+        } else {
+            Err(SemanticsError::VariableNotFound {
+                name: var.to_string(),
+            })
         }
     }
-}
 
-impl AExpr {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Result<Int, InterpreterError> {
-        Ok(match self {
-            AExpr::Number(n) => *n,
-            AExpr::Reference(Target::Variable(x)) => {
-                if let Some(x) = m.variables.get(x) {
-                    *x
-                } else {
-                    return Err(InterpreterError::VariableNotFound {
-                        name: x.to_string(),
-                    });
-                }
-            }
-            AExpr::Reference(Target::Array(arr, idx)) => {
-                let data = if let Some(data) = m.arrays.get(arr) {
-                    data
-                } else {
-                    return Err(InterpreterError::ArrayNotFound {
-                        name: arr.to_string(),
-                    });
-                };
-                let idx = idx.semantics(m)?;
-                if let Some(x) = data.get(idx as usize) {
-                    *x
-                } else {
-                    return Err(InterpreterError::IndexOutOfBound {
-                        name: arr.to_string(),
-                        index: idx,
-                    });
-                }
-            }
-            AExpr::Binary(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?)?,
-            AExpr::Minus(n) => (n.semantics(m)?)
-                .checked_neg()
-                .ok_or(InterpreterError::ArithmeticOverflow)?,
-            AExpr::Function(f) => match f {
-                Function::Division(l, r) => {
-                    AOp::Divide.semantic(l.semantics(m)?, r.semantics(m)?)?
-                }
-                Function::Min(x, y) => x.semantics(m)?.min(y.semantics(m)?),
-                Function::Max(x, y) => x.semantics(m)?.max(y.semantics(m)?),
-                Function::Count(arr, x) | Function::LogicalCount(arr, x) => {
-                    let data = if let Some(data) = m.arrays.get(arr) {
-                        data
-                    } else {
-                        return Err(InterpreterError::ArrayNotFound {
-                            name: arr.to_string(),
-                        });
-                    };
-                    let x = x.semantics(m)?;
-                    data.iter().filter(|e| **e == x).count() as _
-                }
-                Function::Length(arr) | Function::LogicalLength(arr) => {
-                    let data = if let Some(data) = m.arrays.get(arr) {
-                        data
-                    } else {
-                        return Err(InterpreterError::ArrayNotFound {
-                            name: arr.to_string(),
-                        });
-                    };
-                    data.len() as _
-                }
-                Function::Fac(x) => {
-                    let x = x.semantics(m)?;
-                    if x < 0 {
-                        return Err(InterpreterError::OutsideFunctionDomain);
-                    }
-                    (1..=x)
-                        .try_fold(1 as Int, |acc, x| acc.checked_mul(x))
-                        .ok_or(InterpreterError::ArithmeticOverflow)?
-                }
-                Function::Fib(x) => {
-                    let x = x.semantics(m)?;
-                    if x < 0 {
-                        return Err(InterpreterError::OutsideFunctionDomain);
-                    }
-                    (0..x)
-                        .try_fold((0 as Int, 1), |(a, b), _| Some((b, a.checked_add(b)?)))
-                        .map(|(x, _)| x)
-                        .ok_or(InterpreterError::ArithmeticOverflow)?
-                }
-            },
-        })
+    fn array_element(&self, array: &Array, index: Int) -> Result<Int, SemanticsError> {
+        let data = lookup_array(self, array)?;
+        data.get(index as usize)
+            .ok_or_else(|| SemanticsError::IndexOutOfBound {
+                name: array.to_string(),
+                index,
+            })
+            .copied()
     }
-}
 
-#[derive(Debug, PartialEq, Eq, thiserror::Error)]
-pub enum InterpreterError {
-    #[error("division by zero")]
-    DivisionByZero,
-    #[error("negative exponent")]
-    NegativeExponent,
-    #[error("variable '{name}' not found")]
-    VariableNotFound { name: String },
-    #[error("array '{name}' not found")]
-    ArrayNotFound { name: String },
-    #[error("index {index} in '{name}' is out-of-bounds")]
-    IndexOutOfBound { name: String, index: Int },
-    #[error("no progression")]
-    NoProgression,
-    #[error("an arithmetic operation overflowed")]
-    ArithmeticOverflow,
-    #[error("tried to evaluate a quantified expression")]
-    EvaluateQuantifier,
-    #[error("tried to evaluate function where argument was outside of domain")]
-    OutsideFunctionDomain,
-}
-
-impl AOp {
-    pub fn semantic(&self, l: Int, r: Int) -> Result<Int, InterpreterError> {
-        Ok(match self {
-            AOp::Plus => l
-                .checked_add(r)
-                .ok_or(InterpreterError::ArithmeticOverflow)?,
-            AOp::Minus => l
-                .checked_sub(r)
-                .ok_or(InterpreterError::ArithmeticOverflow)?,
-            AOp::Times => l
-                .checked_mul(r)
-                .ok_or(InterpreterError::ArithmeticOverflow)?,
-            AOp::Divide => {
-                if r != 0 {
-                    l / r
-                } else {
-                    return Err(InterpreterError::DivisionByZero);
-                }
-            }
-            AOp::Pow => {
-                if r >= 0 {
-                    l.checked_pow(r as _)
-                        .ok_or(InterpreterError::ArithmeticOverflow)?
-                } else {
-                    return Err(InterpreterError::NegativeExponent);
-                }
-            }
-        })
-    }
-}
-
-impl BExpr {
-    pub fn semantics(&self, m: &InterpreterMemory) -> Result<bool, InterpreterError> {
-        Ok(match self {
-            BExpr::Bool(b) => *b,
-            BExpr::Rel(l, op, r) => op.semantic(l.semantics(m)?, r.semantics(m)?),
-            BExpr::Logic(l, op, r) => op.semantic(l.semantics(m)?, || r.semantics(m))?,
-            BExpr::Not(b) => !b.semantics(m)?,
-            BExpr::Quantified(_, _, _) => return Err(InterpreterError::EvaluateQuantifier),
-        })
-    }
-}
-
-impl RelOp {
-    pub fn semantic(&self, l: Int, r: Int) -> bool {
-        match self {
-            RelOp::Eq => l == r,
-            RelOp::Ne => l != r,
-            RelOp::Gt => l > r,
-            RelOp::Ge => l >= r,
-            RelOp::Lt => l < r,
-            RelOp::Le => l <= r,
-        }
-    }
-}
-
-impl LogicOp {
-    pub fn semantic(
+    fn set_array_element(
         &self,
-        l: bool,
-        r: impl FnOnce() -> Result<bool, InterpreterError>,
-    ) -> Result<bool, InterpreterError> {
-        Ok(match self {
-            LogicOp::And => l && r()?,
-            LogicOp::Land => {
-                let r = r()?;
-                l && r
+        array: &Array,
+        index: Int,
+        value: Int,
+    ) -> Result<Self, SemanticsError> {
+        match self.get_arr(array) {
+            Some(data) if 0 <= index && index < data.len() as _ => {
+                let mut m2 = self.clone();
+                let data = m2.arrays.get_mut(array).unwrap();
+                data[index as usize] = value;
+                Ok(m2)
             }
-            LogicOp::Or => l || r()?,
-            LogicOp::Lor => {
-                let r = r()?;
-                l || r
-            }
-            LogicOp::Implies => {
-                let r = r()?;
-                !l || r
-            }
-        })
+            Some(_) => Err(SemanticsError::ArrayNotFound {
+                name: array.to_string(),
+            }),
+            None => Err(SemanticsError::IndexOutOfBound {
+                name: array.to_string(),
+                index,
+            }),
+        }
+    }
+
+    fn array_length(&self, array: &Array) -> Result<Int, SemanticsError> {
+        let data = lookup_array(self, array)?;
+        Ok(data.len() as _)
+    }
+
+    fn array_count(&self, array: &Array, element: Int) -> Result<Int, SemanticsError> {
+        let data = lookup_array(self, array)?;
+        Ok(data.iter().filter(|e| **e == element).count() as _)
     }
 }

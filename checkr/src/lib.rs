@@ -26,7 +26,7 @@
 //! source of randomness. It also implements this trait for all of the GCL
 //! constructs, which allows programs to be generated in a programmatic way.
 //! Similarly, the inputs of [`Environment`] implementations must too implement
-//! [`Generate`].
+//! [`Generate`](generation::Generate).
 
 use std::{borrow::Cow, time::Duration};
 
@@ -36,23 +36,16 @@ pub use miette;
 use rand::prelude::*;
 use tracing::debug;
 
-use crate::ast::Commands;
+use gcl::ast::Commands;
 
-pub mod analysis;
-pub mod ast;
 pub mod config;
 pub mod driver;
 pub mod egg;
 pub mod env;
-pub mod fmt;
-mod gcl;
 pub mod generation;
 pub mod interpreter;
-pub mod parse;
-pub mod pg;
 pub mod pv;
 pub mod security;
-pub mod sign;
 
 #[derive(Debug)]
 pub struct ProgramGenerationBuilder {
@@ -62,12 +55,6 @@ pub struct ProgramGenerationBuilder {
     no_loop: bool,
     no_division: bool,
     generate_annotated: bool,
-}
-
-impl Commands {
-    pub fn builder(analysis: Analysis) -> ProgramGenerationBuilder {
-        ProgramGenerationBuilder::new(analysis)
-    }
 }
 
 impl ProgramGenerationBuilder {

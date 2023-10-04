@@ -50,7 +50,7 @@ impl CanonicalProgramConfig {
     pub fn generated_program(&self, analysis: Analysis) -> Result<GeneratedProgram> {
         let builder = analysis.setup_generation();
         Ok(builder.from_cmds_and_input(
-            checkr::parse::parse_commands(&self.src).unwrap(),
+            gcl::parse::parse_commands(&self.src).unwrap(),
             analysis.input_from_str(&self.input)?,
         ))
     }
@@ -121,7 +121,7 @@ impl ProgramConfig {
                 ..
             } => {
                 let builder = analysis.setup_generation().seed(Some(*seed));
-                builder.from_cmds(checkr::parse::parse_commands(src).unwrap())
+                builder.from_cmds(gcl::parse::parse_commands(src).unwrap())
             }
             ProgramConfig {
                 src: Some(src),
@@ -130,7 +130,7 @@ impl ProgramConfig {
             } => {
                 let builder = analysis.setup_generation();
                 builder.from_cmds_and_input(
-                    checkr::parse::parse_commands(src).unwrap(),
+                    gcl::parse::parse_commands(src).unwrap(),
                     analysis.input_from_str(input)?,
                 )
             }

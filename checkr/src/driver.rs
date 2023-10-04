@@ -6,10 +6,8 @@ use std::{
 use tokio::process::Command;
 use tracing::error;
 
-use crate::{
-    ast::Commands,
-    env::{Analysis, EnvError, Environment, Output},
-};
+use crate::env::{Analysis, EnvError, Environment, Output};
+use gcl::ast::Commands;
 
 pub struct Driver {
     dir: PathBuf,

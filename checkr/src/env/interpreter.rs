@@ -1,13 +1,15 @@
+use gcl::{
+    ast::Commands,
+    memory::{Memory, MemoryRef},
+    pg::{Determinism, Node, ProgramGraph},
+};
 use itertools::{chain, Itertools};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 
 use crate::{
-    ast::Commands,
     generation::Generate,
     interpreter::{Configuration, Interpreter, InterpreterMemory, TerminationState},
-    pg::{Determinism, Node, ProgramGraph},
-    sign::{Memory, MemoryRef},
 };
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
@@ -34,7 +36,8 @@ impl Generate for InterpreterInput {
                 let len = rng.gen_range(5..=10);
                 (0..len).map(|_| rng.gen_range(-10..=10)).collect()
             },
-        );
+        )
+        .into();
         InterpreterInput {
             determinism: *[Determinism::Deterministic, Determinism::NonDeterministic]
                 .choose(rng)

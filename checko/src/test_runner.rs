@@ -241,7 +241,9 @@ async fn generate_test_results<E: Environment>(
 ) -> Vec<TestResult> {
     let mut results = vec![];
 
-    let Some(programs) = config.envs.get(&E::ANALYSIS) else { return vec![] };
+    let Some(programs) = config.envs.get(&E::ANALYSIS) else {
+        return vec![];
+    };
 
     for (pid, program) in programs.programs() {
         let generated = program.generated_program(env.analysis()).unwrap();

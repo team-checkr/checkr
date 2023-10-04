@@ -1,19 +1,21 @@
 use std::collections::HashSet;
 
+use ce_sign::{Sign, SignAnalysis, SignMemory, Signs};
+use gcl::{
+    ast::{Commands, Target},
+    memory::Memory,
+    pg::{
+        analysis::{mono_analysis, FiFo, NodeOrder},
+        Determinism, Node, ProgramGraph,
+    },
+};
 use indexmap::IndexMap;
 use itertools::{chain, Itertools};
-
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use tracing::error;
 
-use crate::{
-    analysis::{mono_analysis, FiFo, NodeOrder},
-    ast::{Commands, Target},
-    generation::Generate,
-    pg::{Determinism, Node, ProgramGraph},
-    sign::{Memory, Sign, SignAnalysis, SignMemory, Signs},
-};
+use crate::generation::Generate;
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown, ValidationResult};
 

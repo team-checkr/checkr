@@ -1,6 +1,7 @@
+use gcl::ast::Commands;
 use serde::{Deserialize, Serialize};
 
-use crate::{ast::Commands, generation::Generate};
+use crate::generation::Generate;
 
 use super::{Analysis, EnvError, Environment, ToMarkdown, ValidationResult};
 

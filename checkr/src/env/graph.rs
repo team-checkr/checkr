@@ -1,15 +1,15 @@
 use std::collections::HashMap;
 
+use gcl::{
+    ast::Commands,
+    pg::{Determinism, ProgramGraph},
+};
 use graphviz_rust::dot_structures::{Attribute, Id};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
 
-use crate::{
-    ast::Commands,
-    generation::Generate,
-    pg::{Determinism, ProgramGraph},
-};
+use crate::generation::Generate;
 
 use super::{Analysis, EnvError, Environment, Markdown, ToMarkdown};
 
@@ -57,7 +57,7 @@ impl Environment for GraphEnv {
 
     fn run(
         &self,
-        cmds: &crate::ast::Commands,
+        cmds: &gcl::ast::Commands,
         input: &Self::Input,
     ) -> Result<Self::Output, EnvError> {
         let pg = ProgramGraph::new(input.determinism, cmds);
@@ -66,7 +66,7 @@ impl Environment for GraphEnv {
 
     fn validate(
         &self,
-        cmds: &crate::ast::Commands,
+        cmds: &gcl::ast::Commands,
         input: &Self::Input,
         output: &Self::Output,
     ) -> Result<super::ValidationResult, EnvError> {

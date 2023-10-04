@@ -10,17 +10,19 @@ publish = false
 
 [dependencies]
 bitflags = "2.4.0"
+ce-shell.workspace = true
+ce-sign.workspace = true
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }
 egg = "0.9.3"
+gcl = { workspace = true }
 graphviz-rust = "0.6.1"
 indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = { workspace = true }
-lalrpop-util = { version = "0.20.0", features = ["lexer"] }
-miette = { version = "5.5.0", features = ["fancy"] }
-once_cell = "1.17.0"
-petgraph = { version = "0.6.3" }
+miette = { workspace = true }
+once_cell = { workspace = true }
+petgraph.workspace = true
 rand = { workspace = true }
 serde = { workspace = true }
 serde_json = { workspace = true }
@@ -32,6 +34,3 @@ typeshare = { workspace = true }
 
 [dev-dependencies]
 pretty_assertions = "1.3.0"
-
-[build-dependencies]
-lalrpop = { version = "0.20.0", features = ["lexer"] }

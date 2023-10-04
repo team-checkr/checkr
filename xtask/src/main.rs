@@ -1,101 +1,111 @@
+mod env_template;
+
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
-use color_eyre::{eyre::ContextCompat, Result};
+use color_eyre::Result;
+use heck::{ToKebabCase, ToPascalCase, ToSnakeCase};
+use itertools::Itertools;
 use toml_edit::Document;
 use xshell::cmd;
 
 #[derive(Debug, Parser)]
 enum Cli {
-    RegenerateCi {},
-    UpdateStartBinaries {},
+    /// Create a new environment
+    ///
+    /// Example usage:
+    ///   cargo xtask new-env --short-name "calc" --long-name "Calculator"
+    NewEnv {
+        /// The short name of the environment
+        ///
+        /// For example, for sign analysis this is "sign"
+        #[clap(long)]
+        short_name: String,
+        /// The long name of the environment
+        ///
+        /// For example, for sign analysis this is "Sign Analysis"
+        #[clap(long)]
+        long_name: String,
+    },
 }
 
 async fn run() -> Result<()> {
     match Cli::parse() {
-        Cli::RegenerateCi {} => {
+        Cli::NewEnv {
+            short_name,
+            long_name,
+        } => {
             let sh = xshell::Shell::new()?;
 
-            sh.change_dir(project_root());
+            let crate_name = format!("ce-{}", short_name.to_kebab_case());
 
+            // NOTE: Setup new crate
+            sh.change_dir(project_root());
+            sh.change_dir("envs");
+            cmd!(sh, "cargo new --lib {crate_name}").run()?;
+            sh.change_dir(&crate_name);
+
+            cmd!(
+                sh,
+                "cargo add ce-core dioxus serde serde_json tracing itertools"
+            )
+            .run()?;
+            let template_src = include_str!("./env_template.rs")
+                .replace("Template", &short_name.to_pascal_case().to_string());
+            sh.write_file("./src/lib.rs", template_src)?;
+
+            // NOTE: Add crate to project Cargo.toml
+            sh.change_dir(project_root());
             let toml = sh.read_file("Cargo.toml")?;
             let mut doc = toml.parse::<Document>()?;
-            if let Some(profile) = doc.get_mut("profile").and_then(|p| p.as_table_mut()) {
-                profile.remove_entry("dist");
-            }
+            let table = [("path".to_string(), format!("./envs/{crate_name}"))]
+                .into_iter()
+                .collect::<toml_edit::InlineTable>();
+            doc["workspace"]["dependencies"]
+                .as_table_mut()
+                .unwrap()
+                .insert(
+                    &crate_name,
+                    toml_edit::Item::Value(toml_edit::Value::InlineTable(table)),
+                );
+            doc["workspace"]["dependencies"]
+                .as_table_mut()
+                .unwrap()
+                .sort_values();
             sh.write_file("Cargo.toml", doc.to_string())?;
 
-            // NOTE: Installers produced a strange 404 error in CI. Disable for the moment.
-            // cmd!(sh, "cargo dist init --ci=github --installer=github-shell --installer=github-powershell").run()?;
-            cmd!(sh, "cargo dist init --ci=github").run()?;
-            sh.write_file(
-                "Cargo.toml",
-                sh.read_file("Cargo.toml")?.trim().to_string() + "\n",
-            )?;
+            // NOTE: Add crate to shell
+            sh.change_dir(project_root());
+            sh.change_dir("ce-shell");
+            cmd!(sh, "cargo add {crate_name}").run()?;
+            let shell_file = "src/lib.rs";
+            let shell = sh.read_file(shell_file)?;
+            let marker = "define_shell!(";
+            let define_shell_start = shell.find(marker).unwrap() + marker.len();
+            let define_shell_end =
+                define_shell_start + shell[define_shell_start..].find(')').unwrap();
 
-            const ASDF: &str = r#"
-      - name: Install just and typeshare
-        uses: taiki-e/install-action@v2
-        with:
-          tool: just
-      - name: Build UI
-        run: just build-ui"#;
-
-            const RELEASE_FILE: &str = ".github/workflows/release.yml";
-            let mut ci = sh.read_file(RELEASE_FILE)?;
-
-            let just_before_str = "run: ${{ matrix.install-dist }}";
-            let pos = ci
-                .find(just_before_str)
-                .wrap_err("did not find magic string in release.yml")?;
-
-            ci.insert_str(pos + just_before_str.len(), ASDF);
-            let ci = ci
-                .replace(
-                    "rustup update stable && rustup default stable",
-                    &["rustup update nightly", "rustup default nightly"].join(" && "),
-                )
-                .trim_end()
-                .to_string()
-                + "\n";
-            sh.write_file(RELEASE_FILE, ci)?;
-        }
-        Cli::UpdateStartBinaries {} => {
-            struct Target {
-                triple: &'static str,
-                name: &'static str,
+            let mut envs = shell[define_shell_start..define_shell_end]
+                .lines()
+                .map(|l| l.trim().to_string())
+                .filter(|l| !l.is_empty())
+                .collect_vec();
+            envs.push(format!(
+                r#"{ce_snake}::{pascal}Env[{pascal}, {long_name:?}],"#,
+                ce_snake = crate_name.to_snake_case(),
+                pascal = short_name.to_pascal_case(),
+            ));
+            envs.sort();
+            for env in &mut envs {
+                *env = format!("    {env}");
             }
-
-            let targets = [
-                Target {
-                    triple: "x86_64-apple-darwin",
-                    name: "macos",
-                },
-                Target {
-                    triple: "x86_64-pc-windows-msvc",
-                    name: "win.exe",
-                },
-                Target {
-                    triple: "x86_64-unknown-linux-gnu",
-                    name: "linux",
-                },
-            ];
-
-            let base = project_root().join("starters/fsharp-starter/dev");
-            tokio::fs::create_dir_all(&base).await?;
-
-            for target in targets {
-                binswap_github::builder()
-                    .repo_author("team-checkr")
-                    .repo_name("checkr")
-                    .bin_name("inspectify")
-                    .add_target(target.triple)
-                    .no_check_with_cmd(true)
-                    .no_confirm(true)
-                    .build()?
-                    .fetch_and_write_to(base.join(target.name))
-                    .await?;
-            }
+            let new_shell = format!(
+                "{}\n{}\n{}",
+                &shell[0..define_shell_start],
+                envs.iter().format("\n"),
+                &shell[define_shell_end..]
+            );
+            sh.write_file(shell_file, new_shell)?;
         }
     }
 
