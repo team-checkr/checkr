@@ -32,6 +32,24 @@ impl<'a> Deserialize<'a> for Commands {
     }
 }
 
+impl Serialize for BExpr {
+    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
+    where
+        S: serde::Serializer,
+    {
+        serializer.serialize_str(&self.to_string())
+    }
+}
+impl<'a> Deserialize<'a> for BExpr {
+    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
+    where
+        D: serde::Deserializer<'a>,
+    {
+        let src = String::deserialize(deserializer)?;
+        crate::parse::parse_predicate(&src).map_err(serde::de::Error::custom)
+    }
+}
+
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);
 
