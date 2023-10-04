@@ -3,9 +3,9 @@
 pub mod components;
 pub mod gen;
 
-use std::{marker::PhantomData, sync::Arc};
+use std::marker::PhantomData;
 
-use dioxus::prelude::{Coroutine, Element, Props, ScopeState};
+use dioxus::prelude::*;
 pub use gen::Generate;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
@@ -33,54 +33,133 @@ pub type Result<T, E = EnvError> = std::result::Result<T, E>;
 
 #[derive(Props)]
 pub struct RenderProps<'a, E: Env> {
-    pub set_input: Coroutine<E::Input>,
-    pub input: Arc<E::Input>,
-    pub reference_output: Arc<E::Output>,
-    pub real_output: Arc<E::Output>,
-    pub marker: PhantomData<&'a ()>,
+    set_input: Coroutine<E::Input>,
+    input: E::Input,
+    result: AnalysisResult<E>,
+    marker: PhantomData<&'a ()>,
 }
 
-impl<'a, E: Env> RenderProps<'a, E> {
-    pub fn set_input(&self, input: E::Input) {
-        self.set_input.send(input);
+#[derive(Debug, Clone, PartialEq)]
+pub enum AnalysisResult<E: Env> {
+    Nothing,
+    Stale {
+        reference: E::Output,
+        real: E::Output,
+        validation: ValidationResult,
+    },
+    Active {
+        reference: E::Output,
+        real: E::Output,
+        validation: ValidationResult,
+    },
+}
+
+#[derive(Debug, Clone, PartialEq)]
+pub struct Results<'a, E: Env> {
+    reference: &'a E::Output,
+    real: &'a E::Output,
+    validation: &'a ValidationResult,
+}
+
+impl<'a, E: Env> Results<'a, E> {
+    pub fn reference(&self) -> &'a E::Output {
+        self.reference
+    }
+    pub fn real(&self) -> &'a E::Output {
+        self.real
+    }
+    pub fn validation(&self) -> &'a ValidationResult {
+        self.validation
     }
 }
 
-pub trait Env: Default {
+impl<'a, E: Env> RenderProps<'a, E> {
+    pub fn new(
+        set_input: Coroutine<E::Input>,
+        input: E::Input,
+        result: AnalysisResult<E>,
+    ) -> RenderProps<'a, E> {
+        RenderProps {
+            set_input,
+            input,
+            result,
+            marker: Default::default(),
+        }
+    }
+    pub fn set_input(&self, input: E::Input) {
+        self.set_input.send(input);
+    }
+    pub fn input(&self) -> &E::Input {
+        &self.input
+    }
+    pub fn result(&self) -> &AnalysisResult<E> {
+        &self.result
+    }
+    pub fn with_result(
+        &self,
+        cx: &'a ScopeState,
+        f: impl FnOnce(Results<E>) -> Element<'a>,
+    ) -> Element<'a> {
+        match &self.result {
+            AnalysisResult::Nothing => cx.render(
+                rsx!(div { class: "grid place-items-center text-xl", span { "Loading..." }}),
+            ),
+            AnalysisResult::Stale {
+                reference,
+                real,
+                validation,
+            }
+            | AnalysisResult::Active {
+                reference,
+                real,
+                validation,
+            } => f(Results {
+                reference,
+                real,
+                validation,
+            }),
+        }
+    }
+}
+
+pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
     type Input: Generate<Context = ()>
         + Serialize
         + for<'a> Deserialize<'a>
         + std::fmt::Debug
+        + Clone
+        + PartialEq
         + Send
         + Sync;
-    type Output: Serialize + for<'a> Deserialize<'a> + std::fmt::Debug + Send + Sync;
+    type Output: Serialize
+        + for<'a> Deserialize<'a>
+        + std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Send
+        + Sync;
 
     fn run(input: &Self::Input) -> Result<Self::Output>;
     fn validate(input: &Self::Input, output: &Self::Output) -> Result<ValidationResult>;
     fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a>;
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-pub enum ValidationResult {
-    CorrectTerminated,
-    CorrectNonTerminated { iterations: u64 },
-    Mismatch { reason: String },
-    TimeOut,
-}
-
 #[macro_export]
-macro_rules! basic_env_test {
-    ($env:path) => {
+macro_rules! define_env {
+    ($name:ident) => {
+        #[derive(Debug, Default, Clone, PartialEq)]
+        pub struct $name;
+
         #[test]
         fn env_roundtrip() {
             let mut rng =
                 <$crate::rand::rngs::SmallRng as $crate::rand::SeedableRng>::seed_from_u64(0xCEC34);
             for _ in 0..1000 {
                 let input =
-                    <<$env as $crate::Env>::Input as $crate::Generate>::gen(&mut (), &mut rng);
-                let output = <$env as $crate::Env>::run(&input).unwrap();
+                    <<$name as $crate::Env>::Input as $crate::Generate>::gen(&mut (), &mut rng);
+                let output = <$name as $crate::Env>::run(&input).unwrap();
                 let validation_result =
-                    <$env as $crate::Env>::validate(&input, &output).expect("failed to validate");
+                    <$name as $crate::Env>::validate(&input, &output).expect("failed to validate");
                 match validation_result {
                     $crate::ValidationResult::CorrectTerminated
                     | $crate::ValidationResult::CorrectNonTerminated { .. } => {
@@ -91,4 +170,12 @@ macro_rules! basic_env_test {
             }
         }
     };
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+pub enum ValidationResult {
+    CorrectTerminated,
+    CorrectNonTerminated { iterations: u64 },
+    Mismatch { reason: String },
+    TimeOut,
 }

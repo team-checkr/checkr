@@ -1,11 +1,10 @@
 use ce_core::{
-    basic_env_test, components::StandardLayout, rand, Env, Generate, RenderProps, ValidationResult,
+    components::StandardLayout, define_env, rand, Env, Generate, RenderProps, ValidationResult,
 };
 use dioxus::prelude::*;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default)]
-pub struct TemplateEnv;
+define_env!(TemplateEnv);
 
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct TemplateInput {}
@@ -29,9 +28,11 @@ impl Env for TemplateEnv {
     fn render<'a>(cx: &'a ScopeState, _props: &'a RenderProps<'a, Self>) -> Element<'a> {
         cx.render(rsx!(StandardLayout {
             input: cx.render(rsx!(div {
+                class: "grid place-items-center",
                 "Input goes here"
             })),
             output: cx.render(rsx!(div {
+                class: "grid place-items-center",
                 "Output goes here"
             })),
         }))
@@ -45,5 +46,3 @@ impl Generate for TemplateInput {
         Self {}
     }
 }
-
-basic_env_test!(TemplateEnv);
