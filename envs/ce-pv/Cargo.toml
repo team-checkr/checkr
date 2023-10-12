@@ -1,5 +1,5 @@
 [package]
-name = "ce-shell"
+name = "ce-pv"
 edition = "2021"
 version.workspace = true
 repository.workspace = true
@@ -10,14 +10,11 @@ license.workspace = true
 
 [dependencies]
 ce-core.workspace = true
-ce-graph.workspace = true
-ce-parse.workspace = true
-ce-pv.workspace = true
-ce-sign.workspace = true
 dioxus.workspace = true
-futures-util = "0.3.28"
 itertools.workspace = true
-rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tracing.workspace = true
+gcl.workspace = true
+z3 = {version="0.12", features = ["static-link-z3"]}
+env_logger = "0.9.0"

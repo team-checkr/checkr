@@ -288,6 +288,16 @@ impl BExpr {
             BExpr::Quantified(_, _, _) => todo!(),
         }
     }
+
+    pub fn contains_var<T>(&self, t: &Target<T>) -> bool {
+        match self {
+            BExpr::Bool(_) => false,
+            BExpr::Rel(l, _, r) => l.contains_var(t) || r.contains_var(t),
+            BExpr::Logic(l, _, r) => l.contains_var(t) || r.contains_var(t),
+            BExpr::Not(e) => e.contains_var(t),
+            BExpr::Quantified(_, v, e) => !v.same_name(t) && e.contains_var(t),
+        }
+    }
 }
 
 impl AExpr {
@@ -316,6 +326,16 @@ impl AExpr {
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
             AExpr::Function(_) => self.clone(),
+        }
+    }
+
+    pub fn contains_var<T>(&self, t: &Target<T>) -> bool {
+        match self {
+            AExpr::Number(_) => false,
+            AExpr::Reference(v) => v.same_name(t),
+            AExpr::Binary(l, _, r) => l.contains_var(t) || r.contains_var(t),
+            AExpr::Minus(e) => e.contains_var(t),
+            AExpr::Function(ref f) => f.exprs().any(|x| x.contains_var(&t)),
         }
     }
 }
