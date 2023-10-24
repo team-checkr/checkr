@@ -1,6 +1,8 @@
 extern crate env_logger;
 
 extern crate z3;
+use dioxus::html::form;
+use gcl::ast::Function;
 use std::convert::TryInto;
 use std::ops::Add;
 use std::time::Duration;
@@ -53,6 +55,12 @@ pub trait Be {
 pub trait GuardE {
     fn ver_con_if(&self, c: BExpr) -> Vec<BExpr>;
     fn ver_con_do(&self, i: Predicate, c: BExpr) -> Vec<BExpr>;
+}
+
+pub trait Fun {
+    fn pretty_print(&self) -> String;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx>;
+    fn ver_con(&self, c: BExpr) -> Vec<BExpr>;
 }
 
 impl Env for PvEnv {
@@ -161,46 +169,73 @@ impl GuardE for Vec<Guard> {
 
     fn ver_con_do(&self, i: Predicate, c: BExpr) -> Vec<BExpr> {
         let mut wpv = Vec::new();
-        let mut done = Vec::new();
         let mut qv = Vec::new();
         for n in (0..self.len()).rev() {
             let cond = i.clone();
             let wp = &mut self[n].1.ver_con(cond);
+            let mut wpb = wp.last().clone().unwrap();
             wpv.append(&mut wp.clone());
-            qv.push(wp[0].clone());
-            done.push(self[n].0.clone());
+            qv.push(wpb.clone());
         }
         // Do some z3 magic on this mf'er here
         // Like do it right here
         // If everything holds (Inv && Done[GC] -> Q) && (Inv && Guard) -> Weakest Pre [body](Inv), then we're good
         let _ = env_logger::try_init();
-        let cfg = Config::new();
-        let ctx = Context::new(&cfg);
-        let inv = i.z3_ast(&ctx);
-        let solver = Solver::new(&ctx);
 
         for n in (0..self.len()).rev() {
-            solver.assert(
-                &ast::Bool::implies(
-                    &ast::Bool::and(&ctx, &[&inv, &done[n].z3_ast(&ctx).not()]),
-                    &c.z3_ast(&ctx),
-                )
-                .not(),
-            );
-            solver.assert(
-                &ast::Bool::implies(
-                    &ast::Bool::and(&ctx, &[&inv, &self[n].0.z3_ast(&ctx)]),
-                    &qv[n].z3_ast(&ctx),
-                )
-                .not(),
-            );
+            let cfg = Config::new();
+            let ctx = Context::new(&cfg);
+            let solver = Solver::new(&ctx);
+            let inv = i.z3_ast(&ctx);
+            let and = &ast::Bool::and(&ctx, &[&inv, &self[n].0.z3_ast(&ctx).not()]);
+            let imp = &ast::Bool::implies(&and, &c.z3_ast(&ctx)).not();
+            solver.assert(&and);
+
+            let result1 = solver.check();
+            match result1 {
+                SatResult::Sat => {
+                    solver.assert(&imp);
+                    let result = solver.check();
+                    match result {
+                        SatResult::Sat => panic!("Invariant and Done[GC] does not imply Q"),
+                        SatResult::Unsat => println!("Invariant and Done[GC] implies Q"),
+                        SatResult::Unknown => panic!("Z3 is confused"),
+                    }
+                }
+                SatResult::Unsat => println!("Invariant and Done[GC] is unsatisfiable"),
+                SatResult::Unknown => panic!("Z3 is confused"),
+            }
+            let cfg = Config::new();
+            let ctx = Context::new(&cfg);
+            let solver = Solver::new(&ctx);
+            let inv = i.z3_ast(&ctx);
+            let and = &ast::Bool::and(&ctx, &[&inv, &self[n].0.z3_ast(&ctx)]);
+            let imp = &ast::Bool::implies(&and, &qv[n].z3_ast(&ctx)).not();
+            println!("{}", qv[n].pretty_print());
+            solver.assert(&and);
+            let result2 = solver.check();
+
+            match result2 {
+                SatResult::Sat => {
+                    solver.pop(1);
+                    solver.assert(&imp);
+                    let result = solver.check();
+                    match result {
+                        SatResult::Sat => {
+                            panic!("Invariant and Guard does not imply Weakest Pre [body](Inv)")
+                        }
+                        SatResult::Unsat => {
+                            println!("Invariant and Guard implies Weakest Pre [body](Inv)")
+                        }
+                        SatResult::Unknown => panic!("Z3 is confused"),
+                    }
+                }
+
+                SatResult::Unsat => println!("Invariant and Guard is unsatisfiable"),
+                SatResult::Unknown => panic!("Z3 is confused"),
+            }
         }
-        let result = solver.check();
-        match result {
-            SatResult::Sat => panic!("Invariant does not hold"),
-            SatResult::Unsat => println!("Invariant holds"),
-            SatResult::Unknown => panic!("Z3 is confused"),
-        }
+
         wpv.push(i.clone());
         wpv
     }
@@ -225,11 +260,7 @@ impl Ae for AExpr {
 
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
         match self {
-            AExpr::Number(n) => {
-                let mut a: i64;
-                let a = *n;
-                ast::Int::from_i64(&ctx, a)
-            }
+            AExpr::Number(n) => ast::Int::from_i64(&ctx, *n),
             AExpr::Reference(x) => ast::Int::new_const(&ctx, x.name()),
             AExpr::Minus(m) => -m.z3_ast(&ctx),
             AExpr::Binary(l, op, r) => match op {
@@ -270,14 +301,27 @@ impl Be for BExpr {
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> Bool<'ctx> {
         match self {
             //BExpr::Bool(b) => ast::Bool::<'a>::from_bool(&ctx, b.clone()),
-            BExpr::Bool(b) => todo!(),
+            BExpr::Bool(b) => Bool::from_bool(&ctx, *b),
             BExpr::Rel(l, op, r) => match op {
-                RelOp::Eq => ast::Bool::from_bool(&ctx, l.z3_ast(&ctx).eq(&r.z3_ast(&ctx))),
+                RelOp::Eq => ast::Bool::and(
+                    &ctx,
+                    &[
+                        &l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
+                        &l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
+                    ],
+                ),
                 RelOp::Ge => l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
                 RelOp::Gt => l.z3_ast(&ctx).gt(&r.z3_ast(&ctx)),
                 RelOp::Le => l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
                 RelOp::Lt => l.z3_ast(&ctx).lt(&r.z3_ast(&ctx)),
-                RelOp::Ne => ast::Bool::from_bool(&ctx, !l.z3_ast(&ctx).eq(&r.z3_ast(&ctx))),
+                RelOp::Ne => ast::Bool::and(
+                    &ctx,
+                    &[
+                        &l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
+                        &l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
+                    ],
+                )
+                .not(),
             },
             BExpr::Logic(l, op, r) => match op {
                 LogicOp::And => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
@@ -292,24 +336,321 @@ impl Be for BExpr {
     }
 }
 
+impl Fun for Function {
+    fn pretty_print(&self) -> String {
+        match self {
+            Function::Division(n, d) => format!("({}/{})", n.pretty_print(), d.pretty_print()),
+            Function::Min(x, y) => format!("min({}, {})", x.pretty_print(), y.pretty_print()),
+            Function::Max(x, y) => format!("max({}, {})", x.pretty_print(), y.pretty_print()),
+            Function::Count(a, e) => todo!(),
+            Function::LogicalCount(a, e) => todo!(),
+            Function::Length(a) => todo!(),
+            Function::LogicalLength(a) => todo!(),
+            Function::Fac(n) => format!("fac({})", n.pretty_print()),
+            Function::Fib(n) => format!("fib({})", n.pretty_print()),
+        }
+    }
+
+    fn ver_con(&self, c: BExpr) -> Vec<BExpr> {
+        match self {
+            Function::Division(n, d) => todo!(),
+            Function::Min(x, y) => todo!(),
+            Function::Max(x, y) => todo!(),
+            Function::Count(a, e) => unimplemented!(),
+            Function::LogicalCount(a, e) => unimplemented!(),
+            Function::Length(a) => unimplemented!(),
+            Function::LogicalLength(a) => unimplemented!(),
+            Function::Fac(n) => todo!(),
+            Function::Fib(n) => todo!(),
+        }
+    }
+
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
+        match self {
+            Function::Division(n, d) => n.z3_ast(&ctx).div(&d.z3_ast(&ctx)),
+            Function::Min(x, y) => todo!(),
+            Function::Max(x, y) => todo!(),
+            Function::Count(a, e) => todo!(),
+            Function::LogicalCount(a, e) => todo!(),
+            Function::Length(a) => todo!(),
+            Function::LogicalLength(a) => todo!(),
+            Function::Fac(n) => todo!(),
+            Function::Fib(n) => todo!(),
+        }
+    }
+}
+
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////// TESTS ///////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+/////////////////////////////////////////////////////////////////////////////
+
 #[test]
-fn pre_condition_test() {
-    let pre = gcl::parse::parse_predicate("n > 5").unwrap();
-    let post = gcl::parse::parse_predicate("n=1").unwrap();
+fn pre_condition_test1() {
+    let pre = gcl::parse::parse_predicate("n > 0").unwrap();
+    let post = gcl::parse::parse_predicate("n>2").unwrap();
     let src = r#"
-    n :=1024;
-    do {n>=10} n>1 ->
-        n:=n/2
-    od
+        n:=n+1;
+        n:=n+1
     "#;
     let cmds = gcl::parse::parse_commands(src).unwrap();
     let c = cmds.clone();
 
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
     let binding = c.ver_con(post);
-    let output = binding.last().unwrap().clone();
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
     for n in (0..binding.len()).rev() {
         println!("{}", binding[n].pretty_print());
     }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
 
-    assert_eq!(output, pre);
+#[test]
+fn pre_condition_test2() {
+    let pre = gcl::parse::parse_predicate("x>=0 && y>=0").unwrap();
+    let post = gcl::parse::parse_predicate("z=5").unwrap();
+    let src = r#"
+        x:=3;
+        y:=2;
+        z:=x+y
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test3() {
+    let pre = gcl::parse::parse_predicate("x>=0 && y<0").unwrap();
+    let post = gcl::parse::parse_predicate("x=y").unwrap();
+    let src = r#"
+        if (x<y) -> x:=y
+        [] (x>y) -> y:=x
+        [] (x=y) -> skip
+        fi
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test4() {
+    let pre = gcl::parse::parse_predicate("true").unwrap();
+    let post = gcl::parse::parse_predicate("M=res*N+m").unwrap();
+    let src = r#"
+        res:=0;
+        m:=M;
+        do {M=res*N+m} m>=N ->
+        m:=m-N;
+        res:=res+1
+        od
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test5() {
+    let pre = gcl::parse::parse_predicate("true").unwrap();
+    let post = gcl::parse::parse_predicate("n=0").unwrap();
+    let src = r#"
+        n:=12;
+        do {n>=0} n>0 ->
+        n:=n-1
+        od
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test6() {
+    let pre = gcl::parse::parse_predicate("true").unwrap();
+    let post = gcl::parse::parse_predicate("n=1").unwrap();
+    let src = r#"
+        n:=1024;
+        do {n>=1} n>1 ->
+        n:=n/2
+        od
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test7() {
+    let pre = gcl::parse::parse_predicate("true").unwrap();
+    let post = gcl::parse::parse_predicate("M=res*N+m").unwrap();
+    let src = r#"
+        res:=0;
+        m:=M;
+        do {M=res*N+m} m>=N ->
+        m:=m-N;
+        res:=res+1
+        od
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
+}
+
+#[test]
+fn pre_condition_test8() {
+    let pre = gcl::parse::parse_predicate("0<=y").unwrap();
+    let post = gcl::parse::parse_predicate("x=y").unwrap();
+    let src = r#"
+        z:=10;
+        x:=0;
+        do {x<=y} x<y ->
+            if (y<z) -> y:=z
+            [] (y>=z) -> skip
+            fi;
+            x:=x+1
+        od
+    "#;
+    let cmds = gcl::parse::parse_commands(src).unwrap();
+    let c = cmds.clone();
+
+    let _ = env_logger::try_init();
+    let cfg = Config::new();
+    let ctx = Context::new(&cfg);
+    let solver = Solver::new(&ctx);
+
+    let binding = c.ver_con(post);
+    let pre_new = binding.last().unwrap().clone().z3_ast(&ctx);
+    let pre = pre.z3_ast(&ctx);
+    for n in (0..binding.len()).rev() {
+        println!("{}", binding[n].pretty_print());
+    }
+    solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+    let result = match solver.check() {
+        SatResult::Sat => false,
+        SatResult::Unsat => true,
+        SatResult::Unknown => false,
+    };
+    assert!(result);
 }
