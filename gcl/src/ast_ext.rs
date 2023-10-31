@@ -298,6 +298,16 @@ impl BExpr {
             BExpr::Quantified(_, v, e) => !v.same_name(t) && e.contains_var(t),
         }
     }
+
+    pub fn reduce(&self) -> BExpr {
+        match self {
+            BExpr::Bool(b) => BExpr::Bool(*b),
+            BExpr::Rel(l, op, r) => BExpr::Rel(l.reduce(), *op, r.reduce()),
+            BExpr::Logic(l, op, r) => BExpr::Logic(Box::new(l.reduce()), *op, Box::new(r.reduce())),
+            BExpr::Not(e) => BExpr::Not(Box::new(e.reduce())),
+            BExpr::Quantified(_, _, _) => todo!(),
+        }
+    }
 }
 
 impl AExpr {
@@ -320,7 +330,26 @@ impl AExpr {
         {
             AExpr::Number(n) => AExpr::Number(n),
             AExpr::Reference(v) => AExpr::Reference(v.simplify()),
-            AExpr::Binary(l, op, r) => AExpr::binary(l.simplify(), op, r.simplify()),
+            AExpr::Binary(l, op, r) => {
+                let l = l.simplify();
+                let r = r.simplify();
+                match (&l, op, &r) {
+                    (AExpr::Number(0), AOp::Plus, x) | (x, AOp::Plus, AExpr::Number(0)) => {
+                        x.clone()
+                    }
+                    (AExpr::Number(0), AOp::Minus, x) => AExpr::Minus(Box::new(x.clone())),
+                    (x, AOp::Minus, AExpr::Number(0)) => x.clone(),
+                    (AExpr::Number(1), AOp::Times, x) | (x, AOp::Times, AExpr::Number(1)) => {
+                        x.clone()
+                    }
+                    (AExpr::Number(0), AOp::Times, _) | (_, AOp::Times, AExpr::Number(0)) => {
+                        AExpr::Number(0)
+                    }
+                    (AExpr::Number(0), AOp::Divide, _) => AExpr::Number(0),
+                    (x, AOp::Divide, AExpr::Number(1)) => x.clone(),
+                    _ => AExpr::binary(l, op, r),
+                }
+            }
             AExpr::Minus(e) => match &*e {
                 AExpr::Minus(inner) => inner.simplify(),
                 _ => AExpr::Minus(Box::new(e.simplify())),
@@ -336,6 +365,222 @@ impl AExpr {
             AExpr::Binary(l, _, r) => l.contains_var(t) || r.contains_var(t),
             AExpr::Minus(e) => e.contains_var(t),
             AExpr::Function(ref f) => f.exprs().any(|x| x.contains_var(&t)),
+        }
+    }
+    pub fn reduce(&self) -> AExpr {
+        let n = AExpr::Number(self.find_p_m_ints());
+        let mut vars = self.find_p_m_var();
+        let mul_div_pow_exprs = self.find_mul_div_pow_expr();
+        let mut ae;
+        if vars.len() > 1 {
+            ae = AExpr::Binary(Box::new(n), AOp::Plus, Box::new(vars.pop().unwrap()));
+            for var in vars {
+                ae = AExpr::Binary(Box::new(ae), AOp::Plus, Box::new(var));
+            }
+        } else if vars.len() == 1 {
+            ae = AExpr::Binary(Box::new(n), AOp::Plus, Box::new(vars[0].clone()));
+        } else {
+            ae = n;
+        }
+
+        if mul_div_pow_exprs.len() > 1 {
+            for expr in mul_div_pow_exprs {
+                ae = AExpr::Binary(Box::new(ae), AOp::Plus, Box::new(expr));
+            }
+        } else if mul_div_pow_exprs.len() == 1 {
+            ae = AExpr::Binary(
+                Box::new(ae),
+                AOp::Plus,
+                Box::new(mul_div_pow_exprs[0].clone()),
+            )
+        }
+        ae
+    }
+
+    pub fn find_p_m_ints(&self) -> i64 {
+        match self {
+            AExpr::Number(n) => *n,
+            AExpr::Reference(_) => 0,
+            AExpr::Binary(l, op, r) => match op {
+                AOp::Plus => l.find_p_m_ints() + r.find_p_m_ints(),
+                AOp::Minus => l.find_p_m_ints() - r.find_p_m_ints(),
+                AOp::Divide => 0,
+                AOp::Times => 0,
+                AOp::Pow => 0,
+            },
+            AExpr::Minus(e) => -e.find_p_m_ints(),
+            AExpr::Function(_) => 0,
+        }
+    }
+
+    pub fn find_vars(&self) -> Vec<Target<Box<AExpr>>> {
+        match self {
+            AExpr::Number(_) => vec![],
+            AExpr::Reference(v) => vec![v.clone()],
+            AExpr::Binary(l, _, r) => {
+                let mut var_vec = Vec::new();
+                var_vec.append(&mut l.find_vars());
+                var_vec.append(&mut r.find_vars());
+                var_vec
+            }
+            AExpr::Minus(e) => e.find_vars(),
+            AExpr::Function(f) => f.exprs().flat_map(|x| x.find_vars()).collect(),
+        }
+    }
+
+    // pub fn reduce_mul_div(&self) -> AExpr {
+    //     match self {
+    //         AExpr::Number(_) => self.clone(),
+    //         AExpr::Reference(_) => self.clone(),
+    //         AExpr::Binary(l, op, r) => match op {
+    //             AOp::Plus => AExpr::Binary(
+    //                 Box::new(l.clone().reduce_mul_div()),
+    //                 *op,
+    //                 Box::new(r.clone().reduce_mul_div()),
+    //             ),
+    //             AOp::Minus => AExpr::Binary(
+    //                 Box::new(l.clone().reduce_mul_div()),
+    //                 *op,
+    //                 Box::new(r.clone().reduce_mul_div()),
+    //             ),
+    //             AOp::Times => {
+    //                 let l = l.clone().reduce_mul_div();
+    //                 let r = r.clone().reduce_mul_div();
+    //                 match (l, r) {
+    //                     (AExpr::Number(x), AExpr::Number(y)) => AExpr::Number(x * y),
+    //                     (AExpr::Number(x), y) | (y, AExpr::Number(x)) => {
+    //                         if x == 0 {
+    //                             AExpr::Number(0)
+    //                         } else {
+    //                             y.reduce_mul_div_int(&x, op)
+    //                         }
+    //                     }
+    //                     _ => self.clone(),
+    //                 }
+    //             }
+    //             AOp::Divide => {
+    //                 let l_new = l.clone().reduce_mul_div();
+    //                 let r_new = r.clone().reduce_mul_div();
+    //                 match (l_new, r_new) {
+    //                     (AExpr::Number(x), AExpr::Number(y)) => AExpr::Number(x / y),
+    //                     (y, AExpr::Number(x)) => {
+    //                         if x == 0 {
+    //                             todo!();
+    //                         } else {
+    //                             y.reduce_mul_div_int(&x, &op)
+    //                         }
+    //                     }
+    //                     _ => self.clone(),
+    //                 }
+    //             }
+    //             AOp::Pow => AExpr::Binary(
+    //                 Box::new(l.clone().reduce_mul_div()),
+    //                 *op,
+    //                 Box::new(r.clone().reduce_mul_div()),
+    //             ),
+    //         },
+
+    //         AExpr::Minus(e) => AExpr::Minus(Box::new(e.reduce_mul_div())),
+    //         AExpr::Function(_) => self.clone(),
+    //     }
+    // }
+    // pub fn reduce_mul_div_int(&self, c: &i64, o: &AOp) -> AExpr {
+    //     match self {
+    //         AExpr::Number(x) => match o {
+    //             AOp::Times => AExpr::Number(x * c),
+    //             AOp::Divide => AExpr::Number(x / c),
+    //             _ => self.clone(),
+    //         },
+    //         AExpr::Reference(_) => {
+    //             AExpr::Binary(Box::new(self.clone()), *o, Box::new(AExpr::Number(*c)))
+    //         }
+    //         AExpr::Minus(e) => AExpr::Minus(Box::new(e.reduce_mul_div_int(&-c, o))),
+    //         AExpr::Function(_) => {
+    //             AExpr::Binary(Box::new(self.clone()), *o, Box::new(AExpr::Number(*c)))
+    //         }
+    //         AExpr::Binary(l, op, r) => match o {
+    //             AOp::Times => AExpr::Binary(
+    //                 Box::new(l.clone().reduce_mul_div_int(c, op)),
+    //                 *op,
+    //                 Box::new(r.clone().reduce_mul_div_int(c, op)),
+    //             ),
+    //             AOp::Divide => AExpr::Binary(
+    //                 Box::new(l.clone().reduce_mul_div_int(c, op)),
+    //                 *op,
+    //                 Box::new(r.clone().reduce_mul_div_int(c, op)),
+    //             ),
+    //             _ => self.clone(),
+    //         },
+    //     }
+    // }
+
+    pub fn find_mul_div_pow_expr(&self) -> Vec<AExpr> {
+        let mut var_vec = Vec::new();
+        match self {
+            AExpr::Number(_) => vec![],
+            AExpr::Reference(_) => vec![],
+            AExpr::Binary(l, op, r) => match op {
+                AOp::Plus => {
+                    var_vec.append(&mut l.find_mul_div_pow_expr());
+                    var_vec.append(&mut r.find_mul_div_pow_expr());
+                    var_vec
+                }
+                AOp::Minus => {
+                    var_vec.append(&mut l.find_mul_div_pow_expr());
+                    let r_expr = r.find_mul_div_pow_expr();
+                    for expr in r_expr {
+                        var_vec.push(AExpr::Minus(Box::new(expr)));
+                    }
+                    var_vec
+                }
+                _ => vec![AExpr::Binary(
+                    Box::new(l.clone().reduce()),
+                    *op,
+                    Box::new(r.clone().reduce()),
+                )],
+            },
+            AExpr::Minus(e) => {
+                let m_exprs = e.find_mul_div_pow_expr();
+                for expr in m_exprs {
+                    var_vec.push(AExpr::Minus(Box::new(expr)));
+                }
+                var_vec
+            }
+            AExpr::Function(_) => vec![self.clone()],
+        }
+    }
+
+    pub fn find_p_m_var(&self) -> Vec<AExpr> {
+        let mut var_vec = Vec::new();
+        match self {
+            AExpr::Number(_) => vec![],
+            AExpr::Reference(x) => vec![AExpr::Reference(x.clone())],
+            AExpr::Binary(l, op, r) => match op {
+                AOp::Plus => {
+                    var_vec.append(&mut l.find_p_m_var());
+                    var_vec.append(&mut r.find_p_m_var());
+                    var_vec
+                }
+                AOp::Minus => {
+                    var_vec.append(&mut l.find_p_m_var());
+                    let r_var = r.find_p_m_var();
+                    for var in r_var {
+                        var_vec.push(AExpr::Minus(Box::new(var)));
+                    }
+                    var_vec
+                }
+                AOp::Divide => vec![],
+                AOp::Times => vec![],
+                AOp::Pow => vec![],
+            },
+            AExpr::Minus(e) => {
+                let m_vars = e.find_p_m_var();
+                for var in m_vars {
+                    var_vec.push(AExpr::Minus(Box::new(var)));
+                }
+                var_vec
+            }
+            AExpr::Function(_) => vec![],
         }
     }
 }

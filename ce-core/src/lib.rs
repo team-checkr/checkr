@@ -178,4 +178,7 @@ pub enum ValidationResult {
     CorrectNonTerminated { iterations: u64 },
     Mismatch { reason: String },
     TimeOut,
+    IncorretPostcondition,
+    IncorrectInvariant,
+    CannotBeValidated,
 }
