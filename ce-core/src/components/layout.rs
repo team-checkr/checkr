@@ -16,6 +16,9 @@ pub fn StandardLayout<'a>(cx: Scope<'a, StandardLayoutProps<'a>>) -> Element<'a>
         | Some(ValidationResult::CorrectNonTerminated { .. }) => "bg-correct",
         Some(ValidationResult::Mismatch { .. }) => "bg-mismatch",
         Some(ValidationResult::TimeOut) => "bg-time-out",
+        Some(ValidationResult::IncorrectInvariant) => "bg-incorrect-invariant",
+        Some(ValidationResult::IncorretPostcondition) => "bg-incorrect-postcondition",
+        Some(ValidationResult::CannotBeValidated) => "bg-cannot-be-validated",
         None => "bg-working",
     };
 
