@@ -3,7 +3,6 @@ extern crate env_logger;
 extern crate z3;
 use ce_core::components::GclEditor;
 
-use dioxus::html::tr;
 use gcl::ast::Function;
 
 use z3::ast::{Bool, Int as z3int};
@@ -41,10 +40,12 @@ pub trait Cmd {
 
 pub trait Ae {
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx>;
+    fn def(&self) -> BExpr;
 }
 
 pub trait Be {
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> Bool<'ctx>;
+    fn def(&self) -> BExpr;
 }
 
 pub trait GuardE {
@@ -54,7 +55,6 @@ pub trait GuardE {
 
 pub trait Fun {
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx>;
-    fn ver_con(&self, c: BExpr) -> Vec<BExpr>;
 }
 
 impl Env for PvEnv {
@@ -75,6 +75,9 @@ impl Env for PvEnv {
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
         let _ = env_logger::try_init();
         let mut res = true;
+        // Checks if user given loop invariant holds for all checks
+        // Checks are !((Inv && !Guard) -> Q)   (Q is postcondition for loop)
+        // !((Inv && Guard) -> WP[Body][Inv])   (WP[Body][Inv] is weakest precondition for body)
         if output.checks.len() > 0 {
             for check in output.checks.clone() {
                 let cfg = Config::new();
@@ -86,12 +89,14 @@ impl Env for PvEnv {
                     SatResult::Unsat => true,
                     SatResult::Unknown => false,
                 };
-
+                // If one check for the invariant doesnt hold, break
                 if res == false {
                     break;
                 }
             }
         }
+        // Checks if the user given precondition
+        // Implies the precondition generated
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
         let solver = Solver::new(&ctx);
@@ -141,24 +146,34 @@ impl Generate for PvInput {
 }
 
 impl Cmds for Commands {
-    //Fix this at some point, so we can run unit tests
+    // Generate verification conditions
+    // for Sequence of commands
     fn ver_con(&self, cond: BExpr) -> PvOutput {
         let new_c = cond.clone();
         let mut op = PvOutput {
             conds: Vec::new(),
             checks: Vec::new(),
         };
-        op.conds.push(new_c);
+        let mut cs = Vec::new();
+        cs.push(new_c);
         for n in (0..self.0.len()).rev() {
-            let mut p = self.0[n].ver_con(op.conds.last().unwrap().clone());
-            op.conds.append(&mut p.conds);
+            let mut p = self.0[n].ver_con(cs.last().unwrap().clone());
+            cs.append(&mut p.conds);
             op.checks.append(&mut p.checks)
+        }
+        for i in 0..cs.len() {
+            op.conds.push(
+                BExpr::Logic(Box::new(cs[i].clone()), LogicOp::And, Box::new(cs[i].def()))
+                    .simplify(),
+            );
         }
         op
     }
 }
 
 impl Cmd for Command {
+    // Generate Hoare triple
+    // for single command
     fn ver_con(&self, c: BExpr) -> PvOutput {
         let mut op = PvOutput {
             conds: Vec::new(),
@@ -190,6 +205,8 @@ impl Cmd for Command {
 }
 
 impl GuardE for Vec<Guard> {
+    // Generate Hoare triples
+    // for if fi
     fn ver_con_if(&self, c: BExpr) -> Vec<BExpr> {
         let mut wpv = Vec::new();
         let mut wpvl = Vec::new();
@@ -212,7 +229,8 @@ impl GuardE for Vec<Guard> {
         wp.push(wpif);
         wp
     }
-
+    // Generate Hoare triples
+    // for do od loops
     fn ver_con_do(&self, i: Predicate, c: BExpr) -> PvOutput {
         let mut wpv = Vec::new();
         let mut qv = Vec::new();
@@ -257,6 +275,7 @@ impl GuardE for Vec<Guard> {
 }
 
 impl Ae for AExpr {
+    // Generate AST that Z3 can understand
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
         match self {
             AExpr::Number(n) => ast::Int::from_i64(&ctx, *n),
@@ -267,14 +286,58 @@ impl Ae for AExpr {
                 AOp::Minus => ast::Int::sub(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
                 AOp::Times => ast::Int::mul(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
                 AOp::Divide => ast::Int::div(&l.z3_ast(&ctx), &r.z3_ast(&ctx)),
-                AOp::Pow => todo!(),
+                AOp::Pow => ast::Int::power(&l.z3_ast(&ctx), &r.z3_ast(&ctx)).to_int(),
             },
-            AExpr::Function(_f) => todo!(),
+            AExpr::Function(f) => f.z3_ast(&ctx),
+        }
+    }
+
+    // Add extra definitions to predicate
+    // if function isn't defined for all numbers
+    fn def(&self) -> BExpr {
+        match self {
+            AExpr::Binary(l, op, r) => match op {
+                AOp::Divide => {
+                    if r.find_vars().len() > 0 {
+                        BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0))
+                    } else {
+                        BExpr::Bool(true)
+                    }
+                }
+                _ => BExpr::Logic(Box::new(l.def()), LogicOp::And, Box::new(r.def())),
+            },
+            AExpr::Minus(m) => m.def(),
+            AExpr::Function(f) => match f {
+                Function::Division(_, r) => {
+                    if r.find_vars().len() > 0 {
+                        BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0))
+                    } else {
+                        BExpr::Bool(true)
+                    }
+                }
+                Function::Fib(n) => {
+                    if n.find_vars().len() > 0 {
+                        BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))
+                    } else {
+                        BExpr::Bool(true)
+                    }
+                }
+                Function::Fac(n) => {
+                    if n.find_vars().len() > 0 {
+                        BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))
+                    } else {
+                        BExpr::Bool(true)
+                    }
+                }
+                _ => BExpr::Bool(true),
+            },
+            _ => BExpr::Bool(true),
         }
     }
 }
 
 impl Be for BExpr {
+    // Generate AST that Z3 can understand
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> Bool<'ctx> {
         match self {
             BExpr::Bool(b) => Bool::from_bool(&ctx, *b),
@@ -310,34 +373,94 @@ impl Be for BExpr {
             BExpr::Quantified(_, _, _) => unimplemented!(),
         }
     }
+
+    // Add extra definitions to predicate
+    // if function isn't defined for all numbers
+    fn def(&self) -> BExpr {
+        match self {
+            BExpr::Bool(_) => self.clone(),
+            BExpr::Rel(l, _, r) => BExpr::Logic(Box::new(l.def()), LogicOp::And, Box::new(r.def())),
+            BExpr::Logic(l, op, r) => BExpr::Logic(Box::new(l.def()), *op, Box::new(r.def())),
+            BExpr::Not(b) => BExpr::Not(Box::new(b.def())),
+            BExpr::Quantified(_, _, _) => unimplemented!(),
+        }
+    }
 }
 
 impl Fun for Function {
-    fn ver_con(&self, _c: BExpr) -> Vec<BExpr> {
-        match self {
-            Function::Division(_, _) => todo!(),
-            Function::Min(_, _) => todo!(),
-            Function::Max(_, _) => todo!(),
-            Function::Count(_, _) => unimplemented!(),
-            Function::LogicalCount(_, _) => unimplemented!(),
-            Function::Length(_) => unimplemented!(),
-            Function::LogicalLength(_) => unimplemented!(),
-            Function::Fac(_) => todo!(),
-            Function::Fib(_) => todo!(),
-        }
-    }
-
     fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
         match self {
             Function::Division(n, d) => n.z3_ast(&ctx).div(&d.z3_ast(&ctx)),
-            Function::Min(_, _) => todo!(),
-            Function::Max(_, _) => todo!(),
+            Function::Min(x, y) => {
+                let min = RecFuncDecl::new(
+                    &ctx,
+                    "min",
+                    &[&Sort::int(&ctx), &Sort::int(&ctx)],
+                    &Sort::int(&ctx),
+                );
+                let a = ast::Int::new_const(&ctx, "a");
+                let b = ast::Int::new_const(&ctx, "b");
+                let cond: ast::Bool = a.le(&b);
+                let body = cond.ite(&a, &b);
+                min.add_def(&[&a, &b], &body);
+                min.apply(&[&x.z3_ast(&ctx), &y.z3_ast(&ctx)])
+                    .as_int()
+                    .unwrap()
+            }
+            Function::Max(x, y) => {
+                let max = RecFuncDecl::new(
+                    &ctx,
+                    "max",
+                    &[&Sort::int(&ctx), &Sort::int(&ctx)],
+                    &Sort::int(&ctx),
+                );
+                let a = ast::Int::new_const(&ctx, "a");
+                let b = ast::Int::new_const(&ctx, "b");
+                let cond: ast::Bool = a.ge(&b);
+                let body = cond.ite(&a, &b);
+                max.add_def(&[&a, &b], &body);
+                max.apply(&[&x.z3_ast(&ctx), &y.z3_ast(&ctx)])
+                    .as_int()
+                    .unwrap()
+            }
             Function::Count(_, _) => todo!(),
             Function::LogicalCount(_, _) => todo!(),
             Function::Length(_) => todo!(),
             Function::LogicalLength(_) => todo!(),
-            Function::Fac(_) => todo!(),
-            Function::Fib(_) => todo!(),
+            Function::Fac(x) => {
+                let fac = RecFuncDecl::new(&ctx, "fac", &[&Sort::int(&ctx)], &Sort::int(&ctx));
+                let n = ast::Int::new_const(&ctx, "n");
+                let n_m_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
+                let fac_n_m_1 = fac.apply(&[&n_m_1]);
+                let cond: ast::Bool = n.le(&ast::Int::from_i64(&ctx, 0));
+                let body = cond.ite(
+                    &ast::Int::from_i64(&ctx, 1),
+                    &ast::Int::mul(&ctx, &[&n, &fac_n_m_1.as_int().unwrap()]),
+                );
+                fac.add_def(&[&n], &body);
+                fac.apply(&[&x.z3_ast(&ctx)]).as_int().unwrap()
+            }
+            Function::Fib(x) => {
+                let fib = RecFuncDecl::new(&ctx, "fib", &[&Sort::int(&ctx)], &Sort::int(&ctx));
+                let n = ast::Int::new_const(&ctx, "n");
+                let n_minus_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
+                let fib_of_n_minus_1 = fib.apply(&[&n_minus_1]);
+                let n_minus_2 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 2)]);
+                let fib_of_n_minus_2 = fib.apply(&[&n_minus_2]);
+                let cond: ast::Bool = n.le(&ast::Int::from_i64(&ctx, 1));
+                let body = cond.ite(
+                    &ast::Int::from_i64(&ctx, 1),
+                    &ast::Int::add(
+                        &ctx,
+                        &[
+                            &fib_of_n_minus_1.as_int().unwrap(),
+                            &fib_of_n_minus_2.as_int().unwrap(),
+                        ],
+                    ),
+                );
+                fib.add_def(&[&n], &body);
+                fib.apply(&[&x.z3_ast(&ctx)]).as_int().unwrap()
+            }
         }
     }
 }
@@ -367,7 +490,7 @@ fn pre_condition_test1() {
         println!("{}", out.conds[n]);
     }
     match PvEnv::validate(&inp, &out).unwrap() {
-        ValidationResult::CorrectTerminated => assert!(!true),
+        ValidationResult::CorrectTerminated => assert!(true),
         _ => assert!(false),
     }
 }
@@ -549,6 +672,90 @@ fn pre_condition_test8() {
         [] x=y ->
             skip
         fi
+    "#;
+    let coms = gcl::parse::parse_commands(src).unwrap();
+    let inp = PvInput {
+        pre: pr,
+        post: po.clone(),
+        cmds: coms.clone(),
+    };
+    let out = coms.ver_con(po);
+    for n in (0..out.conds.len()).rev() {
+        println!("{}", out.conds[n]);
+    }
+    match PvEnv::validate(&inp, &out).unwrap() {
+        ValidationResult::CorrectTerminated => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn pre_condition_test9() {
+    let pr = gcl::parse::parse_predicate("n>=0").unwrap();
+    let po = gcl::parse::parse_predicate("x>=0").unwrap();
+    let src = r#"
+        x:=n+1;
+        x:=1/x
+    "#;
+    let coms = gcl::parse::parse_commands(src).unwrap();
+    let inp = PvInput {
+        pre: pr,
+        post: po.clone(),
+        cmds: coms.clone(),
+    };
+    let out = coms.ver_con(po);
+    for n in (0..out.conds.len()).rev() {
+        println!("{}", out.conds[n]);
+    }
+    match PvEnv::validate(&inp, &out).unwrap() {
+        ValidationResult::CorrectTerminated => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn pre_condition_test10() {
+    let pr = gcl::parse::parse_predicate("n>=0").unwrap();
+    let po = gcl::parse::parse_predicate("r=fib(n)").unwrap();
+    let src = r#"
+        r:=0;
+        i:=0;
+        s:=1;
+        do {(0<=i && i<=n) && r=fib(i) && s=fib(i+1)} i!=n ->
+            t:=s;
+            s:=r+s;
+            r:=t;
+            i:=i+1
+        od
+    "#;
+    let coms = gcl::parse::parse_commands(src).unwrap();
+    let inp = PvInput {
+        pre: pr,
+        post: po.clone(),
+        cmds: coms.clone(),
+    };
+    let out = coms.ver_con(po);
+    for n in (0..out.conds.len()).rev() {
+        println!("{}", out.conds[n]);
+    }
+    match PvEnv::validate(&inp, &out).unwrap() {
+        ValidationResult::CorrectTerminated => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn pre_condition_test11() {
+    let pr = gcl::parse::parse_predicate("true").unwrap();
+    let po = gcl::parse::parse_predicate("z=min(x,y) && w=max(x,y)").unwrap();
+    let src = r#"
+    if x<y ->
+        z:=x;
+        w:=y
+    [] x>= y ->
+        z:=y;
+        w:=x
+    fi
     "#;
     let coms = gcl::parse::parse_commands(src).unwrap();
     let inp = PvInput {
