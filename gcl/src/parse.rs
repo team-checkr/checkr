@@ -2,7 +2,7 @@ use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;
 
-use crate::ast::{BExpr, Commands, Flow, Predicate, SecurityClass};
+use crate::ast::{BExpr, Command, Commands, Flow, Predicate, SecurityClass};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceSpan {
@@ -64,6 +64,13 @@ impl From<(usize, usize)> for SourceSpan {
 
 pub fn parse_commands(src: &str) -> Result<Commands, ParseError> {
     static PARSER: Lazy<crate::gcl::CommandsParser> = Lazy::new(crate::gcl::CommandsParser::new);
+
+    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
+}
+
+pub fn parse_annotated_command(src: &str) -> Result<Command, ParseError> {
+    static PARSER: Lazy<crate::gcl::AnnotatedCommandParser> =
+        Lazy::new(crate::gcl::AnnotatedCommandParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }
