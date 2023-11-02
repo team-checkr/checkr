@@ -1,7 +1,7 @@
 extern crate env_logger;
 
 extern crate z3;
-use ce_core::components::GclEditor;
+use ce_core::components::{AnnotatedCommand, GclAnnotatedEditor};
 
 use gcl::ast::Function;
 
@@ -114,21 +114,76 @@ impl Env for PvEnv {
     }
 
     fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a> {
+        let input = props.input().clone();
+        let input2 = props.input().clone();
+
         cx.render(rsx!(StandardLayout {
-            input: cx.render(rsx!(GclEditor {
-                commands: props.input().cmds.clone(),
-                on_change: move |cmds| props.set_input(PvInput {
-                    pre: BExpr::Bool(true),
-                    post: BExpr::Bool(true),
-                    cmds
+            input: cx.render(rsx!(GclAnnotatedEditor {
+                command: AnnotatedCommand {
+                    pre: input.pre.clone(),
+                    cmds: input.cmds.clone(),
+                    post: input.post.clone()
+                },
+                on_change: move |cmds: AnnotatedCommand| props.set_input(PvInput {
+                    pre: cmds.pre,
+                    post: cmds.post,
+                    cmds: cmds.cmds,
                 }),
             })),
             output: cx.render(rsx!(div {
                 class: "grid place-items-center",
-                "Output goes here"
+                div {
+                    props.with_result(cx, |res| cx.render(rsx!(div {
+                        class: "grid place-items-center text-xl divide-y font-mono",
+                        pre {
+                            for (cmd, cond) in intersperse_conds(&input2.cmds, &res.reference().conds) {
+                                cx.render(rsx!(div {
+                                    class: "flex text-sm flex-col",
+                                    span { cmd }
+                                    if let Some(cond) = cond {
+                                        cx.render(rsx!(span { class: "text-xs text-orange-500", " {{ " cond " }}" }))
+                                    }
+                                }))
+                            }
+                        }
+                        div {
+                            for cond in res.reference().conds.iter().rev() {
+                                cx.render(rsx!(div {
+                                    class: "grid place-items-center text-sm",
+                                    span { cond.to_string() }
+                                }))
+                            }
+                        }
+                        div {
+                            for cond in res.reference().checks.iter().rev() {
+                                cx.render(rsx!(div {
+                                    class: "grid place-items-center text-sm",
+                                    span { cond.to_string() }
+                                }))
+                            }
+                        }
+                    })))
+                }
             })),
         }))
     }
+}
+
+fn intersperse_conds(commands: &Commands, conds: &[BExpr]) -> Vec<(String, Option<String>)> {
+    let mut buf = Vec::new();
+
+    let mut idx = 0;
+
+    for l in commands.to_string().lines() {
+        if l.ends_with("fi") || l.ends_with("fi ;") || l.ends_with("od") || l.ends_with("od ;") {
+            idx += 1;
+            buf.push((l.to_string(), None));
+        } else {
+            buf.push((l.to_string(), Some(conds[idx].to_string())));
+        }
+    }
+
+    buf
 }
 
 impl Generate for PvInput {
@@ -140,7 +195,7 @@ impl Generate for PvInput {
         Self {
             pre: BExpr::Bool(true),
             post: BExpr::Bool(true),
-            cmds: cmds,
+            cmds,
         }
     }
 }
@@ -195,10 +250,9 @@ impl Cmd for Command {
                 op.conds.append(&mut p.conds);
                 op.checks.append(&mut p.checks);
             }
-            Command::Loop(_) => unimplemented!(),
-            Command::Annotated(_, _, _) => unimplemented!(),
-            Command::Continue => unimplemented!(),
-            Command::Break => unimplemented!(),
+            Command::Loop(_) | Command::Annotated(_, _, _) | Command::Continue | Command::Break => {
+                tracing::warn!("Loop, Annotated, Continue, Break, are not implemented")
+            }
         };
         op
     }
@@ -665,7 +719,7 @@ fn pre_condition_test8() {
             do {x>=y} x>y ->
                 y:=y+1
             od
-        [] x<y -> 
+        [] x<y ->
             do {x<=y} x<y ->
                 x:= x+1
             od

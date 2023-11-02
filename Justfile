@@ -1,7 +1,7 @@
 # Inspectify
 
 inspectify-dev:
-    RUST_BACKTRACE=full RUST_LOG=debug cargo watch --ignore .z3-trace -cx 'run -p inspectify'
+    RUST_BACKTRACE=1 RUST_LOG=debug cargo watch --ignore .z3-trace -cx 'run -p inspectify'
 
 # CI/Release
 
