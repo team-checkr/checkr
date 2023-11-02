@@ -501,9 +501,9 @@ impl Fun for Function {
                 let fib_of_n_minus_1 = fib.apply(&[&n_minus_1]);
                 let n_minus_2 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 2)]);
                 let fib_of_n_minus_2 = fib.apply(&[&n_minus_2]);
-                let cond: ast::Bool = n.le(&ast::Int::from_i64(&ctx, 1));
+                let cond: ast::Bool = n.lt(&ast::Int::from_i64(&ctx, 2));
                 let body = cond.ite(
-                    &ast::Int::from_i64(&ctx, 1),
+                    &n,
                     &ast::Int::add(
                         &ctx,
                         &[
