@@ -39,12 +39,12 @@ pub trait Cmd {
 }
 
 pub trait Ae {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx>;
     fn def(&self) -> BExpr;
 }
 
 pub trait Be {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> Bool<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Bool<'ctx>;
     fn def(&self) -> BExpr;
 }
 
@@ -54,7 +54,83 @@ pub trait GuardE {
 }
 
 pub trait Fun {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx>;
+}
+
+pub fn prelude<'ctx>(ctx: &'ctx Context) -> Vec<RecFuncDecl<'ctx>>{
+    let mut v = Vec::new();
+    v.push(premin(ctx));
+    v.push(premax(ctx));
+    v.push(prefac(ctx));
+    v.push(prefib(ctx));
+    v
+}
+
+pub fn premax<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx>{
+    let max = RecFuncDecl::new(
+        &ctx,
+        "max",
+        &[&Sort::int(&ctx), &Sort::int(&ctx)],
+        &Sort::int(&ctx),
+    );
+    let a = ast::Int::new_const(&ctx, "a");
+    let b = ast::Int::new_const(&ctx, "b");
+    let cond: ast::Bool = a.ge(&b);
+    let body = cond.ite(&a, &b);
+    max.add_def(&[&a, &b], &body);
+    max
+}
+
+pub fn premin<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
+    let min = RecFuncDecl::new(
+        &ctx,
+        "min",
+        &[&Sort::int(&ctx), &Sort::int(&ctx)],
+        &Sort::int(&ctx),
+    );
+    let a = ast::Int::new_const(&ctx, "a");
+    let b = ast::Int::new_const(&ctx, "b");
+    let cond: ast::Bool = a.le(&b);
+    let body = cond.ite(&a, &b);
+    min.add_def(&[&a, &b], &body);
+    min
+    
+}
+
+pub fn prefib<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
+    let fib = RecFuncDecl::new(&ctx, "fib", &[&Sort::int(&ctx)], &Sort::int(&ctx));
+    let n = ast::Int::new_const(&ctx, "n");
+    let n_minus_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
+    let fib_of_n_minus_1 = fib.apply(&[&n_minus_1]);
+    let n_minus_2 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 2)]);
+    let fib_of_n_minus_2 = fib.apply(&[&n_minus_2]);
+    let cond: ast::Bool = n.lt(&ast::Int::from_i64(&ctx, 2));
+    let body = cond.ite(
+        &n,
+        &ast::Int::add(
+            &ctx,
+            &[
+                &fib_of_n_minus_1.as_int().unwrap(),
+                &fib_of_n_minus_2.as_int().unwrap(),
+            ],
+        ),
+    );
+    fib.add_def(&[&n], &body);
+    fib
+}
+
+pub fn prefac<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
+    let fac = RecFuncDecl::new(&ctx, "fac", &[&Sort::int(&ctx)], &Sort::int(&ctx));
+    let n = ast::Int::new_const(&ctx, "n");
+    let n_m_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
+    let fac_n_m_1 = fac.apply(&[&n_m_1]);
+    let cond: ast::Bool = n.le(&ast::Int::from_i64(&ctx, 0));
+    let body = cond.ite(
+        &ast::Int::from_i64(&ctx, 1),
+        &ast::Int::mul(&ctx, &[&n, &fac_n_m_1.as_int().unwrap()]),
+    );
+    fac.add_def(&[&n], &body);
+    fac
 }
 
 impl Env for PvEnv {
@@ -74,7 +150,7 @@ impl Env for PvEnv {
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
         let _ = env_logger::try_init();
-        let mut res = true;
+        let mut res = format!("");
         // Checks if user given loop invariant holds for all checks
         // Checks are !((Inv && !Guard) -> Q)   (Q is postcondition for loop)
         // !((Inv && Guard) -> WP[Body][Inv])   (WP[Body][Inv] is weakest precondition for body)
@@ -83,14 +159,14 @@ impl Env for PvEnv {
                 let cfg = Config::new();
                 let ctx = Context::new(&cfg);
                 let solver = Solver::new(&ctx);
-                solver.assert(&check.z3_ast(&ctx));
+                solver.assert(&check.z3_ast(&ctx, &prelude(&ctx)));
                 res = match solver.check() {
-                    SatResult::Sat => false,
-                    SatResult::Unsat => true,
-                    SatResult::Unknown => false,
+                    SatResult::Sat => format!("{} is not valid", check.to_string()),
+                    SatResult::Unsat => format!(""),
+                    SatResult::Unknown => format!("{} is unknown to Z3", check.to_string()),
                 };
                 // If one check for the invariant doesnt hold, break
-                if res == false {
+                if res != "" {
                     break;
                 }
             }
@@ -100,23 +176,34 @@ impl Env for PvEnv {
         let cfg = Config::new();
         let ctx = Context::new(&cfg);
         let solver = Solver::new(&ctx);
-        let pre = input.pre.clone().z3_ast(&ctx);
-        let pre_new = output.conds.last().unwrap().clone().z3_ast(&ctx);
+        let v = prelude(&ctx);
+        let pre = input.pre.clone().z3_ast(&ctx, &v );
+        let pre_new = output.conds.last().unwrap().clone().z3_ast(&ctx, &v);
         solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
         match solver.check() {
-            SatResult::Sat => Ok(ValidationResult::IncorretPostcondition),
-            SatResult::Unsat => match res {
-                true => Ok(ValidationResult::CorrectTerminated),
-                false => Ok(ValidationResult::IncorrectInvariant),
-            },
-            SatResult::Unknown => Ok(ValidationResult::CannotBeValidated),
+            SatResult::Sat => Ok(ValidationResult::Mismatch {
+                reason: format!("Weakest precondition does not contain the user-given precondition"),
+            }),
+            SatResult::Unsat => {
+                if res != "" {
+                    Ok(ValidationResult::Mismatch { reason: res })
+                } else {
+                    Ok(ValidationResult::CorrectTerminated)
+                }
+            }
+            SatResult::Unknown => Ok(ValidationResult::Mismatch {
+                reason: format!(
+                    "Z3 does not know if {} => {} is valid",
+                    input.pre.to_string(),
+                    output.conds.last().unwrap().to_string()
+                ),
+            }),
         }
     }
 
     fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a> {
         let input = props.input().clone();
         let input2 = props.input().clone();
-
         cx.render(rsx!(StandardLayout {
             input: cx.render(rsx!(GclAnnotatedEditor {
                 command: AnnotatedCommand {
@@ -135,32 +222,27 @@ impl Env for PvEnv {
                 div {
                     props.with_result(cx, |res| cx.render(rsx!(div {
                         class: "grid place-items-center text-xl divide-y font-mono",
+                        div {
+                            div {
+                                class: "grid place-items-center text-xl",
+                                span { class: "text-xl text-orange-500", format!("{:?}", res.validation()) }
+                            }
+                        }
                         pre {
                             for (cmd, cond) in intersperse_conds(&input2.cmds, &res.reference().conds) {
                                 cx.render(rsx!(div {
                                     class: "flex text-sm flex-col",
-                                    span { cmd }
                                     if let Some(cond) = cond {
                                         cx.render(rsx!(span { class: "text-xs text-orange-500", " {{ " cond " }}" }))
                                     }
+                                    span { cmd }
+                                    
                                 }))
                             }
-                        }
-                        div {
-                            for cond in res.reference().conds.iter().rev() {
-                                cx.render(rsx!(div {
-                                    class: "grid place-items-center text-sm",
-                                    span { cond.to_string() }
-                                }))
-                            }
-                        }
-                        div {
-                            for cond in res.reference().checks.iter().rev() {
-                                cx.render(rsx!(div {
-                                    class: "grid place-items-center text-sm",
-                                    span { cond.to_string() }
-                                }))
-                            }
+                            cx.render(rsx!(div {
+                                class: "grid place-items-center text-sm",
+                                span { class: "text-xs text-orange-500", " {{ " res.reference().conds[0].to_string() " }}" }
+                            }))
                         }
                     })))
                 }
@@ -171,20 +253,38 @@ impl Env for PvEnv {
 
 fn intersperse_conds(commands: &Commands, conds: &[BExpr]) -> Vec<(String, Option<String>)> {
     let mut buf = Vec::new();
-
-    let mut idx = 0;
+    let mut idx = conds.len();
 
     for l in commands.to_string().lines() {
-        if l.ends_with("fi") || l.ends_with("fi ;") || l.ends_with("od") || l.ends_with("od ;") {
-            idx += 1;
+        if (l.starts_with("if") && l.ends_with("->")) || (l.starts_with("[]") && l.ends_with("->") || (l.starts_with("do") && l.ends_with("->"))) {
+            if idx > 0 {
+                idx -= 1;
+            }
+            buf.push((l.to_string(), Some(conds[idx].to_string())));
+        }
+        else if l.ends_with("->") {
             buf.push((l.to_string(), None));
+        }
+        else if l.ends_with("fi")
+            || l.ends_with("fi ;")
+            || l.ends_with("od")
+            || l.ends_with("od ;")
+        {
+            if idx > 0{
+                idx -= 1;
+            }
+            buf.push((l.to_string(), Some(conds[idx].to_string())));
         } else {
+            if idx > 0 {
+                idx -= 1;
+            }
             buf.push((l.to_string(), Some(conds[idx].to_string())));
         }
     }
 
     buf
 }
+
 
 impl Generate for PvInput {
     type Context = ();
@@ -193,8 +293,8 @@ impl Generate for PvInput {
         let cmds = Commands::gen(&mut Default::default(), rng);
 
         Self {
-            pre: BExpr::Bool(true),
-            post: BExpr::Bool(true),
+            pre: BExpr::Bool(false),
+            post: BExpr::Bool(false),
             cmds,
         }
     }
@@ -250,9 +350,12 @@ impl Cmd for Command {
                 op.conds.append(&mut p.conds);
                 op.checks.append(&mut p.checks);
             }
-            Command::Loop(_) | Command::Annotated(_, _, _) | Command::Continue | Command::Break => {
-                tracing::warn!("Loop, Annotated, Continue, Break, are not implemented")
-            }
+            Command::Loop(_) => tracing::warn!(
+                "Please add a loop invariant to your loop, in the format do {{Inv}} (Guard) C od"
+            ),
+            Command::Annotated(_, _, _) | Command::Break | Command::Continue => tracing::warn!(
+                "Annotations, Breaks and Continues are not implemented for Program Verification"
+            ),
         };
         op
     }
@@ -330,19 +433,19 @@ impl GuardE for Vec<Guard> {
 
 impl Ae for AExpr {
     // Generate AST that Z3 can understand
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx> {
         match self {
             AExpr::Number(n) => ast::Int::from_i64(&ctx, *n),
             AExpr::Reference(x) => ast::Int::new_const(&ctx, x.name()),
-            AExpr::Minus(m) => -m.z3_ast(&ctx),
+            AExpr::Minus(m) => -m.z3_ast(&ctx, &v),
             AExpr::Binary(l, op, r) => match op {
-                AOp::Plus => ast::Int::add(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                AOp::Minus => ast::Int::sub(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                AOp::Times => ast::Int::mul(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                AOp::Divide => ast::Int::div(&l.z3_ast(&ctx), &r.z3_ast(&ctx)),
-                AOp::Pow => ast::Int::power(&l.z3_ast(&ctx), &r.z3_ast(&ctx)).to_int(),
+                AOp::Plus => ast::Int::add(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                AOp::Minus => ast::Int::sub(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                AOp::Times => ast::Int::mul(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                AOp::Divide => ast::Int::div(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)),
+                AOp::Pow => ast::Int::power(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)).to_int(),
             },
-            AExpr::Function(f) => f.z3_ast(&ctx),
+            AExpr::Function(f) => f.z3_ast(&ctx, &v),
         }
     }
 
@@ -392,38 +495,38 @@ impl Ae for AExpr {
 
 impl Be for BExpr {
     // Generate AST that Z3 can understand
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> Bool<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Bool<'ctx> {
         match self {
             BExpr::Bool(b) => Bool::from_bool(&ctx, *b),
             BExpr::Rel(l, op, r) => match op {
                 RelOp::Eq => ast::Bool::and(
                     &ctx,
                     &[
-                        &l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
-                        &l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
+                        &l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
+                        &l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
                     ],
                 ),
-                RelOp::Ge => l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
-                RelOp::Gt => l.z3_ast(&ctx).gt(&r.z3_ast(&ctx)),
-                RelOp::Le => l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
-                RelOp::Lt => l.z3_ast(&ctx).lt(&r.z3_ast(&ctx)),
+                RelOp::Ge => l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
+                RelOp::Gt => l.z3_ast(&ctx, &v).gt(&r.z3_ast(&ctx, &v)),
+                RelOp::Le => l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
+                RelOp::Lt => l.z3_ast(&ctx, &v).lt(&r.z3_ast(&ctx, &v)),
                 RelOp::Ne => ast::Bool::and(
                     &ctx,
                     &[
-                        &l.z3_ast(&ctx).ge(&r.z3_ast(&ctx)),
-                        &l.z3_ast(&ctx).le(&r.z3_ast(&ctx)),
+                        &l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
+                        &l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
                     ],
                 )
                 .not(),
             },
             BExpr::Logic(l, op, r) => match op {
-                LogicOp::And => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                LogicOp::Implies => ast::Bool::implies(&l.z3_ast(&ctx), &r.z3_ast(&ctx)),
-                LogicOp::Land => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                LogicOp::Lor => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
-                LogicOp::Or => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx), &r.z3_ast(&ctx)]),
+                LogicOp::And => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                LogicOp::Implies => ast::Bool::implies(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)),
+                LogicOp::Land => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                LogicOp::Lor => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                LogicOp::Or => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
             },
-            BExpr::Not(b) => b.z3_ast(&ctx).not(),
+            BExpr::Not(b) => b.z3_ast(&ctx, &v).not(),
             BExpr::Quantified(_, _, _) => unimplemented!(),
         }
     }
@@ -442,38 +545,20 @@ impl Be for BExpr {
 }
 
 impl Fun for Function {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context) -> z3int<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx> {
+        let min = &v[0];
+        let max = &v[1];
+        let fac = &v[2];
+        let fib = &v[3];
         match self {
-            Function::Division(n, d) => n.z3_ast(&ctx).div(&d.z3_ast(&ctx)),
+            Function::Division(n, d) => n.z3_ast(&ctx, &v).div(&d.z3_ast(&ctx, &v)),
             Function::Min(x, y) => {
-                let min = RecFuncDecl::new(
-                    &ctx,
-                    "min",
-                    &[&Sort::int(&ctx), &Sort::int(&ctx)],
-                    &Sort::int(&ctx),
-                );
-                let a = ast::Int::new_const(&ctx, "a");
-                let b = ast::Int::new_const(&ctx, "b");
-                let cond: ast::Bool = a.le(&b);
-                let body = cond.ite(&a, &b);
-                min.add_def(&[&a, &b], &body);
-                min.apply(&[&x.z3_ast(&ctx), &y.z3_ast(&ctx)])
+                min.apply(&[&x.z3_ast(&ctx, &v), &y.z3_ast(&ctx, &v)])
                     .as_int()
                     .unwrap()
             }
             Function::Max(x, y) => {
-                let max = RecFuncDecl::new(
-                    &ctx,
-                    "max",
-                    &[&Sort::int(&ctx), &Sort::int(&ctx)],
-                    &Sort::int(&ctx),
-                );
-                let a = ast::Int::new_const(&ctx, "a");
-                let b = ast::Int::new_const(&ctx, "b");
-                let cond: ast::Bool = a.ge(&b);
-                let body = cond.ite(&a, &b);
-                max.add_def(&[&a, &b], &body);
-                max.apply(&[&x.z3_ast(&ctx), &y.z3_ast(&ctx)])
+                max.apply(&[&x.z3_ast(&ctx, &v), &y.z3_ast(&ctx, &v)])
                     .as_int()
                     .unwrap()
             }
@@ -482,38 +567,10 @@ impl Fun for Function {
             Function::Length(_) => todo!(),
             Function::LogicalLength(_) => todo!(),
             Function::Fac(x) => {
-                let fac = RecFuncDecl::new(&ctx, "fac", &[&Sort::int(&ctx)], &Sort::int(&ctx));
-                let n = ast::Int::new_const(&ctx, "n");
-                let n_m_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
-                let fac_n_m_1 = fac.apply(&[&n_m_1]);
-                let cond: ast::Bool = n.le(&ast::Int::from_i64(&ctx, 0));
-                let body = cond.ite(
-                    &ast::Int::from_i64(&ctx, 1),
-                    &ast::Int::mul(&ctx, &[&n, &fac_n_m_1.as_int().unwrap()]),
-                );
-                fac.add_def(&[&n], &body);
-                fac.apply(&[&x.z3_ast(&ctx)]).as_int().unwrap()
+                fac.apply(&[&x.z3_ast(&ctx, &v)]).as_int().unwrap()
             }
             Function::Fib(x) => {
-                let fib = RecFuncDecl::new(&ctx, "fib", &[&Sort::int(&ctx)], &Sort::int(&ctx));
-                let n = ast::Int::new_const(&ctx, "n");
-                let n_minus_1 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 1)]);
-                let fib_of_n_minus_1 = fib.apply(&[&n_minus_1]);
-                let n_minus_2 = ast::Int::sub(&ctx, &[&n, &ast::Int::from_i64(&ctx, 2)]);
-                let fib_of_n_minus_2 = fib.apply(&[&n_minus_2]);
-                let cond: ast::Bool = n.lt(&ast::Int::from_i64(&ctx, 2));
-                let body = cond.ite(
-                    &n,
-                    &ast::Int::add(
-                        &ctx,
-                        &[
-                            &fib_of_n_minus_1.as_int().unwrap(),
-                            &fib_of_n_minus_2.as_int().unwrap(),
-                        ],
-                    ),
-                );
-                fib.add_def(&[&n], &body);
-                fib.apply(&[&x.z3_ast(&ctx)]).as_int().unwrap()
+                fib.apply(&[&x.z3_ast(&ctx, &v)]).as_int().unwrap()
             }
         }
     }
@@ -602,7 +659,7 @@ fn pre_condition_test3() {
 
 #[test]
 fn pre_condition_test4() {
-    let pr = gcl::parse::parse_predicate("true").unwrap();
+    let pr = gcl::parse::parse_predicate("N>0 && M>=0").unwrap();
     let po = gcl::parse::parse_predicate("M=res*N+m").unwrap();
     let src = r#"
         res:=0;
@@ -803,13 +860,13 @@ fn pre_condition_test11() {
     let pr = gcl::parse::parse_predicate("true").unwrap();
     let po = gcl::parse::parse_predicate("z=min(x,y) && w=max(x,y)").unwrap();
     let src = r#"
-    if x<y ->
-        z:=x;
-        w:=y
-    [] x>= y ->
-        z:=y;
-        w:=x
-    fi
+        if x<y ->
+            z:=x;
+            w:=y
+        [] x>= y ->
+            z:=y;
+            w:=x
+        fi
     "#;
     let coms = gcl::parse::parse_commands(src).unwrap();
     let inp = PvInput {
