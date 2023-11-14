@@ -24,6 +24,21 @@ pub struct PvInput {
     cmds: Commands,
 }
 
+pub struct Z3OutputInt<'ctx> {
+    assertion: z3int<'ctx>,
+    vars: Vec<z3int<'ctx>>,
+}
+
+pub struct Z3OutputBool<'ctx> {
+    assertion: Bool<'ctx>,
+    vars: Vec<z3int<'ctx>>,
+}
+
+pub struct ModelOutput{
+    vars: Vec<String>,
+    vals: Vec<i64>,
+}
+
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct PvOutput {
     conds: Vec<BExpr>,
@@ -39,24 +54,25 @@ pub trait Cmd {
 }
 
 pub trait Ae {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputInt<'ctx>;
     fn def(&self) -> BExpr;
 }
 
 pub trait Be {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Bool<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputBool<'ctx>;
     fn def(&self) -> BExpr;
 }
 
 pub trait GuardE {
-    fn ver_con_if(&self, c: BExpr) -> Vec<BExpr>;
+    fn ver_con_if(&self, c: BExpr) -> PvOutput;
     fn ver_con_do(&self, i: Predicate, c: BExpr) -> PvOutput;
 }
 
 pub trait Fun {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx>;
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputInt<'ctx>;
 }
 
+// Function to initialise language extensions (functions)
 pub fn prelude<'ctx>(ctx: &'ctx Context) -> Vec<RecFuncDecl<'ctx>>{
     let mut v = Vec::new();
     v.push(premin(ctx));
@@ -66,6 +82,7 @@ pub fn prelude<'ctx>(ctx: &'ctx Context) -> Vec<RecFuncDecl<'ctx>>{
     v
 }
 
+// Function declaration for maximum value between two variables
 pub fn premax<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx>{
     let max = RecFuncDecl::new(
         &ctx,
@@ -81,6 +98,7 @@ pub fn premax<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx>{
     max
 }
 
+// Function declaration for minimum value between two variables
 pub fn premin<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     let min = RecFuncDecl::new(
         &ctx,
@@ -97,6 +115,7 @@ pub fn premin<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     
 }
 
+// Function declaration for the Fibonacci Sequence of a variable
 pub fn prefib<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     let fib = RecFuncDecl::new(&ctx, "fib", &[&Sort::int(&ctx)], &Sort::int(&ctx));
     let n = ast::Int::new_const(&ctx, "n");
@@ -119,6 +138,7 @@ pub fn prefib<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     fib
 }
 
+// Function declaration for the factorial of a variable
 pub fn prefac<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     let fac = RecFuncDecl::new(&ctx, "fac", &[&Sort::int(&ctx)], &Sort::int(&ctx));
     let n = ast::Int::new_const(&ctx, "n");
@@ -131,6 +151,23 @@ pub fn prefac<'ctx>(ctx: &'ctx Context) -> RecFuncDecl<'ctx> {
     );
     fac.add_def(&[&n], &body);
     fac
+}
+
+// Function to create a countermodel using Z3
+pub fn getmodel<'ctx>(vars: Vec<z3int<'ctx>>, model: Model<'ctx>) -> ModelOutput {
+    let mut out = ModelOutput{
+        vars: Vec::new(),
+        vals: Vec::new(),
+    };
+    for i in vars{
+        if out.vars.contains(&i.to_string()){
+            continue;
+        }
+        let val = model.eval(&i, true).unwrap().as_i64().unwrap();
+        out.vals.push(val);
+        out.vars.push(i.to_string());
+    }
+    out
 }
 
 impl Env for PvEnv {
@@ -150,25 +187,35 @@ impl Env for PvEnv {
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
         let _ = env_logger::try_init();
-        let mut res = format!("");
         // Checks if user given loop invariant holds for all checks
         // Checks are !((Inv && !Guard) -> Q)   (Q is postcondition for loop)
         // !((Inv && Guard) -> WP[Body][Inv])   (WP[Body][Inv] is weakest precondition for body)
         if output.checks.len() > 0 {
+            let mut i = 0;
             for check in output.checks.clone() {
                 let cfg = Config::new();
                 let ctx = Context::new(&cfg);
                 let solver = Solver::new(&ctx);
-                solver.assert(&check.z3_ast(&ctx, &prelude(&ctx)));
-                res = match solver.check() {
-                    SatResult::Sat => format!("{} is not valid", check.to_string()),
-                    SatResult::Unsat => format!(""),
-                    SatResult::Unknown => format!("{} is unknown to Z3", check.to_string()),
+                let v = prelude(&ctx);
+                let z3out = check.z3_ast(&ctx, &v);
+                solver.assert(&z3out.assertion);
+                match solver.check() {
+                    SatResult::Sat => { 
+                        let model = solver.get_model().unwrap();
+                        let out = getmodel(z3out.vars, model);
+                        let mut res = String::new();
+                        for i in 0..out.vars.len(){
+                            res.push_str(&format!("{} = {}, ", out.vars[i], out.vals[i]));
+                        }
+                        if i % 2 == 0 {
+                            return Ok(ValidationResult::Mismatch {reason: format!("(Inv && done[GC]) -> Q is not valid for the loop, a counterexample is {res}")})
+                        } else {
+                            return Ok(ValidationResult::Mismatch {reason: format!("(Inv && Guard) -> WP[GC](Inv) is not valid for the loop, a counterexample is {res}")})
+                        }
+                    },
+                    SatResult::Unsat => i+=1,
+                    SatResult::Unknown => return Ok(ValidationResult::Mismatch {reason : format!("{} is unknown to Z3", check.to_string())}),
                 };
-                // If one check for the invariant doesnt hold, break
-                if res != "" {
-                    break;
-                }
             }
         }
         // Checks if the user given precondition
@@ -179,17 +226,20 @@ impl Env for PvEnv {
         let v = prelude(&ctx);
         let pre = input.pre.clone().z3_ast(&ctx, &v );
         let pre_new = output.conds.last().unwrap().clone().z3_ast(&ctx, &v);
-        solver.assert(&ast::Bool::implies(&pre, &pre_new).not());
+        solver.assert(&ast::Bool::implies(&pre.assertion, &pre_new.assertion).not());
         match solver.check() {
-            SatResult::Sat => Ok(ValidationResult::Mismatch {
-                reason: format!("Weakest precondition does not contain the user-given precondition"),
-            }),
-            SatResult::Unsat => {
-                if res != "" {
-                    Ok(ValidationResult::Mismatch { reason: res })
-                } else {
-                    Ok(ValidationResult::CorrectTerminated)
+            SatResult::Sat => {
+                let model = solver.get_model().unwrap();
+                let out = getmodel(pre.vars, model);
+                let mut res = String::new();
+                for i in 0..out.vars.len(){
+                    res.push_str(&format!("{} = {}, ", out.vars[i], out.vals[i]));
                 }
+                Ok(ValidationResult::Mismatch {
+                reason: format!("Weakest precondition does not contain the user-given precondition, a counterexample is {res}"),
+            })},
+            SatResult::Unsat => {
+                Ok(ValidationResult::CorrectTerminated)
             }
             SatResult::Unknown => Ok(ValidationResult::Mismatch {
                 reason: format!(
@@ -225,7 +275,12 @@ impl Env for PvEnv {
                         div {
                             div {
                                 class: "grid place-items-center text-xl",
-                                span { class: "text-xl text-orange-500", format!("{:?}", res.validation()) }
+                                span { class: "text-xl text-orange-500", if *res.validation() != ValidationResult::CorrectTerminated{
+                                    format!("{:?}", res.validation()) }
+                                    else{
+                                        format!("Program Verified!")
+                                    }
+                                }
                             }
                         }
                         pre {
@@ -302,7 +357,7 @@ impl Generate for PvInput {
 
 impl Cmds for Commands {
     // Generate verification conditions
-    // for Sequence of commands
+    // for sequencial commands
     fn ver_con(&self, cond: BExpr) -> PvOutput {
         let new_c = cond.clone();
         let mut op = PvOutput {
@@ -328,7 +383,7 @@ impl Cmds for Commands {
 
 impl Cmd for Command {
     // Generate Hoare triple
-    // for single command
+    // for a single command
     fn ver_con(&self, c: BExpr) -> PvOutput {
         let mut op = PvOutput {
             conds: Vec::new(),
@@ -344,17 +399,21 @@ impl Cmd for Command {
                 }
             }
             Command::Skip => op.conds.push(c.clone().reduce().simplify()),
-            Command::If(guards) => op.conds.append(&mut guards.ver_con_if(c)),
+            Command::If(guards) => {
+                let p = &mut guards.ver_con_if(c);
+                op.conds.append(&mut p.conds);
+                op.checks.append(&mut p.checks);
+            }
             Command::EnrichedLoop(predicate, guards) => {
                 let mut p = guards.ver_con_do(predicate.clone(), c);
                 op.conds.append(&mut p.conds);
                 op.checks.append(&mut p.checks);
             }
             Command::Loop(_) => tracing::warn!(
-                "Please add a loop invariant to your loop, in the format do {{Inv}} (Guard) C od"
+                "Please add a loop invariant to your loop, in the format: do {{Inv}} (Guard) C od"
             ),
             Command::Annotated(_, _, _) | Command::Break | Command::Continue => tracing::warn!(
-                "Annotations, Breaks and Continues are not implemented for Program Verification"
+                "Annotations, Breaks and Continue are not implemented for Program Verification"
             ),
         };
         op
@@ -363,13 +422,18 @@ impl Cmd for Command {
 
 impl GuardE for Vec<Guard> {
     // Generate Hoare triples
-    // for if fi
-    fn ver_con_if(&self, c: BExpr) -> Vec<BExpr> {
+    // for if-fi conditional statement
+    fn ver_con_if(&self, c: BExpr) -> PvOutput {
         let mut wpv = Vec::new();
         let mut wpvl = Vec::new();
+        let mut output = PvOutput {
+            conds: Vec::new(),
+            checks: Vec::new(),
+        };
         for n in (0..self.len()).rev() {
             let cond = c.clone();
             let mut left = self[n].1.ver_con(cond);
+            output.checks.append(&mut left.checks);
             let l = left.conds.last().unwrap().clone();
             wpvl.append(&mut left.conds);
 
@@ -384,10 +448,11 @@ impl GuardE for Vec<Guard> {
 
         wp.append(&mut wpvl);
         wp.push(wpif);
-        wp
+        output.conds.append(&mut wp);
+        output
     }
     // Generate Hoare triples
-    // for do od loops
+    // for do-od loops
     fn ver_con_do(&self, i: Predicate, c: BExpr) -> PvOutput {
         let mut wpv = Vec::new();
         let mut qv = Vec::new();
@@ -433,19 +498,71 @@ impl GuardE for Vec<Guard> {
 
 impl Ae for AExpr {
     // Generate AST that Z3 can understand
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputInt<'ctx> {
         match self {
-            AExpr::Number(n) => ast::Int::from_i64(&ctx, *n),
-            AExpr::Reference(x) => ast::Int::new_const(&ctx, x.name()),
-            AExpr::Minus(m) => -m.z3_ast(&ctx, &v),
+            AExpr::Number(n) => Z3OutputInt{
+                assertion: ast::Int::from_i64(&ctx, *n),
+                vars: Vec::new(),},
+            AExpr::Reference(x) => {let var = ast::Int::new_const(&ctx, x.name());
+                Z3OutputInt{assertion: var.clone(),
+                vars: vec![var]}},
+            AExpr::Minus(m) => {let out = m.z3_ast(&ctx, &v);
+                    Z3OutputInt{assertion: -out.assertion,
+                    vars: out.vars}},
             AExpr::Binary(l, op, r) => match op {
-                AOp::Plus => ast::Int::add(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                AOp::Minus => ast::Int::sub(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                AOp::Times => ast::Int::mul(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                AOp::Divide => ast::Int::div(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)),
-                AOp::Pow => ast::Int::power(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)).to_int(),
-            },
+                AOp::Plus => {
+                    let outl = l.z3_ast(&ctx, &v);
+                    let outr = r.z3_ast(&ctx, &v);
+                    let mut outvars = outl.vars.clone();
+                    outvars.append(&mut outr.vars.clone());
+                    Z3OutputInt{
+                        assertion: ast::Int::add(&ctx, &[&outl.assertion, &outr.assertion]),
+                        vars: outvars
+                    }
+                },
+                AOp::Minus => {
+                    let outl = l.z3_ast(&ctx, &v);
+                    let outr = r.z3_ast(&ctx, &v);
+                    let mut outvars = outl.vars.clone();
+                    outvars.append(&mut outr.vars.clone());
+                    Z3OutputInt{
+                        assertion: ast::Int::sub(&ctx, &[&outl.assertion, &outr.assertion]),
+                        vars: outvars
+                    }
+                },
+                AOp::Times => {
+                    let outl = l.z3_ast(&ctx, &v);
+                    let outr = r.z3_ast(&ctx, &v);
+                    let mut outvars = outl.vars.clone();
+                    outvars.append(&mut outr.vars.clone());
+                    Z3OutputInt{
+                        assertion: ast::Int::mul(&ctx, &[&outl.assertion, &outr.assertion]),
+                        vars: outvars
+                    }
+                },
+                AOp::Divide => {
+                    let outl = l.z3_ast(&ctx, &v);
+                    let outr = r.z3_ast(&ctx, &v);
+                    let mut outvars = outl.vars.clone();
+                    outvars.append(&mut outr.vars.clone());
+                    Z3OutputInt{
+                        assertion: ast::Int::div(&outl.assertion, &outr.assertion),
+                        vars: outvars
+                    }
+                },
+                AOp::Pow => {
+                    let outl = l.z3_ast(&ctx, &v);
+                    let outr = r.z3_ast(&ctx, &v);
+                    let mut outvars = outl.vars.clone();
+                    outvars.append(&mut outr.vars.clone());
+                    Z3OutputInt{
+                        assertion: ast::Int::power(&outl.assertion, &outr.assertion).to_int(),
+                        vars: outvars
+                    }
+                },
+            }
             AExpr::Function(f) => f.z3_ast(&ctx, &v),
+            
         }
     }
 
@@ -467,26 +584,30 @@ impl Ae for AExpr {
             AExpr::Function(f) => match f {
                 Function::Division(_, r) => {
                     if r.find_vars().len() > 0 {
-                        BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0))
+                        BExpr::Logic(Box::new(BExpr::Rel(*r.clone(), RelOp::Ne, AExpr::Number(0))), LogicOp::And, Box::new(r.def()))
                     } else {
                         BExpr::Bool(true)
                     }
                 }
                 Function::Fib(n) => {
                     if n.find_vars().len() > 0 {
-                        BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))
+                        BExpr::Logic(Box::new(BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))), LogicOp::And, Box::new(n.def()))
                     } else {
                         BExpr::Bool(true)
                     }
                 }
                 Function::Fac(n) => {
                     if n.find_vars().len() > 0 {
-                        BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))
+                        BExpr::Logic(Box::new(BExpr::Rel(*n.clone(), RelOp::Ge, AExpr::Number(0))), LogicOp::And, Box::new(n.def()))
                     } else {
                         BExpr::Bool(true)
                     }
                 }
-                _ => BExpr::Bool(true),
+                Function::Min(x, y) => BExpr::Logic(Box::new(x.def()), LogicOp::And, Box::new(y.def())),
+                Function::Max(x, y) => BExpr::Logic(Box::new(x.def()), LogicOp::And, Box::new(y.def())),
+                _ => {
+                    tracing::warn!("Arrays not implemented for Program Verification");
+                    BExpr::Bool(true)},
             },
             _ => BExpr::Bool(true),
         }
@@ -495,39 +616,146 @@ impl Ae for AExpr {
 
 impl Be for BExpr {
     // Generate AST that Z3 can understand
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Bool<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputBool<'ctx> {
         match self {
-            BExpr::Bool(b) => Bool::from_bool(&ctx, *b),
+            BExpr::Bool(b) => Z3OutputBool{assertion: Bool::from_bool(&ctx, *b),
+                vars: Vec::new()},
             BExpr::Rel(l, op, r) => match op {
-                RelOp::Eq => ast::Bool::and(
-                    &ctx,
-                    &[
-                        &l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
-                        &l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
-                    ],
-                ),
-                RelOp::Ge => l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
-                RelOp::Gt => l.z3_ast(&ctx, &v).gt(&r.z3_ast(&ctx, &v)),
-                RelOp::Le => l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
-                RelOp::Lt => l.z3_ast(&ctx, &v).lt(&r.z3_ast(&ctx, &v)),
-                RelOp::Ne => ast::Bool::and(
-                    &ctx,
-                    &[
-                        &l.z3_ast(&ctx, &v).ge(&r.z3_ast(&ctx, &v)),
-                        &l.z3_ast(&ctx, &v).le(&r.z3_ast(&ctx, &v)),
-                    ],
-                )
-                .not(),
+                RelOp::Eq => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::and(
+                            &ctx,
+                            &[
+                                &l.assertion.ge(&r.assertion),
+                                &l.assertion.le(&r.assertion),
+                            ],
+                        ),
+                        vars: outvars,
+                    }
+                }
+                RelOp::Ge => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: l.assertion.ge(&r.assertion),
+                        vars: outvars,
+                    }
+                }
+                RelOp::Gt => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: l.assertion.gt(&r.assertion),
+                        vars: outvars,
+                    }
+                }
+                RelOp::Le => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: l.assertion.le(&r.assertion),
+                        vars: outvars,
+                    }
+                }
+                RelOp::Lt => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: l.assertion.lt(&r.assertion),
+                        vars: outvars,
+                    }
+                }
+                RelOp::Ne => {
+                    let l = l.z3_ast(&ctx, &v);
+                    let r = r.z3_ast(&ctx, &v);
+                    let mut outvars = l.vars.clone();
+                    outvars.append(&mut r.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::and(
+                            &ctx,
+                            &[
+                                &l.assertion.ge(&r.assertion),
+                                &l.assertion.le(&r.assertion),
+                            ],
+                        ).not(),
+                        vars: outvars,
+                    }
+                }
             },
             BExpr::Logic(l, op, r) => match op {
-                LogicOp::And => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                LogicOp::Implies => ast::Bool::implies(&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)),
-                LogicOp::Land => ast::Bool::and(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                LogicOp::Lor => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
-                LogicOp::Or => ast::Bool::or(&ctx, &[&l.z3_ast(&ctx, &v), &r.z3_ast(&ctx, &v)]),
+                LogicOp::And => {
+                    let left = l.z3_ast(&ctx, &v);
+                    let right = r.z3_ast(&ctx, &v);
+                    let mut outvars = left.vars.clone();
+                    outvars.append(&mut right.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::and(&ctx, &[&left.assertion, &right.assertion]),
+                        vars: outvars,
+                    }
+                },
+                LogicOp::Implies => {
+                    let left = l.z3_ast(&ctx, &v);
+                    let right = r.z3_ast(&ctx, &v);
+                    let mut outvars = left.vars.clone();
+                    outvars.append(&mut right.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::implies(&left.assertion, &right.assertion),
+                        vars: outvars,
+                    }
+                },
+                LogicOp::Land => {
+                    let left = l.z3_ast(&ctx, &v);
+                    let right = r.z3_ast(&ctx, &v);
+                    let mut outvars = left.vars.clone();
+                    outvars.append(&mut right.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::and(&ctx, &[&left.assertion, &right.assertion]),
+                        vars: outvars,
+                    }
+                },
+                LogicOp::Lor => {
+                    let left = l.z3_ast(&ctx, &v);
+                    let right = r.z3_ast(&ctx, &v);
+                    let mut outvars = left.vars.clone();
+                    outvars.append(&mut right.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::or(&ctx, &[&left.assertion, &right.assertion]),
+                        vars: outvars,
+                    }
+                },
+                LogicOp::Or => {
+                    let left = l.z3_ast(&ctx, &v);
+                    let right = r.z3_ast(&ctx, &v);
+                    let mut outvars = left.vars.clone();
+                    outvars.append(&mut right.vars.clone());
+                    Z3OutputBool{
+                        assertion: ast::Bool::or(&ctx, &[&left.assertion, &right.assertion]),
+                        vars: outvars,
+                    }
+                },
             },
-            BExpr::Not(b) => b.z3_ast(&ctx, &v).not(),
-            BExpr::Quantified(_, _, _) => unimplemented!(),
+            BExpr::Not(b) => {let out =b.z3_ast(&ctx, &v);
+            Z3OutputBool{
+                assertion: out.assertion.not(),
+                vars: out.vars
+            }},
+            BExpr::Quantified(_, _, _) => {tracing::warn!("Quantifiers are not implemented for Program Verification");
+            Z3OutputBool{
+                assertion: ast::Bool::from_bool(&ctx, false),
+                vars: Vec::new()
+            }},
         }
     }
 
@@ -545,32 +773,85 @@ impl Be for BExpr {
 }
 
 impl Fun for Function {
-    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> z3int<'ctx> {
+    fn z3_ast<'ctx>(&self, ctx: &'ctx Context, v: &'ctx Vec<RecFuncDecl>) -> Z3OutputInt<'ctx> {
         let min = &v[0];
         let max = &v[1];
         let fac = &v[2];
         let fib = &v[3];
         match self {
-            Function::Division(n, d) => n.z3_ast(&ctx, &v).div(&d.z3_ast(&ctx, &v)),
+            Function::Division(n, d) => {
+                let l = n.z3_ast(&ctx, &v);
+                let r = d.z3_ast(&ctx, &v);
+                let mut outvars = l.vars.clone();
+                outvars.append(&mut r.vars.clone());
+                Z3OutputInt{
+                    assertion: l.assertion.div(&r.assertion),
+                    vars: outvars
+                }
+            }
             Function::Min(x, y) => {
-                min.apply(&[&x.z3_ast(&ctx, &v), &y.z3_ast(&ctx, &v)])
+                let l = x.z3_ast(&ctx, &v);
+                let r = y.z3_ast(&ctx, &v);
+                let mut outvars = l.vars.clone();
+                outvars.append(&mut r.vars.clone());
+                Z3OutputInt{
+                    assertion: min.apply(&[&l.assertion, &r.assertion])
                     .as_int()
-                    .unwrap()
+                    .unwrap(),
+                    vars: outvars
+                }
             }
             Function::Max(x, y) => {
-                max.apply(&[&x.z3_ast(&ctx, &v), &y.z3_ast(&ctx, &v)])
+                let l = x.z3_ast(&ctx, &v);
+                let r = y.z3_ast(&ctx, &v);
+                let mut outvars = l.vars.clone();
+                outvars.append(&mut r.vars.clone());
+                Z3OutputInt{
+                    assertion: max.apply(&[&l.assertion, &r.assertion])
                     .as_int()
-                    .unwrap()
+                    .unwrap(),
+                    vars: outvars
+                }
             }
-            Function::Count(_, _) => todo!(),
-            Function::LogicalCount(_, _) => todo!(),
-            Function::Length(_) => todo!(),
-            Function::LogicalLength(_) => todo!(),
+            Function::Count(_, _) => {tracing::warn!("Arrays are not implemented for Program Verification");
+            Z3OutputInt{
+                assertion: ast::Int::from_i64(&ctx, 0),
+                vars: Vec::new()
+            }},
+            Function::LogicalCount(_, _) => {tracing::warn!("Arrays are not implemented for Program Verification");
+            Z3OutputInt{
+                assertion: ast::Int::from_i64(&ctx, 0),
+                vars: Vec::new()
+            }},
+            Function::Length(_) => {tracing::warn!("Arrays are not implemented for Program Verification");
+            Z3OutputInt{
+                assertion: ast::Int::from_i64(&ctx, 0),
+                vars: Vec::new()
+            }},
+            Function::LogicalLength(_) => {tracing::warn!("Arrays are not implemented for Program Verification");
+            Z3OutputInt{
+                assertion: ast::Int::from_i64(&ctx, 0),
+                vars: Vec::new()
+            }},
             Function::Fac(x) => {
-                fac.apply(&[&x.z3_ast(&ctx, &v)]).as_int().unwrap()
+                let l = x.z3_ast(&ctx, &v);
+                let outvars = l.vars.clone();
+                Z3OutputInt{
+                    assertion: fac.apply(&[&l.assertion])
+                    .as_int()
+                    .unwrap(),
+                    vars: outvars
+                }
             }
             Function::Fib(x) => {
-                fib.apply(&[&x.z3_ast(&ctx, &v)]).as_int().unwrap()
+                let l = x.z3_ast(&ctx, &v);
+                let outvars = l.vars.clone();
+                Z3OutputInt{
+                    assertion: fib.apply(&[&l.assertion])
+                    .as_int()
+                    .unwrap(),
+                    vars: outvars
+                }
             }
         }
     }
