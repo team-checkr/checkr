@@ -230,7 +230,7 @@ impl Env for PvEnv {
         match solver.check() {
             SatResult::Sat => {
                 let model = solver.get_model().unwrap();
-                let out = getmodel(pre.vars, model);
+                let out = getmodel(pre_new.vars, model);
                 let mut res = String::new();
                 for i in 0..out.vars.len(){
                     res.push_str(&format!("{} = {}, ", out.vars[i], out.vals[i]));
@@ -267,41 +267,53 @@ impl Env for PvEnv {
                     cmds: cmds.cmds,
                 }),
             })),
-            output: cx.render(rsx!(div {
-                class: "grid place-items-center",
-                div {
-                    props.with_result(cx, |res| cx.render(rsx!(div {
-                        class: "grid place-items-center text-xl divide-y font-mono",
-                        div {
+                output: cx.render(rsx!(div {
+                    class: "grid place-items-center",
+                    div {
+                        props.with_result(cx, |res| cx.render(rsx!(div {
+                            class: "grid place-items-center text-xl divide-y font-mono",
                             div {
-                                class: "grid place-items-center text-xl",
-                                span { class: "text-xl text-orange-500", if *res.validation() != ValidationResult::CorrectTerminated{
-                                    format!("{:?}", res.validation()) }
-                                    else{
-                                        format!("Program Verified!")
+                                div {
+                                    class: "grid place-items-center text-xl",
+                                     match res.validation() {
+                                        ValidationResult::CorrectTerminated => cx.render(rsx!(span {
+                                            class: "text-green-500",
+                                            "Program Verified!"
+                                        })),
+                                        ValidationResult::CorrectNonTerminated { iterations: _ } => cx.render(rsx!(span {
+                                            class: "text-green-400",
+                                            "Correct non-terminated"
+                                        })),
+                                        ValidationResult::Mismatch { reason } => cx.render(rsx!(span {
+                                            class: "text-orange-500",
+                                            "" reason.to_string()
+                                        })),
+                                        ValidationResult::TimeOut => cx.render(rsx!(span {
+                                            class: "text-[chucknorris]",
+                                            "Time out"
+                                        })),
                                     }
                                 }
                             }
-                        }
-                        pre {
-                            for (cmd, cond) in intersperse_conds(&input2.cmds, &res.reference().conds) {
+                            pre {
+                                for (cmd, cond) in intersperse_conds(&input2.cmds, &res.reference().conds) {
+                                    cx.render(rsx!(div {
+                                        class: "flex text-sm flex-col",
+                                        if let Some(cond) = cond {
+                                            cx.render(rsx!(span { class: "text-xs text-blue-500", " {{ " cond " }}" }))
+                                        }
+                                        span { cmd }
+                                        
+                                    }))
+                                }
                                 cx.render(rsx!(div {
                                     class: "flex text-sm flex-col",
-                                    if let Some(cond) = cond {
-                                        cx.render(rsx!(span { class: "text-xs text-orange-500", " {{ " cond " }}" }))
-                                    }
-                                    span { cmd }
-                                    
+                                    cx.render( rsx!(span { class: "text-xs text-blue-500", " {{ " res.reference().conds[0].to_string() " }}" }))
                                 }))
                             }
-                            cx.render(rsx!(div {
-                                class: "grid place-items-center text-sm",
-                                span { class: "text-xs text-orange-500", " {{ " res.reference().conds[0].to_string() " }}" }
-                            }))
-                        }
-                    })))
-                }
-            })),
+                        })))
+                    }
+                })),
         }))
     }
 }
@@ -1021,7 +1033,7 @@ fn pre_condition_test6() {
 #[test]
 fn pre_condition_test7() {
     let pr = gcl::parse::parse_predicate("0<=y").unwrap();
-    let po = gcl::parse::parse_predicate("x=y").unwrap();
+    let po = gcl::parse::parse_predicate("x=y   ").unwrap();
     let src = r#"
         z:=10;
         x:=0;
@@ -1030,7 +1042,7 @@ fn pre_condition_test7() {
             [] (y>=z) -> skip
             fi;
             x:=x+1
-        od
+        od  
     "#;
     let coms = gcl::parse::parse_commands(src).unwrap();
     let inp = PvInput {
