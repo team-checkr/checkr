@@ -229,6 +229,23 @@ impl Env for PvEnv {
         solver.assert(&ast::Bool::implies(&pre.assertion, &pre_new.assertion).not());
         match solver.check() {
             SatResult::Sat => {
+                if pre_new.vars.len() == 0 {
+                    if pre.vars.len() == 0 {
+                        return Ok(ValidationResult::Mismatch {
+                            reason: format!("Weakest precondition does not contain the user-given precondition"),
+                        });
+                    } else {
+                        let model = solver.get_model().unwrap();
+                        let out = getmodel(pre.vars, model);
+                        let mut res = String::new();
+                        for i in 0..out.vars.len(){
+                            res.push_str(&format!("{} = {}, ", out.vars[i], out.vals[i]));
+                        }
+                        return Ok(ValidationResult::Mismatch {
+                            reason: format!("Weakest precondition does not contain the user-given precondition, a counterexample is {res}"),
+                        });
+                    }
+                }
                 let model = solver.get_model().unwrap();
                 let out = getmodel(pre_new.vars, model);
                 let mut res = String::new();
