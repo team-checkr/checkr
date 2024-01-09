@@ -467,7 +467,7 @@ impl GuardE for Vec<Guard> {
             wpvl.append(&mut left.conds);
 
             let r = self[n].0.clone();
-            wpv.push(BExpr::Logic(Box::new(l), LogicOp::And, Box::new(r)));
+            wpv.push(BExpr::Logic(Box::new(BExpr::Not(Box::new(l))), LogicOp::Or, Box::new(r)));
         }
         let mut wp = Vec::new();
         let mut wpif = wpv.pop().unwrap();
@@ -1050,7 +1050,7 @@ fn pre_condition_test6() {
 #[test]
 fn pre_condition_test7() {
     let pr = gcl::parse::parse_predicate("0<=y").unwrap();
-    let po = gcl::parse::parse_predicate("x=y   ").unwrap();
+    let po = gcl::parse::parse_predicate("x=y").unwrap();
     let src = r#"
         z:=10;
         x:=0;
@@ -1177,6 +1177,34 @@ fn pre_condition_test11() {
             z:=y;
             w:=x
         fi
+    "#;
+    let coms = gcl::parse::parse_commands(src).unwrap();
+    let inp = PvInput {
+        pre: pr,
+        post: po.clone(),
+        cmds: coms.clone(),
+    };
+    let out = coms.ver_con(po);
+    for n in (0..out.conds.len()).rev() {
+        println!("{}", out.conds[n]);
+    }
+    match PvEnv::validate(&inp, &out).unwrap() {
+        ValidationResult::CorrectTerminated => assert!(true),
+        _ => assert!(false),
+    }
+}
+
+#[test]
+fn pre_condition_test12() {
+    let pr = gcl::parse::parse_predicate("n>=0").unwrap();
+    let po = gcl::parse::parse_predicate("r=fac(n)").unwrap();
+    let src = r#"
+    r:=1;
+    x:=0;
+    do {r=fac(x) && x<=n && x>=0} x<n ->
+        x:=x+1;
+        r:=r*x
+    od
     "#;
     let coms = gcl::parse::parse_commands(src).unwrap();
     let inp = PvInput {
