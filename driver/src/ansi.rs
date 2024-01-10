@@ -105,8 +105,8 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
                         ColorType::Background => fg = Some(*color),
                     }
                 }
-                (Code::Unknown(value), _) => {
-                    tracing::warn!(code=?value, "unhandled code");
+                (Code::Unknown(_value), _) => {
+                    // tracing::warn!(code=?value, "unhandled code");
                 }
                 _ => {}
             }

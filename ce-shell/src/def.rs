@@ -75,7 +75,7 @@ macro_rules! define_shell {
             pub fn parse_output(self, src: &str) -> Output {
                 match self {
                     $(Analysis::$name => {
-                        let output = serde_json::from_str::<<$krate as Env>::Output>(src).unwrap();
+                        let output = serde_json::from_str::<<$krate as Env>::Output>(src).expect("failed to parse output");
                         Output {
                             analysis: self,
                             json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),

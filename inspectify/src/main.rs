@@ -169,7 +169,7 @@ struct AppProps {
 }
 
 fn App(cx: Scope<AppProps>) -> Element {
-    use_shared_state_provider(cx, || Analysis::Sign);
+    use_shared_state_provider(cx, || Analysis::Pv);
     use_shared_state_provider::<SharedHubDriver>(cx, || {
         (cx.props.hub.clone(), cx.props.driver.clone())
     });
