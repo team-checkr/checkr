@@ -334,7 +334,7 @@ impl Env for PvEnv {
         }))
     }
 }
-
+// Generation of output to the frontend
 fn intersperse_conds(commands: &Commands, conds: &[BExpr]) -> Vec<(String, Option<String>)> {
     let mut buf = Vec::new();
     let mut idx = conds.len();
@@ -467,7 +467,7 @@ impl GuardE for Vec<Guard> {
             wpvl.append(&mut left.conds);
 
             let r = self[n].0.clone();
-            wpv.push(BExpr::Logic(Box::new(BExpr::Not(Box::new(l))), LogicOp::Or, Box::new(r)));
+            wpv.push(BExpr::Logic(Box::new(l), LogicOp::And, Box::new(r)));
         }
         let mut wp = Vec::new();
         let mut wpif = wpv.pop().unwrap();
