@@ -1,5 +1,5 @@
 [package]
-name = "ce-shell"
+name = "inspectify-api"
 edition = "2021"
 version.workspace = true
 repository.workspace = true
@@ -9,15 +9,13 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+axum.workspace = true
 ce-core.workspace = true
-ce-graph.workspace = true
-ce-parse.workspace = true
-ce-sign.workspace = true
-dioxus.workspace = true
-futures-util = "0.3.28"
-itertools.workspace = true
+ce-shell.workspace = true
+futures-util = "0.3.30"
 rand.workspace = true
-serde.workspace = true
+serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
-tapi.workspace = true
-tracing.workspace = true
+tapi = { version = "0.1.21", path = "../tapi" }
+tokio = { workspace = true, features = ["full"] }
+tower-http = { version = "0.5.0", features = ["cors"] }

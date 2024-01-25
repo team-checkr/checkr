@@ -1,0 +1,16 @@
+/* Write your global styles here, in PostCSS syntax */
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+.prose :not(pre) > code {
+	/* TODO: There are some cases where this is nice, but in PV for example the
+            predicates get way too long and they need to be broken up */
+	/* @apply whitespace-nowrap; */
+}
+.prose code::before {
+	content: '';
+}
+.prose code::after {
+	content: '';
+}

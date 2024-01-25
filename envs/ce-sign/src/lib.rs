@@ -27,14 +27,14 @@ pub use semantics::{Bools, Sign, SignAnalysis, SignMemory, Signs};
 
 define_env!(SignEnv);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignInput {
     pub commands: Commands,
     pub determinism: Determinism,
     pub assignment: SignMemory,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SignOutput {
     pub initial_node: String,
     pub final_node: String,

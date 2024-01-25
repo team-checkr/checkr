@@ -126,6 +126,7 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
     type Input: Generate<Context = ()>
         + Serialize
         + for<'a> Deserialize<'a>
+        + tapi::Tapi
         + std::fmt::Debug
         + Clone
         + PartialEq
@@ -133,6 +134,7 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
         + Sync;
     type Output: Serialize
         + for<'a> Deserialize<'a>
+        + tapi::Tapi
         + std::fmt::Debug
         + Clone
         + PartialEq
