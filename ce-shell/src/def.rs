@@ -17,7 +17,7 @@ macro_rules! define_shell {
         use dioxus::prelude::*;
 
 
-        #[derive(Debug, Clone, Copy, PartialEq, Eq, Hash)]
+        #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         pub enum Analysis {
             $(
                 $name,

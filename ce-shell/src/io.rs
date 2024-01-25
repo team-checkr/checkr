@@ -2,13 +2,13 @@ use std::sync::Arc;
 
 use crate::Analysis;
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
     pub(crate) analysis: Analysis,
     pub(crate) json: Arc<serde_json::Value>,
 }
 
-#[derive(Debug, Clone, PartialEq, Eq)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
     pub(crate) analysis: Analysis,
     pub(crate) json: Arc<serde_json::Value>,

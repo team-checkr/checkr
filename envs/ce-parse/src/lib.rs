@@ -8,12 +8,12 @@ use serde::{Deserialize, Serialize};
 
 define_env!(ParseEnv);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseInput {
     commands: Commands,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseOutput {
     formatted: String,
 }
