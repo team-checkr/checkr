@@ -1,5 +1,6 @@
-import { writable, type Writable } from 'svelte/store';
+import { derived, writable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
+import { compilationStatusStore } from './jobs';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
 
@@ -21,8 +22,12 @@ const ios: Record<ce_shell.Analysis, Io<ce_shell.Analysis>> = Object.fromEntries
 
 		let activeJob: null | driver.job.JobId = null;
 
-		input.subscribe((input) => {
-			if (!input) return;
+		derived([compilationStatusStore, input], ([compilationStatus, input]) => [
+			compilationStatus,
+			input
+		]).subscribe(([compilationStatus, input]) => {
+			if (!compilationStatus || !input) return;
+			if (compilationStatus.state != 'Succeeded') return;
 
 			if (activeJob) {
 				api.cancelJob(activeJob);

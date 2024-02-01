@@ -23,6 +23,7 @@ use tracing::Instrument;
 pub struct Driver {
     hub: Hub<()>,
     config: RunOption,
+    current_compilation: Arc<RwLock<Option<Job<()>>>>,
     latest_successfull_compile: Arc<RwLock<Option<Job<()>>>>,
 }
 
@@ -47,18 +48,19 @@ impl Driver {
         Ok(Self {
             config,
             hub,
+            current_compilation: Default::default(),
             latest_successfull_compile: Default::default(),
         })
     }
     #[tracing::instrument(skip_all, fields(analysis=%input.analysis()))]
-    pub fn exec_job(&self, input: &Input) -> Job<()> {
+    pub fn exec_job(&self, input: &Input) -> color_eyre::Result<Job<()>> {
         let mut args = self
             .config
             .run
             .split(' ')
             .map(|s| s.to_string())
             .collect_vec();
-        args.push(input.analysis().to_string());
+        args.push(input.analysis().code().to_string());
         args.push(input.to_string());
         self.hub.exec_command(
             JobKind::Analysis(input.analysis(), input.clone()),
@@ -69,12 +71,20 @@ impl Driver {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start_recompile(&self) -> Option<Job<()>> {
+    pub fn start_recompile(&self) -> Option<color_eyre::Result<Job<()>>> {
         self.config.compile.as_ref().map(|compile| {
+            if let Some(job) = self.current_compilation.write().unwrap().take() {
+                job.kill();
+            }
+
             let args = compile.split(' ').collect_vec();
             let job = self
                 .hub
-                .exec_command(JobKind::Compilation, (), args[0], &args[1..]);
+                .exec_command(JobKind::Compilation, (), args[0], &args[1..])?;
+            self.current_compilation
+                .write()
+                .unwrap()
+                .replace(job.clone());
             tokio::spawn({
                 let driver = self.clone();
                 let job = job.clone();
@@ -87,7 +97,7 @@ impl Driver {
                     }
                 }
             });
-            job
+            Ok(job)
         })
     }
     pub fn config(&self) -> &RunOption {
@@ -98,7 +108,7 @@ impl Driver {
         let driver = self.clone();
 
         let config = driver.config();
-        let dir = PathBuf::from(".");
+        let dir = driver.hub.path().to_owned();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
@@ -143,9 +153,9 @@ impl Driver {
 
         Ok(tokio::spawn(
             async move {
-                let mut last_job: Option<Job<()>> = None;
+                let mut last_job: Option<color_eyre::Result<Job<()>>> = None;
                 while let Some(()) = rx.recv().await {
-                    if let Some(last_job) = last_job {
+                    if let Some(Ok(last_job)) = last_job {
                         last_job.kill();
                     }
                     last_job = driver.start_recompile();
@@ -160,5 +170,9 @@ impl Driver {
 
     pub fn latest_successfull_compile(&self) -> Option<Job<()>> {
         self.latest_successfull_compile.read().unwrap().clone()
+    }
+
+    pub fn current_compilation(&self) -> Option<Job<()>> {
+        self.current_compilation.read().unwrap().clone()
     }
 }

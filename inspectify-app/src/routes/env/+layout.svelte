@@ -1,16 +1,39 @@
 <script lang="ts">
+	import Ansi from '$lib/components/Ansi.svelte';
 	import JobPane from '$lib/components/JobPane.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
+	import { compilationStatusStore } from '$lib/jobs';
+
+	import Fire from '~icons/heroicons/fire';
 
 	let showStatus = true;
 </script>
 
-<main class="grid">
-	<slot />
-</main>
+<div class="relative grid grid-rows-[1fr_auto]">
+	<main class="grid">
+		<slot />
+	</main>
 
-{#if showStatus}
-	<JobPane />
-{/if}
+	{#if showStatus}
+		<JobPane />
+	{/if}
+
+	{#if $compilationStatusStore && $compilationStatusStore.state == 'Failed'}
+		<div class="absolute inset-0 mt-20 grid items-start justify-center">
+			<div class="max-w-5xl overflow-hidden rounded-lg bg-slate-600 shadow-xl">
+				<div class="flex items-center justify-between bg-red-600 px-3 py-1">
+					<h2 class="text-xl font-light italic">Compilation error</h2>
+					<Fire class="text-lg text-red-200" />
+				</div>
+				<div class="overflow-auto text-sm">
+					{#if $compilationStatusStore.error_output}
+						<pre class="p-3"><code><Ansi spans={$compilationStatusStore.error_output} /></code
+							></pre>
+					{/if}
+				</div>
+			</div>
+		</div>
+	{/if}
+</div>
 
 <StatusBar bind:showStatus />

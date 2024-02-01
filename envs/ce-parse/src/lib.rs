@@ -15,7 +15,7 @@ pub struct ParseInput {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseOutput {
-    formatted: String,
+    pretty: String,
 }
 
 impl Env for ParseEnv {
@@ -25,7 +25,7 @@ impl Env for ParseEnv {
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(ParseOutput {
-            formatted: input.commands.to_string(),
+            pretty: input.commands.to_string(),
         })
     }
 
@@ -45,14 +45,14 @@ impl Env for ParseEnv {
                     h2 { class: "italic font-semibold px-2 py-1", "Real" }
                     pre {
                         class: "p-2 overflow-auto text-xs",
-                        "{res.real().formatted}"
+                        "{res.real().pretty}"
                     }
                 }
                 div {
                     h2 { class: "italic font-semibold px-2 py-1", "Reference" }
                     pre {
                         class: "p-2 overflow-auto text-xs",
-                        "{res.reference().formatted}"
+                        "{res.reference().pretty}"
                     }
                 }
             }))),

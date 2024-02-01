@@ -6,6 +6,9 @@
 	import CommandLineIcon from '~icons/heroicons/command-line';
 	import PlayCircleIcon from '~icons/heroicons/play-circle';
 	import QuestionMarkCircleIcon from '~icons/heroicons/question-mark-circle';
+	import { startListeningOnCompilation } from '$lib/jobs';
+
+	startListeningOnCompilation();
 
 	const { ANALYSIS } = ce_shell;
 </script>

@@ -1,24 +1,19 @@
 <script lang="ts">
-	import { api, type gcl } from '$lib/api';
+	import { browser } from '$app/environment';
+	import { api, ce_sign, type gcl } from '$lib/api';
 	import Editor from '$lib/components/Editor.svelte';
 	import Network from '$lib/components/Network.svelte';
 	import { useIo } from '$lib/io';
 
-	const color = 'idk';
-
-	const io = useIo('Graph');
+	const io = useIo('Parse');
 	const input = io.input;
 	const output = io.output;
 
 	let commands = '';
 	let externallySet = '';
-	let determinism: gcl.pg.Determinism = { Case: 'Deterministic' };
 
 	$: if (commands && commands != externallySet) {
-		input.set({
-			commands,
-			determinism
-		});
+		input.set({ commands });
 	}
 
 	const regenerate = async () => {
@@ -41,8 +36,9 @@
 	</div>
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
-			<Network dot={$output?.dot || ''} />
+			<pre class="p-2"><code
+					>{#if $output}{$output.pretty}{/if}</code
+				></pre>
 		</div>
 	</div>
-	<div class="h-4 bg-green-500 transition {color}"></div>
 </div>

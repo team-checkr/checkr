@@ -1,10 +1,12 @@
 use std::{
     ffi::OsStr,
     fmt::Debug,
+    path::{Path, PathBuf},
     process::Stdio,
     sync::{atomic::AtomicUsize, Arc, RwLock},
 };
 
+use color_eyre::eyre::Context;
 use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinSet};
 use tracing::Instrument;
 
@@ -13,8 +15,9 @@ use crate::{
     JobId,
 };
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Clone)]
 pub struct Hub<T> {
+    path: PathBuf,
     next_job_id: Arc<AtomicUsize>,
     jobs: Arc<RwLock<Vec<Job<T>>>>,
 }
@@ -26,6 +29,24 @@ impl<T> PartialEq for Hub<T> {
 }
 
 impl<T: Send + Sync + 'static> Hub<T> {
+    pub fn new(path: PathBuf) -> color_eyre::Result<Self> {
+        let path = path
+            .canonicalize()
+            .wrap_err_with(|| format!("could not canonicalize path: {path:?}"))?;
+        let next_job_id = Arc::new(AtomicUsize::new(0));
+        let jobs = Arc::new(RwLock::new(Vec::new()));
+
+        Ok(Self {
+            path,
+            next_job_id,
+            jobs,
+        })
+    }
+
+    pub fn path(&self) -> &Path {
+        &self.path
+    }
+
     #[tracing::instrument(skip_all, fields(?kind))]
     pub fn exec_command(
         &self,
@@ -33,7 +54,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
         data: T,
         program: impl AsRef<OsStr> + Debug,
         args: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
-    ) -> Job<T>
+    ) -> color_eyre::Result<Job<T>>
     where
         T: Debug,
     {
@@ -44,6 +65,8 @@ impl<T: Send + Sync + 'static> Hub<T> {
         };
 
         let mut cmd = tokio::process::Command::new(program);
+
+        cmd.current_dir(&self.path);
 
         cmd.args(args)
             .stderr(Stdio::piped())
@@ -56,7 +79,9 @@ impl<T: Send + Sync + 'static> Hub<T> {
 
         tracing::debug!(?cmd, "spawning");
 
-        let mut child = cmd.spawn().unwrap();
+        let mut child = cmd
+            .spawn()
+            .with_context(|| format!("failed to spawn {:?}", cmd))?;
 
         let stdin = child.stdin.take().expect("we piped stdin");
         let stderr = child.stderr.take().expect("we piped stderr");
@@ -97,7 +122,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
 
         self.jobs.write().unwrap().push(job.clone());
 
-        job
+        Ok(job)
     }
     pub fn jobs(&self, count: Option<usize>) -> Vec<Job<T>> {
         if let Some(count) = count {
