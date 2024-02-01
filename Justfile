@@ -1,10 +1,10 @@
 # Inspectify
 
-inspectify-dev:
-    RUST_BACKTRACE=full RUST_LOG=debug cargo watch -cx 'run -p inspectify'
+inspectify-api ARGS="":
+    RUST_LOG=debug cargo run -p inspectify-api -- {{ARGS}}
 
-inspectify-gen-api:
-    abeye generate --target ts http://localhost:3000/spec -o inspectify-app/src/lib/api.ts
+inspectify-app:
+    cd inspectify-app && (npm install && npm run dev)
 
 # CI/Release
 
