@@ -1,4 +1,7 @@
 <script lang="ts">
+	import { driver } from '$lib/api';
+	import { jobsStore } from '$lib/jobs';
+
 	import ChevronDoubleUp from '~icons/heroicons/chevron-double-up';
 	import Link from '~icons/heroicons/link';
 
@@ -6,6 +9,24 @@
 	const version = '1.2.3';
 
 	export let showStatus: boolean;
+
+	let jobStates = Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
+		driver.job.JobState,
+		number
+	>;
+
+	$: {
+		jobStates = Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
+			driver.job.JobState,
+			number
+		>;
+
+		for (let job of $jobsStore) {
+			if (job.state in jobStates) {
+				jobStates[job.state]++;
+			}
+		}
+	}
 </script>
 
 <div class="flex items-center space-x-1 border-t bg-slate-900 text-sm">
@@ -15,6 +36,17 @@
 	>
 		<ChevronDoubleUp class="transition {showStatus ? 'rotate-0' : 'rotate-180'}" />
 	</button>
+
+	{#if jobStates['Queued'] === 0 && jobStates['Running'] === 0 && jobStates['Succeeded'] > 0 && jobStates['Failed'] === 0 && jobStates['Warning'] === 0}
+		<p>No active jobs</p>
+	{:else}
+		<b>Jobs: </b>
+		<i class="space-x-1">
+			{#each Object.entries(jobStates) as [state, count] (state)}
+				{#if count > 0}<span>{count} {state.toLowerCase()}</span>{/if}
+			{/each}
+		</i>
+	{/if}
 
 	<div class="flex-1"></div>
 

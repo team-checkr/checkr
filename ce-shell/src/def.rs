@@ -48,6 +48,7 @@ macro_rules! define_shell {
             fn from_str(s: &str) -> Result<Self, Self::Err> {
                 match s {
                     $($display => Ok(Analysis::$name),)*
+                    $(stringify!($name) => Ok(Analysis::$name),)*
                     _ => Err(format!("analysis can be one of: {}", [$(stringify!($name),)*].into_iter().format(", "))),
                 }
             }
@@ -56,6 +57,11 @@ macro_rules! define_shell {
         impl Analysis {
             pub fn options() -> &'static [Analysis] {
                 &[$(Analysis::$name),*]
+            }
+            pub fn code(&self) -> &'static str {
+                match self {
+                    $(Analysis::$name => stringify!($name)),*
+                }
             }
             #[tracing::instrument(skip_all, fields(analysis = self.to_string()))]
             pub fn gen_input(self, rng: &mut rand::rngs::SmallRng) -> Input {

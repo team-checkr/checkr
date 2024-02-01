@@ -1034,6 +1034,7 @@ dependencies = [
  "notify",
  "notify-debouncer-mini",
  "serde",
+ "serde_json",
  "tapi",
  "tokio",
  "toml",
@@ -1698,6 +1699,7 @@ dependencies = [
  "ce-core",
  "ce-graph",
  "ce-shell",
+ "clap",
  "color-eyre",
  "driver",
  "futures-util",
@@ -1709,6 +1711,9 @@ dependencies = [
  "tokio",
  "tokio-stream",
  "tower-http",
+ "tracing",
+ "tracing-error",
+ "tracing-subscriber",
 ]
 
 [[package]]
