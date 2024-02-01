@@ -1,7 +1,4 @@
-use ce_core::{
-    components::StandardLayout, define_env, rand, Env, Generate, RenderProps, ValidationResult,
-};
-use dioxus::prelude::*;
+use ce_core::{define_env, rand, Env, Generate, ValidationResult};
 use serde::{Deserialize, Serialize};
 
 define_env!(TemplateEnv);
@@ -23,19 +20,6 @@ impl Env for TemplateEnv {
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
         Ok(ValidationResult::CorrectTerminated)
-    }
-
-    fn render<'a>(cx: &'a ScopeState, _props: &'a RenderProps<'a, Self>) -> Element<'a> {
-        cx.render(rsx!(StandardLayout {
-            input: cx.render(rsx!(div {
-                class: "grid place-items-center",
-                "Input goes here"
-            })),
-            output: cx.render(rsx!(div {
-                class: "grid place-items-center",
-                "Output goes here"
-            })),
-        }))
     }
 }
 

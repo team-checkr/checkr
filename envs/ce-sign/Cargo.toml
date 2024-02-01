@@ -11,7 +11,6 @@ license.workspace = true
 [dependencies]
 bitflags.workspace = true
 ce-core.workspace = true
-dioxus.workspace = true
 gcl.workspace = true
 indexmap.workspace = true
 itertools.workspace = true

@@ -47,7 +47,7 @@ async fn run() -> Result<()> {
 
             cmd!(
                 sh,
-                "cargo add ce-core dioxus serde serde_json tracing itertools"
+                "cargo add ce-core serde serde_json tracing tapi itertools"
             )
             .run()?;
             let template_src = include_str!("./env_template.rs")

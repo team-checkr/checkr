@@ -10,7 +10,6 @@ license.workspace = true
 
 [dependencies]
 ce-core.workspace = true
-dioxus.workspace = true
 gcl.workspace = true
 serde.workspace = true
 serde_json.workspace = true
