@@ -13,3 +13,4 @@ ce-core.workspace = true
 dioxus.workspace = true
 gcl.workspace = true
 serde.workspace = true
+tapi.workspace = true

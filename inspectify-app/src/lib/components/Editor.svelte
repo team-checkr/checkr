@@ -2,7 +2,7 @@
 	import { createEventDispatcher, onDestroy, onMount } from 'svelte';
 	import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
-	export let value: string;
+	export let value: string = '';
 
 	let editor: Monaco.editor.IStandaloneCodeEditor;
 	let monaco: typeof Monaco;
@@ -11,21 +11,27 @@
 
 	onMount(async () => {
 		monaco = (await import('../monaco')).default;
+		const { GCL_LANGUAGE_ID } = await import('../langs/gcl');
 
-		// const { PGCL_LANGUAGE_ID } = await import('./pgcl');
 		// const { AYU_MIRAGE } = await import('../themes/ayu');
 
 		editor = monaco.editor.create(editorContainer, {
 			minimap: { enabled: false },
 			lineNumbers: 'off',
 			// theme: AYU_MIRAGE,
-			scrollBeyondLastLine: false
+			theme: 'vs-dark',
+			scrollBeyondLastLine: false,
+			language: GCL_LANGUAGE_ID
 		});
-		model = monaco.editor.createModel(value, 'idk');
+		model = monaco.editor.createModel(value, GCL_LANGUAGE_ID);
 		editor.setModel(model);
 		model.onDidChangeContent(() => {
 			value = model.getValue();
 		});
+
+		window.addEventListener('resize', () => editor.layout());
+
+		setInterval(() => editor.layout(), 1000);
 	});
 
 	onDestroy(() => {
@@ -38,7 +44,9 @@
 	}
 </script>
 
-<div class="h-96 w-full" bind:this={editorContainer} />
+<div class="relative h-full w-full">
+	<div class="absolute inset-0" bind:this={editorContainer} />
+</div>
 
 <style>
 	.container {

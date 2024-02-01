@@ -16,3 +16,6 @@ serde.workspace = true
 serde_json.workspace = true
 tapi-macro = { path = "../tapi-macro" }
 tsify = { version = "0.4.5", default-features = false, features = ["json"] }
+
+[dev-dependencies]
+insta = "1.34.0"

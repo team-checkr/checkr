@@ -1,12 +1,13 @@
 <script lang="ts">
+	import { ce_shell } from '$lib/api';
+	import { page } from '$app/stores';
 	import '../app.pcss';
-	import { type Analysis, ANALYSIS } from '$lib/api';
 
 	import CommandLineIcon from '~icons/heroicons/command-line';
 	import PlayCircleIcon from '~icons/heroicons/play-circle';
 	import QuestionMarkCircleIcon from '~icons/heroicons/question-mark-circle';
 
-	let analysis: Analysis = ANALYSIS[0];
+	const { ANALYSIS } = ce_shell;
 </script>
 
 <div class="grid h-screen grid-rows-[auto_1fr]">
@@ -28,12 +29,15 @@
 	  )
 	} -->
 
-		<select class="ml-4 border-none bg-transparent py-0 text-right" bind:value={analysis}>
-			<!-- on:input={(evt) => (analysis = Analysis.from_str(evt.target.value).unwrap())} -->
+		<div class="ml-6 flex h-full text-base font-thin">
 			{#each ANALYSIS as o}
-				<option>{o}</option>
+				<a
+					href="/env/{o}"
+					class="flex items-center px-2 transition"
+					class:active={$page.url.pathname == `/env/${o}`}>{o}</a
+				>
 			{/each}
-		</select>
+		</div>
 
 		<div class="flex-1"></div>
 		<a
@@ -53,7 +57,11 @@
 		</a>
 	</nav>
 
-	<main>
-		<slot />
-	</main>
+	<slot />
 </div>
+
+<style>
+	.active {
+		@apply bg-slate-700;
+	}
+</style>

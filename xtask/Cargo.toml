@@ -11,7 +11,7 @@ publish = false
 # release = false
 
 [dependencies]
-binswap-github = "0.1.7"
+# binswap-github = "0.1.7"
 ce-core.workspace = true
 clap = { version = "4.1.4", features = ["derive"] }
 color-eyre = { workspace = true }
@@ -20,6 +20,7 @@ heck = "0.4.1"
 itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+tapi.workspace = true
 tokio = { workspace = true }
 toml_edit = "0.20.0"
 tracing.workspace = true

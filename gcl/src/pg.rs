@@ -17,7 +17,9 @@ pub struct ProgramGraph {
     outgoing: HashMap<Node, Vec<Edge>>,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(
+    tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(tag = "Case")]
 pub enum Determinism {
     Deterministic,

@@ -16,12 +16,22 @@ macro_rules! define_shell {
 
         use dioxus::prelude::*;
 
+        pub mod envs {
+            $(pub use $krate;)*
+        }
+
+        #[derive(tapi::Tapi)]
+        #[serde(tag = "analysis", content = "io")]
+        pub enum Envs {
+            $($name {
+                input: <$krate as Env>::Input,
+                output: <$krate as Env>::Output,
+            },)*
+        }
 
         #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
         pub enum Analysis {
-            $(
-                $name,
-            )*
+            $($name,)*
         }
 
         impl std::fmt::Display for Analysis {
@@ -60,26 +70,28 @@ macro_rules! define_shell {
                 }
             }
             #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
-            pub fn parse_input(self, src: &str) -> Input {
+            pub fn parse_input(self, src: &str) -> Result<Input, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
-                        let input = serde_json::from_str::<<$krate as Env>::Input>(src).unwrap();
-                        Input {
+                        let input = serde_json::from_str::<<$krate as Env>::Input>(src)
+                            .map_err($crate::io::Error::JsonError)?;
+                        Ok(Input {
                             analysis: self,
                             json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
-                        }
+                        })
                     }),*
                 }
             }
             #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
-            pub fn parse_output(self, src: &str) -> Output {
+            pub fn parse_output(self, src: &str) -> Result<Output, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
-                        let output = serde_json::from_str::<<$krate as Env>::Output>(src).unwrap();
-                        Output {
+                        let output = serde_json::from_str::<<$krate as Env>::Output>(src)
+                            .map_err($crate::io::Error::JsonError)?;
+                        Ok(Output {
                             analysis: self,
                             json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
-                        }
+                        })
                     }),*
                 }
             }
@@ -131,6 +143,26 @@ macro_rules! define_shell {
                 }
             }
         }
+
+        $(
+            impl EnvExt for $krate {
+                const ANALYSIS: Analysis = Analysis::$name;
+
+                fn generalize_input(input: &Self::Input) -> Input {
+                    Input {
+                        analysis: Self::ANALYSIS,
+                        json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
+                    }
+                }
+
+                fn generalize_output(output: &Self::Output) -> Output {
+                    Output {
+                        analysis: Self::ANALYSIS,
+                        json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
+                    }
+                }
+            }
+        )*
     };
 }
 

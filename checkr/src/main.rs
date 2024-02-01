@@ -26,7 +26,7 @@ fn main() -> color_eyre::Result<()> {
 
     match Cli::parse() {
         Cli::Reference { analysis, input } => {
-            let input = analysis.parse_input(&input);
+            let input = analysis.parse_input(&input)?;
             let output = input.reference_output()?;
             println!("{output}");
 

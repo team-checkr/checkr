@@ -1,6 +1,7 @@
-#[derive(Debug, Clone, Copy, PartialEq)]
-pub struct Span<'a> {
-    pub text: &'a str,
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Span {
+    // pub text: &'a str,
+    pub text: String,
     pub code: Option<Code>,
     pub fg: Option<Color>,
     pub bg: Option<Color>,
@@ -13,7 +14,7 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
     while !s.is_empty() {
         if let Some((left, right)) = s.split_once('\u{001b}') {
             spans.push(Span {
-                text: left,
+                text: left.to_string(),
                 code: None,
                 fg: None,
                 bg: None,
@@ -29,7 +30,7 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
             {
                 for value in right[1..end_idx + 1].split(';') {
                     spans.push(Span {
-                        text: "",
+                        text: "".to_string(),
                         code: Some(Code::from_str(value)),
                         fg: None,
                         bg: None,
@@ -41,7 +42,7 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
             }
         } else {
             spans.push(Span {
-                text: s,
+                text: s.to_string(),
                 code: None,
                 fg: None,
                 bg: None,
@@ -119,13 +120,13 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
     spans
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub enum ColorType {
     Foreground,
     Background,
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub enum Code {
     Reset,
     Bright,
@@ -141,7 +142,7 @@ pub enum Code {
     Unknown(u8),
 }
 
-#[derive(Debug, Clone, Copy, PartialEq)]
+#[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, serde::Serialize)]
 pub enum Color {
     Black,
     Red,

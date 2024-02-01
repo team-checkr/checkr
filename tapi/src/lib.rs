@@ -1,7 +1,9 @@
+#[cfg(test)]
+mod tests;
+
 use std::{
-    any::Any,
     cell::{Cell, RefCell},
-    collections::{HashMap, HashSet},
+    collections::{BTreeMap, HashMap, HashSet},
     marker::PhantomData,
     rc::Rc,
     sync::Arc,
@@ -74,10 +76,10 @@ impl RequestStructure {
         }
     }
 }
-pub trait Endpoint {
+pub trait Endpoint<AppState> {
     fn path(&self) -> &'static str;
     fn method(&self) -> Method;
-    fn bind_to(&self, router: axum::Router) -> axum::Router;
+    fn bind_to(&self, router: axum::Router<AppState>) -> axum::Router<AppState>;
     fn body(&self) -> RequestStructure;
     fn res(&self) -> ResponseTapi;
     fn tys(&self) -> Vec<&'static dyn Typed> {
@@ -117,21 +119,21 @@ pub trait Endpoint {
         match (self.body(), self.res()) {
             (RequestStructure { body: None, .. }, ResponseTapi::Sse(ty)) => {
                 // TODO: handle non-json responses
-                write!(s, "sse<{}>({:?}, \"json\")", ty.ts_name(), self.path(),).unwrap();
+                write!(s, "sse<{}>({:?}, \"json\")", ty.full_ts_name(), self.path(),).unwrap();
             }
             (RequestStructure { body, .. }, res) => {
                 write!(
                     s,
                     "request<{}, {}>({:?}, {:?}, {:?}, {:?})",
                     match body {
-                        Some(RequestStructureBody::Query(ty)) => ty.ts_name(),
-                        Some(RequestStructureBody::Json(ty)) => ty.ts_name(),
+                        Some(RequestStructureBody::Query(ty)) => ty.full_ts_name(),
+                        Some(RequestStructureBody::Json(ty)) => ty.full_ts_name(),
                         // TODO: is this right?
                         Some(RequestStructureBody::PlainText) =>
                             "Record<string, never>".to_string(),
                         None => "Record<string, never>".to_string(),
                     },
-                    res.ty().ts_name(),
+                    res.ty().full_ts_name(),
                     match body {
                         Some(RequestStructureBody::Query(_)) => "query",
                         Some(RequestStructureBody::Json(_)) => "json",
@@ -156,9 +158,9 @@ pub trait Endpoint {
         s
     }
 }
-impl<'a, T> Endpoint for &'a T
+impl<'a, AppState, T> Endpoint<AppState> for &'a T
 where
-    T: Endpoint,
+    T: Endpoint<AppState>,
 {
     fn path(&self) -> &'static str {
         (*self).path()
@@ -166,7 +168,7 @@ where
     fn method(&self) -> Method {
         (*self).method()
     }
-    fn bind_to(&self, router: axum::Router) -> axum::Router {
+    fn bind_to(&self, router: axum::Router<AppState>) -> axum::Router<AppState> {
         (*self).bind_to(router)
     }
     fn body(&self) -> RequestStructure {
@@ -177,12 +179,12 @@ where
     }
 }
 
-pub struct Endpoints<'a> {
-    endpoints: Vec<&'a dyn Endpoint>,
+pub struct Endpoints<'a, AppState> {
+    endpoints: Vec<&'a dyn Endpoint<AppState>>,
     extra_tys: Vec<&'static dyn Typed>,
 }
-impl<'a> Endpoints<'a> {
-    pub fn new(endpoints: impl IntoIterator<Item = &'a dyn Endpoint>) -> Self {
+impl<'a, AppState> Endpoints<'a, AppState> {
+    pub fn new(endpoints: impl IntoIterator<Item = &'a dyn Endpoint<AppState>>) -> Self {
         Self {
             endpoints: endpoints.into_iter().collect(),
             extra_tys: Vec::new(),
@@ -207,7 +209,19 @@ impl<'a> Endpoints<'a> {
 
         for ty in self.tys() {
             if let Some(decl) = ty.ts_decl() {
+                for p in ty.path() {
+                    s.push_str(&format!("export namespace {p} {{"));
+                }
+                if !ty.path().is_empty() {
+                    s.push('\n');
+                }
                 s.push_str(&decl);
+                if !ty.path().is_empty() {
+                    s.push('\n');
+                }
+                for _p in ty.path() {
+                    s.push('}');
+                }
                 s.push('\n');
             }
         }
@@ -222,24 +236,24 @@ impl<'a> Endpoints<'a> {
         s
     }
 }
-impl<'a> IntoIterator for Endpoints<'a> {
-    type Item = &'a dyn Endpoint;
+impl<'a, AppState> IntoIterator for Endpoints<'a, AppState> {
+    type Item = &'a dyn Endpoint<AppState>;
     type IntoIter = std::vec::IntoIter<Self::Item>;
     fn into_iter(self) -> Self::IntoIter {
         self.endpoints.into_iter()
     }
 }
-impl<'s, 'a> IntoIterator for &'s Endpoints<'a> {
-    type Item = &'a dyn Endpoint;
-    type IntoIter = std::iter::Copied<std::slice::Iter<'s, &'a dyn Endpoint>>;
+impl<'s, 'a, AppState> IntoIterator for &'s Endpoints<'a, AppState> {
+    type Item = &'a dyn Endpoint<AppState>;
+    type IntoIter = std::iter::Copied<std::slice::Iter<'s, &'a dyn Endpoint<AppState>>>;
     fn into_iter(self) -> Self::IntoIter {
         self.endpoints.iter().copied()
     }
 }
 
-pub trait RouterExt {
-    fn tapi<E: Endpoint + ?Sized>(self, endpoint: &E) -> Self;
-    fn tapis<'a>(self, endpoints: impl IntoIterator<Item = &'a dyn Endpoint>) -> Self
+pub trait RouterExt<AppState: 'static> {
+    fn tapi<E: Endpoint<AppState> + ?Sized>(self, endpoint: &E) -> Self;
+    fn tapis<'a>(self, endpoints: impl IntoIterator<Item = &'a dyn Endpoint<AppState>>) -> Self
     where
         Self: Sized,
     {
@@ -247,8 +261,8 @@ pub trait RouterExt {
     }
 }
 
-impl RouterExt for axum::Router {
-    fn tapi<E: Endpoint + ?Sized>(self, endpoint: &E) -> Self {
+impl<AppState: 'static> RouterExt<AppState> for axum::Router<AppState> {
+    fn tapi<E: Endpoint<AppState> + ?Sized>(self, endpoint: &E) -> Self {
         E::bind_to(endpoint, self)
     }
 }
@@ -305,6 +319,11 @@ impl<T: Tapi + 'static> RequestTapiExtractor for axum::extract::Query<T> {
 impl<T: Tapi + 'static> RequestTapiExtractor for axum::Json<T> {
     fn extract_request() -> RequestTapi {
         RequestTapi::Json(<T as Tapi>::boxed())
+    }
+}
+impl<T> RequestTapiExtractor for axum::extract::State<T> {
+    fn extract_request() -> RequestTapi {
+        RequestTapi::None
     }
 }
 
@@ -384,7 +403,24 @@ pub trait Tapi {
     fn id() -> std::any::TypeId;
     fn dependencies() -> Vec<&'static dyn Typed>;
     fn ts_name() -> String;
+    fn full_ts_name() -> String {
+        let mut name = Self::ts_name();
+        for p in Self::path().iter().rev() {
+            name = format!("{}.{}", p, name);
+        }
+        name
+    }
     fn zod_name() -> String;
+    fn path() -> Vec<&'static str> {
+        let mut path = std::any::type_name::<Self>()
+            .split('<')
+            .next()
+            .unwrap()
+            .split("::")
+            .collect::<Vec<_>>();
+        path.pop();
+        path
+    }
     fn ts_decl() -> Option<String> {
         None
     }
@@ -403,6 +439,8 @@ pub trait Typed: std::fmt::Debug {
     fn name(&self) -> &'static str;
     fn id(&self) -> std::any::TypeId;
     fn dependencies(&self) -> Vec<&'static dyn Typed>;
+    fn path(&self) -> Vec<&'static str>;
+    fn full_ts_name(&self) -> String;
     fn ts_name(&self) -> String;
     fn zod_name(&self) -> String;
     fn ts_decl(&self) -> Option<String>;
@@ -418,6 +456,12 @@ impl<T: Tapi> Typed for TypedWrap<T> {
     }
     fn dependencies(&self) -> Vec<&'static dyn Typed> {
         <T as Tapi>::dependencies()
+    }
+    fn path(&self) -> Vec<&'static str> {
+        <T as Tapi>::path()
+    }
+    fn full_ts_name(&self) -> String {
+        <T as Tapi>::full_ts_name()
     }
     fn ts_name(&self) -> String {
         <T as Tapi>::ts_name()
@@ -463,6 +507,9 @@ macro_rules! impl_typed {
                 fn dependencies() -> Vec<&'static dyn Typed> {
                     Vec::new()
                 }
+                fn path() -> Vec<&'static str> {
+                    Vec::new()
+                }
                 fn ts_name() -> String {
                     $ts_name.to_string()
                 }
@@ -484,14 +531,13 @@ macro_rules! impl_generic {
                     std::any::TypeId::of::<$ty<T>>()
                 }
                 fn dependencies() -> Vec<&'static dyn Typed> {
-                    if let Some(inner) = (&TypedWrap(PhantomData::<T>) as &dyn Any).downcast_ref::<&dyn Typed>() {
-                        inner.dependencies()
-                    } else {
-                        Vec::new()
-                    }
+                    vec![T::boxed()]
+                }
+                fn path() -> Vec<&'static str> {
+                    Vec::new()
                 }
                 fn ts_name() -> String {
-                    format!($ts_name, T::ts_name())
+                    format!($ts_name, T::full_ts_name())
                 }
                 fn zod_name() -> String {
                     format!($zod_name, T::zod_name())
@@ -513,21 +559,23 @@ impl_typed!(
     u32 = "number",
     u64 = "number",
     u128 = "number",
+    usize = "number",
     f32 = "number",
     f64 = "number",
     bool = "boolean",
     char = "string",
+    &str = "string",
 );
 impl_generic!(
     Vec = "{}[]" & "z.array({})",
-    Option = "{}?" & "z.optional({})",
+    Option = "({} | null)" & "z.optional({})",
     HashSet = "{}[]" & "z.array({})",
     Rc = "{}" & "{}",
     Arc = "{}" & "{}",
     Cell = "{}" & "{}",
     RefCell = "{}" & "{}",
 );
-impl<T: 'static + Tapi> Tapi for HashMap<String, T> {
+impl<K: 'static + Tapi, V: 'static + Tapi> Tapi for HashMap<K, V> {
     fn name() -> &'static str {
         std::any::type_name::<Self>()
     }
@@ -535,16 +583,19 @@ impl<T: 'static + Tapi> Tapi for HashMap<String, T> {
         std::any::TypeId::of::<Self>()
     }
     fn dependencies() -> Vec<&'static dyn Typed> {
-        T::dependencies()
+        [K::boxed(), V::boxed()].to_vec()
+    }
+    fn path() -> Vec<&'static str> {
+        Vec::new()
     }
     fn ts_name() -> String {
-        format!("Record<{}, {}>", String::ts_name(), T::ts_name())
+        format!("Record<{}, {}>", K::full_ts_name(), V::full_ts_name())
     }
     fn zod_name() -> String {
-        format!("z.record({}, {})", String::zod_name(), T::zod_name())
+        format!("z.record({}, {})", K::zod_name(), V::zod_name())
     }
 }
-impl<T: 'static + Tapi> Tapi for IndexMap<String, T> {
+impl<K: 'static + Tapi, V: 'static + Tapi> Tapi for BTreeMap<K, V> {
     fn name() -> &'static str {
         std::any::type_name::<Self>()
     }
@@ -552,13 +603,36 @@ impl<T: 'static + Tapi> Tapi for IndexMap<String, T> {
         std::any::TypeId::of::<Self>()
     }
     fn dependencies() -> Vec<&'static dyn Typed> {
-        T::dependencies()
+        [K::boxed(), V::boxed()].to_vec()
+    }
+    fn path() -> Vec<&'static str> {
+        Vec::new()
     }
     fn ts_name() -> String {
-        format!("Record<{}, {}>", String::ts_name(), T::ts_name())
+        format!("Record<{}, {}>", K::full_ts_name(), V::full_ts_name())
     }
     fn zod_name() -> String {
-        format!("z.record({}, {})", String::zod_name(), T::zod_name())
+        format!("z.record({}, {})", K::zod_name(), V::zod_name())
+    }
+}
+impl<K: 'static + Tapi, V: 'static + Tapi> Tapi for IndexMap<K, V> {
+    fn name() -> &'static str {
+        std::any::type_name::<Self>()
+    }
+    fn id() -> std::any::TypeId {
+        std::any::TypeId::of::<Self>()
+    }
+    fn dependencies() -> Vec<&'static dyn Typed> {
+        [K::boxed(), V::boxed()].to_vec()
+    }
+    fn path() -> Vec<&'static str> {
+        Vec::new()
+    }
+    fn ts_name() -> String {
+        format!("Record<{}, {}>", K::full_ts_name(), V::full_ts_name())
+    }
+    fn zod_name() -> String {
+        format!("z.record({}, {})", K::zod_name(), V::zod_name())
     }
 }
 
@@ -572,18 +646,22 @@ macro_rules! impl_tuple {
                 std::any::TypeId::of::<Self>()
             }
             fn dependencies() -> Vec<&'static dyn Typed> {
-                let mut deps = Vec::new();
-                $(
-                    deps.extend(<$ty as Tapi>::dependencies());
-                )*
-                deps.sort_by_key(|t| t.id());
-                deps.dedup_by_key(|t| t.id());
-                deps
+                [$(<$ty as Tapi>::boxed()),*].to_vec()
+                // let mut deps = Vec::new();
+                // $(
+                //     deps.extend(<$ty as Tapi>::dependencies());
+                // )*
+                // deps.sort_by_key(|t| t.id());
+                // deps.dedup_by_key(|t| t.id());
+                // deps
+            }
+            fn path() -> Vec<&'static str> {
+                Vec::new()
             }
             fn ts_name() -> String {
                 format!(
                     "[{}]",
-                    vec![$(<$ty as Tapi>::ts_name()),*].join(", ")
+                    vec![$(<$ty as Tapi>::full_ts_name()),*].join(", ")
                 )
             }
             fn zod_name() -> String {
@@ -607,6 +685,9 @@ impl Tapi for serde_json::Value {
         std::any::TypeId::of::<Self>()
     }
     fn dependencies() -> Vec<&'static dyn Typed> {
+        Vec::new()
+    }
+    fn path() -> Vec<&'static str> {
         Vec::new()
     }
     fn ts_name() -> String {

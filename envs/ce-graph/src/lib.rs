@@ -11,15 +11,15 @@ use serde::{Deserialize, Serialize};
 
 define_env!(GraphEnv);
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphInput {
-    commands: Commands,
-    deterministic: Determinism,
+    pub commands: Commands,
+    pub determinism: Determinism,
 }
 
-#[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct GraphOutput {
-    dot: String,
+    pub dot: String,
 }
 
 impl Env for GraphEnv {
@@ -28,7 +28,7 @@ impl Env for GraphEnv {
     type Output = GraphOutput;
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let dot = ProgramGraph::new(input.deterministic, &input.commands).dot();
+        let dot = ProgramGraph::new(input.determinism, &input.commands).dot();
         Ok(GraphOutput { dot })
     }
 
@@ -42,7 +42,7 @@ impl Env for GraphEnv {
                 commands: props.input().commands.clone(),
                 on_change: move |commands| props.set_input(GraphInput {
                     commands,
-                    deterministic: Determinism::Deterministic
+                    determinism: Determinism::Deterministic
                 }),
             })),
             output: props.with_result(cx, |res| cx.render(rsx!(
@@ -74,7 +74,7 @@ impl Generate for GraphInput {
     fn gen<R: ce_core::rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         GraphInput {
             commands: Commands::gen(&mut Default::default(), rng),
-            deterministic: Determinism::NonDeterministic,
+            determinism: Determinism::NonDeterministic,
         }
     }
 }
