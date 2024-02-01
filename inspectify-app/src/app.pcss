@@ -14,3 +14,11 @@
 .prose code::after {
 	content: '';
 }
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    @apply border-slate-600;
+  }
+}

@@ -36,3 +36,9 @@ impl std::fmt::Display for Output {
         self.json.fmt(f)
     }
 }
+
+#[derive(Debug, thiserror::Error)]
+pub enum Error {
+    #[error("json error: {0}")]
+    JsonError(#[from] serde_json::Error),
+}

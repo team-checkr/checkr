@@ -40,7 +40,9 @@
 	"type": "module",
 	"dependencies": {
 		"@iconify-json/heroicons": "^1.1.19",
+		"ayu": "^8.0.1",
 		"monaco-editor": "^0.45.0",
-		"unplugin-icons": "^0.18.1"
+		"unplugin-icons": "^0.18.1",
+		"vis-network": "^9.1.9"
 	}
 }

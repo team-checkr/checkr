@@ -6,11 +6,11 @@ pub enum Target<Idx = ()> {
     Array(Array, Idx),
 }
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Variable(pub String);
 
-#[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Array(pub String);
 
@@ -52,6 +52,32 @@ impl<'a> Deserialize<'a> for BExpr {
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);
+
+impl tapi::Tapi for Commands {
+    fn name() -> &'static str {
+        "Commands"
+    }
+
+    fn id() -> std::any::TypeId {
+        std::any::TypeId::of::<Commands>()
+    }
+
+    fn dependencies() -> Vec<&'static dyn tapi::Typed> {
+        vec![]
+    }
+
+    fn ts_name() -> String {
+        "Commands".to_string()
+    }
+
+    fn zod_name() -> String {
+        "Commands".to_string()
+    }
+
+    fn ts_decl() -> Option<String> {
+        Some("export type Commands = string;".to_string())
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Command {

@@ -57,47 +57,47 @@ async fn run() -> color_eyre::Result<()> {
 
     let view = dioxus_liveview::LiveViewPool::new();
 
-    let app = Router::new()
-        // The root route contains the glue code to connect to the WebSocket
-        .route(
-            "/",
-            get(move || async move {
-                Html(
-                    include_str!("./index.html")
-                        .replace(
-                            "%head%",
-                            &format!("<style>{}</style>", include_str!("../public/tailwind.css")),
-                        )
-                        .replace(
-                            "%glue%",
-                            &dioxus_liveview::interpreter_glue(&format!("ws://{addr}/ws")),
-                        ),
-                )
-            }),
-        )
-        // The WebSocket route is what Dioxus uses to communicate with the browser
-        .route(
-            "/ws",
-            get(move |ws: WebSocketUpgrade| async move {
-                ws.on_upgrade(move |socket| async move {
-                    // When the WebSocket is upgraded, launch the LiveView with the app component
-                    _ = view
-                        .launch_with_props(
-                            dioxus_liveview::axum_socket(socket),
-                            App,
-                            AppProps { hub, driver },
-                        )
-                        .await;
-                })
-            }),
-        );
+    // let app = Router::new()
+    //     // The root route contains the glue code to connect to the WebSocket
+    //     .route(
+    //         "/",
+    //         get(move || async move {
+    //             Html(
+    //                 include_str!("./index.html")
+    //                     .replace(
+    //                         "%head%",
+    //                         &format!("<style>{}</style>", include_str!("../public/tailwind.css")),
+    //                     )
+    //                     .replace(
+    //                         "%glue%",
+    //                         &dioxus_liveview::interpreter_glue(&format!("ws://{addr}/ws")),
+    //                     ),
+    //             )
+    //         }),
+    //     )
+    //     // The WebSocket route is what Dioxus uses to communicate with the browser
+    //     .route(
+    //         "/ws",
+    //         get(move |ws: WebSocketUpgrade| async move {
+    //             ws.on_upgrade(move |socket| async move {
+    //                 // When the WebSocket is upgraded, launch the LiveView with the app component
+    //                 _ = view
+    //                     .launch_with_props(
+    //                         dioxus_liveview::axum_socket(socket),
+    //                         App,
+    //                         AppProps { hub, driver },
+    //                     )
+    //                     .await;
+    //             })
+    //         }),
+    //     );
 
-    println!("Listening on http://{addr}");
+    // println!("Listening on http://{addr}");
 
-    axum::Server::bind(&addr.to_string().parse().unwrap())
-        .serve(app.into_make_service())
-        .await
-        .unwrap();
+    // axum::Server::bind(&addr.to_string().parse().unwrap())
+    //     .serve(app.into_make_service())
+    //     .await
+    //     .unwrap();
 
     Ok(())
 }
@@ -556,7 +556,10 @@ fn ViewEnv(cx: Scope) -> Element {
                 if stdout.is_empty() {
                     return;
                 }
-                let output = input.analysis().parse_output(&stdout);
+                let output = input
+                    .analysis()
+                    .parse_output(&stdout)
+                    .expect("failed to parse output");
                 real_output.set(Some(output));
             }
             .instrument(tracing::info_span!("running analysis", ?analysis))

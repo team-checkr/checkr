@@ -174,7 +174,8 @@ macro_rules! define_env {
     };
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(tag = "type")]
 pub enum ValidationResult {
     CorrectTerminated,
     CorrectNonTerminated { iterations: u64 },

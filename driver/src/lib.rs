@@ -61,7 +61,7 @@ impl Driver {
         args.push(input.analysis().to_string());
         args.push(input.to_string());
         self.hub.exec_command(
-            JobKind::Analysis(input.analysis()),
+            JobKind::Analysis(input.analysis(), input.clone()),
             (),
             &args[0],
             &args[1..],

@@ -1,6 +1,8 @@
+use darling::FromMeta;
 use proc_macro2::Ident;
 use quote::format_ident;
-use syn::parse_macro_input;
+use serde_derive_internals::attr::TagType;
+use syn::{parse_macro_input, Fields};
 
 #[derive(Debug)]
 struct Args {
@@ -74,17 +76,17 @@ pub fn tapi(
     let mut body_ty = Vec::new();
     for inp in &fn_.sig.inputs {
         match inp {
-            syn::FnArg::Receiver(r) => {
+            syn::FnArg::Receiver(_) => {
                 todo!("idk what to do with receivers")
             }
             syn::FnArg::Typed(t) => {
-                body_ty.push((&*t.ty).clone());
+                body_ty.push((*t.ty).clone());
             }
         }
     }
     let res_ty = match &fn_.sig.output {
         syn::ReturnType::Default => None,
-        syn::ReturnType::Type(_, ty) => Some((&**ty).clone()),
+        syn::ReturnType::Type(_, ty) => Some((**ty).clone()),
     };
 
     let res_ty = res_ty.unwrap_or_else(|| {
@@ -107,14 +109,14 @@ pub fn tapi(
         mod #name {
             use super::*;
             pub struct endpoint;
-            impl ::tapi::Endpoint for endpoint {
+            impl ::tapi::Endpoint<AppState> for endpoint {
                 fn path(&self) -> &'static str {
                     #path
                 }
                 fn method(&self) -> tapi::Method {
                     ::tapi::Method::#method
                 }
-                fn bind_to(&self, router: ::axum::Router) -> ::axum::Router {
+                fn bind_to(&self, router: ::axum::Router<AppState>) -> ::axum::Router<AppState> {
                     router.route(#path, ::axum::routing::#handler(super::#name))
                 }
                 fn body(&self) -> ::tapi::RequestStructure {
@@ -137,70 +139,192 @@ pub fn tapi(
     output.into()
 }
 
-#[proc_macro_derive(Tapi)]
+#[derive(Debug, FromMeta)]
+struct DeriveInput {
+    krate: Option<String>,
+}
+
+#[proc_macro_derive(Tapi, attributes(serde, tapi))]
 pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
     let input = proc_macro2::TokenStream::from(input);
 
     let derive_input = syn::parse2::<syn::DeriveInput>(input.clone()).unwrap();
 
-    let name = derive_input.ident;
-
-    match &derive_input.data {
-        syn::Data::Struct(st) => {
-            let mut field_names = Vec::new();
-            let mut fields = Vec::new();
-            for field in &st.fields {
-                field_names.push(field.ident.clone().unwrap());
-                fields.push(field.ty.clone());
+    let tapi_path = derive_input
+        .attrs
+        .iter()
+        .find_map(|attr| {
+            if attr.meta.path().is_ident("tapi") {
+                let derive_input = DeriveInput::from_meta(&attr.meta)
+                    .unwrap_or_else(|_| panic!("at: {}", line!()));
+                derive_input.krate.map(|krate| {
+                    syn::parse_str(&krate)
+                        .unwrap_or_else(|_| panic!("failed to parse krate path: {}", line!()))
+                })
+            } else {
+                None
             }
-            quote::quote! {
-                impl ::tapi::Tapi for #name {
-                    fn name() -> &'static str {
-                        stringify!(#name)
+        })
+        .unwrap_or_else(|| quote::quote!(::tapi));
+
+    let name = derive_input.ident.clone();
+    let constant_name = format_ident!("{}", heck::AsShoutySnakeCase(&name.to_string()).to_string());
+    let generics = derive_input.generics.params.clone();
+    let mut sgenerics = Vec::new();
+    let mut life_times = Vec::new();
+    for g in &generics {
+        match g {
+            syn::GenericParam::Lifetime(l) => {
+                life_times.push(l.lifetime.clone());
+            }
+            syn::GenericParam::Type(ty) => {
+                let ident = &ty.ident;
+                sgenerics.push(quote::quote!(#ident))
+            }
+            syn::GenericParam::Const(_) => todo!("syn::GenericParam::Const"),
+        }
+    }
+    let serde_flags = {
+        let cx = serde_derive_internals::Ctxt::new();
+        let container = serde_derive_internals::ast::Container::from_ast(
+            &cx,
+            &derive_input,
+            serde_derive_internals::Derive::Serialize,
+        )
+        .unwrap();
+        cx.check().unwrap();
+        container
+    };
+
+    if let (Some(type_into), Some(_type_from)) = (
+        serde_flags.attrs.type_into(),
+        serde_flags.attrs.type_try_from(),
+    ) {
+        return quote::quote!(
+            impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
+                fn name() -> &'static str {
+                    stringify!(#name)
+                }
+                fn id() -> std::any::TypeId {
+                    std::any::TypeId::of::<#name<#(#sgenerics),*>>()
+                }
+                fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
+                    vec![#(<#sgenerics as #tapi_path::Tapi>::boxed()),*]
+                }
+                fn ts_name() -> String {
+                    stringify!(#name).to_string()
+                }
+                fn zod_name() -> String {
+                    stringify!(#name).to_string()
+                }
+                fn ts_decl() -> Option<String> {
+                    Some(format!(
+                        "export type {} = {};",
+                        stringify!(#name),
+                        <#type_into as #tapi_path::Tapi>::full_ts_name(),
+                    ))
+                }
+                fn zod_decl() -> Option<String> {
+                    None
+                }
+            }
+        )
+        .into();
+    }
+
+    let result: proc_macro2::TokenStream = match &derive_input.data {
+        syn::Data::Struct(st) => {
+            if serde_flags.attrs.transparent() {
+                let inner_ty = st.fields.iter().next().unwrap().ty.clone();
+                quote::quote! {
+                    impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
+                        fn name() -> &'static str {
+                            stringify!(#name)
+                        }
+                        fn id() -> std::any::TypeId {
+                            std::any::TypeId::of::<#name<#(#sgenerics),*>>()
+                        }
+                        fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
+                            // todo!();
+                            // TODO
+                            vec![<#inner_ty as #tapi_path::Tapi>::boxed()]
+                            // vec![#(<#fields as #tapi_path::Tapi>::boxed()),*]
+                        }
+                        fn ts_name() -> String {
+                            stringify!(#name).to_string()
+                        }
+                        fn zod_name() -> String {
+                            stringify!(#name).to_string()
+                        }
+                        fn ts_decl() -> Option<String> {
+                            Some(format!(
+                                "export type {} = {};",
+                                stringify!(#name),
+                                <#inner_ty as #tapi_path::Tapi>::full_ts_name(),
+                            ))
+                        }
+                        fn zod_decl() -> Option<String> {
+                            None
+                        }
                     }
-                    fn id() -> std::any::TypeId {
-                        std::any::TypeId::of::<#name>()
-                    }
-                    fn dependencies() -> Vec<&'static dyn ::tapi::Typed> {
-                        vec![#(<#fields as ::tapi::Tapi>::boxed()),*]
-                    }
-                    fn ts_name() -> String {
-                        stringify!(#name).to_string()
-                    }
-                    fn zod_name() -> String {
-                        stringify!(#name).to_string()
-                    }
-                    fn ts_decl() -> Option<String> {
-                        Some(format!(
-                            "export type {} = {{ {} }}",
-                            stringify!(#name),
-                            vec![#(
+                }
+            } else {
+                let mut field_names = Vec::new();
+                let mut fields = Vec::new();
+                for field in &st.fields {
+                    field_names.push(field.ident.clone().expect("field did not have a name"));
+                    fields.push(field.ty.clone());
+                }
+                quote::quote! {
+                    impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
+                        fn name() -> &'static str {
+                            stringify!(#name)
+                        }
+                        fn id() -> std::any::TypeId {
+                            std::any::TypeId::of::<#name<#(#sgenerics),*>>()
+                        }
+                        fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
+                            vec![#(<#fields as #tapi_path::Tapi>::boxed()),*]
+                        }
+                        fn ts_name() -> String {
+                            stringify!(#name).to_string()
+                        }
+                        fn zod_name() -> String {
+                            stringify!(#name).to_string()
+                        }
+                        fn ts_decl() -> Option<String> {
+                            let fields: Vec<String> = vec![#(
                                 format!(
                                     "{}: {}",
                                     stringify!(#field_names),
-                                    <#fields as ::tapi::Tapi>::ts_name()
+                                    <#fields as #tapi_path::Tapi>::full_ts_name(),
                                 ),
-                            )*].join(", ")
-                        ))
-                    }
-                    fn zod_decl() -> Option<String> {
-                        Some(format!(
-                            "const {} = z.object({{ {} }});\ntype {} = z.infer<typeof {}>;",
-                            stringify!(#name),
-                            vec![#(
+                            )*];
+                            Some(format!(
+                                "export type {} = {{ {} }}",
+                                stringify!(#name),
+                                fields.join(", "),
+                            ))
+                        }
+                        fn zod_decl() -> Option<String> {
+                            let fields: Vec<String> = vec![#(
                                 format!(
                                     "{}: {}",
                                     stringify!(#field_names),
-                                    <#fields as ::tapi::Tapi>::zod_name()
+                                    <#fields as #tapi_path::Tapi>::zod_name()
                                 ),
-                            )*].join(", "),
-                            stringify!(#name),
-                            stringify!(#name),
-                        ))
+                            )*];
+                            Some(format!(
+                                "const {} = z.object({{ {} }});\ntype {} = z.infer<typeof {}>;",
+                                stringify!(#name),
+                                fields.join(", "),
+                                stringify!(#name),
+                                stringify!(#name),
+                            ))
+                        }
                     }
                 }
             }
-            .into()
         }
         syn::Data::Enum(en) => {
             // We want to transform an enum like this:
@@ -209,14 +333,14 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             //     Bar,
             // }
             // into something like this:
-            // impl ::tapi::Tapi for Analysis {
+            // impl #tapi_path::Tapi for Analysis {
             //    fn name() -> &'static str {
             //        stringify!(Analysis)
             //    }
             //    fn id() -> std::any::TypeId {
             //        std::any::TypeId::of::<Analysis>()
             //    }
-            //    fn dependencies() -> Vec<&'static dyn ::tapi::Typed> {
+            //    fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
             //        Vec::new()
             //    }
             //    fn ts_name() -> String {
@@ -242,24 +366,150 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             //        ))
             //    }
             // }
+
             let mut variants = Vec::new();
+            let mut deps = Vec::new();
+            let generate_const = en.variants.iter().all(|v| v.fields.is_empty());
             for variant in &en.variants {
                 let ident = &variant.ident;
-                variants.push(ident);
-                // variants.push(quote::quote! {
-                //     stringify!(#ident),
-                // });
+                match (serde_flags.attrs.tag(), &variant.fields) {
+                    // "X"
+                    (TagType::External, Fields::Unit) => {
+                        variants.push(quote::quote!(format!("{:?}", stringify!(#ident))))
+                    }
+                    // { "X": { "foo": string, "bar": number } }
+                    (TagType::External, Fields::Named(_)) => {
+                        let field_names: Vec<_> = variant
+                            .fields
+                            .iter()
+                            .map(|f| f.ident.clone().expect("field did not have a name"))
+                            .collect();
+                        let fields: Vec<_> = variant.fields.iter().map(|f| f.ty.clone()).collect();
+                        deps.extend_from_slice(&fields);
+
+                        let fields = if field_names.is_empty() {
+                            quote::quote!("")
+                        } else {
+                            quote::quote!(vec![#(
+                                    format!(
+                                        "{}: {}",
+                                        stringify!(#field_names),
+                                        <#fields as #tapi_path::Tapi>::full_ts_name(),
+                                    ),
+                                )*]
+                            .join(", "))
+                        };
+
+                        variants.push(quote::quote!(format!(
+                            "{{ {:?}: {{ {} }} }}",
+                            stringify!(#ident),
+                            #fields,
+                        )))
+                    }
+
+                    // { "X": string }
+                    // { "X": [string, number] }
+                    (TagType::External, Fields::Unnamed(unnamed)) => {
+                        variants.push(quote::quote!(format!(
+                            "{{ {:?}: {} }}",
+                            stringify!(#ident),
+                            <#unnamed as #tapi_path::Tapi>::full_ts_name(),
+                        )))
+                    }
+                    // { "tag": "X", "foo": string, "bar": number }
+                    (TagType::Internal { tag }, Fields::Unit | Fields::Named(_)) => {
+                        let field_names: Vec<_> = variant
+                            .fields
+                            .iter()
+                            .map(|f| f.ident.clone().expect("field did not have a name"))
+                            .collect();
+                        let fields: Vec<_> = variant.fields.iter().map(|f| f.ty.clone()).collect();
+                        deps.extend_from_slice(&fields);
+
+                        let fields = if field_names.is_empty() {
+                            quote::quote!("")
+                        } else {
+                            quote::quote!(format!(
+                                ", {}",
+                                vec![#(
+                                    format!(
+                                        "{:?}: {}",
+                                        stringify!(#field_names),
+                                        <#fields as #tapi_path::Tapi>::full_ts_name(),
+                                    ),
+                                )*]
+                                .join(", "),
+                            ))
+                        };
+
+                        variants.push(quote::quote!(format!(
+                            "{{ {}: {:?}{} }}",
+                            stringify!(#tag),
+                            stringify!(#ident),
+                            #fields,
+                        )))
+                    }
+                    (TagType::Internal { tag }, Fields::Unnamed(_)) => {
+                        todo!("variant: TagType::Internal, Fields::Unnamed(_)")
+                    }
+                    // { "tag": "X", "content": { "foo": string, "bar": number } }
+                    (TagType::Adjacent { tag, content }, Fields::Unit | Fields::Named(_)) => {
+                        let field_names: Vec<_> = variant
+                            .fields
+                            .iter()
+                            .map(|f| f.ident.clone().expect("field did not have a name"))
+                            .collect();
+                        let fields: Vec<_> = variant.fields.iter().map(|f| f.ty.clone()).collect();
+                        deps.extend_from_slice(&fields);
+
+                        let fields = if field_names.is_empty() {
+                            quote::quote!("")
+                        } else {
+                            quote::quote!(vec![#(
+                                format!(
+                                    "{:?}: {}",
+                                    stringify!(#field_names),
+                                    <#fields as #tapi_path::Tapi>::full_ts_name(),
+                                ),
+                            )*]
+                            .join(", "))
+                        };
+
+                        variants.push(quote::quote!(format!(
+                            "{{ {}: {:?}, {}: {{ {} }} }}",
+                            stringify!(#tag),
+                            stringify!(#ident),
+                            stringify!(#content),
+                            #fields,
+                        )))
+                    }
+                    (TagType::Adjacent { tag, content }, Fields::Unnamed(unnamed)) => variants
+                        .push(quote::quote!(format!(
+                            "{{ {}: {:?}, {}: {} }}",
+                            stringify!(#tag),
+                            stringify!(#ident),
+                            stringify!(#content),
+                            <#unnamed as #tapi_path::Tapi>::full_ts_name(),
+                        ))),
+                    (TagType::None, Fields::Unit) => todo!("serde enum without tag"),
+                    (TagType::None, Fields::Named(_)) => {
+                        todo!("variant: TagType::None, Fields::Named(_)")
+                    }
+                    (TagType::None, Fields::Unnamed(_)) => {
+                        todo!("variant: TagType::None, Fields::Unnamed(_)")
+                    }
+                }
             }
             quote::quote! {
-                impl ::tapi::Tapi for #name {
+                impl #tapi_path::Tapi for #name {
                     fn name() -> &'static str {
                         stringify!(#name)
                     }
                     fn id() -> std::any::TypeId {
                         std::any::TypeId::of::<#name>()
                     }
-                    fn dependencies() -> Vec<&'static dyn ::tapi::Typed> {
-                        Vec::new()
+                    fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
+                        vec![#(#deps::boxed(),)*]
                     }
                     fn ts_name() -> String {
                         stringify!(#name).to_string()
@@ -268,14 +518,23 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         stringify!(#name).to_string()
                     }
                     fn ts_decl() -> Option<String> {
-                        Some(format!(
-                            "export type {} = {};\nexport const {}: {}[] = [{}];",
+                        let ty_decl = format!(
+                            "export type {} = {};",
                             stringify!(#name),
-                            vec![#(format!("{:?}", stringify!(#variants))),*].join(" | "),
-                            stringify!(#name).to_uppercase(),
-                            stringify!(#name),
-                            vec![#(format!("{:?}", stringify!(#variants))),*].join(", "),
-                        ))
+                            vec![#(#variants),*].join(" | "),
+                        );
+                        if !#generate_const {
+                            Some(ty_decl)
+                        } else {
+                            let data_decl = format!(
+                                "export const {}: {}[] = [{}];",
+                                stringify!(#constant_name),
+                                stringify!(#name),
+                                vec![#(#variants),*].join(", "),
+                            );
+
+                            Some(format!("{ty_decl}\n{data_decl}"))
+                        }
                     }
                     fn zod_decl() -> Option<String> {
                         Some(format!(
@@ -288,8 +547,11 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     }
                 }
             }
-            .into()
         }
-        syn::Data::Union(_) => todo!(),
-    }
+        syn::Data::Union(_) => todo!("unions are not supported yet"),
+    };
+
+    // let pretty = prettyplease::unparse(&syn::parse2(result.clone()).unwrap());
+    // eprintln!("{pretty}");
+    result.into()
 }

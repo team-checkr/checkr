@@ -20,7 +20,18 @@ pub struct SignAnalysis {
 }
 
 #[derive(
-    Debug, Default, Clone, Copy, PartialEq, Eq, Hash, PartialOrd, Ord, Serialize, Deserialize,
+    tapi::Tapi,
+    Debug,
+    Default,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    Hash,
+    PartialOrd,
+    Ord,
+    Serialize,
+    Deserialize,
 )]
 #[serde(tag = "Case")]
 pub enum Sign {
@@ -52,7 +63,7 @@ impl Sign {
 }
 
 bitflags::bitflags! {
-    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
+    #[derive(tapi::Tapi, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(into = "Vec<Sign>", try_from = "Vec<Sign>")]
     pub struct Signs: u8 {
         const POSITIVE = 0b001;

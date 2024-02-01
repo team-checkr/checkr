@@ -2,7 +2,7 @@ use std::{
     ffi::OsStr,
     fmt::Debug,
     process::Stdio,
-    sync::{Arc, RwLock},
+    sync::{atomic::AtomicUsize, Arc, RwLock},
 };
 
 use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinSet};
@@ -15,6 +15,7 @@ use crate::{
 
 #[derive(Debug, Default, Clone)]
 pub struct Hub<T> {
+    next_job_id: Arc<AtomicUsize>,
     jobs: Arc<RwLock<Vec<Job<T>>>>,
 }
 
@@ -37,7 +38,9 @@ impl<T: Send + Sync + 'static> Hub<T> {
         T: Debug,
     {
         let id = JobId {
-            value: self.jobs.read().unwrap().len(),
+            value: self
+                .next_job_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
         };
 
         let mut cmd = tokio::process::Command::new(program);
@@ -96,12 +99,17 @@ impl<T: Send + Sync + 'static> Hub<T> {
 
         job
     }
-    pub fn jobs(&self) -> Vec<Job<T>> {
-        self.jobs.read().unwrap().clone()
+    pub fn jobs(&self, count: Option<usize>) -> Vec<Job<T>> {
+        if let Some(count) = count {
+            self.jobs.read().unwrap()[self.jobs.read().unwrap().len().saturating_sub(count)..]
+                .to_vec()
+        } else {
+            self.jobs.read().unwrap().clone()
+        }
     }
 
     pub fn get_job(&self, id: JobId) -> Option<Job<T>> {
-        self.jobs().iter().find(|j| j.id() == id).cloned()
+        self.jobs(None).iter().find(|j| j.id() == id).cloned()
     }
 }
 
