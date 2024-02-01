@@ -2,18 +2,15 @@
 
 mod semantics;
 
-use std::{collections::HashSet, fmt::Display, hash::Hash};
+use std::collections::HashSet;
 
 use ce_core::{
-    components::{GclEditor, Network, StandardLayout},
     define_env,
-    rand::{self, seq::SliceRandom, SeedableRng},
-    Env, EnvError, Generate, RenderProps, ValidationResult,
+    rand::{self, seq::SliceRandom},
+    Env, EnvError, Generate, ValidationResult,
 };
-use dioxus::{self, prelude::*};
 use gcl::{
     ast::{Array, Commands, Target, Variable},
-    memory::{Memory, MemoryRef},
     pg::{
         analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
@@ -115,94 +112,6 @@ impl Env for SignEnv {
             })
         }
     }
-
-    fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a> {
-        let reference_dot =
-            ProgramGraph::new(props.input().determinism, &props.input().commands).dot();
-        let real_dot = ProgramGraph::new(props.input().determinism, &props.input().commands).dot();
-
-        cx.render(rsx!(
-            StandardLayout {
-                input: cx.render(rsx!(div {
-                    class: "grid grid-rows-2 divide-y",
-                    GclEditor {
-                        commands: props.input().commands.clone(),
-                        on_change: move |commands| props.set_input(SignInput::gen_from_commands(&mut rand::rngs::SmallRng::from_entropy(), commands)),
-                    }
-                    div {
-                        class: "flex items-start justify-start p-2",
-                        div {
-                            class: "grid grid-cols-[repeat(4,auto)] gap-2 items-center font-mono",
-                            for thingy in props.input().assignment.iter() {
-                                match thingy {
-                                    MemoryRef::Variable(name, &sign) => cx.render(rsx!(
-                                        span { "{name}" }
-                                        for s in [Sign::Negative, Sign::Zero, Sign::Positive] {
-                                            label {
-                                                input {
-                                                    class: "hidden peer",
-                                                    r#type: "radio",
-                                                    checked: sign == s,
-                                                    onclick: move |_| props.set_input(props.input().set_sign(name, s)),
-                                                }
-                                                div {
-                                                    class: "w-10 aspect-square peer-checked:bg-blue-500 bg-stone-600 grid place-items-center rounded transition active:scale-95",
-                                                    "{s}"
-                                                }
-                                            }
-                                        }
-                                    )),
-                                    MemoryRef::Array(name, &signs) => cx.render(rsx!(
-                                        span { "{name}" }
-                                        for s in [Sign::Negative, Sign::Zero, Sign::Positive] {
-                                            input {
-                                                r#type: "checkbox",
-                                                checked: signs.contains(s.into()),
-                                                onclick: move |_| props.set_input(props.input().set_signs(name, signs ^ s.into())),
-                                            }
-                                        }
-                                    )),
-                                }
-                            }
-                        }
-                    }
-                })),
-                output: props.with_result(cx, |res| cx.render(rsx!(div {
-                    class: "grid grid-rows-[auto_1fr_1fr] grid-cols-2",
-                    h2 { class: "italic font-semibold px-2 py-1 border-r", "Real" }
-                    h2 { class: "italic font-semibold px-2 py-1", "Reference" }
-                    div {
-                        class: "grid relative border-b border-r",
-                        div {
-                            class: "absolute inset-0 grid",
-                            Network { dot: real_dot }
-                        }
-                    }
-                    div {
-                        class: "grid relative border-b",
-                        div {
-                            class: "absolute inset-0 grid",
-                            Network { dot: reference_dot }
-                        }
-                    }
-                    div {
-                        class: "relative border-r",
-                        div {
-                            class: "absolute inset-0 overflow-auto",
-                            ViewThingy { thingy: res.real().nodes.clone() }
-                        }
-                    }
-                    div {
-                        class: "relative",
-                        div {
-                            class: "absolute inset-0 overflow-auto",
-                            ViewThingy { thingy: res.reference().nodes.clone() }
-                        }
-                    }
-                }))),
-            }
-        ))
-    }
 }
 
 impl SignInput {
@@ -216,92 +125,6 @@ impl SignInput {
         new.assignment.arrays.insert(arr.clone(), signs);
         new
     }
-}
-
-#[inline_props]
-fn ViewThingy<A: Display + PartialEq + Eq + Hash, B: Display + PartialEq + Eq + Hash>(
-    cx: Scope,
-    thingy: IndexMap<String, HashSet<Memory<A, B>>>,
-) -> Element {
-    let vars = thingy
-        .values()
-        .flat_map(|mems| {
-            mems.iter()
-                .flat_map(|mem| mem.iter().map(|mem_ref| mem_ref.target()))
-        })
-        .sorted()
-        .dedup()
-        .collect_vec();
-
-    #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord)]
-    enum CharClass<A, T, O> {
-        Start,
-        Alpha(A),
-        Numeric(T),
-        Other(O),
-        End,
-    }
-
-    let nodes = thingy.iter().sorted_by_key(|(name, _)| {
-        name.chars()
-            .group_by(|&c| {
-                if c.is_alphabetic() {
-                    CharClass::Alpha(())
-                } else if c.is_numeric() {
-                    CharClass::Numeric(())
-                } else if c == '▷' {
-                    CharClass::Start
-                } else if c == '◀' {
-                    CharClass::End
-                } else {
-                    CharClass::Other(())
-                }
-            })
-            .into_iter()
-            .map(|(key, chars)| match key {
-                CharClass::Start => CharClass::Start,
-                CharClass::Alpha(()) => CharClass::Alpha(chars.into_iter().join("")),
-                CharClass::Numeric(()) => CharClass::Numeric(
-                    chars
-                        .into_iter()
-                        .join("")
-                        .parse::<i64>()
-                        .unwrap_or(i64::MAX),
-                ),
-                CharClass::Other(()) => CharClass::Other(chars.into_iter().join("")),
-                CharClass::End => CharClass::End,
-            })
-            .collect_vec()
-    });
-
-    cx.render(rsx!(div {
-        class: "flex items-start",
-        div {
-            class: "[&_*]:border-t grid grid-flow-dense w-full",
-            style: "grid-template-columns: repeat({vars.len() + 1}, auto);",
-            div { class: "border-none" }
-            for target in &vars {
-                div { class: "text-center border-none", "{target}" }
-            }
-            for (name, mems) in nodes {
-                for (idx, mem) in mems.iter().enumerate() {
-                    if idx == 0 {
-                        rsx!(h2 {
-                            class: "px-2",
-                            style: "grid-row: span {mems.len()} / span {mems.len()};",
-                            "{name}"
-                        })
-                    }
-                    for thingy in mem.iter() {
-                        div {
-                            class: "text-sm font-mono px-2 py-0.5",
-                            "{thingy}"
-                        }
-                    }
-                }
-            }
-        }
-    }))
 }
 
 impl SignInput {

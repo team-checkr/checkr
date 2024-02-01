@@ -1,8 +1,4 @@
-use ce_core::{
-    components::{GclEditor, StandardLayout},
-    define_env, rand, Env, Generate, RenderProps, ValidationResult,
-};
-use dioxus::prelude::*;
+use ce_core::{define_env, rand, Env, Generate, ValidationResult};
 use gcl::ast::Commands;
 use serde::{Deserialize, Serialize};
 
@@ -31,32 +27,6 @@ impl Env for ParseEnv {
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
         Ok(ValidationResult::CorrectTerminated)
-    }
-
-    fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a> {
-        cx.render(rsx!(StandardLayout {
-            input: cx.render(rsx!(GclEditor {
-                commands: props.input().commands.clone(),
-                on_change: move |commands| props.set_input(ParseInput { commands }),
-            })),
-            output: props.with_result(cx, |res| cx.render(rsx!(div {
-                class: "grid grid-rows-2 divide-y",
-                div {
-                    h2 { class: "italic font-semibold px-2 py-1", "Real" }
-                    pre {
-                        class: "p-2 overflow-auto text-xs",
-                        "{res.real().pretty}"
-                    }
-                }
-                div {
-                    h2 { class: "italic font-semibold px-2 py-1", "Reference" }
-                    pre {
-                        class: "p-2 overflow-auto text-xs",
-                        "{res.reference().pretty}"
-                    }
-                }
-            }))),
-        }))
     }
 }
 

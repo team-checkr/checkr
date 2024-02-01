@@ -448,9 +448,6 @@ dependencies = [
 name = "ce-core"
 version = "0.1.21"
 dependencies = [
- "dioxus",
- "dioxus-heroicons",
- "dioxus-liveview",
  "futures-util",
  "gcl",
  "itertools 0.11.0",
@@ -468,7 +465,6 @@ name = "ce-graph"
 version = "0.1.21"
 dependencies = [
  "ce-core",
- "dioxus",
  "gcl",
  "serde",
  "tapi",
@@ -479,7 +475,6 @@ name = "ce-parse"
 version = "0.1.21"
 dependencies = [
  "ce-core",
- "dioxus",
  "gcl",
  "serde",
  "serde_json",
@@ -494,7 +489,6 @@ dependencies = [
  "ce-graph",
  "ce-parse",
  "ce-sign",
- "dioxus",
  "futures-util",
  "itertools 0.11.0",
  "rand",
@@ -511,7 +505,6 @@ version = "0.1.21"
 dependencies = [
  "bitflags 2.4.1",
  "ce-core",
- "dioxus",
  "gcl",
  "indexmap 2.1.0",
  "itertools 0.11.0",
@@ -870,14 +863,6 @@ name = "dioxus-debug-cell"
 version = "0.1.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "2ea539174bb236e0e7dc9c12b19b88eae3cb574dedbd0252a2d43ea7e6de13e2"
-
-[[package]]
-name = "dioxus-heroicons"
-version = "0.2.0"
-source = "git+https://github.com/atty303/dioxus-heroicons.git?branch=bump-dioxus#1a9b76932fdd75a8e5a3aa6d7e8c873d55862768"
-dependencies = [
- "dioxus",
-]
 
 [[package]]
 name = "dioxus-hooks"
@@ -1670,28 +1655,6 @@ dependencies = [
 ]
 
 [[package]]
-name = "inspectify"
-version = "0.1.21"
-dependencies = [
- "axum 0.7.3",
- "ce-core",
- "ce-shell",
- "color-eyre",
- "dioxus",
- "dioxus-liveview",
- "driver",
- "futures-util",
- "glob",
- "itertools 0.11.0",
- "notify",
- "notify-debouncer-mini",
- "tokio",
- "tracing",
- "tracing-error",
- "tracing-subscriber",
-]
-
-[[package]]
 name = "inspectify-api"
 version = "0.1.21"
 dependencies = [
@@ -2076,7 +2039,6 @@ version = "0.4.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "5d40b221972a1fc5ef4d858a2f671fb34c75983eb385463dff3780eeff6a9d43"
 dependencies = [
- "crossbeam-channel",
  "log",
  "notify",
 ]
@@ -3743,7 +3705,6 @@ dependencies = [
  "ce-core",
  "clap",
  "color-eyre",
- "dioxus",
  "heck",
  "itertools 0.11.0",
  "serde",

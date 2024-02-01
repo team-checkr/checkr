@@ -15,7 +15,6 @@ publish = false
 ce-core.workspace = true
 clap = { version = "4.1.4", features = ["derive"] }
 color-eyre = { workspace = true }
-dioxus.workspace = true
 heck = "0.4.1"
 itertools.workspace = true
 serde.workspace = true

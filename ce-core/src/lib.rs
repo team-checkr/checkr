@@ -1,16 +1,9 @@
-#![allow(non_snake_case)]
-
-pub mod components;
 pub mod gen;
 
-use std::marker::PhantomData;
-
-use dioxus::prelude::*;
 pub use gen::Generate;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
 
-pub use dioxus_heroicons;
 pub use rand;
 
 #[derive(Debug, thiserror::Error)]
@@ -30,14 +23,6 @@ pub enum EnvError {
 }
 
 pub type Result<T, E = EnvError> = std::result::Result<T, E>;
-
-#[derive(Props)]
-pub struct RenderProps<'a, E: Env> {
-    set_input: Coroutine<E::Input>,
-    input: E::Input,
-    result: AnalysisResult<E>,
-    marker: PhantomData<&'a ()>,
-}
 
 #[derive(Debug, Clone, PartialEq)]
 pub enum AnalysisResult<E: Env> {
@@ -73,55 +58,6 @@ impl<'a, E: Env> Results<'a, E> {
     }
 }
 
-impl<'a, E: Env> RenderProps<'a, E> {
-    pub fn new(
-        set_input: Coroutine<E::Input>,
-        input: E::Input,
-        result: AnalysisResult<E>,
-    ) -> RenderProps<'a, E> {
-        RenderProps {
-            set_input,
-            input,
-            result,
-            marker: Default::default(),
-        }
-    }
-    pub fn set_input(&self, input: E::Input) {
-        self.set_input.send(input);
-    }
-    pub fn input(&self) -> &E::Input {
-        &self.input
-    }
-    pub fn result(&self) -> &AnalysisResult<E> {
-        &self.result
-    }
-    pub fn with_result(
-        &self,
-        cx: &'a ScopeState,
-        f: impl FnOnce(Results<E>) -> Element<'a>,
-    ) -> Element<'a> {
-        match &self.result {
-            AnalysisResult::Nothing => cx.render(
-                rsx!(div { class: "grid place-items-center text-xl", span { "Loading..." }}),
-            ),
-            AnalysisResult::Stale {
-                reference,
-                real,
-                validation,
-            }
-            | AnalysisResult::Active {
-                reference,
-                real,
-                validation,
-            } => f(Results {
-                reference,
-                real,
-                validation,
-            }),
-        }
-    }
-}
-
 pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
     type Input: Generate<Context = ()>
         + Serialize
@@ -143,7 +79,6 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
 
     fn run(input: &Self::Input) -> Result<Self::Output>;
     fn validate(input: &Self::Input, output: &Self::Output) -> Result<ValidationResult>;
-    fn render<'a>(cx: &'a ScopeState, props: &'a RenderProps<'a, Self>) -> Element<'a>;
 }
 
 #[macro_export]

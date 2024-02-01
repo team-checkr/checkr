@@ -8,7 +8,6 @@ members = [
     "driver",
     "envs/*",
     "gcl",
-    "inspectify",
     "inspectify-api",
     "tapi",
     "tapi-macro",

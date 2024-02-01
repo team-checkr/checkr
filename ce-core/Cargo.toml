@@ -9,10 +9,6 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-dioxus.workspace = true
-# dioxus-heroicons = "0.2.0"
-dioxus-heroicons = { git = "https://github.com/atty303/dioxus-heroicons.git", branch = "bump-dioxus" }
-dioxus-liveview.workspace = true
 futures-util = "0.3.28"
 gcl.workspace = true
 itertools.workspace = true

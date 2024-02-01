@@ -13,7 +13,6 @@ ce-core.workspace = true
 ce-graph.workspace = true
 ce-parse.workspace = true
 ce-sign.workspace = true
-dioxus.workspace = true
 futures-util = "0.3.28"
 itertools.workspace = true
 rand.workspace = true
