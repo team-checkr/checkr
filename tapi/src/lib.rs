@@ -207,24 +207,50 @@ impl<'a, AppState> Endpoints<'a, AppState> {
         let mut s = String::new();
         s.push_str(include_str!("../preamble.ts"));
 
+        #[derive(Default)]
+        pub struct Node {
+            children: BTreeMap<String, Node>,
+            decls: Vec<String>,
+        }
+
+        let mut root = Node::default();
+
         for ty in self.tys() {
             if let Some(decl) = ty.ts_decl() {
+                let mut node = &mut root;
                 for p in ty.path() {
-                    s.push_str(&format!("export namespace {p} {{"));
+                    node = node.children.entry(p.to_string()).or_default();
                 }
-                if !ty.path().is_empty() {
-                    s.push('\n');
-                }
-                s.push_str(&decl);
-                if !ty.path().is_empty() {
-                    s.push('\n');
-                }
-                for _p in ty.path() {
-                    s.push('}');
-                }
-                s.push('\n');
+                node.decls.push(decl);
             }
         }
+
+        impl Node {
+            fn write(&self, s: &mut String, indent: usize) {
+                for decl in &self.decls {
+                    for l in decl.lines() {
+                        for _ in 0..indent {
+                            s.push_str("  ");
+                        }
+                        s.push_str(l);
+                        s.push('\n');
+                    }
+                }
+                for (name, node) in &self.children {
+                    for _ in 0..indent {
+                        s.push_str("  ");
+                    }
+                    s.push_str(&format!("export namespace {} {{\n", name));
+                    node.write(s, indent + 1);
+                    for _ in 0..indent {
+                        s.push_str("  ");
+                    }
+                    s.push_str("}\n");
+                }
+            }
+        }
+
+        root.write(&mut s, 0);
 
         s.push_str("export const api = {\n");
         for endpoint in &self.endpoints {
