@@ -80,6 +80,31 @@ impl<'de> serde::Deserialize<'de> for Target {
         Ok(Target::Variable(Variable::deserialize(deserializer)?))
     }
 }
+impl tapi::Tapi for Target {
+    fn name() -> &'static str {
+        "Target"
+    }
+
+    fn id() -> std::any::TypeId {
+        std::any::TypeId::of::<Target>()
+    }
+
+    fn dependencies() -> Vec<&'static dyn tapi::Typed> {
+        Vec::new()
+    }
+
+    fn ts_name() -> String {
+        "Target".to_string()
+    }
+
+    fn zod_name() -> String {
+        "Target".to_string()
+    }
+
+    fn ts_decl() -> Option<String> {
+        Some("export type Target = string;".to_string())
+    }
+}
 impl Variable {
     pub fn is_logical(&self) -> bool {
         self.0.starts_with('_')

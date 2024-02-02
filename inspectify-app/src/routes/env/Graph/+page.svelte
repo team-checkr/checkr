@@ -1,12 +1,21 @@
 <script lang="ts">
-	import { api, type gcl } from '$lib/api';
+	import { type gcl } from '$lib/api';
 	import Editor from '$lib/components/Editor.svelte';
 	import Network from '$lib/components/Network.svelte';
 	import { useIo } from '$lib/io';
 
 	const color = 'idk';
 
-	const io = useIo('Graph');
+	const io = useIo(
+		'Graph',
+		{
+			commands: 'skip',
+			determinism: { Case: 'Deterministic' }
+		},
+		{
+			dot: 'digraph G {}'
+		}
+	);
 	const input = io.input;
 	const output = io.output;
 
@@ -41,7 +50,7 @@
 	</div>
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
-			<Network dot={$output?.dot || ''} />
+			<Network dot={$output.dot || ''} />
 		</div>
 	</div>
 	<div class="h-4 bg-green-500 transition {color}"></div>

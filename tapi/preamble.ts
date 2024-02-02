@@ -20,26 +20,28 @@ const request =
     path: string,
     resTy: ResponseType
   ) =>
-  async (req: Req, options?: ApiOptions): Promise<Res> => {
-    const res = await fetch(`${getApiBase(options)}${path}`, {
+  (
+    req: Req,
+    options?: ApiOptions
+  ): { data: Promise<Res>; abort: () => void } => {
+    const controller = new AbortController();
+    const promise = fetch(`${getApiBase(options)}${path}`, {
       method,
       headers:
         reqTy == "json" ? { "Content-Type": "application/json" } : void 0,
       body: reqTy == "json" ? JSON.stringify(req) : void 0,
     });
-    if (!res.ok) {
-      throw new Error(await res.text());
-    }
-    if (resTy == "none") {
-      return "" as Res;
-    }
-    if (resTy == "json") {
-      return (await res.json()) as Res;
-    }
-    if (resTy == "text") {
-      return (await res.text()) as Res;
-    }
-    throw new Error(`Unknown response type ${resTy}`);
+    return {
+      data: (async () => {
+        const res = await promise;
+        if (!res.ok) throw new Error(await res.text());
+        if (resTy == "none") return "" as Res;
+        if (resTy == "json") return (await res.json()) as Res;
+        if (resTy == "text") return (await res.text()) as Res;
+        throw new Error(`Unknown response type ${resTy}`);
+      })(),
+      abort: () => controller.abort(),
+    };
   };
 
 export type SSEStream<T> = (
@@ -52,14 +54,15 @@ export type SSEStream<T> = (
 ) => void;
 
 const sse =
-  <T>(url: string, resTy: ResponseType) =>
+  <P extends any[], T>(url: (params: P) => string, resTy: ResponseType) =>
   (
+    params: P,
     options?: ApiOptions
   ): {
     cancel: () => void;
     listen: (stream: SSEStream<T>) => void;
   } => {
-    const source = new EventSource(`${getApiBase(options)}${url}`);
+    const source = new EventSource(`${getApiBase(options)}${url(params)}`);
 
     let stream: SSEStream<T> | null = null;
 

@@ -14,9 +14,9 @@ use ce_shell::Input;
 use color_eyre::eyre::Context;
 use config::RunOption;
 
-pub use hub::Hub;
+pub use hub::{Hub, HubEvent};
 use itertools::Itertools;
-pub use job::{Job, JobId, JobKind, JobState};
+pub use job::{Job, JobEvent, JobId, JobKind, JobState};
 use tracing::Instrument;
 
 #[derive(Debug, Clone)]

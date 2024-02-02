@@ -20,26 +20,28 @@ const request =
     path: string,
     resTy: ResponseType
   ) =>
-  async (req: Req, options?: ApiOptions): Promise<Res> => {
-    const res = await fetch(`${getApiBase(options)}${path}`, {
+  (
+    req: Req,
+    options?: ApiOptions
+  ): { data: Promise<Res>; abort: () => void } => {
+    const controller = new AbortController();
+    const promise = fetch(`${getApiBase(options)}${path}`, {
       method,
       headers:
         reqTy == "json" ? { "Content-Type": "application/json" } : void 0,
       body: reqTy == "json" ? JSON.stringify(req) : void 0,
     });
-    if (!res.ok) {
-      throw new Error(await res.text());
-    }
-    if (resTy == "none") {
-      return "" as Res;
-    }
-    if (resTy == "json") {
-      return (await res.json()) as Res;
-    }
-    if (resTy == "text") {
-      return (await res.text()) as Res;
-    }
-    throw new Error(`Unknown response type ${resTy}`);
+    return {
+      data: (async () => {
+        const res = await promise;
+        if (!res.ok) throw new Error(await res.text());
+        if (resTy == "none") return "" as Res;
+        if (resTy == "json") return (await res.json()) as Res;
+        if (resTy == "text") return (await res.text()) as Res;
+        throw new Error(`Unknown response type ${resTy}`);
+      })(),
+      abort: () => controller.abort(),
+    };
   };
 
 export type SSEStream<T> = (
@@ -52,14 +54,15 @@ export type SSEStream<T> = (
 ) => void;
 
 const sse =
-  <T>(url: string, resTy: ResponseType) =>
+  <P extends any[], T>(url: (params: P) => string, resTy: ResponseType) =>
   (
+    params: P,
     options?: ApiOptions
   ): {
     cancel: () => void;
     listen: (stream: SSEStream<T>) => void;
   } => {
-    const source = new EventSource(`${getApiBase(options)}${url}`);
+    const source = new EventSource(`${getApiBase(options)}${url(params)}`);
 
     let stream: SSEStream<T> | null = null;
 
@@ -125,6 +128,9 @@ export namespace driver {
 export namespace gcl {
   export namespace ast {
     export type Commands = string;
+    export type Target = string;
+    export type TargetKind = "Variable" | "Array";
+    export const TARGET_KIND: TargetKind[] = ["Variable", "Array"];
     export type Variable = string;
     export type Array = string;
   }
@@ -138,20 +144,22 @@ export namespace gcl {
 }
 export namespace inspectify_api {
   export namespace endpoints {
-    export type GenerateParams = { analysis: ce_shell.Analysis }
     export type GclDotInput = { determinism: gcl.pg.Determinism, commands: gcl.ast.Commands }
-    export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
+    export type GenerateParams = { analysis: ce_shell.Analysis }
+    export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "id": driver.job.JobId, "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } };
+    export type Target = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
     export type JobOutput = { output: ce_shell.io.Output, validation: ce_core.ValidationResult }
     export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, stdout: string, spans: inspectify_api.endpoints.Span[] }
+    export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
     export type Span = { text: string, fg: (driver.ansi.Color | null), bg: (driver.ansi.Color | null) }
   }
 }
 export const api = {
     generate: request<inspectify_api.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
-    jobs: sse<inspectify_api.endpoints.Job[]>("/jobs", "json"),
+    events: sse<[], inspectify_api.endpoints.Event>(() => `/events`, "json"),
+    jobsCancel: request<driver.job.JobId, unknown>("json", "POST", "/jobs/cancel", "none"),
+    jobsWait: request<driver.job.JobId, (inspectify_api.endpoints.JobOutput | null)>("json", "POST", "/jobs/wait", "json"),
     analysis: request<ce_shell.io.Input, driver.job.JobId>("json", "POST", "/analysis", "json"),
-    cancelJob: request<driver.job.JobId, unknown>("json", "POST", "/cancel-job", "none"),
-    waitForJob: request<driver.job.JobId, (inspectify_api.endpoints.JobOutput | null)>("json", "POST", "/wait-for-job", "json"),
-    gclDot: request<inspectify_api.endpoints.GclDotInput, ce_graph.GraphOutput>("json", "POST", "/gcl-dot", "json"),
-    compilationStatus: sse<(inspectify_api.endpoints.CompilationStatus | null)>("/compilation-status", "json"),
+    gclDot: request<inspectify_api.endpoints.GclDotInput, ce_graph.GraphOutput>("json", "POST", "/gcl/dot", "json"),
+    gclFreeVars: request<gcl.ast.Commands, inspectify_api.endpoints.Target[]>("json", "POST", "/gcl/free-vars", "json"),
 };
