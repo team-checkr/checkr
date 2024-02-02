@@ -1,9 +1,14 @@
-use std::time::Duration;
+use std::{boxed, time::Duration};
 
-use axum::{extract::State, Json};
+use axum::{
+    extract::{Path, State},
+    Json,
+};
 use ce_shell::{Analysis, EnvExt};
-use driver::{JobId, JobState};
+use driver::{HubEvent, JobId, JobState};
+use gcl::ast::TargetKind;
 use rand::SeedableRng;
+use tracing::event;
 
 #[derive(Clone)]
 pub struct AppState {
@@ -15,12 +20,12 @@ pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
     type E = &'static dyn tapi::Endpoint<AppState>;
     tapi::Endpoints::new([
         &generate::endpoint as E,
-        &jobs::endpoint as E,
+        &events::endpoint as E,
+        &jobs_cancel::endpoint as E,
+        &jobs_wait::endpoint as E,
         &exec_analysis::endpoint as E,
-        &cancel_job::endpoint as E,
-        &wait_for_job::endpoint as E,
         &gcl_dot::endpoint as E,
-        &compilation_status::endpoint as E,
+        &gcl_free_vars::endpoint as E,
     ])
 }
 
@@ -54,33 +59,34 @@ struct Job {
 }
 
 impl AppState {
-    fn jobs(&self) -> Vec<Job> {
+    fn job(&self, id: JobId) -> Job {
+        let job = self.hub.get_job(id).unwrap();
+        let state = job.state();
+        let kind = job.kind();
+        let stdout = job.stdout();
+        let combined = job.stdout_and_stderr();
+        let spans = driver::ansi::parse_ansi(&combined)
+            .into_iter()
+            .map(|s| Span {
+                text: s.text,
+                fg: s.fg,
+                bg: s.bg,
+            })
+            .collect();
+
+        Job {
+            id,
+            state,
+            kind,
+            stdout,
+            spans,
+        }
+    }
+    fn jobs(&self) -> Vec<JobId> {
         self.hub
             .jobs(Some(25))
             .into_iter()
-            .map(|job| {
-                let id = job.id();
-                let state = job.state();
-                let kind = job.kind();
-                let stdout = job.stdout();
-                let combined = job.stdout_and_stderr();
-                let spans = driver::ansi::parse_ansi(&combined)
-                    .into_iter()
-                    .map(|s| Span {
-                        text: s.text,
-                        fg: s.fg,
-                        bg: s.bg,
-                    })
-                    .collect();
-
-                Job {
-                    id,
-                    state,
-                    kind,
-                    stdout,
-                    spans,
-                }
-            })
+            .map(|job| job.id())
             .collect()
     }
 }
@@ -89,8 +95,9 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
     interval: Duration,
     mut f: impl FnMut() -> T + Send + 'static,
     mut g: impl FnMut(&T) -> S + Send + 'static,
-) -> tapi::Sse<S> {
-    let (tx, rx) = tokio::sync::mpsc::channel::<Result<S, axum::BoxError>>(1);
+    tx: tokio::sync::mpsc::Sender<Result<S, axum::BoxError>>,
+) {
+    // let (tx, rx) = tokio::sync::mpsc::channel::<Result<S, axum::BoxError>>(1);
 
     tokio::spawn(async move {
         let mut last = None;
@@ -104,16 +111,144 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
         }
     });
 
-    tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+    // tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }
 
-#[tapi::tapi(path = "/jobs", method = Get)]
-async fn jobs(State(state): State<AppState>) -> tapi::Sse<Vec<Job>> {
+// #[tapi::tapi(path = "/jobs/list", method = Get)]
+// async fn jobs_list(State(state): State<AppState>) -> tapi::Sse<Vec<JobId>> {
+//     periodic_stream(
+//         Duration::from_millis(100),
+//         move || state.jobs(),
+//         |jobs| jobs.clone(),
+//     )
+// }
+
+#[derive(tapi::Tapi, Debug, Clone, serde::Serialize)]
+#[serde(tag = "type", content = "value")]
+enum Event {
+    CompilationStatus { status: Option<CompilationStatus> },
+    JobChanged { id: JobId, job: Job },
+    JobsChanged { jobs: Vec<JobId> },
+}
+
+#[tapi::tapi(path = "/events", method = Get)]
+async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
+    let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, axum::BoxError>>(1);
+
+    tokio::spawn({
+        let state = state.clone();
+        let tx = tx.clone();
+        async move {
+            tokio::time::sleep(Duration::from_millis(100)).await;
+
+            for id in state.jobs() {
+                let job = state.job(id);
+                tx.send(Ok(Event::JobChanged { id, job })).await.unwrap();
+            }
+        }
+    });
+
+    tokio::spawn({
+        let state = state.clone();
+        let tx = tx.clone();
+        async move {
+            let mut events = state.hub.events();
+            while let Ok(event) = events.recv().await {
+                match event {
+                    HubEvent::JobAdded(id) => {
+                        tx.send(Ok(Event::JobsChanged { jobs: state.jobs() }))
+                            .await
+                            .unwrap();
+
+                        tokio::spawn({
+                            let state = state.clone();
+                            let tx = tx.clone();
+                            async move {
+                                let job = state.hub.get_job(id).unwrap();
+                                let mut events = job.events();
+                                while let Ok(_event) = events.recv().await {
+                                    tx.send(Ok(Event::JobChanged {
+                                        id,
+                                        job: state.job(id),
+                                    }))
+                                    .await
+                                    .unwrap();
+                                }
+                            }
+                        });
+                    }
+                }
+            }
+        }
+    });
+
+    // periodic_stream(
+    //     Duration::from_millis(100),
+    //     {
+    //         let state = state.clone();
+    //         move || state.jobs()
+    //     },
+    //     |jobs| JobEvent::JobsChanged { jobs: jobs.clone() },
+    //     tx.clone(),
+    // );
+
     periodic_stream(
         Duration::from_millis(100),
-        move || state.jobs(),
-        |jobs| jobs.clone(),
-    )
+        {
+            let state = state.clone();
+            move || {
+                state
+                    .driver
+                    .current_compilation()
+                    .map(|job| (job.clone(), job.state()))
+            }
+        },
+        |cached| Event::CompilationStatus {
+            status: cached.clone().map(|(job, state)| CompilationStatus {
+                id: job.id(),
+                state,
+                error_output: if job.state() == JobState::Failed {
+                    let combined = job.stdout_and_stderr();
+                    let spans = driver::ansi::parse_ansi(&combined)
+                        .into_iter()
+                        .map(|s| Span {
+                            text: s.text,
+                            fg: s.fg,
+                            bg: s.bg,
+                        })
+                        .collect();
+                    Some(spans)
+                } else {
+                    None
+                },
+            }),
+        },
+        tx.clone(),
+    );
+
+    // periodic_stream(
+    //     Duration::from_millis(100),
+    //     move || state.job(id),
+    //     |job| JobEvent::JobChanged {
+    //         id: job.id,
+    //         job: job.clone(),
+    //     },
+    //     tx.clone(),
+    // );
+
+    // tokio::spawn(async move {
+    //     let mut last = None;
+    //     loop {
+    //         let new = f();
+    //         if Some(new.clone()) != last {
+    //             tx.send(Ok(g(&new))).await.unwrap();
+    //             last = Some(new);
+    //         }
+    //         tokio::time::sleep(interval).await;
+    //     }
+    // });
+
+    tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }
 
 #[tapi::tapi(path = "/analysis", method = Post)]
@@ -125,8 +260,8 @@ async fn exec_analysis(
     Json(output.id())
 }
 
-#[tapi::tapi(path = "/cancel-job", method = Post)]
-async fn cancel_job(State(state): State<AppState>, Json(id): Json<JobId>) {
+#[tapi::tapi(path = "/jobs/cancel", method = Post)]
+async fn jobs_cancel(State(state): State<AppState>, Json(id): Json<JobId>) {
     if let Some(job) = state.hub.get_job(id) {
         job.kill();
     }
@@ -138,20 +273,25 @@ struct JobOutput {
     validation: ce_core::ValidationResult,
 }
 
-#[tapi::tapi(path = "/wait-for-job", method = Post)]
-async fn wait_for_job(
+#[tapi::tapi(path = "/jobs/wait", method = Post)]
+async fn jobs_wait(
     State(state): State<AppState>,
     Json(id): Json<JobId>,
 ) -> Json<Option<JobOutput>> {
     if let Some(job) = state.hub.get_job(id) {
-        job.wait().await;
-        match job.kind() {
-            driver::JobKind::Analysis(a, input) => {
-                let output = a.parse_output(&job.stdout()).unwrap();
-                let validation = input.validate_output(&output).unwrap();
-                Json(Some(JobOutput { output, validation }))
+        match job.wait().await {
+            driver::JobState::Succeeded => match job.kind() {
+                driver::JobKind::Analysis(a, input) => {
+                    let output = a.parse_output(&job.stdout()).unwrap();
+                    let validation = input.validate_output(&output).unwrap();
+                    Json(Some(JobOutput { output, validation }))
+                }
+                driver::JobKind::Compilation => todo!(),
+            },
+            state => {
+                tracing::error!(stdout=?job.stdout(), stderr=?job.stderr(), ?state, "job failed");
+                Json(None)
             }
-            driver::JobKind::Compilation => todo!(),
         }
     } else {
         Json(None)
@@ -164,7 +304,7 @@ struct GclDotInput {
     commands: gcl::ast::Commands,
 }
 
-#[tapi::tapi(path = "/gcl-dot", method = Post)]
+#[tapi::tapi(path = "/gcl/dot", method = Post)]
 async fn gcl_dot(
     State(state): State<AppState>,
     Json(GclDotInput {
@@ -200,41 +340,31 @@ async fn gcl_dot(
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
+struct Target {
+    name: gcl::ast::Target,
+    kind: TargetKind,
+}
+
+#[tapi::tapi(path = "/gcl/free-vars", method = Post)]
+async fn gcl_free_vars(Json(commands): Json<gcl::ast::Commands>) -> Json<Vec<Target>> {
+    Json(
+        commands
+            .fv()
+            .into_iter()
+            .map(|target| Target {
+                name: target.clone(),
+                kind: match target {
+                    gcl::ast::Target::Variable(_) => TargetKind::Variable,
+                    gcl::ast::Target::Array(_, _) => TargetKind::Array,
+                },
+            })
+            .collect(),
+    )
+}
+
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 struct CompilationStatus {
     id: JobId,
     state: JobState,
     error_output: Option<Vec<Span>>,
-}
-
-#[tapi::tapi(path = "/compilation-status", method = Get)]
-async fn compilation_status(State(state): State<AppState>) -> tapi::Sse<Option<CompilationStatus>> {
-    periodic_stream(
-        Duration::from_millis(100),
-        move || {
-            state
-                .driver
-                .current_compilation()
-                .map(|job| (job.clone(), job.state()))
-        },
-        |cached| {
-            cached.clone().map(|(job, state)| CompilationStatus {
-                id: job.id(),
-                state,
-                error_output: if job.state() == JobState::Failed {
-                    let combined = job.stdout_and_stderr();
-                    let spans = driver::ansi::parse_ansi(&combined)
-                        .into_iter()
-                        .map(|s| Span {
-                            text: s.text,
-                            fg: s.fg,
-                            bg: s.bg,
-                        })
-                        .collect();
-                    Some(spans)
-                } else {
-                    None
-                },
-            })
-        },
-    )
 }

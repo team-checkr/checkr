@@ -11,6 +11,7 @@ use std::{
 
 use futures_util::StreamExt;
 use indexmap::IndexMap;
+use itertools::Itertools;
 pub use tapi_macro::{tapi, Tapi};
 
 #[derive(Debug)]
@@ -117,9 +118,47 @@ pub trait Endpoint<AppState> {
         use std::fmt::Write;
         let mut s = String::new();
         match (self.body(), self.res()) {
-            (RequestStructure { body: None, .. }, ResponseTapi::Sse(ty)) => {
-                // TODO: handle non-json responses
-                write!(s, "sse<{}>({:?}, \"json\")", ty.full_ts_name(), self.path(),).unwrap();
+            (
+                RequestStructure {
+                    body: None, path, ..
+                },
+                ResponseTapi::Sse(ty),
+            ) => {
+                let mut params = Vec::new();
+                let final_path = self
+                    .path()
+                    .split('/')
+                    .filter(|p| !p.is_empty())
+                    .map(|p| {
+                        if let Some(name) = p.strip_prefix(':') {
+                            params.push(name);
+                            format!("/${{{name}}}")
+                        } else {
+                            format!("/{p}")
+                        }
+                    })
+                    .join("");
+                let final_path = format!("`{final_path}`");
+                if let Some(path_param) = path {
+                    write!(
+                        s,
+                        "sse<[{}], {}>(({}) => {final_path}, \"json\")",
+                        path_param.full_ts_name(),
+                        ty.full_ts_name(),
+                        params.iter().format(", "),
+                    )
+                    .unwrap();
+                } else {
+                    // TODO: handle non-json responses
+                    write!(
+                        s,
+                        "sse<[{}], {}>(({}) => {final_path}, \"json\")",
+                        "",
+                        ty.full_ts_name(),
+                        params.iter().format(", "),
+                    )
+                    .unwrap();
+                }
             }
             (RequestStructure { body, .. }, res) => {
                 write!(

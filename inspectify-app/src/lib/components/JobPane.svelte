@@ -1,6 +1,6 @@
 <script lang="ts">
 	import { driver } from '$lib/api';
-	import { jobsStore, startListeningOnJobs } from '$lib/jobs';
+	import { jobsListStore, jobsStore } from '$lib/events';
 
 	import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
 	import ArrowPath from '~icons/heroicons/arrow-path';
@@ -10,6 +10,7 @@
 	import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
 	import Ansi from '$lib/components/Ansi.svelte';
 	import JsonView from './JSONView.svelte';
+	import { derived } from 'svelte/store';
 
 	const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string]> = {
 		Queued: [EllipsisHorizontal, 'animate-pulse'],
@@ -22,13 +23,17 @@
 
 	const Icon = (state: driver.job.JobState) => icons[state][0];
 
-	startListeningOnJobs();
-	$: filteredJobs = $jobsStore.filter((j) => j.state != 'Canceled');
+	$: jobs = derived(
+		$jobsListStore.map((id) => jobsStore[id]),
+		(jobs) => jobs
+	);
+	$: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
+	// $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
 	let selectedJobId: null | driver.job.JobId = null;
-	$: selectedJob = filteredJobs.find((j) => j.id == selectedJobId);
-	$: if (selectedJobId == null || !filteredJobs.find((j) => j.id == selectedJobId)) {
-		selectedJobId = $jobsStore.length > 0 ? $jobsStore[$jobsStore.length - 1].id : null;
-	}
+	$: selectedJob = typeof selectedJobId == 'number' ? jobsStore[selectedJobId] : null;
+	// $: if (selectedJobId == null || !filteredJobs.includes(selectedJob)) {
+	// 	selectedJobId = $jobsStore.length > 0 ? $jobsStore[$jobsStore.length - 1].id : null;
+	// }
 	type Output =
 		| {
 				kind: 'parsed';
@@ -39,16 +44,16 @@
 				raw: string;
 		  };
 	let output: Output | null = null;
-	$: if (selectedJob) {
+	$: if ($selectedJob) {
 		try {
 			output = {
 				kind: 'parsed',
-				parsed: JSON.parse(selectedJob.stdout)
+				parsed: JSON.parse($selectedJob.stdout)
 			};
 		} catch (e) {
 			output = {
 				kind: 'parse error',
-				raw: selectedJob.stdout
+				raw: $selectedJob.stdout
 			};
 		}
 	}
@@ -56,11 +61,11 @@
 	const tabs = ['Output', 'Input JSON', 'Output JSON', 'Reference Output', 'Validation'] as const;
 	type Tab = (typeof tabs)[number];
 	let currentTab: Tab = tabs[0];
-	$: if (selectedJob?.kind.kind == 'Compilation') {
+	$: if ($selectedJob?.kind.kind == 'Compilation') {
 		currentTab = 'Output';
 	}
 	$: isDisabled = (tab: Tab) =>
-		selectedJob ? tab != 'Output' && selectedJob.kind.kind == 'Compilation' : true;
+		$selectedJob ? tab != 'Output' && $selectedJob.kind.kind == 'Compilation' : true;
 </script>
 
 <div class="z-10 grid grid-cols-[20ch_1fr] grid-rows-[35vh] border-t bg-slate-950">
@@ -78,7 +83,11 @@
 								? 'bg-slate-700'
 								: 'group-hover:bg-slate-800'}"
 						>
-							{job.kind.kind == 'Compilation' ? 'Compilation' : job.kind.data[0]}
+							{job.kind.kind == 'Compilation'
+								? 'Compilation'
+								: job.kind.kind == 'Waiting'
+									? '...'
+									: job.kind.data[0]}
 						</div>
 						<div
 							class="flex items-center justify-center px-1 py-0.5 transition {job.id ==
@@ -98,7 +107,7 @@
 	</div>
 
 	<!-- Job view -->
-	{#if selectedJob}
+	{#if $selectedJob}
 		<div class="grid grid-rows-[auto_1fr] border-l">
 			<div class="flex text-sm">
 				{#each tabs as tab}
@@ -117,11 +126,11 @@
 			<div class="relative self-stretch bg-slate-900 text-xs">
 				<div class="absolute inset-0 overflow-auto">
 					{#if currentTab == 'Output'}
-						<pre class="p-3 [overflow-anchor:none]"><code><Ansi spans={selectedJob.spans} /></code
+						<pre class="p-3 [overflow-anchor:none]"><code><Ansi spans={$selectedJob.spans} /></code
 							></pre>
 						<div class="[overflow-anchor:auto]" />
-					{:else if currentTab == 'Input JSON' && selectedJob.kind.kind != 'Compilation'}
-						<JsonView json={selectedJob.kind.data[1].json} />
+					{:else if currentTab == 'Input JSON' && $selectedJob.kind.kind == 'Analysis'}
+						<JsonView json={$selectedJob.kind.data[1].json} />
 						<div class="[overflow-anchor:auto]" />
 					{:else if currentTab == 'Output JSON'}
 						{#if output}

@@ -1,6 +1,7 @@
 <script lang="ts">
+	import { derived } from 'svelte/store';
 	import { driver } from '$lib/api';
-	import { jobsStore } from '$lib/jobs';
+	import { jobsStore, jobsListStore, connectionStore } from '$lib/events';
 
 	import ChevronDoubleUp from '~icons/heroicons/chevron-double-up';
 	import Link from '~icons/heroicons/link';
@@ -10,18 +11,22 @@
 
 	export let showStatus: boolean;
 
-	let jobStates = Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
-		driver.job.JobState,
-		number
-	>;
+	$: jobs = derived(
+		$jobsListStore.map((id) => jobsStore[id]),
+		(jobs) => jobs
+	);
 
-	$: {
-		jobStates = Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
+	const emptyJobStates = () =>
+		Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
 			driver.job.JobState,
 			number
 		>;
 
-		for (let job of $jobsStore) {
+	let jobStates = emptyJobStates();
+
+	$: {
+		jobStates = emptyJobStates();
+		for (let job of $jobs) {
 			if (job.state in jobStates) {
 				jobStates[job.state]++;
 			}
@@ -51,7 +56,9 @@
 	<div class="flex-1"></div>
 
 	<div class="text-xs text-slate-400">v{version}</div>
-	<div class="place-self-end bg-green-600 p-1">
+	<div
+		class="place-self-end {$connectionStore == 'connected' ? 'bg-green-600' : 'bg-orange-600'} p-1"
+	>
 		<Link />
 	</div>
 </div>

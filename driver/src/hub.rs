@@ -15,11 +15,18 @@ use crate::{
     JobId,
 };
 
+#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum HubEvent {
+    JobAdded(JobId),
+}
+
 #[derive(Debug, Clone)]
 pub struct Hub<T> {
     path: PathBuf,
     next_job_id: Arc<AtomicUsize>,
     jobs: Arc<RwLock<Vec<Job<T>>>>,
+    events_tx: Arc<tokio::sync::broadcast::Sender<HubEvent>>,
+    events_rx: Arc<tokio::sync::broadcast::Receiver<HubEvent>>,
 }
 
 impl<T> PartialEq for Hub<T> {
@@ -36,15 +43,23 @@ impl<T: Send + Sync + 'static> Hub<T> {
         let next_job_id = Arc::new(AtomicUsize::new(0));
         let jobs = Arc::new(RwLock::new(Vec::new()));
 
+        let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
+
         Ok(Self {
             path,
             next_job_id,
             jobs,
+            events_tx: Arc::new(events_tx),
+            events_rx: Arc::new(events_rx),
         })
     }
 
     pub fn path(&self) -> &Path {
         &self.path
+    }
+
+    pub fn events(&self) -> tokio::sync::broadcast::Receiver<HubEvent> {
+        self.events_rx.resubscribe()
     }
 
     #[tracing::instrument(skip_all, fields(?kind))]
@@ -109,7 +124,8 @@ impl<T: Send + Sync + 'static> Hub<T> {
                 id,
                 child: tokio::sync::RwLock::new(Some(child)),
                 stdin: Some(stdin),
-                events_rx,
+                events_tx: Arc::new(events_tx),
+                events_rx: Arc::new(events_rx),
                 join_set: Mutex::new(join_set),
                 stderr,
                 stdout,
@@ -121,6 +137,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
         );
 
         self.jobs.write().unwrap().push(job.clone());
+        self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
 
         Ok(job)
     }

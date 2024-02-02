@@ -8,7 +8,7 @@
 	let text = '';
 
 	const regenerate = async () => {
-		const res = await api.generate({ analysis });
+		const res = await api.generate({ analysis }).data;
 
 		if (analysis == 'Graph') {
 			const body = res.json as ce_graph.GraphInput;
@@ -18,10 +18,6 @@
 
 	onMount(async () => {
 		setGlobalApiBase(PUBLIC_API_BASE || 'http://0.0.0.0:3000/api');
-
-		api.jobs().listen((res) => {
-			console.log(res);
-		});
 
 		await regenerate();
 	});

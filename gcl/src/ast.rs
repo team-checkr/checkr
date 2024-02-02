@@ -5,6 +5,13 @@ pub enum Target<Idx = ()> {
     Variable(Variable),
     Array(Array, Idx),
 }
+#[derive(
+    tapi::Tapi, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
+pub enum TargetKind {
+    Variable,
+    Array,
+}
 
 #[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]

@@ -1,65 +1,145 @@
 import { derived, writable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
-import { compilationStatusStore } from './jobs';
+import { compilationStatusStore } from './events';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
 
 type OutputState = 'None' | 'Stale' | 'Current';
 
 export type Io<A extends ce_shell.Analysis> = {
-	input: Writable<Mapping[A]['input'] | null>;
-	output: Writable<Mapping[A]['output'] | null>;
+	input: Writable<Mapping[A]['input']>;
+	output: Writable<Mapping[A]['output']>;
 	outputState: OutputState;
 	validation: Writable<ce_core.ValidationResult | null>;
 	generate: () => Promise<Mapping[A]['input']>;
 };
 
-const ios: Record<ce_shell.Analysis, Io<ce_shell.Analysis>> = Object.fromEntries(
-	ce_shell.ANALYSIS.map((a) => {
-		const input = writable(null);
-		const output = writable(null);
-		const validation = writable(null);
+const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 
-		let activeJob: null | driver.job.JobId = null;
+const initializeIo = <A extends ce_shell.Analysis>(
+	analysis: A,
+	defaultInput: Mapping[A]['input'],
+	defaultOutput: Mapping[A]['output']
+): Io<A> => {
+	const input = writable<Mapping[A]['input']>(defaultInput);
+	const output = writable<Mapping[A]['output']>(defaultOutput);
+	const validation = writable<ce_core.ValidationResult | null>(null);
 
-		derived([compilationStatusStore, input], ([compilationStatus, input]) => [
-			compilationStatus,
-			input
-		]).subscribe(([compilationStatus, input]) => {
-			if (!compilationStatus || !input) return;
-			if (compilationStatus.state != 'Succeeded') return;
+	let activeJob: null | driver.job.JobId = null;
+	let activeRequest: null | { abort: () => void } = null;
 
-			if (activeJob) {
-				api.cancelJob(activeJob);
-				activeJob = null;
-			}
+	derived([compilationStatusStore, input], (x) => x).subscribe(([compilationStatus, input]) => {
+		if (!compilationStatus || !input) return;
+		if (compilationStatus.state != 'Succeeded') return;
 
-			api.analysis({ analysis: a, json: input }).then((id) => {
-				activeJob = id;
-				api.waitForJob(id).then((result) => {
-					if (result) {
-						output.set(result.output.json as any);
-						validation.set(result.validation as any);
-					}
-				});
+		if (activeJob) {
+			api.jobsCancel(activeJob);
+			activeJob = null;
+		}
+		if (activeRequest) {
+			activeRequest.abort();
+			activeRequest = null;
+		}
+
+		const request = api.analysis({ analysis, json: input });
+		request.data.then((id) => {
+			activeJob = id;
+			const innerRequest = api.jobsWait(id);
+			innerRequest.data.then((result) => {
+				if (innerRequest == activeRequest) activeRequest = null;
+				if (activeJob == id) activeJob = null;
+				if (result) {
+					output.set(result.output.json as any);
+					validation.set(result.validation as any);
+				}
 			});
+			activeRequest = innerRequest;
+		});
+	});
+
+	const generate = () =>
+		api.generate({ analysis }).data.then((result) => {
+			input.set(result.json as any);
+			return result.json as any;
 		});
 
-		return [
-			a,
-			{
-				input,
-				output,
-				outputState: 'None',
-				validation,
-				generate: () =>
-					api.generate({ analysis: a }).then((result) => {
-						input.set(result.json as any);
-						return result.json as any;
-					})
-			} satisfies Io<typeof a>
-		];
-	})
-) as any;
+	generate();
 
-export const useIo = <A extends ce_shell.Analysis>(analysis: A): Io<A> => ios[analysis] as Io<A>;
+	return {
+		input,
+		output,
+		outputState: 'None',
+		validation,
+		generate
+	};
+};
+
+export const useIo = <A extends ce_shell.Analysis>(
+	analysis: A,
+	defaultInput: Mapping[A]['input'],
+	defaultOutput: Mapping[A]['output']
+): Io<A> => {
+	if (!ios[analysis]) {
+		ios[analysis] = initializeIo(analysis, defaultInput, defaultOutput);
+	}
+	return ios[analysis] as Io<A>;
+};
+
+// Object.fromEntries(
+// 	ce_shell.ANALYSIS.map((a) => {
+// 		const input = writable<Mapping[ce_shell.Analysis]['input'] | null>(null);
+// 		const output = writable<Mapping[ce_shell.Analysis]['output'] | null>(null);
+// 		const validation = writable<ce_core.ValidationResult | null>(null);
+
+// 		let activeJob: null | driver.job.JobId = null;
+// 		let activeRequest: null | { abort: () => void } = null;
+
+// 		derived([compilationStatusStore, input], (x) => x).subscribe(([compilationStatus, input]) => {
+// 			if (!compilationStatus || !input) return;
+// 			if (compilationStatus.state != 'Succeeded') return;
+
+// 			if (activeJob) {
+// 				api.jobsCancel(activeJob);
+// 				activeJob = null;
+// 			}
+// 			if (activeRequest) {
+// 				activeRequest.abort();
+// 				activeRequest = null;
+// 			}
+
+// 			const request = api.analysis({ analysis: a, json: input });
+// 			request.data.then((id) => {
+// 				activeJob = id;
+// 				const innerRequest = api.jobsWait(id);
+// 				innerRequest.data.then((result) => {
+// 					if (innerRequest == activeRequest) activeRequest = null;
+// 					if (activeJob == id) activeJob = null;
+// 					if (result) {
+// 						output.set(result.output.json as any);
+// 						validation.set(result.validation as any);
+// 					}
+// 				});
+// 				activeRequest = innerRequest;
+// 			});
+// 		});
+
+// 		const generate = () =>
+// 			api.generate({ analysis: a }).data.then((result) => {
+// 				input.set(result.json as any);
+// 				return result.json as any;
+// 			});
+
+// 		generate();
+
+// 		return [
+// 			a,
+// 			{
+// 				input,
+// 				output,
+// 				outputState: 'None',
+// 				validation,
+// 				generate
+// 			} satisfies Io<typeof a>
+// 		];
+// 	})
+// ) as any;

@@ -26,7 +26,8 @@ pub(crate) struct JobInner<T> {
     pub(crate) id: JobId,
     pub(crate) child: tokio::sync::RwLock<Option<tokio::process::Child>>,
     pub(crate) stdin: Option<tokio::process::ChildStdin>,
-    pub(crate) events_rx: tokio::sync::broadcast::Receiver<JobEvent>,
+    pub(crate) events_tx: Arc<tokio::sync::broadcast::Sender<JobEvent>>,
+    pub(crate) events_rx: Arc<tokio::sync::broadcast::Receiver<JobEvent>>,
     pub(crate) join_set: Mutex<JoinSet<()>>,
     pub(crate) stderr: Arc<RwLock<Vec<u8>>>,
     pub(crate) stdout: Arc<RwLock<Vec<u8>>>,
@@ -67,6 +68,7 @@ pub enum JobEvent {
     Closed {
         src: JobEventSource,
     },
+    Finished,
 }
 
 impl<T> PartialEq for Job<T> {
@@ -101,6 +103,7 @@ impl<T: Send + Sync + 'static> Job<T> {
             let job = job.clone();
             async move {
                 job.wait().await;
+                job.inner.events_tx.send(JobEvent::Finished).unwrap();
                 tracing::debug!("all streams closed");
             }
         });
@@ -125,6 +128,7 @@ impl<T: Send + Sync + 'static> Job<T> {
                         JobEvent::Closed { src } => {
                             tracing::debug!(?src, "closed");
                         }
+                        JobEvent::Finished => {}
                     }
                 }
             }
@@ -138,6 +142,9 @@ impl<T: Send + Sync + 'static> Job<T> {
     }
     pub fn started(&self) -> Instant {
         self.started
+    }
+    pub fn events(&self) -> tokio::sync::broadcast::Receiver<JobEvent> {
+        self.inner.events_rx.resubscribe()
     }
     pub fn raw_stdout_and_stderr(&self) -> impl Deref<Target = Vec<u8>> + '_ {
         self.inner.combined.read().unwrap()
@@ -193,11 +200,24 @@ impl<T: Send + Sync + 'static> Job<T> {
     }
 }
 
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Serialize)]
+#[derive(tapi::Tapi, Clone, PartialEq, Eq, Serialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum JobKind {
     Compilation,
     Analysis(Analysis, ce_shell::Input),
+}
+
+impl std::fmt::Debug for JobKind {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Compilation => write!(f, "Compilation"),
+            Self::Analysis(analysis, _) => f
+                .debug_tuple("Analysis")
+                .field(analysis)
+                .field(&"...")
+                .finish(),
+        }
+    }
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, Serialize)]

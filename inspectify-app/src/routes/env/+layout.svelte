@@ -2,7 +2,7 @@
 	import Ansi from '$lib/components/Ansi.svelte';
 	import JobPane from '$lib/components/JobPane.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
-	import { compilationStatusStore } from '$lib/jobs';
+	import { compilationStatusStore } from '$lib/events';
 
 	import Fire from '~icons/heroicons/fire';
 

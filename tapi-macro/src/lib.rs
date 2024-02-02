@@ -501,7 +501,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
             }
             quote::quote! {
-                impl #tapi_path::Tapi for #name {
+                impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
                     fn name() -> &'static str {
                         stringify!(#name)
                     }
@@ -509,7 +509,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                         std::any::TypeId::of::<#name>()
                     }
                     fn dependencies() -> Vec<&'static dyn #tapi_path::Typed> {
-                        vec![#(#deps::boxed(),)*]
+                        vec![#(<#deps as #tapi_path::Tapi>::boxed(),)*]
                     }
                     fn ts_name() -> String {
                         stringify!(#name).to_string()
