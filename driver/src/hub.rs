@@ -35,10 +35,7 @@ impl<T> PartialEq for Hub<T> {
 }
 
 impl<T: Send + Sync + 'static> Hub<T> {
-    pub fn new(path: PathBuf) -> color_eyre::Result<Self> {
-        let path = path
-            .canonicalize()
-            .wrap_err_with(|| format!("could not canonicalize path: {path:?}"))?;
+    pub fn new() -> color_eyre::Result<Self> {
         let next_job_id = Arc::new(AtomicUsize::new(0));
         let jobs = Arc::new(RwLock::new(Vec::new()));
 

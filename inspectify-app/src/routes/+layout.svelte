@@ -4,7 +4,6 @@
 	import '../app.pcss';
 
 	import CommandLineIcon from '~icons/heroicons/command-line';
-	import PlayCircleIcon from '~icons/heroicons/play-circle';
 	import QuestionMarkCircleIcon from '~icons/heroicons/question-mark-circle';
 
 	const { ANALYSIS } = ce_shell;
@@ -40,13 +39,6 @@
 		</div>
 
 		<div class="flex-1"></div>
-		<a
-			href="/"
-			class="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white"
-		>
-			<span>Analysis</span>
-			<PlayCircleIcon class="w-4" />
-		</a>
 
 		<a
 			href="/guide"

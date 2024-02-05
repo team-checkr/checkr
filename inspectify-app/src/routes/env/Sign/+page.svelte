@@ -1,8 +1,9 @@
 <script lang="ts">
 	import { browser } from '$app/environment';
-	import { api, ce_sign, gcl, type inspectify_api } from '$lib/api';
-	import Editor from '$lib/components/Editor.svelte';
+	import { api, ce_sign, type inspectify_api } from '$lib/api';
 	import Network from '$lib/components/Network.svelte';
+	import StandardInput from '$lib/components/StandardInput.svelte';
+	import ValidationIndicator from '$lib/components/ValidationIndicator.svelte';
 	import { useIo } from '$lib/io';
 
 	const io = useIo(
@@ -16,10 +17,6 @@
 	);
 	const input = io.input;
 	const output = io.output;
-
-	const regenerate = async () => {
-		$input = await io.generate();
-	};
 
 	$: commands = $input.commands;
 	$: determinism = $input.determinism.Case;
@@ -43,47 +40,37 @@
 </script>
 
 <div class="grid grid-cols-[45ch_1fr_1fr] grid-rows-[1fr_auto]">
-	<div class="grid grid-rows-[auto_1fr]">
-		<div>
-			<button on:click={regenerate}>Generate</button>
-		</div>
-		<div class="relative row-span-2 border-r">
-			<div class="absolute inset-0 grid overflow-auto">
-				<Editor bind:value={$input.commands} />
-			</div>
-		</div>
-		<div>
-			<div class="grid grid-cols-[auto_repeat(3,1fr)] place-items-center">
-				{#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
-					<div class="px-2 py-0.5 font-mono text-sm">
-						{v.name}
-					</div>
-					{#each ce_sign.semantics.SIGN as sign}
-						{#if v.kind == 'Variable'}
-							<div>
-								<label for="{v.name}-{sign.Case}">{fmtSignOrSigns(sign)}</label>
-								<input
-									type="radio"
-									name={v.name}
-									id="{v.name}-{sign.Case}"
-									value={$input.assignment.variables[v.name].Case == sign.Case
-										? $input.assignment.variables[v.name]
-										: sign}
-									bind:group={$input.assignment.variables[v.name]}
-								/>
-							</div>
-						{:else if v.kind == 'Array'}
-							<div>
-								{fmtSignOrSigns(sign)}
-							</div>
-						{:else}
-							<div>...</div>
-						{/if}
-					{/each}
+	<StandardInput analysis="Sign" {io}>
+		<div class="grid grid-cols-[auto_repeat(3,1fr)] place-items-center">
+			{#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
+				<div class="px-2 py-0.5 font-mono text-sm">
+					{v.name}
+				</div>
+				{#each ce_sign.semantics.SIGN as sign}
+					{#if v.kind == 'Variable'}
+						<div>
+							<label for="{v.name}-{sign.Case}">{fmtSignOrSigns(sign)}</label>
+							<input
+								type="radio"
+								name={v.name}
+								id="{v.name}-{sign.Case}"
+								value={$input.assignment.variables[v.name].Case == sign.Case
+									? $input.assignment.variables[v.name]
+									: sign}
+								bind:group={$input.assignment.variables[v.name]}
+							/>
+						</div>
+					{:else if v.kind == 'Array'}
+						<div>
+							{fmtSignOrSigns(sign)}
+						</div>
+					{:else}
+						<div>...</div>
+					{/if}
 				{/each}
-			</div>
+			{/each}
 		</div>
-	</div>
+	</StandardInput>
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
 			{#if dotPromise}
@@ -91,7 +78,6 @@
 					<Network {dot} />
 				{/await}
 			{/if}
-			<!-- <Network {dot} /> -->
 		</div>
 	</div>
 	<div class="relative">
@@ -123,4 +109,5 @@
 			</div>
 		</div>
 	</div>
+	<ValidationIndicator {io} />
 </div>
