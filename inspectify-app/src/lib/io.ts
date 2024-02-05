@@ -9,7 +9,7 @@ type OutputState = 'None' | 'Stale' | 'Current';
 export type Io<A extends ce_shell.Analysis> = {
 	input: Writable<Mapping[A]['input']>;
 	output: Writable<Mapping[A]['output']>;
-	outputState: OutputState;
+	outputState: Writable<OutputState>;
 	validation: Writable<ce_core.ValidationResult | null>;
 	generate: () => Promise<Mapping[A]['input']>;
 };
@@ -23,6 +23,7 @@ const initializeIo = <A extends ce_shell.Analysis>(
 ): Io<A> => {
 	const input = writable<Mapping[A]['input']>(defaultInput);
 	const output = writable<Mapping[A]['output']>(defaultOutput);
+	const outputState = writable<OutputState>('None');
 	const validation = writable<ce_core.ValidationResult | null>(null);
 
 	let activeJob: null | driver.job.JobId = null;
@@ -41,6 +42,7 @@ const initializeIo = <A extends ce_shell.Analysis>(
 			activeRequest = null;
 		}
 
+		outputState.set('Stale');
 		const request = api.analysis({ analysis, json: input });
 		request.data.then((id) => {
 			activeJob = id;
@@ -51,6 +53,7 @@ const initializeIo = <A extends ce_shell.Analysis>(
 				if (result) {
 					output.set(result.output.json as any);
 					validation.set(result.validation as any);
+					outputState.set('Current');
 				}
 			});
 			activeRequest = innerRequest;
@@ -68,7 +71,7 @@ const initializeIo = <A extends ce_shell.Analysis>(
 	return {
 		input,
 		output,
-		outputState: 'None',
+		outputState,
 		validation,
 		generate
 	};

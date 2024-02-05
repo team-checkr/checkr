@@ -56,8 +56,8 @@ async fn run() -> color_eyre::Result<()> {
     let endpoints = endpoints::endpoints().with_ty::<ce_shell::Envs>();
 
     let run_toml_path = cli.dir.join("run.toml");
-    let hub = driver::Hub::new(cli.dir.clone())?;
-    let driver = driver::Driver::new_from_path(hub.clone(), run_toml_path)?;
+    let hub = driver::Hub::new()?;
+    let driver = driver::Driver::new_from_path(hub.clone(), cli.dir.clone(), run_toml_path)?;
     if let Some(job) = driver.start_recompile() {
         job?;
     }
