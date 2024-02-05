@@ -22,7 +22,6 @@ pub enum HubEvent {
 
 #[derive(Debug, Clone)]
 pub struct Hub<T> {
-    path: PathBuf,
     next_job_id: Arc<AtomicUsize>,
     jobs: Arc<RwLock<Vec<Job<T>>>>,
     events_tx: Arc<tokio::sync::broadcast::Sender<HubEvent>>,
@@ -46,16 +45,11 @@ impl<T: Send + Sync + 'static> Hub<T> {
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
         Ok(Self {
-            path,
             next_job_id,
             jobs,
             events_tx: Arc::new(events_tx),
             events_rx: Arc::new(events_rx),
         })
-    }
-
-    pub fn path(&self) -> &Path {
-        &self.path
     }
 
     pub fn events(&self) -> tokio::sync::broadcast::Receiver<HubEvent> {
@@ -66,6 +60,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
     pub fn exec_command(
         &self,
         kind: JobKind,
+        cwd: impl AsRef<Path> + Debug,
         data: T,
         program: impl AsRef<OsStr> + Debug,
         args: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
@@ -81,7 +76,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
 
         let mut cmd = tokio::process::Command::new(program);
 
-        cmd.current_dir(&self.path);
+        cmd.current_dir(cwd);
 
         cmd.args(args)
             .stderr(Stdio::piped())
