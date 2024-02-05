@@ -22,6 +22,7 @@ use tracing::Instrument;
 #[derive(Debug, Clone)]
 pub struct Driver {
     hub: Hub<()>,
+    path: PathBuf,
     config: RunOption,
     current_compilation: Arc<RwLock<Option<Job<()>>>>,
     latest_successfull_compile: Arc<RwLock<Option<Job<()>>>>,
@@ -41,12 +42,13 @@ impl PartialEq for Driver {
 impl Driver {
     #[tracing::instrument]
     pub fn new_from_path(hub: Hub<()>, path: impl AsRef<Path> + Debug) -> color_eyre::Result<Self> {
-        let p = path.as_ref();
-        let src = std::fs::read_to_string(p).wrap_err("could not read run options")?;
+        let path = path.as_ref().to_path_buf();
+        let src = std::fs::read_to_string(&path).wrap_err("could not read run options")?;
         let config: RunOption = toml::from_str(&src).wrap_err("error parsing run options")?;
 
         Ok(Self {
             config,
+            path,
             hub,
             current_compilation: Default::default(),
             latest_successfull_compile: Default::default(),
@@ -64,6 +66,7 @@ impl Driver {
         args.push(input.to_string());
         self.hub.exec_command(
             JobKind::Analysis(input.analysis(), input.clone()),
+            &self.path,
             (),
             &args[0],
             &args[1..],
@@ -78,9 +81,9 @@ impl Driver {
             }
 
             let args = compile.split(' ').collect_vec();
-            let job = self
-                .hub
-                .exec_command(JobKind::Compilation, (), args[0], &args[1..])?;
+            let job =
+                self.hub
+                    .exec_command(JobKind::Compilation, &self.path, (), args[0], &args[1..])?;
             self.current_compilation
                 .write()
                 .unwrap()
@@ -108,7 +111,7 @@ impl Driver {
         let driver = self.clone();
 
         let config = driver.config();
-        let dir = driver.hub.path().to_owned();
+        let dir = driver.path.clone();
 
         let (tx, mut rx) = tokio::sync::mpsc::unbounded_channel();
 
