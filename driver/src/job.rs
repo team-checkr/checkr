@@ -198,6 +198,10 @@ impl<T: Send + Sync + 'static> Job<T> {
             }
         });
     }
+
+    pub fn data(&self) -> &T {
+        &self.inner.data
+    }
 }
 
 #[derive(tapi::Tapi, Clone, PartialEq, Eq, Serialize)]

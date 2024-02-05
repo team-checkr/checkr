@@ -144,14 +144,15 @@ export namespace gcl {
 }
 export namespace inspectify_api {
   export namespace endpoints {
+    export type GenerateParams = { analysis: ce_shell.Analysis }
     export type GclDotInput = { determinism: gcl.pg.Determinism, commands: gcl.ast.Commands }
     export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "id": driver.job.JobId, "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } };
-    export type GenerateParams = { analysis: ce_shell.Analysis }
+    export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, group_name: (string | null), stdout: string, spans: inspectify_api.endpoints.Span[], analysis_data: (inspectify_api.endpoints.AnalysisData | null) }
     export type JobOutput = { output: ce_shell.io.Output, validation: ce_core.ValidationResult }
     export type Target = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
-    export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, stdout: string, spans: inspectify_api.endpoints.Span[] }
     export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
     export type Span = { text: string, fg: (driver.ansi.Color | null), bg: (driver.ansi.Color | null) }
+    export type AnalysisData = { reference_output: ce_shell.io.Output, validation: ce_core.ValidationResult }
   }
 }
 export const api = {

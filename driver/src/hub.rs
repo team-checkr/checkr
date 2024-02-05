@@ -7,12 +7,13 @@ use std::{
 };
 
 use color_eyre::eyre::Context;
+use notify::event;
 use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinSet};
 use tracing::Instrument;
 
 use crate::{
     job::{Job, JobEvent, JobEventSource, JobInner, JobKind},
-    JobId,
+    JobId, JobState,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -53,6 +54,14 @@ impl<T: Send + Sync + 'static> Hub<T> {
         self.events_rx.resubscribe()
     }
 
+    fn next_job_id(&self) -> JobId {
+        JobId {
+            value: self
+                .next_job_id
+                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
+        }
+    }
+
     #[tracing::instrument(skip_all, fields(?kind))]
     pub fn exec_command(
         &self,
@@ -65,11 +74,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
     where
         T: Debug,
     {
-        let id = JobId {
-            value: self
-                .next_job_id
-                .fetch_add(1, std::sync::atomic::Ordering::SeqCst),
-        };
+        let id = self.next_job_id();
 
         let mut cmd = tokio::process::Command::new(program);
 
@@ -145,6 +150,40 @@ impl<T: Send + Sync + 'static> Hub<T> {
     pub fn get_job(&self, id: JobId) -> Option<Job<T>> {
         self.jobs(None).iter().find(|j| j.id() == id).cloned()
     }
+
+    pub fn add_finished_job(&self, j: FinishedJobParams<T>) -> Job<T> {
+        let id = self.next_job_id();
+
+        let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
+        let inner = JobInner {
+            id,
+            child: Default::default(),
+            stdin: Default::default(),
+            events_tx: Arc::new(events_tx),
+            events_rx: Arc::new(events_rx),
+            join_set: Default::default(),
+            stderr: Arc::new(RwLock::new(j.stderr)),
+            stdout: Arc::new(RwLock::new(j.stdout)),
+            combined: Arc::new(RwLock::new(j.combined)),
+            kind: j.kind,
+            state: RwLock::new(j.state),
+            data: j.data,
+        };
+        let job = Job::new(id, inner);
+        self.jobs.write().unwrap().push(job.clone());
+        self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
+
+        job
+    }
+}
+
+pub struct FinishedJobParams<T> {
+    pub kind: JobKind,
+    pub data: T,
+    pub stderr: Vec<u8>,
+    pub stdout: Vec<u8>,
+    pub combined: Vec<u8>,
+    pub state: JobState,
 }
 
 #[tracing::instrument(skip_all, fields(spawn_reader=%src))]

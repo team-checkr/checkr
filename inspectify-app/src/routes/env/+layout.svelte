@@ -15,7 +15,9 @@
 	</main>
 
 	{#if showStatus}
-		<JobPane />
+		<div class="h-[35vh]">
+			<JobPane />
+		</div>
 	{/if}
 
 	{#if $compilationStatusStore && $compilationStatusStore.state == 'Failed'}

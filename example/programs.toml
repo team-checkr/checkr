@@ -1,0 +1,17 @@
+[[envs.Graph]]
+seed = 125234
+shown = true
+
+[[envs.Graph]]
+input = '''
+{"commands":"x := y ; y := -x","determinism":{"Case":"NonDeterministic"}}
+'''
+
+# [[envs.Interpreter]]
+# seed = 12353
+# src = '''
+# x := y ; y := -x
+# '''
+# input = '''
+#     {"assignment":{"arrays":{},"variables":{"x":-1,"y":-8}},"determinism":{"Case":"Deterministic"},"trace_length":11}
+# '''

@@ -1,19 +1,21 @@
-use std::{boxed, time::Duration};
+use std::time::Duration;
 
-use axum::{
-    extract::{Path, State},
-    Json,
-};
+use axum::{extract::State, Json};
+use ce_core::ValidationResult;
 use ce_shell::{Analysis, EnvExt};
 use driver::{HubEvent, JobId, JobState};
-use gcl::ast::TargetKind;
+use gcl::{ast::TargetKind, pg::analysis};
 use rand::SeedableRng;
-use tracing::event;
+
+#[derive(Debug, Default, Clone)]
+pub struct JobData {
+    pub group_name: Option<String>,
+}
 
 #[derive(Clone)]
 pub struct AppState {
-    pub hub: driver::Hub<()>,
-    pub driver: driver::Driver,
+    pub hub: driver::Hub<JobData>,
+    pub driver: driver::Driver<JobData>,
 }
 
 pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
@@ -54,8 +56,16 @@ struct Job {
     id: JobId,
     state: driver::JobState,
     kind: driver::JobKind,
+    group_name: Option<String>,
     stdout: String,
     spans: Vec<Span>,
+    analysis_data: Option<AnalysisData>,
+}
+
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
+struct AnalysisData {
+    reference_output: ce_shell::Output,
+    validation: ce_core::ValidationResult,
 }
 
 impl AppState {
@@ -74,12 +84,31 @@ impl AppState {
             })
             .collect();
 
+        let analysis_data = match &kind {
+            driver::JobKind::Analysis(a, input) => {
+                let reference_output = input.reference_output().unwrap();
+                let validation = match a.parse_output(&stdout) {
+                    Ok(output) => input.validate_output(&output).unwrap(),
+                    Err(e) => ValidationResult::Mismatch {
+                        reason: format!("failed to parse output: {e:?}"),
+                    },
+                };
+                Some(AnalysisData {
+                    reference_output,
+                    validation,
+                })
+            }
+            _ => None,
+        };
+
         Job {
             id,
             state,
             kind,
+            group_name: job.data().group_name.clone(),
             stdout,
             spans,
+            analysis_data,
         }
     }
     fn jobs(&self) -> Vec<JobId> {
@@ -140,6 +169,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
         let tx = tx.clone();
         async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
+
+            tx.send(Ok(Event::JobsChanged { jobs: state.jobs() }))
+                .await
+                .unwrap();
 
             for id in state.jobs() {
                 let job = state.job(id);
@@ -256,7 +289,7 @@ async fn exec_analysis(
     State(state): State<AppState>,
     Json(input): Json<ce_shell::Input>,
 ) -> Json<JobId> {
-    let output = state.driver.exec_job(&input).unwrap();
+    let output = state.driver.exec_job(&input, JobData::default()).unwrap();
     Json(output.id())
 }
 
@@ -314,12 +347,13 @@ async fn gcl_dot(
 ) -> Json<ce_graph::GraphOutput> {
     let job = state
         .driver
-        .exec_job(&ce_graph::GraphEnv::generalize_input(
-            &ce_graph::GraphInput {
+        .exec_job(
+            &ce_graph::GraphEnv::generalize_input(&ce_graph::GraphInput {
                 commands: commands.clone(),
                 determinism,
-            },
-        ))
+            }),
+            JobData::default(),
+        )
         .unwrap();
 
     match job.wait().await {

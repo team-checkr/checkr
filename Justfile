@@ -18,3 +18,10 @@ build-ci:
 
 release-hook:
     git cliff -t $NEW_VERSION -o CHANGELOG.md
+
+# Debugging
+
+checko-debug:
+    # rm -rf example/runs.db3
+    # rm -rf example/groups/
+    RUST_LOG=debug cargo run -p inspectify-api -- --checko example

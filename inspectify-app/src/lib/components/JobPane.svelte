@@ -12,6 +12,8 @@
 	import JsonView from './JSONView.svelte';
 	import { derived } from 'svelte/store';
 
+	export let showGroup = false;
+
 	const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string]> = {
 		Queued: [EllipsisHorizontal, 'animate-pulse'],
 		Running: [ArrowPath, 'animate-spin text-slate-400'],
@@ -68,12 +70,16 @@
 		$selectedJob ? tab != 'Output' && $selectedJob.kind.kind == 'Compilation' : true;
 </script>
 
-<div class="z-10 grid grid-cols-[20ch_1fr] grid-rows-[35vh] border-t bg-slate-950">
+<div
+	class="z-10 grid h-full {showGroup
+		? 'grid-cols-[25ch_1fr]'
+		: 'grid-cols-[20ch_1fr]'} border-t bg-slate-950"
+>
 	<!-- Job list -->
-	<div class="relative text-sm">
+	<div class="relative border-r text-sm">
 		<div class="absolute inset-0 grid items-start overflow-auto">
-			<div class="grid grid-cols-[1fr_1fr]">
-				{#each ['Job', 'State'] as title}
+			<div class="grid {showGroup ? 'grid-cols-3' : 'grid-cols-2'}">
+				{#each showGroup ? ['Job', 'State', 'Group'] : ['Job', 'State'] as title}
 					<div class="sticky top-0 bg-slate-950 px-2 py-1 text-center font-bold">{title}</div>
 				{/each}
 				{#each filteredJobs.slice().reverse() as job (job.id)}
@@ -94,12 +100,26 @@
 							selectedJobId
 								? 'bg-slate-700'
 								: 'group-hover:bg-slate-800'}"
+							title={job.state}
 						>
 							<svelte:component
 								this={Icon(job.state)}
 								class="w-4 transition {icons[job.state][1]}"
 							/>
 						</div>
+						{#if showGroup}
+							<div
+								class="py-0.5 pl-2 pr-1 text-center transition {job.id == selectedJobId
+									? 'bg-slate-700'
+									: 'group-hover:bg-slate-800'}"
+							>
+								{#if job.group_name}
+									{job.group_name}
+								{:else}
+									<span class="text-xs italic text-gray-400">None</span>
+								{/if}
+							</div>
+						{/if}
 					</button>
 				{/each}
 			</div>
@@ -108,7 +128,7 @@
 
 	<!-- Job view -->
 	{#if $selectedJob}
-		<div class="grid grid-rows-[auto_1fr] border-l">
+		<div class="grid grid-rows-[auto_1fr]">
 			<div class="flex text-sm">
 				{#each tabs as tab}
 					<button
@@ -152,16 +172,16 @@
 						<!-- <JsonView json={JSON.parse(selectedJob.stdout)} /> -->
 						<div class="[overflow-anchor:auto]" />
 					{:else if currentTab == 'Reference Output'}
-						<pre class="p-3 [overflow-anchor:none]"><code>TODO</code></pre>
+						<JsonView json={$selectedJob.analysis_data?.reference_output.json} />
 						<div class="[overflow-anchor:auto]" />
 					{:else if currentTab == 'Validation'}
-						<pre class="p-3 [overflow-anchor:none]"><code
-								>{JSON.stringify({ validation: 'todo' }, null, 2)}</code
-							></pre>
+						<JsonView json={$selectedJob.analysis_data?.validation} />
 						<div class="[overflow-anchor:auto]" />
 					{/if}
 				</div>
 			</div>
 		</div>
+	{:else}
+		<div class="bg-slate-900" />
 	{/if}
 </div>
