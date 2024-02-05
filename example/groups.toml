@@ -1,0 +1,27 @@
+[[groups]]
+name = "01"
+git = "git@github.com:team-checkr/fsharp-starter.git"
+
+[[groups]]
+name = "02"
+git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "03"
+# git = "git@github.com:CamillaFaerch/checkr.git"
+
+[[groups]]
+name = "04"
+git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "05"
+# git = "git@github.com:CamillaFaerch/checkr.git"
+
+[[groups]]
+name = "06"
+git = "git@github.com:CamillaFaerch/gcmd.git"
+
+# [[groups]]
+# name = "07"
+# git = "git@github.com:CamillaFaerch/checkr.git"

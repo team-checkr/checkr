@@ -49,6 +49,7 @@ if (browser) {
 						jobsStore[id] = writable({
 							id,
 							state: 'Queued',
+							group_name: null,
 							kind: { kind: 'Waiting', data: {} },
 							stdout: '',
 							spans: []

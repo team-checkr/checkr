@@ -18,11 +18,19 @@ impl Input {
     pub fn analysis(&self) -> Analysis {
         self.analysis
     }
+
+    pub fn data(&self) -> Arc<serde_json::Value> {
+        self.json.clone()
+    }
 }
 
 impl Output {
     pub fn analysis(&self) -> Analysis {
         self.analysis
+    }
+
+    pub fn data(&self) -> Arc<serde_json::Value> {
+        self.json.clone()
     }
 }
 

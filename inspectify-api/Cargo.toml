@@ -13,17 +13,24 @@ axum.workspace = true
 ce-core.workspace = true
 ce-graph.workspace = true
 ce-shell.workspace = true
+chrono = { version = "0.4.33", features = ["serde"] }
 clap.workspace = true
 color-eyre = "0.6.2"
 driver.workspace = true
 futures-util = "0.3.30"
 gcl.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+lz4_flex = "0.11.2"
+md5 = "0.7.0"
 rand.workspace = true
+rusqlite = { version = "0.30.0", features = ["bundled", "chrono"] }
 serde = { workspace = true, features = ["derive"] }
 serde_json.workspace = true
 tapi = { version = "0.1.21", path = "../tapi" }
 tokio = { workspace = true, features = ["full"] }
 tokio-stream = "0.1.14"
+toml.workspace = true
 tower-http = { version = "0.5.0", features = ["cors"] }
 tracing.workspace = true
 tracing-error.workspace = true

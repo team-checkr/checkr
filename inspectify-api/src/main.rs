@@ -1,9 +1,11 @@
+mod checko;
 mod endpoints;
 
 use std::{net::SocketAddr, path::PathBuf};
 
 use axum::Router;
 use clap::Parser;
+use endpoints::JobData;
 use tapi::RouterExt;
 use tracing_subscriber::prelude::*;
 
@@ -48,21 +50,33 @@ struct Cli {
     // /// Update the binary to the latest release from GitHub
     // #[clap(short = 'u', long, default_value_t = false)]
     // self_update: bool,
+    /// The path to the checko SQLite database
+    #[clap(long)]
+    checko: Option<PathBuf>,
 }
 
 async fn run() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
-    let endpoints = endpoints::endpoints().with_ty::<ce_shell::Envs>();
-
-    let run_toml_path = cli.dir.join("run.toml");
     let hub = driver::Hub::new()?;
+    let run_toml_path = cli.dir.join("run.toml");
     let driver = driver::Driver::new_from_path(hub.clone(), cli.dir.clone(), run_toml_path)?;
-    if let Some(job) = driver.start_recompile() {
+    if let Some(job) = driver.start_recompile(JobData::default()) {
         job?;
     }
 
-    driver.spawn_watcher()?;
+    if let Some(checko_path) = cli.checko {
+        let mut checko = checko::Checko::open(hub.clone(), &checko_path)?;
+        checko.repopulate_hub()?;
+        tokio::spawn(async move {
+            checko.work().await.unwrap();
+        });
+        // return Ok(());
+    } else {
+        driver.spawn_watcher(JobData::default())?;
+    }
+
+    let endpoints = endpoints::endpoints().with_ty::<ce_shell::Envs>();
 
     let api = Router::new()
         .tapis(&endpoints)
