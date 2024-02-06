@@ -111,7 +111,7 @@ impl ProgramsConfig {
         self.envs.iter().flat_map(|(analysis, p)| {
             p.programs.iter().map(move |p| {
                 let c = p.canonicalize(*analysis).unwrap();
-                analysis.parse_input(&c.input).unwrap()
+                analysis.input_from_str(&c.input).unwrap()
             })
         })
     }

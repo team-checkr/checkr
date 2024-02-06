@@ -8,13 +8,11 @@ use std::{
 };
 
 use color_eyre::eyre::{Context, ContextCompat};
-use driver::{Driver, Hub, Job, JobData, JobKind};
+use driver::{Driver, Hub, Job};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
 use crate::endpoints::InspectifyJobMeta;
-
-use self::db::RunData;
 
 pub struct Checko {
     hub: Hub<InspectifyJobMeta>,
@@ -37,9 +35,9 @@ impl Checko {
             .wrap_err_with(|| format!("could not canonicalize path: '{}'", path.display()))?;
 
         let runs_db_path = path.join("runs.db3");
-        let groups_path = dunce::canonicalize(&path.join("groups.toml"))
+        let groups_path = dunce::canonicalize(path.join("groups.toml"))
             .wrap_err_with(|| format!("missing groups.toml at '{}'", path.display()))?;
-        let programs_path = dunce::canonicalize(&path.join("programs.toml"))
+        let programs_path = dunce::canonicalize(path.join("programs.toml"))
             .wrap_err_with(|| format!("missing programs.toml at '{}'", path.display()))?;
 
         let db = db::CheckoDb::open(&runs_db_path).wrap_err("could not open db")?;
@@ -59,22 +57,7 @@ impl Checko {
     pub fn repopulate_hub(&self) -> color_eyre::Result<()> {
         for run in self.db.all_runs()? {
             let data = run.data.decompress();
-
-            let (stderr, stdout, combined) = match (data.stderr, data.stdout, data.combined) {
-                (Some(stderr), Some(stdout), Some(combined)) => (stderr, stdout, combined),
-                _ => continue,
-            };
-
-            self.hub.add_finished_job(JobData {
-                kind: JobKind::Analysis(data.input),
-                stderr: stderr.into_bytes(),
-                stdout: stdout.into_bytes(),
-                combined: combined.into_bytes(),
-                state: driver::JobState::Warning,
-                meta: InspectifyJobMeta {
-                    group_name: Some(run.group_name.clone()),
-                },
-            });
+            self.hub.add_finished_job(data);
         }
 
         Ok(())
@@ -200,7 +183,9 @@ impl Checko {
                 join_set.spawn(async move {
                     let group_state = group_state.await;
                     db.start_run(run.id)?;
-                    let input = run.input();
+                    let Some(input) = run.input() else {
+                        return Ok::<_, color_eyre::Report>(());
+                    };
                     let job = group_state.driver.exec_job(
                         &input,
                         InspectifyJobMeta {
@@ -214,15 +199,8 @@ impl Checko {
                         .lock()
                         .unwrap()
                         .retain(|j| j.id() != job.id());
-                    db.finish_run(
-                        run.id,
-                        &RunData {
-                            input,
-                            stdout: Some(job.stdout()),
-                            stderr: Some(job.stderr()),
-                            combined: Some(job.stdout_and_stderr()),
-                        },
-                    )?;
+
+                    db.finish_run(run.id, &job.data())?;
                     Ok::<_, color_eyre::Report>(())
                 });
             }
