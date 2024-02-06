@@ -163,17 +163,26 @@ impl<T: Send + Sync + 'static> Job<T> {
     pub fn events(&self) -> tokio::sync::broadcast::Receiver<JobEvent> {
         self.inner.events_rx.resubscribe()
     }
-    fn data(&self) -> impl Deref<Target = JobData<T>> + '_ {
+    pub fn data(&self) -> impl Deref<Target = JobData<T>> + '_ {
         self.inner.data.read().unwrap()
     }
     fn data_mut(&self) -> impl DerefMut<Target = JobData<T>> + '_ {
         self.inner.data.write().unwrap()
     }
+    pub fn raw_stdout_and_stderr(&self) -> Vec<u8> {
+        self.data().combined.to_vec()
+    }
     pub fn stdout_and_stderr(&self) -> String {
         String::from_utf8(self.data().combined.to_vec()).unwrap_or_default()
     }
+    pub fn raw_stdout(&self) -> Vec<u8> {
+        self.data().stdout.to_vec()
+    }
     pub fn stdout(&self) -> String {
         String::from_utf8(self.data().stdout.to_vec()).unwrap_or_default()
+    }
+    pub fn raw_stderr(&self) -> Vec<u8> {
+        self.data().stderr.to_vec()
     }
     pub fn stderr(&self) -> String {
         String::from_utf8(self.data().stderr.to_vec()).unwrap_or_default()

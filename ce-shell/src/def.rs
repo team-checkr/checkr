@@ -66,7 +66,7 @@ macro_rules! define_shell {
                 }
             }
             #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
-            pub fn parse_input(self, src: &str) -> Result<Input, $crate::io::Error> {
+            pub fn input_from_str(self, src: &str) -> Result<Input, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
                         let input = serde_json::from_str::<<$krate as Env>::Input>(src)
@@ -79,10 +79,36 @@ macro_rules! define_shell {
                 }
             }
             #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
-            pub fn parse_output(self, src: &str) -> Result<Output, $crate::io::Error> {
+            pub fn input_from_slice(self, src: &[u8]) -> Result<Input, $crate::io::Error> {
+                match self {
+                    $(Analysis::$name => {
+                        let input = serde_json::from_slice::<<$krate as Env>::Input>(src)
+                            .map_err($crate::io::Error::JsonError)?;
+                        Ok(Input {
+                            analysis: self,
+                            json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
+                        })
+                    }),*
+                }
+            }
+            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            pub fn output_from_str(self, src: &str) -> Result<Output, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
                         let output = serde_json::from_str::<<$krate as Env>::Output>(src)
+                            .map_err($crate::io::Error::JsonError)?;
+                        Ok(Output {
+                            analysis: self,
+                            json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
+                        })
+                    }),*
+                }
+            }
+            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            pub fn output_from_from_bytes(self, src: &[u8]) -> Result<Output, $crate::io::Error> {
+                match self {
+                    $(Analysis::$name => {
+                        let output = serde_json::from_slice::<<$krate as Env>::Output>(src)
                             .map_err($crate::io::Error::JsonError)?;
                         Ok(Output {
                             analysis: self,

@@ -6,8 +6,9 @@ use ce_shell::{Analysis, EnvExt};
 use driver::{HubEvent, JobId, JobState};
 use gcl::ast::TargetKind;
 use rand::SeedableRng;
+use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone)]
+#[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {
     pub group_name: Option<String>,
 }
@@ -87,7 +88,7 @@ impl AppState {
         let analysis_data = match &kind {
             driver::JobKind::Analysis(input) => {
                 let reference_output = input.reference_output().unwrap();
-                let validation = match input.analysis().parse_output(&stdout) {
+                let validation = match input.analysis().output_from_str(&stdout) {
                     Ok(output) => input.validate_output(&output).unwrap(),
                     Err(e) => ValidationResult::Mismatch {
                         reason: format!("failed to parse output: {e:?}"),
@@ -318,7 +319,7 @@ async fn jobs_wait(
         match job.wait().await {
             driver::JobState::Succeeded => match job.kind() {
                 driver::JobKind::Analysis(input) => {
-                    let output = input.analysis().parse_output(&job.stdout()).unwrap();
+                    let output = input.analysis().output_from_str(&job.stdout()).unwrap();
                     let validation = input.validate_output(&output).unwrap();
                     Json(Some(JobOutput { output, validation }))
                 }

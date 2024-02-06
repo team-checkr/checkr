@@ -4,8 +4,11 @@ use std::{
     sync::{Arc, Mutex},
 };
 
-use ce_shell::{Input, Output};
+use ce_shell::Input;
+use driver::JobKind;
 use rusqlite::{types::FromSql, OptionalExtension, ToSql};
+
+use crate::endpoints::InspectifyJobMeta;
 
 #[derive(Clone)]
 pub struct CheckoDb {
@@ -16,7 +19,7 @@ pub struct Compressed<T> {
     _ph: PhantomData<T>,
 }
 
-impl FromSql for Compressed<RunData> {
+impl FromSql for Compressed<JobData> {
     fn column_result(value: rusqlite::types::ValueRef) -> rusqlite::types::FromSqlResult<Self> {
         Ok(Self {
             data: FromSql::column_result(value)?,
@@ -25,7 +28,7 @@ impl FromSql for Compressed<RunData> {
     }
 }
 
-impl ToSql for Compressed<RunData> {
+impl ToSql for Compressed<JobData> {
     fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
         self.data.to_sql()
     }
@@ -88,7 +91,7 @@ impl<T> std::ops::Deref for WithId<T> {
     }
 }
 
-pub struct Run<T = RunData> {
+pub struct Run<T = JobData> {
     pub group_name: String,
     input_md5: [u8; 16],
     pub data: T,
@@ -97,14 +100,9 @@ pub struct Run<T = RunData> {
     finished: Option<chrono::DateTime<chrono::Utc>>,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
-pub struct RunData {
-    pub input: Input,
-    pub stdout: Option<String>,
-    pub stderr: Option<String>,
-    pub combined: Option<String>,
-}
-pub type CompressedRun = Run<Compressed<RunData>>;
+pub type JobData = driver::JobData<InspectifyJobMeta>;
+
+pub type CompressedRun = Run<Compressed<JobData>>;
 
 impl From<Run> for CompressedRun {
     fn from(run: Run) -> Self {
@@ -142,43 +140,26 @@ impl Run {
     pub fn new(group_name: String, input: Input) -> color_eyre::Result<Self> {
         let input_md5 = input_hash(&input);
         Ok(Self {
-            group_name,
+            group_name: group_name.clone(),
             input_md5,
-            data: RunData {
-                input,
-                stdout: None,
-                stderr: None,
-                combined: None,
-            },
+            data: JobData::new(
+                JobKind::Analysis(input),
+                InspectifyJobMeta {
+                    group_name: Some(group_name),
+                },
+            ),
             queued: chrono::Utc::now(),
             started: None,
             finished: None,
         })
     }
-    pub fn output(&self) -> color_eyre::Result<Option<Output>> {
-        if let Some(raw_stdout) = &self.data.stdout {
-            Ok(Some(self.data.input.analysis().parse_output(raw_stdout)?))
-        } else {
-            Ok(None)
-        }
-    }
 }
 
 impl CompressedRun {
-    pub fn input(&self) -> Input {
-        self.data.decompress().input
-    }
-    pub fn output(&self) -> color_eyre::Result<Option<Output>> {
-        if let Some(raw_stdout) = &self.data.decompress().stdout {
-            Ok(Some(
-                self.data
-                    .decompress()
-                    .input
-                    .analysis()
-                    .parse_output(raw_stdout)?,
-            ))
-        } else {
-            Ok(None)
+    pub fn input(&self) -> Option<Input> {
+        match self.data.decompress().kind {
+            JobKind::Analysis(input) => Some(input),
+            _ => None,
         }
     }
 }
@@ -228,7 +209,7 @@ impl CheckoDb {
         Ok(())
     }
 
-    pub fn finish_run(&self, id: Id<CompressedRun>, data: &RunData) -> color_eyre::Result<()> {
+    pub fn finish_run(&self, id: Id<CompressedRun>, data: &JobData) -> color_eyre::Result<()> {
         let data = Compressed::compress(data);
         self.conn().execute(
             "UPDATE runs SET finished = CURRENT_TIMESTAMP, data = ?2 WHERE id = ?1",
