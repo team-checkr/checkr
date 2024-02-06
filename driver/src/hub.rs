@@ -22,20 +22,20 @@ pub enum HubEvent {
 }
 
 #[derive(Debug, Clone)]
-pub struct Hub<T> {
+pub struct Hub<M> {
     next_job_id: Arc<AtomicUsize>,
-    jobs: Arc<RwLock<Vec<Job<T>>>>,
+    jobs: Arc<RwLock<Vec<Job<M>>>>,
     events_tx: Arc<tokio::sync::broadcast::Sender<HubEvent>>,
     events_rx: Arc<tokio::sync::broadcast::Receiver<HubEvent>>,
 }
 
-impl<T> PartialEq for Hub<T> {
+impl<M> PartialEq for Hub<M> {
     fn eq(&self, other: &Self) -> bool {
         Arc::ptr_eq(&self.jobs, &other.jobs)
     }
 }
 
-impl<T: Send + Sync + 'static> Hub<T> {
+impl<M: Send + Sync + 'static> Hub<M> {
     pub fn new() -> color_eyre::Result<Self> {
         let next_job_id = Arc::new(AtomicUsize::new(0));
         let jobs = Arc::new(RwLock::new(Vec::new()));
@@ -67,12 +67,12 @@ impl<T: Send + Sync + 'static> Hub<T> {
         &self,
         kind: JobKind,
         cwd: impl AsRef<Path> + Debug,
-        data: T,
+        meta: M,
         program: impl AsRef<OsStr> + Debug,
         args: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
-    ) -> color_eyre::Result<Job<T>>
+    ) -> color_eyre::Result<Job<M>>
     where
-        T: Debug,
+        M: Debug,
     {
         let id = self.next_job_id();
 
@@ -129,7 +129,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
                 combined: Default::default(),
                 kind,
                 state: Default::default(),
-                data,
+                meta,
             },
         );
 
@@ -138,7 +138,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
 
         Ok(job)
     }
-    pub fn jobs(&self, count: Option<usize>) -> Vec<Job<T>> {
+    pub fn jobs(&self, count: Option<usize>) -> Vec<Job<M>> {
         if let Some(count) = count {
             self.jobs.read().unwrap()[self.jobs.read().unwrap().len().saturating_sub(count)..]
                 .to_vec()
@@ -147,11 +147,11 @@ impl<T: Send + Sync + 'static> Hub<T> {
         }
     }
 
-    pub fn get_job(&self, id: JobId) -> Option<Job<T>> {
+    pub fn get_job(&self, id: JobId) -> Option<Job<M>> {
         self.jobs(None).iter().find(|j| j.id() == id).cloned()
     }
 
-    pub fn add_finished_job(&self, j: FinishedJobParams<T>) -> Job<T> {
+    pub fn add_finished_job(&self, j: FinishedJobParams<M>) -> Job<M> {
         let id = self.next_job_id();
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
@@ -167,7 +167,7 @@ impl<T: Send + Sync + 'static> Hub<T> {
             combined: Arc::new(RwLock::new(j.combined)),
             kind: j.kind,
             state: RwLock::new(j.state),
-            data: j.data,
+            meta: j.meta,
         };
         let job = Job::new(id, inner);
         self.jobs.write().unwrap().push(job.clone());
@@ -177,9 +177,9 @@ impl<T: Send + Sync + 'static> Hub<T> {
     }
 }
 
-pub struct FinishedJobParams<T> {
+pub struct FinishedJobParams<M> {
     pub kind: JobKind,
-    pub data: T,
+    pub meta: M,
     pub stderr: Vec<u8>,
     pub stdout: Vec<u8>,
     pub combined: Vec<u8>,

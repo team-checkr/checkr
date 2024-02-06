@@ -34,7 +34,7 @@ pub(crate) struct JobInner<T> {
     pub(crate) combined: Arc<RwLock<Vec<u8>>>,
     pub(crate) kind: JobKind,
     pub(crate) state: RwLock<JobState>,
-    pub(crate) data: T,
+    pub(crate) meta: T,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -199,8 +199,8 @@ impl<T: Send + Sync + 'static> Job<T> {
         });
     }
 
-    pub fn data(&self) -> &T {
-        &self.inner.data
+    pub fn meta(&self) -> &T {
+        &self.inner.meta
     }
 }
 

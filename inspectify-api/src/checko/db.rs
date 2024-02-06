@@ -43,7 +43,6 @@ impl<T: serde::Serialize + for<'a> serde::Deserialize<'a>> Compressed<T> {
     #[tracing::instrument(skip_all)]
     pub fn decompress(&self) -> T {
         let data = lz4_flex::decompress_size_prepended(&self.data).unwrap();
-        tracing::error!(ty=?std::any::type_name::<T>(), len=?data.len(), "decompressing data");
         serde_json::from_slice(&data).unwrap()
     }
 }

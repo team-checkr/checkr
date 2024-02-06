@@ -4,18 +4,18 @@ use axum::{extract::State, Json};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, EnvExt};
 use driver::{HubEvent, JobId, JobState};
-use gcl::{ast::TargetKind, pg::analysis};
+use gcl::ast::TargetKind;
 use rand::SeedableRng;
 
 #[derive(Debug, Default, Clone)]
-pub struct JobData {
+pub struct InspectifyJobMeta {
     pub group_name: Option<String>,
 }
 
 #[derive(Clone)]
 pub struct AppState {
-    pub hub: driver::Hub<JobData>,
-    pub driver: driver::Driver<JobData>,
+    pub hub: driver::Hub<InspectifyJobMeta>,
+    pub driver: driver::Driver<InspectifyJobMeta>,
 }
 
 pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
@@ -105,7 +105,7 @@ impl AppState {
             id,
             state,
             kind,
-            group_name: job.data().group_name.clone(),
+            group_name: job.meta().group_name.clone(),
             stdout,
             spans,
             analysis_data,
@@ -289,7 +289,10 @@ async fn exec_analysis(
     State(state): State<AppState>,
     Json(input): Json<ce_shell::Input>,
 ) -> Json<JobId> {
-    let output = state.driver.exec_job(&input, JobData::default()).unwrap();
+    let output = state
+        .driver
+        .exec_job(&input, InspectifyJobMeta::default())
+        .unwrap();
     Json(output.id())
 }
 
@@ -352,7 +355,7 @@ async fn gcl_dot(
                 commands: commands.clone(),
                 determinism,
             }),
-            JobData::default(),
+            InspectifyJobMeta::default(),
         )
         .unwrap();
 
