@@ -85,9 +85,9 @@ impl AppState {
             .collect();
 
         let analysis_data = match &kind {
-            driver::JobKind::Analysis(a, input) => {
+            driver::JobKind::Analysis(input) => {
                 let reference_output = input.reference_output().unwrap();
-                let validation = match a.parse_output(&stdout) {
+                let validation = match input.analysis().parse_output(&stdout) {
                     Ok(output) => input.validate_output(&output).unwrap(),
                     Err(e) => ValidationResult::Mismatch {
                         reason: format!("failed to parse output: {e:?}"),
@@ -317,8 +317,8 @@ async fn jobs_wait(
     if let Some(job) = state.hub.get_job(id) {
         match job.wait().await {
             driver::JobState::Succeeded => match job.kind() {
-                driver::JobKind::Analysis(a, input) => {
-                    let output = a.parse_output(&job.stdout()).unwrap();
+                driver::JobKind::Analysis(input) => {
+                    let output = input.analysis().parse_output(&job.stdout()).unwrap();
                     let validation = input.validate_output(&output).unwrap();
                     Json(Some(JobOutput { output, validation }))
                 }

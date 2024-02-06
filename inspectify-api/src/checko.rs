@@ -71,7 +71,7 @@ impl Checko {
             };
 
             self.hub.add_finished_job(JobData {
-                kind: JobKind::Analysis(data.input.analysis(), data.input),
+                kind: JobKind::Analysis(data.input),
                 stderr: stderr.into_bytes(),
                 stdout: stdout.into_bytes(),
                 combined: combined.into_bytes(),

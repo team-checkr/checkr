@@ -122,7 +122,7 @@ export namespace driver {
     export type JobId = number;
     export type JobState = "Queued" | "Running" | "Succeeded" | "Canceled" | "Failed" | "Warning";
     export const JOB_STATE: JobState[] = ["Queued", "Running", "Succeeded", "Canceled", "Failed", "Warning"];
-    export type JobKind = { "kind": "Compilation", "data": {  } } | { "kind": "Analysis", "data": [ce_shell.Analysis, ce_shell.io.Input] };
+    export type JobKind = { "kind": "Compilation", "data": {  } } | { "kind": "Analysis", "data": ce_shell.io.Input };
   }
 }
 export namespace gcl {

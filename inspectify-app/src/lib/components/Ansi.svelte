@@ -1,6 +1,6 @@
 <script lang="ts">
 	import type { inspectify_api } from '$lib/api';
-	export let spans: inspectify_api.Span[];
+	export let spans: inspectify_api.endpoints.Span[];
 </script>
 
 {#each spans as span}<span class="fg-{span.fg} bg-{span.bg}">{span.text}</span>{/each}

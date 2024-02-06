@@ -74,7 +74,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
         args.push(input.analysis().code().to_string());
         args.push(input.to_string());
         self.hub.exec_command(
-            JobKind::Analysis(input.analysis(), input.clone()),
+            JobKind::Analysis(input.clone()),
             &self.cwd,
             meta,
             &args[0],
