@@ -33,18 +33,13 @@ pub struct GroupState {
 
 impl Checko {
     pub fn open(hub: Hub<InspectifyJobMeta>, path: &Path) -> color_eyre::Result<Self> {
-        let path = path
-            .canonicalize()
+        let path = dunce::canonicalize(path)
             .wrap_err_with(|| format!("could not canonicalize path: '{}'", path.display()))?;
 
         let runs_db_path = path.join("runs.db3");
-        let groups_path = path
-            .join("groups.toml")
-            .canonicalize()
+        let groups_path = dunce::canonicalize(&path.join("groups.toml"))
             .wrap_err_with(|| format!("missing groups.toml at '{}'", path.display()))?;
-        let programs_path = path
-            .join("programs.toml")
-            .canonicalize()
+        let programs_path = dunce::canonicalize(&path.join("programs.toml"))
             .wrap_err_with(|| format!("missing programs.toml at '{}'", path.display()))?;
 
         let db = db::CheckoDb::open(&runs_db_path).wrap_err("could not open db")?;

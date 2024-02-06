@@ -46,9 +46,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
         cwd: impl AsRef<Path> + Debug,
         path: impl AsRef<Path> + Debug,
     ) -> color_eyre::Result<Self> {
-        let cwd = cwd
-            .as_ref()
-            .canonicalize()
+        let cwd = dunce::canonicalize(cwd.as_ref())
             .wrap_err_with(|| format!("could not canonicalize cwd: {cwd:?}"))?;
         let path = path.as_ref().to_path_buf();
         let src = std::fs::read_to_string(&path)
@@ -144,7 +142,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             .iter()
             .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
             .collect::<color_eyre::Result<Vec<glob::Pattern>>>()?;
-        let debouncer_dir = dir.canonicalize()?;
+        let debouncer_dir = dunce::canonicalize(&dir)?;
         let mut debouncer = notify_debouncer_mini::new_debouncer(
             Duration::from_millis(200),
             move |res: notify_debouncer_mini::DebounceEventResult| match res {
