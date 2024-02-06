@@ -17,7 +17,7 @@ chrono = { version = "0.4.33", features = ["serde"] }
 clap.workspace = true
 color-eyre = "0.6.2"
 driver.workspace = true
-dunce = { workspace = true }
+dunce.workspace = true
 futures-util = "0.3.30"
 gcl.workspace = true
 indexmap.workspace = true
