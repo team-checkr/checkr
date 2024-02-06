@@ -52,7 +52,8 @@ if (browser) {
 							group_name: null,
 							kind: { kind: 'Waiting', data: {} },
 							stdout: '',
-							spans: []
+							spans: [],
+							analysis_data: null
 						});
 					}
 				}

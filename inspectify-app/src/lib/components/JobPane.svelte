@@ -93,7 +93,7 @@
 								? 'Compilation'
 								: job.kind.kind == 'Waiting'
 									? '...'
-									: job.kind.data[0]}
+									: job.kind.data.analysis}
 						</div>
 						<div
 							class="flex items-center justify-center px-1 py-0.5 transition {job.id ==
@@ -150,7 +150,7 @@
 							></pre>
 						<div class="[overflow-anchor:auto]" />
 					{:else if currentTab == 'Input JSON' && $selectedJob.kind.kind == 'Analysis'}
-						<JsonView json={$selectedJob.kind.data[1].json} />
+						<JsonView json={$selectedJob.kind.data.json} />
 						<div class="[overflow-anchor:auto]" />
 					{:else if currentTab == 'Output JSON'}
 						{#if output}

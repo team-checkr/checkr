@@ -5,7 +5,6 @@ use std::{
     time::Instant,
 };
 
-use ce_shell::Analysis;
 use serde::{Deserialize, Serialize};
 use tokio::{sync::Mutex, task::JoinSet};
 use tracing::Instrument;
@@ -32,7 +31,7 @@ pub(crate) struct JobInner<M> {
     pub(crate) data: Arc<RwLock<JobData<M>>>,
 }
 
-#[derive(Debug)]
+#[derive(Debug, serde::Serialize, serde::Deserialize)]
 pub struct JobData<M> {
     pub stderr: Vec<u8>,
     pub stdout: Vec<u8>,
@@ -229,27 +228,27 @@ impl<T: Send + Sync + 'static> Job<T> {
     }
 }
 
-#[derive(tapi::Tapi, Clone, PartialEq, Eq, Serialize)]
+#[derive(tapi::Tapi, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[serde(tag = "kind", content = "data")]
 pub enum JobKind {
     Compilation,
-    Analysis(Analysis, ce_shell::Input),
+    Analysis(ce_shell::Input),
 }
 
 impl std::fmt::Debug for JobKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Compilation => write!(f, "Compilation"),
-            Self::Analysis(analysis, _) => f
+            Self::Analysis(input) => f
                 .debug_tuple("Analysis")
-                .field(analysis)
+                .field(&input.analysis())
                 .field(&"...")
                 .finish(),
         }
     }
 }
 
-#[derive(tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, Serialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
 pub enum JobState {
     Queued,
     #[default]
@@ -264,7 +263,7 @@ impl Display for JobKind {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             JobKind::Compilation => write!(f, "Compilation"),
-            JobKind::Analysis(analysis, _) => write!(f, "{analysis}"),
+            JobKind::Analysis(input) => write!(f, "{}", input.analysis()),
         }
     }
 }
