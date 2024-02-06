@@ -1,6 +1,6 @@
 use std::{
     fmt::Display,
-    ops::Deref,
+    ops::{Deref, DerefMut},
     sync::{Arc, RwLock},
     time::Instant,
 };
@@ -22,19 +22,37 @@ pub struct Job<T> {
     inner: Arc<JobInner<T>>,
 }
 #[derive(Debug)]
-pub(crate) struct JobInner<T> {
+pub(crate) struct JobInner<M> {
     pub(crate) id: JobId,
     pub(crate) child: tokio::sync::RwLock<Option<tokio::process::Child>>,
     pub(crate) stdin: Option<tokio::process::ChildStdin>,
     pub(crate) events_tx: Arc<tokio::sync::broadcast::Sender<JobEvent>>,
     pub(crate) events_rx: Arc<tokio::sync::broadcast::Receiver<JobEvent>>,
     pub(crate) join_set: Mutex<JoinSet<()>>,
-    pub(crate) stderr: Arc<RwLock<Vec<u8>>>,
-    pub(crate) stdout: Arc<RwLock<Vec<u8>>>,
-    pub(crate) combined: Arc<RwLock<Vec<u8>>>,
-    pub(crate) kind: JobKind,
-    pub(crate) state: RwLock<JobState>,
-    pub(crate) meta: T,
+    pub(crate) data: Arc<RwLock<JobData<M>>>,
+}
+
+#[derive(Debug)]
+pub struct JobData<M> {
+    pub stderr: Vec<u8>,
+    pub stdout: Vec<u8>,
+    pub combined: Vec<u8>,
+    pub kind: JobKind,
+    pub state: JobState,
+    pub meta: M,
+}
+
+impl<M> JobData<M> {
+    pub fn new(kind: JobKind, meta: M) -> Self {
+        Self {
+            kind,
+            meta,
+            stderr: Default::default(),
+            stdout: Default::default(),
+            combined: Default::default(),
+            state: Default::default(),
+        }
+    }
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -115,15 +133,15 @@ impl<T: Send + Sync + 'static> Job<T> {
                 while let Ok(ev) = events_rx.recv().await {
                     match ev {
                         JobEvent::Wrote { src, from, to } => {
-                            let src = match src {
-                                JobEventSource::Stdout => job.inner.stdout.read().unwrap(),
-                                JobEventSource::Stderr => job.inner.stderr.read().unwrap(),
-                            };
-                            job.inner
-                                .combined
-                                .write()
-                                .unwrap()
-                                .extend_from_slice(&src[from..to]);
+                            let data = &mut *job.inner.data.write().unwrap();
+                            match src {
+                                JobEventSource::Stdout => {
+                                    data.combined.extend_from_slice(&data.stdout[from..to])
+                                }
+                                JobEventSource::Stderr => {
+                                    data.combined.extend_from_slice(&data.stderr[from..to])
+                                }
+                            }
                         }
                         JobEvent::Closed { src } => {
                             tracing::debug!(?src, "closed");
@@ -146,23 +164,26 @@ impl<T: Send + Sync + 'static> Job<T> {
     pub fn events(&self) -> tokio::sync::broadcast::Receiver<JobEvent> {
         self.inner.events_rx.resubscribe()
     }
-    pub fn raw_stdout_and_stderr(&self) -> impl Deref<Target = Vec<u8>> + '_ {
-        self.inner.combined.read().unwrap()
+    fn data(&self) -> impl Deref<Target = JobData<T>> + '_ {
+        self.inner.data.read().unwrap()
+    }
+    fn data_mut(&self) -> impl DerefMut<Target = JobData<T>> + '_ {
+        self.inner.data.write().unwrap()
     }
     pub fn stdout_and_stderr(&self) -> String {
-        String::from_utf8(self.raw_stdout_and_stderr().to_vec()).unwrap_or_default()
+        String::from_utf8(self.data().combined.to_vec()).unwrap_or_default()
     }
     pub fn stdout(&self) -> String {
-        String::from_utf8(self.inner.stdout.read().unwrap().to_vec()).unwrap_or_default()
+        String::from_utf8(self.data().stdout.to_vec()).unwrap_or_default()
     }
     pub fn stderr(&self) -> String {
-        String::from_utf8(self.inner.stderr.read().unwrap().to_vec()).unwrap_or_default()
+        String::from_utf8(self.data().stderr.to_vec()).unwrap_or_default()
     }
     pub fn kind(&self) -> JobKind {
-        self.inner.kind.clone()
+        self.data().kind.clone()
     }
     pub fn state(&self) -> JobState {
-        *self.inner.state.read().unwrap()
+        self.data().state
     }
     pub async fn wait(&self) -> JobState {
         while self.inner.join_set.lock().await.join_next().await.is_some() {}
@@ -172,8 +193,9 @@ impl<T: Send + Sync + 'static> Job<T> {
             match child.wait().await {
                 Ok(es) => {
                     tracing::debug!(?es, "set state");
-                    if *self.inner.state.read().unwrap() != JobState::Canceled {
-                        *self.inner.state.write().unwrap() = if es.success() {
+                    let mut data = self.data_mut();
+                    if data.state != JobState::Canceled {
+                        data.state = if es.success() {
                             JobState::Succeeded
                         } else {
                             JobState::Failed
@@ -190,17 +212,20 @@ impl<T: Send + Sync + 'static> Job<T> {
         let job = self.clone();
         tokio::spawn(async move {
             if let Some(child) = &mut *job.inner.child.write().await {
-                let state = *job.inner.state.read().unwrap();
-                if let JobState::Queued | JobState::Running = state {
-                    *job.inner.state.write().unwrap() = JobState::Canceled
+                let mut data = job.data_mut();
+                if let JobState::Queued | JobState::Running = data.state {
+                    data.state = JobState::Canceled
                 }
                 child.start_kill().unwrap();
             }
         });
     }
 
-    pub fn meta(&self) -> &T {
-        &self.inner.meta
+    pub fn meta(&self) -> T
+    where
+        T: Clone,
+    {
+        self.data().meta.clone()
     }
 }
 
