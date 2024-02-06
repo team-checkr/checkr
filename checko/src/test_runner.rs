@@ -63,7 +63,7 @@ impl TestRunInput {
             "-v",
             &format!(
                 "{}:/root/code",
-                cwd.canonicalize()?
+                dunce::canonicalize(cwd)?
                     .to_str()
                     .wrap_err("failed to create a str from cwd when spawning docker")?
             ),

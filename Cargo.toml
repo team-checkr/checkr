@@ -39,6 +39,7 @@ comfy-table = { version = "7.0.1", default-features = false }
 dioxus = "0.4.0"
 dioxus-liveview = { version = "0.4.0", features = ["axum"] }
 driver = { path = "./driver" }
+dunce = "1.0.4"
 futures-util = "0.3.28"
 gcl = { path = "./gcl" }
 indexmap = { version = "2.0.0", features = ["serde"] }

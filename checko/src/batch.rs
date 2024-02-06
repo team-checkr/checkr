@@ -38,7 +38,7 @@ pub struct Batch {
 impl Batch {
     pub fn from_path(path: impl AsRef<Path>) -> Result<Self> {
         let path = path.as_ref();
-        let path = path.canonicalize().with_context(|| {
+        let path = dunce::canonicalize(path).with_context(|| {
             format!("failed to canonicalize batch path at '{}'", path.display())
         })?;
         let mut batch: Self = serde_json::from_str(
@@ -376,7 +376,7 @@ impl BatchCli {
                 batch.write_to_disk().await?;
             }
             BatchCli::Status { batch_path } => {
-                let batch_path = batch_path.canonicalize()?;
+                let batch_path = dunce::canonicalize(&batch_path)?;
                 let batch: Batch =
                     serde_json::from_str(&std::fs::read_to_string(&batch_path).with_context(
                         || format!("failed to read batch at '{}'", batch_path.display()),
