@@ -12,12 +12,12 @@ use driver::{Driver, FinishedJobParams, Hub, Job, JobKind};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
-use crate::endpoints::JobData;
+use crate::endpoints::InspectifyJobMeta;
 
 use self::db::RunData;
 
 pub struct Checko {
-    hub: Hub<JobData>,
+    hub: Hub<InspectifyJobMeta>,
     path: PathBuf,
     db: db::CheckoDb,
     groups_config: config::GroupsConfig,
@@ -27,12 +27,12 @@ pub struct Checko {
 
 pub struct GroupState {
     config: config::GroupConfig,
-    driver: Driver<JobData>,
-    active_jobs: Mutex<Vec<Job<JobData>>>,
+    driver: Driver<InspectifyJobMeta>,
+    active_jobs: Mutex<Vec<Job<InspectifyJobMeta>>>,
 }
 
 impl Checko {
-    pub fn open(hub: Hub<JobData>, path: &Path) -> color_eyre::Result<Self> {
+    pub fn open(hub: Hub<InspectifyJobMeta>, path: &Path) -> color_eyre::Result<Self> {
         let path = path
             .canonicalize()
             .wrap_err_with(|| format!("could not canonicalize path: '{}'", path.display()))?;
@@ -72,7 +72,7 @@ impl Checko {
 
             self.hub.add_finished_job(FinishedJobParams {
                 kind: JobKind::Analysis(data.input.analysis(), data.input),
-                data: JobData {
+                meta: InspectifyJobMeta {
                     group_name: Some(run.group_name.clone()),
                 },
                 stderr: stderr.into_bytes(),
@@ -170,7 +170,7 @@ impl Checko {
             state
         };
 
-        let compile_job = state.driver.ensure_compile(JobData {
+        let compile_job = state.driver.ensure_compile(InspectifyJobMeta {
             group_name: Some(group_name.to_string()),
         })?;
 
@@ -208,7 +208,7 @@ impl Checko {
                     let input = run.input();
                     let job = group_state.driver.exec_job(
                         &input,
-                        JobData {
+                        InspectifyJobMeta {
                             group_name: Some(run.group_name.clone()),
                         },
                     )?;

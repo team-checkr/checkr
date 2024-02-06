@@ -5,7 +5,7 @@ use std::{net::SocketAddr, path::PathBuf};
 
 use axum::Router;
 use clap::Parser;
-use endpoints::JobData;
+use endpoints::InspectifyJobMeta;
 use tapi::RouterExt;
 use tracing_subscriber::prelude::*;
 
@@ -61,7 +61,7 @@ async fn run() -> color_eyre::Result<()> {
     let hub = driver::Hub::new()?;
     let run_toml_path = cli.dir.join("run.toml");
     let driver = driver::Driver::new_from_path(hub.clone(), cli.dir.clone(), run_toml_path)?;
-    if let Some(job) = driver.start_recompile(JobData::default()) {
+    if let Some(job) = driver.start_recompile(InspectifyJobMeta::default()) {
         job?;
     }
 
@@ -73,7 +73,7 @@ async fn run() -> color_eyre::Result<()> {
         });
         // return Ok(());
     } else {
-        driver.spawn_watcher(JobData::default())?;
+        driver.spawn_watcher(InspectifyJobMeta::default())?;
     }
 
     let endpoints = endpoints::endpoints().with_ty::<ce_shell::Envs>();

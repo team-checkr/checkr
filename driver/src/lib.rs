@@ -20,15 +20,15 @@ pub use job::{Job, JobEvent, JobId, JobKind, JobState};
 use tracing::Instrument;
 
 #[derive(Debug, Clone)]
-pub struct Driver<T: 'static> {
-    hub: Hub<T>,
+pub struct Driver<M: 'static> {
+    hub: Hub<M>,
     cwd: PathBuf,
     config: RunOption,
-    current_compilation: Arc<RwLock<Option<Job<T>>>>,
-    latest_successfull_compile: Arc<RwLock<Option<Job<T>>>>,
+    current_compilation: Arc<RwLock<Option<Job<M>>>>,
+    latest_successfull_compile: Arc<RwLock<Option<Job<M>>>>,
 }
 
-impl<T> PartialEq for Driver<T> {
+impl<M> PartialEq for Driver<M> {
     fn eq(&self, other: &Self) -> bool {
         self.hub == other.hub
             && self.config == other.config
@@ -39,10 +39,10 @@ impl<T> PartialEq for Driver<T> {
     }
 }
 
-impl<T: Debug + Send + Sync + 'static> Driver<T> {
+impl<M: Debug + Send + Sync + 'static> Driver<M> {
     #[tracing::instrument(skip_all, fields(cwd=?cwd, path=?path))]
     pub fn new_from_path(
-        hub: Hub<T>,
+        hub: Hub<M>,
         cwd: impl AsRef<Path> + Debug,
         path: impl AsRef<Path> + Debug,
     ) -> color_eyre::Result<Self> {
@@ -64,7 +64,7 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
         })
     }
     #[tracing::instrument(skip_all, fields(analysis=%input.analysis()))]
-    pub fn exec_job(&self, input: &Input, data: T) -> color_eyre::Result<Job<T>> {
+    pub fn exec_job(&self, input: &Input, meta: M) -> color_eyre::Result<Job<M>> {
         let mut args = self
             .config
             .run
@@ -76,16 +76,16 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
         self.hub.exec_command(
             JobKind::Analysis(input.analysis(), input.clone()),
             &self.cwd,
-            data,
+            meta,
             &args[0],
             &args[1..],
         )
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start_recompile(&self, data: T) -> Option<color_eyre::Result<Job<T>>>
+    pub fn start_recompile(&self, meta: M) -> Option<color_eyre::Result<Job<M>>>
     where
-        T: Clone,
+        M: Clone,
     {
         self.config.compile.as_ref().map(|compile| {
             if let Some(job) = self.current_compilation.write().unwrap().take() {
@@ -96,7 +96,7 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
             let job = self.hub.exec_command(
                 JobKind::Compilation,
                 &self.cwd,
-                data,
+                meta,
                 args[0],
                 &args[1..],
             )?;
@@ -123,9 +123,9 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
         &self.config
     }
     #[tracing::instrument(skip_all)]
-    pub fn spawn_watcher(&self, data: T) -> color_eyre::Result<tokio::task::JoinHandle<()>>
+    pub fn spawn_watcher(&self, meta: M) -> color_eyre::Result<tokio::task::JoinHandle<()>>
     where
-        T: Clone,
+        M: Clone,
     {
         let driver = self.clone();
 
@@ -175,12 +175,12 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
 
         Ok(tokio::spawn(
             async move {
-                let mut last_job: Option<color_eyre::Result<Job<T>>> = None;
+                let mut last_job: Option<color_eyre::Result<Job<M>>> = None;
                 while let Some(()) = rx.recv().await {
                     if let Some(Ok(last_job)) = last_job {
                         last_job.kill();
                     }
-                    last_job = driver.start_recompile(data.clone());
+                    last_job = driver.start_recompile(meta.clone());
                 }
                 // NOTE: It is important to keep the debouncer alive for as long as the
                 // tokio process
@@ -190,24 +190,24 @@ impl<T: Debug + Send + Sync + 'static> Driver<T> {
         ))
     }
 
-    pub fn latest_successfull_compile(&self) -> Option<Job<T>> {
+    pub fn latest_successfull_compile(&self) -> Option<Job<M>> {
         self.latest_successfull_compile.read().unwrap().clone()
     }
 
-    pub fn current_compilation(&self) -> Option<Job<T>> {
+    pub fn current_compilation(&self) -> Option<Job<M>> {
         self.current_compilation.read().unwrap().clone()
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn ensure_compile(&self, data: T) -> color_eyre::Result<Option<Job<T>>>
+    pub fn ensure_compile(&self, meta: M) -> color_eyre::Result<Option<Job<M>>>
     where
-        T: Clone,
+        M: Clone,
     {
         let current_compilation_job = self.current_compilation.read().unwrap().clone();
         if let Some(job) = current_compilation_job {
             Ok(Some(job))
         } else {
-            self.start_recompile(data).transpose()
+            self.start_recompile(meta).transpose()
         }
     }
 }
