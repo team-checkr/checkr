@@ -107,6 +107,8 @@ pub fn tapi(
 
     let output = quote::quote! {
         mod #name {
+            #![allow(unused_parens)]
+
             use super::*;
             pub struct endpoint;
             impl ::tapi::Endpoint<AppState> for endpoint {
@@ -201,6 +203,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
         serde_flags.attrs.type_try_from(),
     ) {
         return quote::quote!(
+            #[allow(unused_parens)]
             impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
                 fn name() -> &'static str {
                     stringify!(#name)
@@ -237,6 +240,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
             if serde_flags.attrs.transparent() {
                 let inner_ty = st.fields.iter().next().unwrap().ty.clone();
                 quote::quote! {
+                    #[allow(unused_parens)]
                     impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
                         fn name() -> &'static str {
                             stringify!(#name)
@@ -276,6 +280,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                     fields.push(field.ty.clone());
                 }
                 quote::quote! {
+                    #[allow(unused_parens)]
                     impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
                         fn name() -> &'static str {
                             stringify!(#name)
@@ -501,6 +506,7 @@ pub fn tapi_derive(input: proc_macro::TokenStream) -> proc_macro::TokenStream {
                 }
             }
             quote::quote! {
+                #[allow(unused_parens)]
                 impl<#(#life_times,)* #(#sgenerics: 'static + #tapi_path::Tapi),*> #tapi_path::Tapi for #name<#(#life_times,)* #(#sgenerics),*> {
                     fn name() -> &'static str {
                         stringify!(#name)
