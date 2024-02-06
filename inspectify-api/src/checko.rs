@@ -8,7 +8,7 @@ use std::{
 };
 
 use color_eyre::eyre::{Context, ContextCompat};
-use driver::{Driver, FinishedJobParams, Hub, Job, JobKind};
+use driver::{Driver, Hub, Job, JobData, JobKind};
 use indexmap::IndexMap;
 use itertools::Itertools;
 
@@ -70,15 +70,15 @@ impl Checko {
                 _ => continue,
             };
 
-            self.hub.add_finished_job(FinishedJobParams {
+            self.hub.add_finished_job(JobData {
                 kind: JobKind::Analysis(data.input.analysis(), data.input),
-                meta: InspectifyJobMeta {
-                    group_name: Some(run.group_name.clone()),
-                },
                 stderr: stderr.into_bytes(),
                 stdout: stdout.into_bytes(),
                 combined: combined.into_bytes(),
                 state: driver::JobState::Warning,
+                meta: InspectifyJobMeta {
+                    group_name: Some(run.group_name.clone()),
+                },
             });
         }
 

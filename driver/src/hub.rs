@@ -1,19 +1,18 @@
 use std::{
     ffi::OsStr,
     fmt::Debug,
-    path::{Path, PathBuf},
+    path::Path,
     process::Stdio,
     sync::{atomic::AtomicUsize, Arc, RwLock},
 };
 
 use color_eyre::eyre::Context;
-use notify::event;
 use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinSet};
 use tracing::Instrument;
 
 use crate::{
-    job::{Job, JobEvent, JobEventSource, JobInner, JobKind},
-    JobId, JobState,
+    job::{Job, JobData, JobEvent, JobEventSource, JobInner, JobKind},
+    JobId,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -101,18 +100,40 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
+        let data = Arc::new(RwLock::new(JobData::new(kind, meta)));
+
         let mut join_set = tokio::task::JoinSet::new();
-        let stderr = spawn_reader(
+        spawn_reader(
             JobEventSource::Stderr,
             &mut join_set,
             stderr,
             events_tx.clone(),
+            {
+                let data = data.clone();
+                move |bytes| {
+                    let mut data = data.write().unwrap();
+                    let from = data.stderr.len();
+                    data.stderr.extend_from_slice(bytes);
+                    let to = data.stderr.len();
+                    (from, to)
+                }
+            },
         );
-        let stdout = spawn_reader(
+        spawn_reader(
             JobEventSource::Stdout,
             &mut join_set,
             stdout,
             events_tx.clone(),
+            {
+                let data = data.clone();
+                move |bytes| {
+                    let mut data = data.write().unwrap();
+                    let from = data.stdout.len();
+                    data.stdout.extend_from_slice(bytes);
+                    let to = data.stdout.len();
+                    (from, to)
+                }
+            },
         );
 
         let job = Job::new(
@@ -124,12 +145,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
                 events_tx: Arc::new(events_tx),
                 events_rx: Arc::new(events_rx),
                 join_set: Mutex::new(join_set),
-                stderr,
-                stdout,
-                combined: Default::default(),
-                kind,
-                state: Default::default(),
-                meta,
+                data,
             },
         );
 
@@ -151,7 +167,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
         self.jobs(None).iter().find(|j| j.id() == id).cloned()
     }
 
-    pub fn add_finished_job(&self, j: FinishedJobParams<M>) -> Job<M> {
+    pub fn add_finished_job(&self, j: JobData<M>) -> Job<M> {
         let id = self.next_job_id();
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
@@ -162,12 +178,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
             events_tx: Arc::new(events_tx),
             events_rx: Arc::new(events_rx),
             join_set: Default::default(),
-            stderr: Arc::new(RwLock::new(j.stderr)),
-            stdout: Arc::new(RwLock::new(j.stdout)),
-            combined: Arc::new(RwLock::new(j.combined)),
-            kind: j.kind,
-            state: RwLock::new(j.state),
-            meta: j.meta,
+            data: Arc::new(RwLock::new(j)),
         };
         let job = Job::new(id, inner);
         self.jobs.write().unwrap().push(job.clone());
@@ -177,25 +188,15 @@ impl<M: Send + Sync + 'static> Hub<M> {
     }
 }
 
-pub struct FinishedJobParams<M> {
-    pub kind: JobKind,
-    pub meta: M,
-    pub stderr: Vec<u8>,
-    pub stdout: Vec<u8>,
-    pub combined: Vec<u8>,
-    pub state: JobState,
-}
-
 #[tracing::instrument(skip_all, fields(spawn_reader=%src))]
 fn spawn_reader(
     src: JobEventSource,
     join_set: &mut JoinSet<()>,
     mut reader: impl AsyncReadExt + Sized + Unpin + Send + 'static,
     event_tx: tokio::sync::broadcast::Sender<JobEvent>,
-) -> Arc<RwLock<Vec<u8>>> {
-    let output = Arc::<RwLock<Vec<u8>>>::default();
+    mut write: impl FnMut(&[u8]) -> (usize, usize) + 'static + Send + Sync,
+) {
     join_set.spawn({
-        let output = Arc::clone(&output);
         async move {
             let mut buf = Vec::with_capacity(1024);
             loop {
@@ -206,17 +207,10 @@ fn spawn_reader(
                     event_tx.send(JobEvent::Closed { src }).unwrap();
                     break;
                 }
-                let (from, to) = {
-                    let mut output = output.write().unwrap();
-                    let from = output.len();
-                    output.extend_from_slice(&buf);
-                    let to = output.len();
-                    (from, to)
-                };
+                let (from, to) = write(&buf);
                 event_tx.send(JobEvent::Wrote { src, from, to }).unwrap();
             }
         }
         .in_current_span()
     });
-    output
 }
