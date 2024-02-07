@@ -146,6 +146,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
                 events_rx: Arc::new(events_rx),
                 join_set: Mutex::new(join_set),
                 data,
+                wait_lock: Default::default(),
             },
         );
 
@@ -179,6 +180,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
             events_rx: Arc::new(events_rx),
             join_set: Default::default(),
             data: Arc::new(RwLock::new(j)),
+            wait_lock: Default::default(),
         };
         let job = Job::new(id, inner);
         self.jobs.write().unwrap().push(job.clone());
