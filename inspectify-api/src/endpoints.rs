@@ -198,15 +198,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
                             let state = state.clone();
                             let tx = tx.clone();
                             async move {
-                                let job = state.hub.get_job(id).unwrap();
-                                let mut events = job.events();
+                                let mut events = state.hub.get_job(id).unwrap().events();
                                 while let Ok(_event) = events.recv().await {
-                                    tx.send(Ok(Event::JobChanged {
-                                        id,
-                                        job: state.job(id),
-                                    }))
-                                    .await
-                                    .unwrap();
+                                    let job = state.job(id);
+                                    tx.send(Ok(Event::JobChanged { id, job })).await.unwrap();
                                 }
                             }
                         });
@@ -215,16 +210,6 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
             }
         }
     });
-
-    // periodic_stream(
-    //     Duration::from_millis(100),
-    //     {
-    //         let state = state.clone();
-    //         move || state.jobs()
-    //     },
-    //     |jobs| JobEvent::JobsChanged { jobs: jobs.clone() },
-    //     tx.clone(),
-    // );
 
     periodic_stream(
         Duration::from_millis(100),

@@ -29,6 +29,14 @@ pub(crate) struct JobInner<M> {
     pub(crate) events_rx: Arc<tokio::sync::broadcast::Receiver<JobEvent>>,
     pub(crate) join_set: Mutex<JoinSet<()>>,
     pub(crate) data: Arc<RwLock<JobData<M>>>,
+    pub(crate) wait_lock: Arc<Mutex<WaitStatus>>,
+}
+
+#[derive(Debug, Default)]
+pub(crate) enum WaitStatus {
+    #[default]
+    Initial,
+    Finished,
 }
 
 #[derive(Debug, serde::Serialize, serde::Deserialize)]
@@ -194,6 +202,13 @@ impl<T: Send + Sync + 'static> Job<T> {
         self.data().state
     }
     pub async fn wait(&self) -> JobState {
+        let mut wait_lock = self.inner.wait_lock.lock().await;
+
+        match &*wait_lock {
+            WaitStatus::Initial => {}
+            WaitStatus::Finished => return self.state(),
+        }
+
         while self.inner.join_set.lock().await.join_next().await.is_some() {}
         let mut guard = self.inner.child.write().await;
         let child = guard.take();
@@ -213,6 +228,7 @@ impl<T: Send + Sync + 'static> Job<T> {
                 Err(_) => todo!(),
             }
         }
+        *wait_lock = WaitStatus::Finished;
         self.state()
     }
     #[tracing::instrument(skip_all)]
