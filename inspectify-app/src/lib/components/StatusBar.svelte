@@ -5,11 +5,10 @@
 
 	import ChevronDoubleUp from '~icons/heroicons/chevron-double-up';
 	import Link from '~icons/heroicons/link';
+	import { showStatus } from '$lib/jobs';
 
 	// TODO
 	const version = '1.2.3';
-
-	export let showStatus: boolean;
 
 	$: jobs = derived(
 		$jobsListStore.map((id) => $jobsStore[id]),
@@ -37,9 +36,9 @@
 <div class="flex items-center space-x-1 border-t bg-slate-900 text-sm">
 	<button
 		class="flex h-full items-center space-x-0.5 bg-slate-900 px-2 text-xs transition hover:bg-slate-400/10 active:bg-slate-400/5"
-		on:click={() => (showStatus = !showStatus)}
+		on:click={() => ($showStatus = !$showStatus)}
 	>
-		<ChevronDoubleUp class="transition {showStatus ? 'rotate-0' : 'rotate-180'}" />
+		<ChevronDoubleUp class="transition {$showStatus ? 'rotate-0' : 'rotate-180'}" />
 	</button>
 
 	{#if jobStates['Queued'] === 0 && jobStates['Running'] === 0 && jobStates['Succeeded'] > 0 && jobStates['Failed'] === 0 && jobStates['Warning'] === 0}

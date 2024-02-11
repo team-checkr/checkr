@@ -150,9 +150,7 @@ impl<T: Send + Sync + 'static> Job<T> {
                                 }
                             }
                         }
-                        JobEvent::Closed { src } => {
-                            tracing::debug!(?src, "closed");
-                        }
+                        JobEvent::Closed { src: _ } => {}
                         JobEvent::Finished => {}
                     }
                 }

@@ -136,6 +136,7 @@ pub fn tapi(
             }
         }
 
+        #[tracing::instrument(name = "route", skip_all, fields(path = #path, method = stringify!(#method)))]
         #item
     };
     output.into()

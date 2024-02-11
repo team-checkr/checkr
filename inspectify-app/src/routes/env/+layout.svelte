@@ -3,10 +3,9 @@
 	import JobPane from '$lib/components/JobPane.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { compilationStatusStore } from '$lib/events';
+	import { showStatus } from '$lib/jobs';
 
 	import Fire from '~icons/heroicons/fire';
-
-	let showStatus = true;
 </script>
 
 <div class="relative grid grid-rows-[1fr_auto]">
@@ -14,7 +13,7 @@
 		<slot />
 	</main>
 
-	{#if showStatus}
+	{#if $showStatus}
 		<div class="h-[35vh]">
 			<JobPane />
 		</div>
@@ -42,4 +41,4 @@
 	{/if}
 </div>
 
-<StatusBar bind:showStatus />
+<StatusBar />

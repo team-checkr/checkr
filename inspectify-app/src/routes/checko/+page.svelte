@@ -3,13 +3,12 @@
 	import JobPane from '$lib/components/JobPane.svelte';
 	import StatusBar from '$lib/components/StatusBar.svelte';
 	import { groupsConfigStore, programsStore } from '$lib/events';
+	import { showStatus } from '$lib/jobs';
 	import GroupJobCell from './GroupJobCell.svelte';
 
 	$: includedAnalysis = ce_shell.ANALYSIS.filter((a) =>
 		$programsStore.find((p) => p.input.analysis == a)
 	);
-
-	let showStatus = false;
 </script>
 
 <div class="grid {showStatus ? 'grid-cols-[1fr_1fr]' : ''}">
@@ -43,4 +42,4 @@
 	</div>
 </div>
 
-<StatusBar bind:showStatus />
+<StatusBar />

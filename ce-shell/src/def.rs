@@ -124,11 +124,12 @@ macro_rules! define_shell {
             pub fn reference_output(&self) -> Result<Output, EnvError> {
                 match self.analysis {
                     $(Analysis::$name => {
-                        type Input = <$krate as Env>::Input;
-                        let input: Input = serde_json::from_value((*self.json).clone()).unwrap();
+                        let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone())
+                            .map_err(EnvError::from_parse_input(&self.json))?;
+                        let reference_output = <$krate>::run(&input)?;
                         Ok(Output {
                             analysis: self.analysis,
-                            json: serde_json::to_value(&<$krate>::run(&input)?)
+                            json: serde_json::to_value(&reference_output)
                                 .expect("all output should be serializable")
                                 .into(),
                         })
@@ -141,8 +142,10 @@ macro_rules! define_shell {
 
                 match self.analysis {
                     $(Analysis::$name => {
-                        let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone()).unwrap();
-                        let output: <$krate as Env>::Output = serde_json::from_value((*output.json).clone()).unwrap();
+                        let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone())
+                            .map_err(EnvError::from_parse_input(&self.json))?;
+                        let output: <$krate as Env>::Output = serde_json::from_value((*output.json).clone())
+                            .map_err(EnvError::from_parse_output(&output.json))?;
                         <$krate as Env>::validate(&input, &output)
                     }),*
                 }

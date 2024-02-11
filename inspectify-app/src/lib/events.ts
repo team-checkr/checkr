@@ -39,8 +39,6 @@ if (browser) {
 		}
 		connectionStore.set('connected');
 
-		console.log(msg.data.type, msg.data.value);
-
 		switch (msg.data.type) {
 			case 'CompilationStatus': {
 				compilationStatusStore.set(msg.data.value.status);
@@ -52,10 +50,8 @@ if (browser) {
 				jobsStore.update(
 					produce((jobsStore) => {
 						if (!jobsStore[job.id]) {
-							console.log('new job (A)', job.id);
 							jobsStore[job.id] = writable(job);
 						}
-						console.log('updating job (A)', job.id);
 						jobsStore[job.id].set(job);
 					})
 				);
@@ -68,7 +64,6 @@ if (browser) {
 					produce((jobsStore) => {
 						for (const id of jobs) {
 							if (!jobsStore[id]) {
-								console.log('new job (B)', id);
 								jobsStore[id] = writable({
 									id,
 									state: 'Queued',
@@ -97,7 +92,6 @@ if (browser) {
 				groupProgramJobAssignedStore.update(
 					produce((x) => {
 						if (!x[group]) x[group] = {};
-						console.log(program.hash_str, job_id);
 						x[group][program.hash_str] = job_id;
 					})
 				);

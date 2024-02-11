@@ -1,6 +1,7 @@
 import { derived, writable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
 import { compilationStatusStore } from './events';
+import { selectedJobId } from './jobs';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
 
@@ -12,9 +13,11 @@ export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
 export type Io<A extends ce_shell.Analysis> = {
 	input: Writable<Input<A>>;
 	output: Writable<Output<A>>;
+	referenceOutput: Writable<Output<A>>;
 	outputState: Writable<OutputState>;
-	validation: Writable<ce_core.ValidationResult | null>;
+	validation: Writable<ce_core.ValidationResult | { type: 'Failure'; message: string } | null>;
 	generate: () => Promise<Input<A>>;
+	latestJobId: Writable<driver.job.JobId | null>;
 };
 
 const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
@@ -26,42 +29,62 @@ const initializeIo = <A extends ce_shell.Analysis>(
 ): Io<A> => {
 	const input = writable<Input<A>>(defaultInput);
 	const output = writable<Output<A>>(defaultOutput);
+	const referenceOutput = writable<Output<A>>(defaultOutput);
 	const outputState = writable<OutputState>('None');
-	const validation = writable<ce_core.ValidationResult | null>(null);
+	const validation = writable<
+		ce_core.ValidationResult | { type: 'Failure'; message: string } | null
+	>(null);
+	const latestJobId = writable<driver.job.JobId | null>(null);
 
-	let activeJob: null | driver.job.JobId = null;
-	let activeRequest: null | { abort: () => void } = null;
+	let activeJob: driver.job.JobId | null = null;
+	let activeRequest: { abort: () => void } | null = null;
 
-	derived([compilationStatusStore, input], (x) => x).subscribe(([compilationStatus, input]) => {
-		if (!compilationStatus || !input) return;
-		if (compilationStatus.state != 'Succeeded') return;
+	const [debounceAnalysis] = debounce(
+		(input: Input<A>) => api.analysis({ analysis, json: input }),
+		200
+	);
 
-		if (activeJob) {
-			api.jobsCancel(activeJob);
-			activeJob = null;
-		}
-		if (activeRequest) {
-			activeRequest.abort();
-			activeRequest = null;
-		}
+	derived([compilationStatusStore, input], (x) => x).subscribe(
+		async ([compilationStatus, input]) => {
+			if (!compilationStatus || !input) return;
+			if (compilationStatus.state != 'Succeeded') return;
 
-		outputState.set('Stale');
-		const request = api.analysis({ analysis, json: input });
-		request.data.then((id) => {
+			if (activeJob) {
+				api.jobsCancel(activeJob);
+				activeJob = null;
+			}
+			if (activeRequest) {
+				activeRequest.abort();
+				activeRequest = null;
+			}
+
+			outputState.set('Stale');
+
+			const request = await debounceAnalysis(input);
+			const id = await request.data;
 			activeJob = id;
+			latestJobId.set(id);
+			selectedJobId.set(id);
 			const innerRequest = api.jobsWait(id);
+			activeRequest = innerRequest;
 			innerRequest.data.then((result) => {
 				if (innerRequest == activeRequest) activeRequest = null;
+				else return;
 				if (activeJob == id) activeJob = null;
-				if (result) {
-					output.set(result.output.json as any);
-					validation.set(result.validation as any);
+				else return;
+				if (result.kind == 'AnalysisSuccess') {
+					const { data } = result;
+					output.set(data.output.json as any);
+					referenceOutput.set(data.reference_output.json as any);
+					validation.set(data.validation as any);
 					outputState.set('Current');
+				} else if (result.kind == 'Failure') {
+					outputState.set('Current');
+					validation.set({ type: 'Failure', message: result.data.error });
 				}
 			});
-			activeRequest = innerRequest;
-		});
-	});
+		}
+	);
 
 	const generate = () =>
 		api.generate({ analysis }).data.then((result) => {
@@ -74,9 +97,11 @@ const initializeIo = <A extends ce_shell.Analysis>(
 	return {
 		input,
 		output,
+		referenceOutput,
 		outputState,
 		validation,
-		generate
+		generate,
+		latestJobId
 	};
 };
 
@@ -91,61 +116,24 @@ export const useIo = <A extends ce_shell.Analysis>(
 	return ios[analysis] as Io<A>;
 };
 
-// Object.fromEntries(
-// 	ce_shell.ANALYSIS.map((a) => {
-// 		const input = writable<Mapping[ce_shell.Analysis]['input'] | null>(null);
-// 		const output = writable<Mapping[ce_shell.Analysis]['output'] | null>(null);
-// 		const validation = writable<ce_core.ValidationResult | null>(null);
+function debounce<A = unknown, R = void>(
+	fn: (args: A) => R,
+	ms: number
+): [(args: A) => Promise<R>, () => void] {
+	let timer: number;
 
-// 		let activeJob: null | driver.job.JobId = null;
-// 		let activeRequest: null | { abort: () => void } = null;
+	const debouncedFunc = (args: A): Promise<R> =>
+		new Promise((resolve) => {
+			if (timer) {
+				clearTimeout(timer);
+			}
 
-// 		derived([compilationStatusStore, input], (x) => x).subscribe(([compilationStatus, input]) => {
-// 			if (!compilationStatus || !input) return;
-// 			if (compilationStatus.state != 'Succeeded') return;
+			timer = setTimeout(() => {
+				resolve(fn(args));
+			}, ms);
+		});
 
-// 			if (activeJob) {
-// 				api.jobsCancel(activeJob);
-// 				activeJob = null;
-// 			}
-// 			if (activeRequest) {
-// 				activeRequest.abort();
-// 				activeRequest = null;
-// 			}
+	const teardown = () => clearTimeout(timer);
 
-// 			const request = api.analysis({ analysis: a, json: input });
-// 			request.data.then((id) => {
-// 				activeJob = id;
-// 				const innerRequest = api.jobsWait(id);
-// 				innerRequest.data.then((result) => {
-// 					if (innerRequest == activeRequest) activeRequest = null;
-// 					if (activeJob == id) activeJob = null;
-// 					if (result) {
-// 						output.set(result.output.json as any);
-// 						validation.set(result.validation as any);
-// 					}
-// 				});
-// 				activeRequest = innerRequest;
-// 			});
-// 		});
-
-// 		const generate = () =>
-// 			api.generate({ analysis: a }).data.then((result) => {
-// 				input.set(result.json as any);
-// 				return result.json as any;
-// 			});
-
-// 		generate();
-
-// 		return [
-// 			a,
-// 			{
-// 				input,
-// 				output,
-// 				outputState: 'None',
-// 				validation,
-// 				generate
-// 			} satisfies Io<typeof a>
-// 		];
-// 	})
-// ) as any;
+	return [debouncedFunc, teardown];
+}

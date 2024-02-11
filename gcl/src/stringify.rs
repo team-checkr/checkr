@@ -3,17 +3,26 @@ use std::{fmt::Display, str::FromStr};
 use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Stringify<T: FromStr + Display>(T);
+pub enum Stringify<T: FromStr + Display> {
+    Parsed(T),
+    Unparsed(String),
+}
 
 impl<T> Stringify<T>
 where
     T: FromStr + Display,
 {
     pub fn new(t: T) -> Self {
-        Self(t)
+        Self::Parsed(t)
     }
-    pub fn inner(&self) -> &T {
-        &self.0
+    pub fn try_parse(&self) -> Result<T, <T as FromStr>::Err>
+    where
+        T: Clone,
+    {
+        match self {
+            Self::Parsed(t) => Ok(t.clone()),
+            Self::Unparsed(s) => T::from_str(s),
+        }
     }
 }
 
@@ -22,7 +31,10 @@ impl<T: FromStr + Display> Serialize for Stringify<T> {
     where
         S: serde::Serializer,
     {
-        serializer.serialize_str(&self.0.to_string())
+        match self {
+            Self::Parsed(t) => serializer.serialize_str(&t.to_string()),
+            Self::Unparsed(s) => serializer.serialize_str(s),
+        }
     }
 }
 
@@ -32,10 +44,7 @@ impl<'de, T: FromStr + Display> Deserialize<'de> for Stringify<T> {
         D: serde::Deserializer<'de>,
     {
         let s = String::deserialize(deserializer)?;
-        match T::from_str(&s) {
-            Ok(t) => Ok(Stringify(t)),
-            Err(_) => Err(serde::de::Error::custom("failed to parse")),
-        }
+        Ok(Self::Unparsed(s))
     }
 }
 

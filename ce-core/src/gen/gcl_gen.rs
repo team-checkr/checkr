@@ -7,13 +7,13 @@ use gcl::ast::{
 use crate::Generate;
 
 pub struct Context {
-    fuel: u32,
-    recursion_limit: u32,
-    negation_limit: u32,
-    no_loops: bool,
-    no_division: bool,
-    no_unary_minus: bool,
-    names: Vec<String>,
+    pub fuel: u32,
+    pub recursion_limit: u32,
+    pub negation_limit: u32,
+    pub no_loops: bool,
+    pub no_division: bool,
+    pub no_unary_minus: bool,
+    pub names: Vec<String>,
 }
 
 type GenerationOptions<R, Ctx, G> = Vec<(f32, Box<dyn Fn(&mut Ctx, &mut R) -> G>)>;
@@ -214,7 +214,10 @@ impl Generate for AExpr {
                     0.4,
                     Box::new(|_, rng| AExpr::Number(rng.gen_range(-100..=100))),
                 ),
-                (0.8, Box::new(|cx, rng| AExpr::Reference(cx.reference(rng)))),
+                (
+                    if cx.names.is_empty() { 0.0 } else { 0.8 },
+                    Box::new(|cx, rng| AExpr::Reference(cx.reference(rng))),
+                ),
                 (
                     if cx.recursion_limit == 0 || cx.fuel == 0 {
                         0.0
