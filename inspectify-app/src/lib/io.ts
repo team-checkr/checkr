@@ -6,23 +6,26 @@ type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io
 
 type OutputState = 'None' | 'Stale' | 'Current';
 
+export type Input<A extends ce_shell.Analysis> = Mapping[A]['input'];
+export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
+
 export type Io<A extends ce_shell.Analysis> = {
-	input: Writable<Mapping[A]['input']>;
-	output: Writable<Mapping[A]['output']>;
+	input: Writable<Input<A>>;
+	output: Writable<Output<A>>;
 	outputState: Writable<OutputState>;
 	validation: Writable<ce_core.ValidationResult | null>;
-	generate: () => Promise<Mapping[A]['input']>;
+	generate: () => Promise<Input<A>>;
 };
 
 const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 
 const initializeIo = <A extends ce_shell.Analysis>(
 	analysis: A,
-	defaultInput: Mapping[A]['input'],
-	defaultOutput: Mapping[A]['output']
+	defaultInput: Input<A>,
+	defaultOutput: Output<A>
 ): Io<A> => {
-	const input = writable<Mapping[A]['input']>(defaultInput);
-	const output = writable<Mapping[A]['output']>(defaultOutput);
+	const input = writable<Input<A>>(defaultInput);
+	const output = writable<Output<A>>(defaultOutput);
 	const outputState = writable<OutputState>('None');
 	const validation = writable<ce_core.ValidationResult | null>(null);
 
@@ -79,8 +82,8 @@ const initializeIo = <A extends ce_shell.Analysis>(
 
 export const useIo = <A extends ce_shell.Analysis>(
 	analysis: A,
-	defaultInput: Mapping[A]['input'],
-	defaultOutput: Mapping[A]['output']
+	defaultInput: Input<A>,
+	defaultOutput: Output<A>
 ): Io<A> => {
 	if (!ios[analysis]) {
 		ios[analysis] = initializeIo(analysis, defaultInput, defaultOutput);

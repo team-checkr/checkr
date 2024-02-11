@@ -445,6 +445,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-calc"
+version = "0.1.21"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "itertools 0.11.0",
+ "serde",
+ "serde_json",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-core"
 version = "0.1.21"
 dependencies = [
@@ -485,6 +498,7 @@ dependencies = [
 name = "ce-shell"
 version = "0.1.21"
 dependencies = [
+ "ce-calc",
  "ce-core",
  "ce-graph",
  "ce-parse",

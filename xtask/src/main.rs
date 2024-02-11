@@ -50,8 +50,8 @@ async fn run() -> Result<()> {
                 "cargo add ce-core serde serde_json tracing tapi itertools"
             )
             .run()?;
-            let template_src = include_str!("./env_template.rs")
-                .replace("Template", &short_name.to_pascal_case().to_string());
+            let template_src =
+                include_str!("./env_template.rs").replace("Template", &short_name.to_pascal_case());
             sh.write_file("./src/lib.rs", template_src)?;
 
             // NOTE: Add crate to project Cargo.toml
@@ -106,6 +106,17 @@ async fn run() -> Result<()> {
                 &shell[define_shell_end..]
             );
             sh.write_file(shell_file, new_shell)?;
+
+            // NOTE: Create +page for the new environment
+            sh.change_dir(project_root());
+            sh.change_dir("inspectify-app/src/routes/env");
+
+            let template_src =
+                include_str!("../../inspectify-app/src/routes/env/Template/+page.svelte")
+                    .replace("Parse", &short_name.to_pascal_case());
+            sh.create_dir(short_name.to_pascal_case())?;
+            sh.change_dir(short_name.to_pascal_case());
+            sh.write_file("./+page.svelte", template_src)?;
         }
     }
 

@@ -13,6 +13,7 @@ pub trait EnvExt: Env {
 }
 
 define_shell!(
+    ce_calc::CalcEnv[Calc, "Calculator"],
     ce_parse::ParseEnv[Parse, "Parse"],
     ce_graph::GraphEnv[Graph, "Graph"],
     ce_sign::SignEnv[Sign, "Sign Analysis"],
