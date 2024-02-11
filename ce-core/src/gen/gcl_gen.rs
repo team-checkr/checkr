@@ -127,7 +127,7 @@ impl Generate for Commands {
 //         },
 //         sign::{Memory, Sign, Signs},
 //     };
-//     use std::collections::HashSet;
+//     use indexmap::IndexSet;
 
 //     let input = SignAnalysisInput::gen(&mut cmds, rng);
 //     let sign_result = SignEnv
@@ -139,7 +139,7 @@ impl Generate for Commands {
 
 //     return Command::Annotated(pre, cmds, post);
 
-//     fn signs_in(assignment: &HashSet<Memory<Sign, Signs>>) -> BExpr {
+//     fn signs_in(assignment: &IndexSet<Memory<Sign, Signs>>) -> BExpr {
 //         assignment
 //             .iter()
 //             .filter_map(|world| {

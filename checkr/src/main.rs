@@ -1,8 +1,20 @@
-use clap::Parser;
+use std::time::Duration;
+
+use clap::{Parser, Subcommand};
 
 #[derive(Debug, Parser)]
 #[command(version)]
-enum Cli {
+struct Cli {
+    #[clap(long, default_value = "false")]
+    spin: bool,
+    #[clap(long, default_value = "false")]
+    spam: bool,
+    #[clap(subcommand)]
+    cmd: Cmd,
+}
+
+#[derive(Debug, Subcommand)]
+enum Cmd {
     /// Reference subcommand
     Reference {
         #[arg(value_enum)]
@@ -19,14 +31,15 @@ fn main() -> color_eyre::Result<()> {
         .without_time()
         .init();
 
-    // for i in 0..3 {
-    //     eprintln!("Hello from stderr! {i} xD>--<");
-    //     std::thread::sleep(std::time::Duration::from_secs(1));
-    // }
+    let cli = Cli::parse();
 
-    match Cli::parse() {
-        Cli::Reference { analysis, input } => {
-            let input = analysis.input_from_str(&input)?;
+    if cli.spin {
+        std::thread::sleep(Duration::from_secs(1_000_000));
+    }
+
+    match &cli.cmd {
+        Cmd::Reference { analysis, input } => {
+            let input = analysis.input_from_str(input)?;
             let output = input.reference_output()?;
             println!("{output}");
 

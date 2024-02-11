@@ -1,10 +1,11 @@
 pub mod analysis;
 
 use std::{
-    collections::{BTreeMap, HashMap, HashSet, VecDeque},
+    collections::{BTreeMap, VecDeque},
     sync::atomic::AtomicU64,
 };
 
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -13,8 +14,8 @@ use crate::ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target};
 #[derive(Debug, Clone)]
 pub struct ProgramGraph {
     edges: Vec<Edge>,
-    nodes: HashSet<Node>,
-    outgoing: HashMap<Node, Vec<Edge>>,
+    nodes: IndexSet<Node>,
+    outgoing: IndexMap<Node, Vec<Edge>>,
 }
 
 #[derive(
@@ -94,7 +95,7 @@ pub enum Action {
     Condition(BExpr),
 }
 impl Action {
-    fn fv(&self) -> HashSet<Target> {
+    fn fv(&self) -> IndexSet<Target> {
         match self {
             Action::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
             Action::Skip => Default::default(),
@@ -224,8 +225,8 @@ impl ProgramGraph {
     pub fn new(det: Determinism, cmds: &Commands) -> Self {
         Node::reset();
         let edges = cmds.edges(det, Node::Start, Node::End);
-        let mut outgoing: HashMap<Node, Vec<Edge>> = HashMap::new();
-        let mut nodes: HashSet<Node> = Default::default();
+        let mut outgoing: IndexMap<Node, Vec<Edge>> = Default::default();
+        let mut nodes: IndexSet<Node> = Default::default();
 
         for e in &edges {
             outgoing.entry(e.0).or_default().push(e.clone());
@@ -243,7 +244,7 @@ impl ProgramGraph {
     pub fn edges(&self) -> &[Edge] {
         &self.edges
     }
-    pub fn nodes(&self) -> &HashSet<Node> {
+    pub fn nodes(&self) -> &IndexSet<Node> {
         &self.nodes
     }
     pub fn outgoing(&self, node: Node) -> &[Edge] {
@@ -253,7 +254,7 @@ impl ProgramGraph {
             .unwrap_or_default()
     }
 
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         self.edges.iter().flat_map(|e| e.action().fv()).collect()
     }
 

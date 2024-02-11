@@ -1,20 +1,31 @@
 import { browser } from '$app/environment';
 import { readonly, writable, type Writable } from 'svelte/store';
 import { api, driver, type inspectify_api } from './api';
+import { produce } from 'immer';
 
 const jobsListWritableStore = writable<driver.job.JobId[]>([]);
 export const jobsListStore = readonly(jobsListWritableStore);
-export const jobsStore: Record<
-	driver.job.JobId,
-	Writable<
-		Omit<inspectify_api.endpoints.Job, 'kind'> & {
-			kind: driver.job.JobKind | { kind: 'Waiting'; data: {} };
-		}
+export const jobsStore: Writable<
+	Record<
+		driver.job.JobId,
+		Writable<
+			Omit<inspectify_api.endpoints.Job, 'kind'> & {
+				kind: driver.job.JobKind | { kind: 'Waiting'; data: {} };
+			}
+		>
 	>
-> = {};
+> = writable({});
 
-export let compilationStatusStore: Writable<inspectify_api.endpoints.CompilationStatus | null> =
+export const compilationStatusStore: Writable<inspectify_api.endpoints.CompilationStatus | null> =
 	writable(null);
+
+export const groupsConfigStore: Writable<inspectify_api.checko.config.GroupsConfig | null> =
+	writable(null);
+export const programsStore: Writable<inspectify_api.endpoints.Program[]> = writable([]);
+
+export const groupProgramJobAssignedStore: Writable<
+	Record<string, Record<string, driver.job.JobId>>
+> = writable({});
 
 type Connection = 'connected' | 'disconnected';
 
@@ -22,12 +33,13 @@ export const connectionStore: Writable<Connection> = writable('disconnected');
 
 if (browser) {
 	api.events([]).listen((msg) => {
-		if (msg.type === 'error') {
+		if (msg.type == 'error') {
 			connectionStore.set('disconnected');
+			return;
 		}
-
-		if (msg.type != 'message') return;
 		connectionStore.set('connected');
+
+		console.log(msg.data.type, msg.data.value);
 
 		switch (msg.data.type) {
 			case 'CompilationStatus': {
@@ -35,28 +47,60 @@ if (browser) {
 				break;
 			}
 			case 'JobChanged': {
-				if (!jobsStore[msg.data.value.id]) {
-					jobsStore[msg.data.value.id] = writable(msg.data.value.job);
-				}
-				jobsStore[msg.data.value.id].set(msg.data.value.job);
+				const { job } = msg.data.value;
+
+				jobsStore.update(
+					produce((jobsStore) => {
+						if (!jobsStore[job.id]) {
+							console.log('new job (A)', job.id);
+							jobsStore[job.id] = writable(job);
+						}
+						console.log('updating job (A)', job.id);
+						jobsStore[job.id].set(job);
+					})
+				);
 				break;
 			}
 			case 'JobsChanged': {
-				jobsListWritableStore.set(msg.data.value.jobs);
-				for (const id of msg.data.value.jobs) {
-					if (!jobsStore[id]) {
-						// TODO: perhaps add a kind that is more appropriate for unknown jobs
-						jobsStore[id] = writable({
-							id,
-							state: 'Queued',
-							group_name: null,
-							kind: { kind: 'Waiting', data: {} },
-							stdout: '',
-							spans: [],
-							analysis_data: null
-						});
-					}
-				}
+				const { jobs } = msg.data.value;
+				jobsListWritableStore.set(jobs);
+				jobsStore.update(
+					produce((jobsStore) => {
+						for (const id of jobs) {
+							if (!jobsStore[id]) {
+								console.log('new job (B)', id);
+								jobsStore[id] = writable({
+									id,
+									state: 'Queued',
+									group_name: null,
+									kind: { kind: 'Waiting', data: {} },
+									stdout: '',
+									spans: [],
+									analysis_data: null
+								});
+							}
+						}
+					})
+				);
+				break;
+			}
+			case 'GroupsConfig': {
+				groupsConfigStore.set(msg.data.value.config);
+				break;
+			}
+			case 'ProgramsConfig': {
+				programsStore.set(msg.data.value.programs);
+				break;
+			}
+			case 'GroupProgramJobAssigned': {
+				const { group, program, job_id } = msg.data.value;
+				groupProgramJobAssignedStore.update(
+					produce((x) => {
+						if (!x[group]) x[group] = {};
+						console.log(program.hash_str, job_id);
+						x[group][program.hash_str] = job_id;
+					})
+				);
 				break;
 			}
 		}

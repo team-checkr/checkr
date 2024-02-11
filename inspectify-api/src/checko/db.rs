@@ -132,13 +132,9 @@ impl From<CompressedRun> for Run {
     }
 }
 
-fn input_hash(input: &Input) -> [u8; 16] {
-    md5::compute(format!("{:?}::{input}", input.analysis())).0
-}
-
 impl Run {
     pub fn new(group_name: String, input: Input) -> color_eyre::Result<Self> {
-        let input_md5 = input_hash(&input);
+        let input_md5 = input.hash();
         Ok(Self {
             group_name: group_name.clone(),
             input_md5,
@@ -245,7 +241,7 @@ impl CheckoDb {
         group_name: &str,
         input: &Input,
     ) -> color_eyre::Result<Option<Id<CompressedRun>>> {
-        let input_md5 = input_hash(input);
+        let input_md5 = input.hash();
         let conn = self.conn();
         let mut stmt =
             conn.prepare("SELECT id FROM runs WHERE group_name = ?1 AND input_md5 = ?2")?;

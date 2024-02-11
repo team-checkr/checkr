@@ -143,13 +143,20 @@ export namespace gcl {
   }
 }
 export namespace inspectify_api {
+  export namespace checko {
+    export namespace config {
+      export type GroupsConfig = { groups: inspectify_api.checko.config.GroupConfig[] }
+      export type GroupConfig = { name: string, git: (string | null), path: (string | null), run: (string | null) }
+    }
+  }
   export namespace endpoints {
-    export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "id": driver.job.JobId, "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } };
     export type GenerateParams = { analysis: ce_shell.Analysis }
     export type GclDotInput = { determinism: gcl.pg.Determinism, commands: gcl.ast.Commands }
-    export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, group_name: (string | null), stdout: string, spans: inspectify_api.endpoints.Span[], analysis_data: (inspectify_api.endpoints.AnalysisData | null) }
-    export type JobOutput = { output: ce_shell.io.Output, validation: ce_core.ValidationResult }
+    export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } } | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } } | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } } | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
     export type Target = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
+    export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, group_name: (string | null), stdout: string, spans: inspectify_api.endpoints.Span[], analysis_data: (inspectify_api.endpoints.AnalysisData | null) }
+    export type Program = { hash: number[], hash_str: string, input: ce_shell.io.Input }
+    export type JobOutput = { output: ce_shell.io.Output, validation: ce_core.ValidationResult }
     export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
     export type Span = { text: string, fg: (driver.ansi.Color | null), bg: (driver.ansi.Color | null) }
     export type AnalysisData = { reference_output: ce_shell.io.Output, validation: ce_core.ValidationResult }

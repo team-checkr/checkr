@@ -15,6 +15,7 @@ ce-parse.workspace = true
 ce-sign.workspace = true
 futures-util = "0.3.28"
 itertools.workspace = true
+md5 = "0.7.0"
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true

@@ -4,6 +4,7 @@ use std::{
     path::Path,
     process::Stdio,
     sync::{atomic::AtomicUsize, Arc, RwLock},
+    time::Duration,
 };
 
 use color_eyre::eyre::Context;
@@ -152,6 +153,17 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         self.jobs.write().unwrap().push(job.clone());
         self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
+
+        // Terminate the job if it has been running for longer than the timeout
+        let timeout = Duration::from_secs(10);
+        tokio::spawn({
+            let job = job.clone();
+            async move {
+                tokio::time::sleep(timeout).await;
+                job.kill();
+                // TODO: indicate that it timed out
+            }
+        });
 
         Ok(job)
     }

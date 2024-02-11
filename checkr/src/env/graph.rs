@@ -1,10 +1,9 @@
-use std::collections::HashMap;
-
 use gcl::{
     ast::Commands,
     pg::{Determinism, ProgramGraph},
 };
 use graphviz_rust::dot_structures::{Attribute, Id};
+use indexmap::IndexMap;
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 use tracing::debug;
@@ -142,12 +141,12 @@ struct Node {
 fn dot_to_petgraph(
     dot: &str,
 ) -> (
-    HashMap<String, Node>,
-    HashMap<String, petgraph::graph::NodeIndex>,
+    IndexMap<String, Node>,
+    IndexMap<String, petgraph::graph::NodeIndex>,
     petgraph::Graph<String, String>,
 ) {
-    let mut nodes = HashMap::<String, Node>::new();
-    let mut node_mapping = HashMap::<String, petgraph::graph::NodeIndex>::new();
+    let mut nodes = IndexMap::<String, Node>::new();
+    let mut node_mapping = IndexMap::<String, petgraph::graph::NodeIndex>::new();
     let mut graph = petgraph::Graph::<String, String>::new();
 
     let parsed = graphviz_rust::parse(dot).unwrap();

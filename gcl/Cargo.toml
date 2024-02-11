@@ -9,6 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+indexmap.workspace = true
 itertools.workspace = true
 lalrpop-util = { version = "0.20.0", features = ["lexer"] }
 miette.workspace = true
