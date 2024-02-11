@@ -10,7 +10,7 @@ use std::{
 };
 
 use futures_util::StreamExt;
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 pub use tapi_macro::{tapi, Tapi};
 
@@ -635,11 +635,32 @@ impl_generic!(
     Vec = "{}[]" & "z.array({})",
     Option = "({} | null)" & "z.optional({})",
     HashSet = "{}[]" & "z.array({})",
+    IndexSet = "{}[]" & "z.array({})",
     Rc = "{}" & "{}",
     Arc = "{}" & "{}",
     Cell = "{}" & "{}",
     RefCell = "{}" & "{}",
 );
+impl<const N: usize, T: Tapi + 'static> Tapi for [T; N] {
+    fn name() -> &'static str {
+        std::any::type_name::<[T; N]>()
+    }
+    fn id() -> std::any::TypeId {
+        std::any::TypeId::of::<[T; N]>()
+    }
+    fn dependencies() -> Vec<&'static dyn Typed> {
+        vec![T::boxed()]
+    }
+    fn path() -> Vec<&'static str> {
+        Vec::new()
+    }
+    fn ts_name() -> String {
+        format!("{}[]", T::full_ts_name())
+    }
+    fn zod_name() -> String {
+        format!("z.array({})", T::zod_name())
+    }
+}
 impl<K: 'static + Tapi, V: 'static + Tapi> Tapi for HashMap<K, V> {
     fn name() -> &'static str {
         std::any::type_name::<Self>()

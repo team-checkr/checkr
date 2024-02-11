@@ -1,7 +1,8 @@
 mod checko;
 mod endpoints;
+mod history_broadcaster;
 
-use std::{net::SocketAddr, path::PathBuf};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
 use axum::Router;
 use clap::Parser;
@@ -65,23 +66,32 @@ async fn run() -> color_eyre::Result<()> {
         job?;
     }
 
-    if let Some(checko_path) = cli.checko {
-        let mut checko = checko::Checko::open(hub.clone(), &checko_path)?;
+    let checko = if let Some(checko_path) = cli.checko {
+        let checko = Arc::new(checko::Checko::open(hub.clone(), &checko_path)?);
         checko.repopulate_hub()?;
-        tokio::spawn(async move {
-            checko.work().await.unwrap();
+        tokio::spawn({
+            let checko = Arc::clone(&checko);
+            async move {
+                checko.work().await.unwrap();
+            }
         });
+        Some(checko)
         // return Ok(());
     } else {
         driver.spawn_watcher(InspectifyJobMeta::default())?;
-    }
+        None
+    };
 
     let endpoints = endpoints::endpoints().with_ty::<ce_shell::Envs>();
 
     let api = Router::new()
         .tapis(&endpoints)
         .layer(tower_http::cors::CorsLayer::permissive())
-        .with_state(AppState { hub, driver });
+        .with_state(AppState {
+            hub,
+            driver,
+            checko,
+        });
     let app = Router::new().nest("/api", api);
 
     if !populate_ts_client(&endpoints) {

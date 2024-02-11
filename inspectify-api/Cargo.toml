@@ -20,6 +20,7 @@ driver.workspace = true
 dunce.workspace = true
 futures-util = "0.3.30"
 gcl.workspace = true
+hex = "0.4.3"
 indexmap.workspace = true
 itertools.workspace = true
 lz4_flex = "0.11.2"

@@ -2,8 +2,6 @@
 
 mod semantics;
 
-use std::collections::HashSet;
-
 use ce_core::{
     define_env,
     rand::{self, seq::SliceRandom},
@@ -16,7 +14,7 @@ use gcl::{
         Determinism, Node, ProgramGraph,
     },
 };
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
@@ -35,7 +33,7 @@ pub struct SignInput {
 pub struct SignOutput {
     pub initial_node: String,
     pub final_node: String,
-    pub nodes: IndexMap<String, HashSet<SignMemory>>,
+    pub nodes: IndexMap<String, IndexSet<SignMemory>>,
 }
 
 impl Env for SignEnv {

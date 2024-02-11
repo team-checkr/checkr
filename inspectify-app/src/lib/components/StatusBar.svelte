@@ -12,7 +12,7 @@
 	export let showStatus: boolean;
 
 	$: jobs = derived(
-		$jobsListStore.map((id) => jobsStore[id]),
+		$jobsListStore.map((id) => $jobsStore[id]),
 		(jobs) => jobs
 	);
 

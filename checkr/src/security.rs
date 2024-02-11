@@ -1,27 +1,26 @@
-use std::collections::HashSet;
-
 use gcl::{
     ast::{Command, Commands, Flow, Guard, SecurityClass, Target},
     memory::Memory,
 };
+use indexmap::IndexSet;
 use itertools::{chain, Itertools};
 use serde::{Deserialize, Serialize};
 
 trait SecurityFlows {
-    fn flows(&self) -> HashSet<Flow<Target>> {
+    fn flows(&self) -> IndexSet<Flow<Target>> {
         self.sec(&Default::default())
     }
-    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>>;
+    fn sec(&self, implicit: &IndexSet<Target>) -> IndexSet<Flow<Target>>;
 }
 
 impl SecurityFlows for Commands {
-    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
+    fn sec(&self, implicit: &IndexSet<Target>) -> IndexSet<Flow<Target>> {
         self.0.iter().flat_map(|c| c.sec(implicit)).collect()
     }
 }
 
 impl SecurityFlows for Command {
-    fn sec(&self, implicit: &HashSet<Target>) -> HashSet<Flow<Target>> {
+    fn sec(&self, implicit: &IndexSet<Target>) -> IndexSet<Flow<Target>> {
         match self {
             Command::Assignment(t, a) => chain!(
                 implicit.iter().cloned(),
@@ -36,11 +35,11 @@ impl SecurityFlows for Command {
                 into: t.clone().unit(),
             })
             .collect(),
-            Command::Skip => HashSet::default(),
+            Command::Skip => IndexSet::default(),
             Command::If(c) | Command::Loop(c) | Command::EnrichedLoop(_, c) => {
                 c.iter()
                     .fold(
-                        (implicit.clone(), HashSet::default()),
+                        (implicit.clone(), IndexSet::default()),
                         |(implicit, flows), guard| {
                             let (new_implicit, new_flows) = guard_sec2(guard, &implicit);
 
@@ -53,16 +52,16 @@ impl SecurityFlows for Command {
                     .1
             }
             Command::Annotated(_, c, _) => c.sec(implicit),
-            Command::Break => HashSet::default(),
-            Command::Continue => HashSet::default(),
+            Command::Break => IndexSet::default(),
+            Command::Continue => IndexSet::default(),
         }
     }
 }
 
 fn guard_sec2(
     guard: &Guard,
-    implicit: &HashSet<Target>,
-) -> (HashSet<Target>, HashSet<Flow<Target>>) {
+    implicit: &IndexSet<Target>,
+) -> (IndexSet<Target>, IndexSet<Flow<Target>>) {
     let implicit = implicit.iter().cloned().chain(guard.0.fv()).collect();
     let flows = guard.1.sec(&implicit);
     (implicit, flows)
@@ -70,15 +69,15 @@ fn guard_sec2(
 
 #[derive(Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 pub struct SecurityLattice {
-    allowed: HashSet<Flow<SecurityClass>>,
+    allowed: IndexSet<Flow<SecurityClass>>,
 }
 
 impl SecurityLattice {
     pub fn new(flows: &[Flow<SecurityClass>]) -> SecurityLattice {
-        let mut allowed: HashSet<Flow<SecurityClass>> = flows.iter().cloned().collect();
+        let mut allowed: IndexSet<Flow<SecurityClass>> = flows.iter().cloned().collect();
         let mut last_len = 0;
         loop {
-            let mut to_add: HashSet<Flow<SecurityClass>> = HashSet::new();
+            let mut to_add: IndexSet<Flow<SecurityClass>> = IndexSet::new();
             for f in &allowed {
                 for a in &allowed {
                     // a -> b, b -> c

@@ -1,5 +1,6 @@
-use std::collections::{HashMap, HashSet, VecDeque};
+use std::collections::VecDeque;
 
+use indexmap::{IndexMap, IndexSet};
 use serde::{Deserialize, Serialize};
 
 use crate::pg::{Edge, Node, ProgramGraph};
@@ -62,7 +63,7 @@ impl Worklist for LiFo {
     }
 }
 
-// pub struct RoundRobin(VecDeque<Node>, HashSet<Node>);
+// pub struct RoundRobin(VecDeque<Node>, IndexSet<Node>);
 // impl Worklist for RoundRobin {
 //     fn empty() -> Self {
 //         RoundRobin(Default::default(), Default::default())
@@ -91,7 +92,7 @@ impl Worklist for LiFo {
 
 #[derive(Debug, Clone, PartialEq, Eq)]
 pub struct AnalysisResults<A: MonotoneFramework> {
-    pub facts: HashMap<Node, A::Domain>,
+    pub facts: IndexMap<Node, A::Domain>,
     pub semantic_calls: usize,
 }
 
@@ -103,7 +104,7 @@ pub fn mono_analysis<A: MonotoneFramework, W: Worklist>(
 
     let bot = A::Domain::bottom();
 
-    let mut facts: HashMap<Node, A::Domain> = HashMap::default();
+    let mut facts: IndexMap<Node, A::Domain> = IndexMap::default();
     for &n in pg.nodes() {
         facts.insert(n, bot.clone());
         worklist.insert(n);
@@ -146,12 +147,12 @@ pub fn mono_analysis<A: MonotoneFramework, W: Worklist>(
     }
 }
 
-impl<T> Lattice for HashSet<T>
+impl<T> Lattice for IndexSet<T>
 where
     T: std::hash::Hash + PartialEq + Eq + Clone,
 {
     fn bottom() -> Self {
-        HashSet::default()
+        Default::default()
     }
 
     fn lub_extend(&mut self, other: &Self) {
@@ -167,13 +168,13 @@ where
     }
 }
 
-impl<K, V> Lattice for HashMap<K, V>
+impl<K, V> Lattice for IndexMap<K, V>
 where
     K: std::hash::Hash + PartialEq + Eq + Clone,
     V: Lattice + Clone,
 {
     fn bottom() -> Self {
-        HashMap::default()
+        IndexMap::default()
     }
 
     fn lub_extend(&mut self, other: &Self) {
@@ -187,7 +188,7 @@ where
     }
 
     fn lub(&self, other: &Self) -> Self {
-        let mut result = HashMap::default();
+        let mut result = IndexMap::default();
 
         for (k, a) in self {
             if let Some(b) = other.get(k) {

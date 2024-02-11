@@ -40,7 +40,7 @@ impl<M> PartialEq for Driver<M> {
 }
 
 impl<M: Debug + Send + Sync + 'static> Driver<M> {
-    #[tracing::instrument(skip_all, fields(cwd=?cwd, path=?path))]
+    #[tracing::instrument(skip(hub))]
     pub fn new_from_path(
         hub: Hub<M>,
         cwd: impl AsRef<Path> + Debug,

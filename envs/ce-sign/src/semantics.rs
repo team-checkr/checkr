@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use gcl::{
     ast::{AExpr, BExpr, Int, Target},
     memory::Memory,
@@ -9,6 +7,7 @@ use gcl::{
     },
     semantics::SemanticsError,
 };
+use indexmap::IndexSet;
 use itertools::{Either, Itertools};
 use serde::{Deserialize, Serialize};
 
@@ -202,7 +201,7 @@ impl FromIterator<bool> for Bools {
 pub type SignMemory = Memory<Sign, Signs>;
 
 impl MonotoneFramework for SignAnalysis {
-    type Domain = HashSet<SignMemory>;
+    type Domain = IndexSet<SignMemory>;
 
     fn semantic(&self, _pg: &ProgramGraph, e: &Edge, prev: &Self::Domain) -> Self::Domain {
         match e.action() {
@@ -223,7 +222,7 @@ impl MonotoneFramework for SignAnalysis {
                             .iter()
                             .collect();
 
-                        let mut new_possible = HashSet::new();
+                        let mut new_possible = IndexSet::new();
 
                         for s in std::iter::once(None).chain(array_signs.iter().map(Some)) {
                             let mut signs = array_signs;

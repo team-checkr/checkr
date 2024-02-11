@@ -41,6 +41,7 @@
 	"dependencies": {
 		"@iconify-json/heroicons": "^1.1.19",
 		"ayu": "^8.0.1",
+		"immer": "^10.0.3",
 		"monaco-editor": "^0.45.0",
 		"unplugin-icons": "^0.18.1",
 		"vis-network": "^9.1.9"

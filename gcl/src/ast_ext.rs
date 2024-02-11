@@ -1,5 +1,6 @@
-use std::{collections::HashSet, fmt::Debug, str::FromStr};
+use std::{fmt::Debug, str::FromStr};
 
+use indexmap::IndexSet;
 use itertools::Either;
 
 use crate::{
@@ -155,36 +156,36 @@ impl From<Array> for Target<()> {
 }
 
 impl Commands {
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         self.0.iter().flat_map(|c| c.fv()).collect()
     }
 }
 impl Command {
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         match self {
             Command::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
-            Command::Skip => HashSet::default(),
+            Command::Skip => IndexSet::default(),
             Command::If(c) => guards_fv(c),
             Command::Loop(c) => guards_fv(c),
             // TODO: Maybe the pred should also be looked at?
             Command::EnrichedLoop(_, c) => guards_fv(c),
             // TODO: Maybe the pred should also be looked at?
             Command::Annotated(_, c, _) => c.fv(),
-            Command::Break => HashSet::default(),
-            Command::Continue => HashSet::default(),
+            Command::Break => IndexSet::default(),
+            Command::Continue => IndexSet::default(),
         }
     }
 }
-fn guards_fv(guards: &[Guard]) -> HashSet<Target> {
+fn guards_fv(guards: &[Guard]) -> IndexSet<Target> {
     guards.iter().flat_map(|g| g.fv()).collect()
 }
 impl Guard {
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         self.0.fv().union(&self.1.fv()).cloned().collect()
     }
 }
 impl Target<Box<AExpr>> {
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         match self {
             Target::Variable(v) => [Target::Variable(v.clone())].into_iter().collect(),
             Target::Array(Array(a), idx) => {
@@ -199,7 +200,7 @@ impl AExpr {
     pub fn binary(lhs: Self, op: AOp, rhs: Self) -> Self {
         Self::Binary(Box::new(lhs), op, Box::new(rhs))
     }
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         match self {
             AExpr::Number(_) => Default::default(),
             AExpr::Reference(v) => v.fv(),
@@ -224,7 +225,7 @@ impl Function {
             }
         }
     }
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         match self {
             Function::Count(a, x) | Function::LogicalCount(a, x) => [Target::Array(a.clone(), ())]
                 .into_iter()
@@ -244,7 +245,7 @@ impl BExpr {
     pub fn rel(lhs: AExpr, op: RelOp, rhs: AExpr) -> Self {
         Self::Rel(lhs, op, rhs)
     }
-    pub fn fv(&self) -> HashSet<Target> {
+    pub fn fv(&self) -> IndexSet<Target> {
         match self {
             BExpr::Bool(_) => Default::default(),
             BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),

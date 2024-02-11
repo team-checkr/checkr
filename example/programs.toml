@@ -1,3 +1,11 @@
+[[envs.Parse]]
+seed = 125234
+shown = true
+
+[[envs.Parse]]
+seed = 1252341
+shown = true
+
 [[envs.Graph]]
 seed = 125234
 shown = true
@@ -6,6 +14,142 @@ shown = true
 input = '''
 {"commands":"x := y ; y := -x","determinism":{"Case":"NonDeterministic"}}
 '''
+
+[[envs.Graph]]
+seed = 1252341
+shown = true
+
+[[envs.Graph]]
+seed = 1252342
+shown = true
+
+[[envs.Graph]]
+seed = 1252343
+shown = true
+
+[[envs.Graph]]
+seed = 1252344
+shown = true
+
+[[envs.Graph]]
+seed = 1252345
+shown = true
+
+[[envs.Graph]]
+seed = 1252346
+shown = true
+
+[[envs.Graph]]
+seed = 1252347
+shown = true
+
+[[envs.Graph]]
+seed = 12523481
+shown = true
+
+[[envs.Graph]]
+seed = 12523482
+shown = true
+
+[[envs.Graph]]
+seed = 12523483
+shown = true
+
+[[envs.Graph]]
+seed = 12523484
+shown = true
+
+[[envs.Graph]]
+seed = 12523485
+shown = true
+
+[[envs.Graph]]
+seed = 12523486
+shown = true
+
+[[envs.Graph]]
+seed = 12523487
+shown = true
+
+[[envs.Graph]]
+seed = 12523488
+shown = true
+
+[[envs.Graph]]
+seed = 12523489
+shown = true
+
+[[envs.Graph]]
+seed = 125234810
+shown = true
+
+[[envs.Sign]]
+seed = 1252341
+shown = true
+
+[[envs.Sign]]
+seed = 1252342
+shown = true
+
+[[envs.Sign]]
+seed = 1252343
+shown = true
+
+[[envs.Sign]]
+seed = 1252344
+shown = true
+
+[[envs.Sign]]
+seed = 1252345
+shown = true
+
+[[envs.Sign]]
+seed = 1252346
+shown = true
+
+[[envs.Sign]]
+seed = 1252347
+shown = true
+
+[[envs.Sign]]
+seed = 12523481
+shown = true
+
+[[envs.Sign]]
+seed = 12523482
+shown = true
+
+[[envs.Sign]]
+seed = 12523483
+shown = true
+
+[[envs.Sign]]
+seed = 12523484
+shown = true
+
+[[envs.Sign]]
+seed = 12523485
+shown = true
+
+[[envs.Sign]]
+seed = 12523486
+shown = true
+
+[[envs.Sign]]
+seed = 12523487
+shown = true
+
+[[envs.Sign]]
+seed = 12523488
+shown = true
+
+[[envs.Sign]]
+seed = 12523489
+shown = true
+
+[[envs.Sign]]
+seed = 125234810
+shown = true
 
 # [[envs.Interpreter]]
 # seed = 12353

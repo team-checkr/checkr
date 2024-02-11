@@ -1,12 +1,14 @@
-use std::time::Duration;
+use std::{sync::Arc, time::Duration};
 
 use axum::{extract::State, Json};
 use ce_core::ValidationResult;
-use ce_shell::{Analysis, EnvExt};
-use driver::{HubEvent, JobId, JobState};
+use ce_shell::{Analysis, EnvExt, Input};
+use driver::{HubEvent, JobId, JobKind, JobState};
 use gcl::ast::TargetKind;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+
+use crate::checko;
 
 #[derive(Debug, Default, Clone, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {
@@ -17,6 +19,7 @@ pub struct InspectifyJobMeta {
 pub struct AppState {
     pub hub: driver::Hub<InspectifyJobMeta>,
     pub driver: driver::Driver<InspectifyJobMeta>,
+    pub checko: Option<Arc<checko::Checko>>,
 }
 
 pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
@@ -114,7 +117,8 @@ impl AppState {
     }
     fn jobs(&self) -> Vec<JobId> {
         self.hub
-            .jobs(Some(25))
+            // .jobs(Some(25))
+            .jobs(None)
             .into_iter()
             .map(|job| job.id())
             .collect()
@@ -156,9 +160,33 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", content = "value")]
 enum Event {
-    CompilationStatus { status: Option<CompilationStatus> },
-    JobChanged { id: JobId, job: Job },
-    JobsChanged { jobs: Vec<JobId> },
+    CompilationStatus {
+        status: Option<CompilationStatus>,
+    },
+    JobChanged {
+        job: Job,
+    },
+    JobsChanged {
+        jobs: Vec<JobId>,
+    },
+    GroupsConfig {
+        config: checko::config::GroupsConfig,
+    },
+    ProgramsConfig {
+        programs: Vec<Program>,
+    },
+    GroupProgramJobAssigned {
+        group: String,
+        program: Program,
+        job_id: JobId,
+    },
+}
+
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
+pub struct Program {
+    pub hash: [u8; 16],
+    pub hash_str: String,
+    pub input: Input,
 }
 
 #[tapi::tapi(path = "/events", method = Get)]
@@ -177,7 +205,7 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
 
             for id in state.jobs() {
                 let job = state.job(id);
-                tx.send(Ok(Event::JobChanged { id, job })).await.unwrap();
+                tx.send(Ok(Event::JobChanged { job })).await.unwrap();
             }
         }
     });
@@ -201,7 +229,7 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
                                 let mut events = state.hub.get_job(id).unwrap().events();
                                 while let Ok(_event) = events.recv().await {
                                     let job = state.job(id);
-                                    tx.send(Ok(Event::JobChanged { id, job })).await.unwrap();
+                                    tx.send(Ok(Event::JobChanged { job })).await.unwrap();
                                 }
                             }
                         });
@@ -266,6 +294,67 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
     //         tokio::time::sleep(interval).await;
     //     }
     // });
+
+    if let Some(checko) = state.checko.clone() {
+        tokio::spawn({
+            let tx = tx.clone();
+            async move {
+                tx.send(Ok(Event::GroupsConfig {
+                    config: checko.groups_config().clone(),
+                }))
+                .await
+                .unwrap();
+                let programs = checko
+                    .programs_config()
+                    .envs
+                    .iter()
+                    .flat_map(|(analysis, ps)| {
+                        ps.programs.iter().map(|p| {
+                            let input = analysis.input_from_str(&p.input).unwrap();
+                            let hash = input.hash();
+                            // hex encoding of the hash
+                            let hash_str = hex::encode(hash);
+                            Program {
+                                hash,
+                                hash_str,
+                                input,
+                            }
+                        })
+                    })
+                    .collect();
+                tx.send(Ok(Event::ProgramsConfig { programs }))
+                    .await
+                    .unwrap();
+
+                let mut events = checko.events();
+                while let Some(event) = events.recv().await {
+                    match event {
+                        checko::CheckoEvent::JobAssigned {
+                            group,
+                            kind,
+                            job_id,
+                        } => match kind {
+                            JobKind::Analysis(input) => {
+                                let program = Program {
+                                    hash: input.hash(),
+                                    hash_str: hex::encode(input.hash()),
+                                    input,
+                                };
+                                tx.send(Ok(Event::GroupProgramJobAssigned {
+                                    group,
+                                    program,
+                                    job_id,
+                                }))
+                                .await
+                                .unwrap();
+                            }
+                            JobKind::Compilation => {}
+                        },
+                    }
+                }
+            }
+        });
+    }
 
     tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }

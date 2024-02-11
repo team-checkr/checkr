@@ -1,5 +1,3 @@
-use std::collections::HashSet;
-
 use ce_sign::{Sign, SignAnalysis, SignMemory, Signs};
 use gcl::{
     ast::{Commands, Target},
@@ -9,7 +7,7 @@ use gcl::{
         Determinism, Node, ProgramGraph,
     },
 };
-use indexmap::IndexMap;
+use indexmap::{IndexMap, IndexSet};
 use itertools::{chain, Itertools};
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
@@ -91,17 +89,17 @@ impl Generate for Signs {
 pub struct SignAnalysisOutput {
     pub initial_node: String,
     pub final_node: String,
-    pub nodes: IndexMap<String, HashSet<SignMemory>>,
+    pub nodes: IndexMap<String, IndexSet<SignMemory>>,
 }
 
 impl ToMarkdown for SignAnalysisOutput {
     fn to_markdown(&self) -> Markdown {
-        let variables: HashSet<_> = self
+        let variables: IndexSet<_> = self
             .nodes
             .iter()
             .flat_map(|(_, worlds)| worlds.iter().flat_map(|w| w.variables.keys().cloned()))
             .collect();
-        let arrays: HashSet<_> = self
+        let arrays: IndexSet<_> = self
             .nodes
             .iter()
             .flat_map(|(_, worlds)| worlds.iter().flat_map(|w| w.arrays.keys().cloned()))

@@ -1,6 +1,9 @@
 <script lang="ts">
 	import { driver } from '$lib/api';
 	import { jobsListStore, jobsStore } from '$lib/events';
+	import Ansi from '$lib/components/Ansi.svelte';
+	import JsonView from './JSONView.svelte';
+	import { derived } from 'svelte/store';
 
 	import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
 	import ArrowPath from '~icons/heroicons/arrow-path';
@@ -8,9 +11,6 @@
 	import NoSymbol from '~icons/heroicons/no-symbol';
 	import Fire from '~icons/heroicons/fire';
 	import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
-	import Ansi from '$lib/components/Ansi.svelte';
-	import JsonView from './JSONView.svelte';
-	import { derived } from 'svelte/store';
 
 	export let showGroup = false;
 
@@ -26,13 +26,13 @@
 	const Icon = (state: driver.job.JobState) => icons[state][0];
 
 	$: jobs = derived(
-		$jobsListStore.map((id) => jobsStore[id]),
+		$jobsListStore.map((id) => $jobsStore[id]),
 		(jobs) => jobs
 	);
 	$: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
 	// $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
 	let selectedJobId: null | driver.job.JobId = null;
-	$: selectedJob = typeof selectedJobId == 'number' ? jobsStore[selectedJobId] : null;
+	$: selectedJob = typeof selectedJobId == 'number' ? $jobsStore[selectedJobId] : null;
 	// $: if (selectedJobId == null || !filteredJobs.includes(selectedJob)) {
 	// 	selectedJobId = $jobsStore.length > 0 ? $jobsStore[$jobsStore.length - 1].id : null;
 	// }

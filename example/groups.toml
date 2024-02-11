@@ -6,6 +6,10 @@ git = "git@github.com:team-checkr/fsharp-starter.git"
 name = "02"
 git = "git@github.com:CamillaFaerch/gcmd.git"
 
+[[groups]]
+name = "03"
+git = "git@github.com:team-checkr/fsharp-starter.git"
+
 # [[groups]]
 # name = "03"
 # git = "git@github.com:CamillaFaerch/checkr.git"
@@ -13,6 +17,10 @@ git = "git@github.com:CamillaFaerch/gcmd.git"
 [[groups]]
 name = "04"
 git = "git@github.com:CamillaFaerch/gcmd.git"
+
+[[groups]]
+name = "23"
+git = "git@github.com:team-checkr/fsharp-starter.git"
 
 # [[groups]]
 # name = "05"
@@ -25,3 +33,27 @@ git = "git@github.com:CamillaFaerch/gcmd.git"
 # [[groups]]
 # name = "07"
 # git = "git@github.com:CamillaFaerch/checkr.git"
+
+[[groups]]
+name = "13"
+git = "git@github.com:team-checkr/fsharp-starter.git"
+
+[[groups]]
+name = "99-ok"
+path = "."
+run = "run.toml"
+
+[[groups]]
+name = "99-unknown"
+path = "."
+run = "run-unknown.toml"
+
+[[groups]]
+name = "99-spin"
+path = "."
+run = "run-spin.toml"
+
+[[groups]]
+name = "99-spam"
+path = "."
+run = "run-spam.toml"

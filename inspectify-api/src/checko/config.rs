@@ -8,24 +8,24 @@ use indexmap::IndexMap;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct GroupsConfig {
     pub groups: Vec<GroupConfig>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProgramsConfig {
     #[serde(default)]
     pub envs: IndexMap<Analysis, ProgramsEnvConfig>,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct ProgramsEnvConfig {
     pub programs: Vec<ProgramConfig>,
 }
 
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, Serialize, Deserialize)]
 pub struct ProgramConfig {
     pub seed: Option<u64>,
     pub input: Option<String>,
@@ -34,7 +34,7 @@ pub struct ProgramConfig {
     pub shown: bool,
 }
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct CanonicalProgramsConfig {
     #[serde(default)]
     pub envs: IndexMap<Analysis, CanonicalProgramsEnvConfig>,
@@ -58,7 +58,7 @@ impl CanonicalProgramsConfig {
 //         ))
 //     }
 // }
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct CanonicalProgramsEnvConfig {
     pub programs: Vec<CanonicalProgramConfig>,
@@ -71,7 +71,7 @@ impl CanonicalProgramsEnvConfig {
             .map(|(idx, p)| (ProgramId(idx), p))
     }
 }
-#[derive(Debug, Clone, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalProgramConfig {
     pub input: String,
     pub shown: bool,
@@ -149,10 +149,12 @@ impl ProgramConfig {
     // }
 }
 
-#[derive(Debug, Default, Clone, Hash, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Hash, Serialize, Deserialize)]
 pub struct GroupConfig {
     pub name: String,
-    pub git: String,
+    pub git: Option<String>,
+    pub path: Option<String>,
+    pub run: Option<String>,
 }
 
 pub fn read_programs(programs: impl AsRef<Path>) -> Result<ProgramsConfig> {

@@ -1,3 +1,4 @@
+use indexmap::IndexSet;
 use rand::{seq::SliceRandom, Rng};
 
 use gcl::ast::{
@@ -126,7 +127,6 @@ pub fn annotate_cmds<R: Rng>(mut cmds: Commands, rng: &mut R) -> Command {
     };
     use ce_sign::{Sign, Signs};
     use gcl::memory::Memory;
-    use std::collections::HashSet;
 
     let input = SignAnalysisInput::gen(&mut cmds, rng);
     let sign_result = SignEnv
@@ -138,7 +138,7 @@ pub fn annotate_cmds<R: Rng>(mut cmds: Commands, rng: &mut R) -> Command {
 
     return Command::Annotated(pre, cmds, post);
 
-    fn signs_in(assignment: &HashSet<Memory<Sign, Signs>>) -> BExpr {
+    fn signs_in(assignment: &IndexSet<Memory<Sign, Signs>>) -> BExpr {
         assignment
             .iter()
             .filter_map(|world| {
