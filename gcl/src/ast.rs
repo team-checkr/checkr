@@ -1,3 +1,5 @@
+use std::str::FromStr;
+
 use serde::{Deserialize, Serialize};
 
 #[derive(Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -21,70 +23,21 @@ pub struct Variable(pub String);
 #[serde(transparent)]
 pub struct Array(pub String);
 
-impl Serialize for Commands {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
+impl FromStr for Commands {
+    type Err = crate::parse::ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        crate::parse::parse_commands(s)
     }
 }
-impl<'a> Deserialize<'a> for Commands {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        let src = String::deserialize(deserializer)?;
-        crate::parse::parse_commands(&src).map_err(serde::de::Error::custom)
-    }
-}
-
-impl Serialize for BExpr {
-    fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>
-    where
-        S: serde::Serializer,
-    {
-        serializer.serialize_str(&self.to_string())
-    }
-}
-impl<'a> Deserialize<'a> for BExpr {
-    fn deserialize<D>(deserializer: D) -> Result<Self, D::Error>
-    where
-        D: serde::Deserializer<'a>,
-    {
-        let src = String::deserialize(deserializer)?;
-        crate::parse::parse_predicate(&src).map_err(serde::de::Error::custom)
+impl FromStr for BExpr {
+    type Err = crate::parse::ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        crate::parse::parse_predicate(s)
     }
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);
-
-impl tapi::Tapi for Commands {
-    fn name() -> &'static str {
-        "Commands"
-    }
-
-    fn id() -> std::any::TypeId {
-        std::any::TypeId::of::<Commands>()
-    }
-
-    fn dependencies() -> Vec<&'static dyn tapi::Typed> {
-        vec![]
-    }
-
-    fn ts_name() -> String {
-        "Commands".to_string()
-    }
-
-    fn zod_name() -> String {
-        "Commands".to_string()
-    }
-
-    fn ts_decl() -> Option<String> {
-        Some("export type Commands = string;".to_string())
-    }
-}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Command {

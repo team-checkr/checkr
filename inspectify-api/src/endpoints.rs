@@ -4,7 +4,7 @@ use axum::{extract::State, Json};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, EnvExt, Input};
 use driver::{HubEvent, JobId, JobKind, JobState};
-use gcl::ast::TargetKind;
+use gcl::{ast::TargetKind, stringify::Stringify};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
@@ -412,7 +412,7 @@ async fn jobs_wait(
 #[derive(tapi::Tapi, Debug, Clone, serde::Deserialize)]
 struct GclDotInput {
     determinism: gcl::pg::Determinism,
-    commands: gcl::ast::Commands,
+    commands: Stringify<gcl::ast::Commands>,
 }
 
 #[tapi::tapi(path = "/gcl/dot", method = Post)]
@@ -440,7 +440,7 @@ async fn gcl_dot(
             Json(output)
         }
         driver::JobState::Failed => {
-            let pg = gcl::pg::ProgramGraph::new(determinism, &commands);
+            let pg = gcl::pg::ProgramGraph::new(determinism, commands.inner());
             Json(ce_graph::GraphOutput { dot: pg.dot() })
         }
 
@@ -458,9 +458,10 @@ struct Target {
 }
 
 #[tapi::tapi(path = "/gcl/free-vars", method = Post)]
-async fn gcl_free_vars(Json(commands): Json<gcl::ast::Commands>) -> Json<Vec<Target>> {
+async fn gcl_free_vars(Json(commands): Json<Stringify<gcl::ast::Commands>>) -> Json<Vec<Target>> {
     Json(
         commands
+            .inner()
             .fv()
             .into_iter()
             .map(|target| Target {
