@@ -13,6 +13,7 @@ use gcl::{
         analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
     },
+    stringify::Stringify,
 };
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
@@ -24,7 +25,7 @@ define_env!(SignEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct SignInput {
-    pub commands: Commands,
+    pub commands: Stringify<Commands>,
     pub determinism: Determinism,
     pub assignment: SignMemory,
 }
@@ -42,7 +43,7 @@ impl Env for SignEnv {
     type Output = SignOutput;
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let pg = ProgramGraph::new(input.determinism, &input.commands);
+        let pg = ProgramGraph::new(input.determinism, input.commands.inner());
 
         for t in pg.fv() {
             match t {
@@ -135,7 +136,7 @@ impl SignInput {
         );
 
         SignInput {
-            commands,
+            commands: Stringify::new(commands),
             assignment,
             determinism: Determinism::Deterministic,
         }

@@ -1,12 +1,12 @@
 use ce_core::{define_env, rand, Env, Generate, ValidationResult};
-use gcl::ast::Commands;
+use gcl::{ast::Commands, stringify::Stringify};
 use serde::{Deserialize, Serialize};
 
 define_env!(ParseEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseInput {
-    commands: Commands,
+    commands: Stringify<Commands>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -21,7 +21,7 @@ impl Env for ParseEnv {
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(ParseOutput {
-            pretty: input.commands.to_string(),
+            pretty: input.commands.inner().to_string(),
         })
     }
 
@@ -35,7 +35,7 @@ impl Generate for ParseInput {
 
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         Self {
-            commands: Commands::gen(&mut Default::default(), rng),
+            commands: Stringify::new(Commands::gen(&mut Default::default(), rng)),
         }
     }
 }
