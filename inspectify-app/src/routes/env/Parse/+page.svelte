@@ -8,7 +8,7 @@
 </script>
 
 <div class="grid grid-cols-[45ch_1fr] grid-rows-[1fr_auto]">
-	<StandardInput analysis="Parse" {io} />
+	<StandardInput analysis="Parse" code="commands" {io} />
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
 			<pre class="p-2"><code
