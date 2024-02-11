@@ -21,7 +21,14 @@ impl Env for ParseEnv {
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(ParseOutput {
-            pretty: input.commands.inner().to_string(),
+            pretty: input
+                .commands
+                .try_parse()
+                .map_err(|err| ce_core::EnvError::InvalidInputForProgram {
+                    message: "failed to parse commands".to_string(),
+                    source: Some(Box::new(err)),
+                })?
+                .to_string(),
         })
     }
 

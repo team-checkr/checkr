@@ -35,6 +35,12 @@ impl FromStr for BExpr {
         crate::parse::parse_predicate(s)
     }
 }
+impl FromStr for AExpr {
+    type Err = crate::parse::ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        crate::parse::parse_aexpr(s)
+    }
+}
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Commands(pub Vec<Command>);

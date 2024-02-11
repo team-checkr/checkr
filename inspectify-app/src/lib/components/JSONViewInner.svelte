@@ -16,6 +16,8 @@
 			</div>
 		{/each}
 	</div>
+{:else if !json}
+	<pre class="text-gray-400">null</pre>
 {:else if typeof json == 'object'}
 	<div class="flex flex-col space-y-2">
 		{#each Object.entries(json) as [key, value] (key)}

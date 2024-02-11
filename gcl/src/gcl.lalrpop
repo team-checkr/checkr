@@ -143,7 +143,7 @@ Quantifier: Quantifier = {
 };
 
 AExpr_ = AExpr;
-AExpr: AExpr = {
+pub AExpr: AExpr = {
     #[precedence(level="1")]
     Int => AExpr::Number(<>),
     Target => AExpr::Reference(<>),

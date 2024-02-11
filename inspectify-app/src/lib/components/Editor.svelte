@@ -9,29 +9,33 @@
 	let model: Monaco.editor.ITextModel;
 	let editorContainer: HTMLElement;
 
-	onMount(async () => {
-		monaco = (await import('../monaco')).default;
-		const { GCL_LANGUAGE_ID } = await import('../langs/gcl');
+	onMount(() => {
+		let observer: ResizeObserver | void;
+		const run = async () => {
+			monaco = (await import('../monaco')).default;
+			const { GCL_LANGUAGE_ID } = await import('../langs/gcl');
 
-		// const { AYU_MIRAGE } = await import('../themes/ayu');
+			// const { AYU_MIRAGE } = await import('../themes/ayu');
 
-		editor = monaco.editor.create(editorContainer, {
-			minimap: { enabled: false },
-			lineNumbers: 'off',
-			// theme: AYU_MIRAGE,
-			theme: 'vs-dark',
-			scrollBeyondLastLine: false,
-			language: GCL_LANGUAGE_ID
-		});
-		model = monaco.editor.createModel(value, GCL_LANGUAGE_ID);
-		editor.setModel(model);
-		model.onDidChangeContent(() => {
-			value = model.getValue();
-		});
+			editor = monaco.editor.create(editorContainer, {
+				minimap: { enabled: false },
+				lineNumbers: 'off',
+				// theme: AYU_MIRAGE,
+				theme: 'vs-dark',
+				scrollBeyondLastLine: false,
+				language: GCL_LANGUAGE_ID
+			});
+			model = monaco.editor.createModel(value, GCL_LANGUAGE_ID);
+			editor.setModel(model);
+			model.onDidChangeContent(() => {
+				value = model.getValue();
+			});
 
-		window.addEventListener('resize', () => editor.layout());
-
-		setInterval(() => editor.layout(), 1000);
+			observer = new ResizeObserver(() => editor.layout());
+			observer.observe(editorContainer);
+		};
+		run();
+		return () => observer?.disconnect();
 	});
 
 	onDestroy(() => {

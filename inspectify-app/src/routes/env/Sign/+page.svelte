@@ -41,9 +41,10 @@
 
 <div class="grid grid-cols-[45ch_1fr_1fr] grid-rows-[1fr_auto]">
 	<StandardInput analysis="Sign" code="commands" {io}>
+		<h1 class="border-y p-2 pb-1 text-lg font-bold">Initial sign assignment</h1>
 		<div class="grid grid-cols-[auto_repeat(3,1fr)] place-items-center">
 			{#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
-				<div class="px-2 py-0.5 font-mono text-sm">
+				<div class="px-4 py-0.5 font-mono text-sm">
 					{v.name}
 				</div>
 				{#each ce_sign.semantics.SIGN as sign}
@@ -71,7 +72,7 @@
 			{/each}
 		</div>
 	</StandardInput>
-	<div class="relative">
+	<div class="relative border-r">
 		<div class="absolute inset-0 grid overflow-auto">
 			{#if dotPromise}
 				{#await dotPromise then { dot }}

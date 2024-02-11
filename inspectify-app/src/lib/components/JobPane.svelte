@@ -11,6 +11,8 @@
 	import NoSymbol from '~icons/heroicons/no-symbol';
 	import Fire from '~icons/heroicons/fire';
 	import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
+	import { selectedJobId, type Tab, currentTab, tabs } from '$lib/jobs';
+	import TrackingScroll from './TrackingScroll.svelte';
 
 	export let showGroup = false;
 
@@ -31,11 +33,7 @@
 	);
 	$: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
 	// $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
-	let selectedJobId: null | driver.job.JobId = null;
-	$: selectedJob = typeof selectedJobId == 'number' ? $jobsStore[selectedJobId] : null;
-	// $: if (selectedJobId == null || !filteredJobs.includes(selectedJob)) {
-	// 	selectedJobId = $jobsStore.length > 0 ? $jobsStore[$jobsStore.length - 1].id : null;
-	// }
+	$: selectedJob = typeof $selectedJobId == 'number' ? $jobsStore[$selectedJobId] : null;
 	type Output =
 		| {
 				kind: 'parsed';
@@ -60,11 +58,8 @@
 		}
 	}
 
-	const tabs = ['Output', 'Input JSON', 'Output JSON', 'Reference Output', 'Validation'] as const;
-	type Tab = (typeof tabs)[number];
-	let currentTab: Tab = tabs[0];
 	$: if ($selectedJob?.kind.kind == 'Compilation') {
-		currentTab = 'Output';
+		$currentTab = 'Output';
 	}
 	$: isDisabled = (tab: Tab) =>
 		$selectedJob ? tab != 'Output' && $selectedJob.kind.kind == 'Compilation' : true;
@@ -83,9 +78,9 @@
 					<div class="sticky top-0 bg-slate-950 px-2 py-1 text-center font-bold">{title}</div>
 				{/each}
 				{#each filteredJobs.slice().reverse() as job (job.id)}
-					<button class="group contents text-left" on:click={() => (selectedJobId = job.id)}>
+					<button class="group contents text-left" on:click={() => ($selectedJobId = job.id)}>
 						<div
-							class="py-0.5 pl-2 pr-1 transition {job.id == selectedJobId
+							class="py-0.5 pl-2 pr-1 transition {job.id == $selectedJobId
 								? 'bg-slate-700'
 								: 'group-hover:bg-slate-800'}"
 						>
@@ -97,7 +92,7 @@
 						</div>
 						<div
 							class="flex items-center justify-center px-1 py-0.5 transition {job.id ==
-							selectedJobId
+							$selectedJobId
 								? 'bg-slate-700'
 								: 'group-hover:bg-slate-800'}"
 							title={job.state}
@@ -109,7 +104,7 @@
 						</div>
 						{#if showGroup}
 							<div
-								class="py-0.5 pl-2 pr-1 text-center transition {job.id == selectedJobId
+								class="py-0.5 pl-2 pr-1 text-center transition {job.id == $selectedJobId
 									? 'bg-slate-700'
 									: 'group-hover:bg-slate-800'}"
 							>
@@ -132,11 +127,11 @@
 			<div class="flex text-sm">
 				{#each tabs as tab}
 					<button
-						class="flex-1 px-2 py-1 transition disabled:opacity-50 {tab == currentTab ||
+						class="flex-1 px-2 py-1 transition disabled:opacity-50 {tab == $currentTab ||
 						isDisabled(tab)
 							? 'bg-slate-700'
 							: 'hover:bg-slate-800'}"
-						on:click={() => (currentTab = tab)}
+						on:click={() => ($currentTab = tab)}
 						disabled={isDisabled(tab)}
 					>
 						{tab}
@@ -145,14 +140,14 @@
 			</div>
 			<div class="relative self-stretch bg-slate-900 text-xs">
 				<div class="absolute inset-0 overflow-auto">
-					{#if currentTab == 'Output'}
-						<pre class="p-3 [overflow-anchor:none]"><code><Ansi spans={$selectedJob.spans} /></code
-							></pre>
-						<div class="[overflow-anchor:auto]" />
-					{:else if currentTab == 'Input JSON' && $selectedJob.kind.kind == 'Analysis'}
+					{#if $currentTab == 'Output'}
+						<TrackingScroll>
+							<Ansi spans={$selectedJob.spans} />
+						</TrackingScroll>
+					{:else if $currentTab == 'Input JSON' && $selectedJob.kind.kind == 'Analysis'}
 						<JsonView json={$selectedJob.kind.data.json} />
 						<div class="[overflow-anchor:auto]" />
-					{:else if currentTab == 'Output JSON'}
+					{:else if $currentTab == 'Output JSON'}
 						{#if output}
 							{#if output.kind == 'parsed'}
 								<JsonView json={output.parsed} />
@@ -171,10 +166,10 @@
 						{/if}
 						<!-- <JsonView json={JSON.parse(selectedJob.stdout)} /> -->
 						<div class="[overflow-anchor:auto]" />
-					{:else if currentTab == 'Reference Output'}
-						<JsonView json={$selectedJob.analysis_data?.reference_output.json} />
+					{:else if $currentTab == 'Reference Output'}
+						<JsonView json={$selectedJob.analysis_data?.reference_output?.json} />
 						<div class="[overflow-anchor:auto]" />
-					{:else if currentTab == 'Validation'}
+					{:else if $currentTab == 'Validation'}
 						<JsonView json={$selectedJob.analysis_data?.validation} />
 						<div class="[overflow-anchor:auto]" />
 					{/if}

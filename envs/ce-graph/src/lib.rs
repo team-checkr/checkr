@@ -25,7 +25,16 @@ impl Env for GraphEnv {
     type Output = GraphOutput;
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let dot = ProgramGraph::new(input.determinism, input.commands.inner()).dot();
+        let dot = ProgramGraph::new(
+            input.determinism,
+            &input.commands.try_parse().map_err(|err| {
+                ce_core::EnvError::InvalidInputForProgram {
+                    message: "failed to parse commands".to_string(),
+                    source: Some(Box::new(err)),
+                }
+            })?,
+        )
+        .dot();
         Ok(GraphOutput { dot })
     }
 

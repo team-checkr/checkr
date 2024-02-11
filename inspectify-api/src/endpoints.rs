@@ -68,11 +68,12 @@ struct Job {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 struct AnalysisData {
-    reference_output: ce_shell::Output,
+    reference_output: Option<ce_shell::Output>,
     validation: ce_core::ValidationResult,
 }
 
 impl AppState {
+    #[tracing::instrument(skip(self))]
     fn job(&self, id: JobId) -> Job {
         let job = self.hub.get_job(id).unwrap();
         let state = job.state();
@@ -90,7 +91,13 @@ impl AppState {
 
         let analysis_data = match &kind {
             driver::JobKind::Analysis(input) => {
-                let reference_output = input.reference_output().unwrap();
+                let reference_output = match input.reference_output() {
+                    Ok(reference_output) => Some(reference_output),
+                    Err(err) => {
+                        tracing::warn!(?err, "failed to get reference output");
+                        None
+                    }
+                };
                 let validation = match input.analysis().output_from_str(&stdout) {
                     Ok(output) => input.validate_output(&output).unwrap(),
                     Err(e) => ValidationResult::Mismatch {
@@ -199,9 +206,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
         async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            tx.send(Ok(Event::JobsChanged { jobs: state.jobs() }))
-                .await
-                .unwrap();
+            let event = Event::JobsChanged { jobs: state.jobs() };
+            if tx.send(Ok(event)).await.is_err() {
+                return;
+            }
 
             for id in state.jobs() {
                 let job = state.job(id);
@@ -218,9 +226,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
             while let Ok(event) = events.recv().await {
                 match event {
                     HubEvent::JobAdded(id) => {
-                        tx.send(Ok(Event::JobsChanged { jobs: state.jobs() }))
-                            .await
-                            .unwrap();
+                        let event = Event::JobsChanged { jobs: state.jobs() };
+                        if tx.send(Ok(event)).await.is_err() {
+                            break;
+                        }
 
                         tokio::spawn({
                             let state = state.clone();
@@ -229,7 +238,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
                                 let mut events = state.hub.get_job(id).unwrap().events();
                                 while let Ok(_event) = events.recv().await {
                                     let job = state.job(id);
-                                    tx.send(Ok(Event::JobChanged { job })).await.unwrap();
+                                    let event = Event::JobChanged { job };
+                                    if tx.send(Ok(event)).await.is_err() {
+                                        break;
+                                    }
                                 }
                             }
                         });
@@ -322,9 +334,10 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
                         })
                     })
                     .collect();
-                tx.send(Ok(Event::ProgramsConfig { programs }))
-                    .await
-                    .unwrap();
+                let event = Event::ProgramsConfig { programs };
+                if tx.send(Ok(event)).await.is_err() {
+                    return;
+                }
 
                 let mut events = checko.events();
                 while let Some(event) = events.recv().await {
@@ -340,13 +353,14 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
                                     hash_str: hex::encode(input.hash()),
                                     input,
                                 };
-                                tx.send(Ok(Event::GroupProgramJobAssigned {
+                                let event = Event::GroupProgramJobAssigned {
                                     group,
                                     program,
                                     job_id,
-                                }))
-                                .await
-                                .unwrap();
+                                };
+                                if tx.send(Ok(event)).await.is_err() {
+                                    break;
+                                }
                             }
                             JobKind::Compilation => {}
                         },
@@ -379,33 +393,43 @@ async fn jobs_cancel(State(state): State<AppState>, Json(id): Json<JobId>) {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize, serde::Deserialize)]
-struct JobOutput {
-    output: ce_shell::Output,
-    validation: ce_core::ValidationResult,
+#[serde(tag = "kind", content = "data")]
+enum JobOutput {
+    AnalysisSuccess {
+        output: ce_shell::Output,
+        reference_output: ce_shell::Output,
+        validation: ce_core::ValidationResult,
+    },
+    CompilationSuccess,
+    Failure {
+        error: String,
+    },
+    JobMissing,
 }
 
 #[tapi::tapi(path = "/jobs/wait", method = Post)]
-async fn jobs_wait(
-    State(state): State<AppState>,
-    Json(id): Json<JobId>,
-) -> Json<Option<JobOutput>> {
+async fn jobs_wait(State(state): State<AppState>, Json(id): Json<JobId>) -> Json<JobOutput> {
     if let Some(job) = state.hub.get_job(id) {
         match job.wait().await {
             driver::JobState::Succeeded => match job.kind() {
                 driver::JobKind::Analysis(input) => {
                     let output = input.analysis().output_from_str(&job.stdout()).unwrap();
+                    let reference_output = input.reference_output().unwrap();
                     let validation = input.validate_output(&output).unwrap();
-                    Json(Some(JobOutput { output, validation }))
+                    Json(JobOutput::AnalysisSuccess {
+                        output,
+                        reference_output,
+                        validation,
+                    })
                 }
                 driver::JobKind::Compilation => todo!(),
             },
-            state => {
-                tracing::error!(stdout=?job.stdout(), stderr=?job.stderr(), ?state, "job failed");
-                Json(None)
-            }
+            state => Json(JobOutput::Failure {
+                error: format!("job failed: {:?}", state),
+            }),
         }
     } else {
-        Json(None)
+        Json(JobOutput::JobMissing)
     }
 }
 
@@ -440,7 +464,7 @@ async fn gcl_dot(
             Json(output)
         }
         driver::JobState::Failed => {
-            let pg = gcl::pg::ProgramGraph::new(determinism, commands.inner());
+            let pg = gcl::pg::ProgramGraph::new(determinism, &commands.try_parse().unwrap());
             Json(ce_graph::GraphOutput { dot: pg.dot() })
         }
 
@@ -461,7 +485,8 @@ struct Target {
 async fn gcl_free_vars(Json(commands): Json<Stringify<gcl::ast::Commands>>) -> Json<Vec<Target>> {
     Json(
         commands
-            .inner()
+            .try_parse()
+            .unwrap()
             .fv()
             .into_iter()
             .map(|target| Target {

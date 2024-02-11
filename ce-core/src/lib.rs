@@ -19,7 +19,30 @@ pub enum EnvError {
         json: Either<serde_json::Value, String>,
     },
     #[error("input is not valid for the current program: {message}")]
-    InvalidInputForProgram { message: String },
+    InvalidInputForProgram {
+        message: String,
+        #[source]
+        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+    },
+}
+
+impl EnvError {
+    pub fn from_parse_input(
+        json: &serde_json::Value,
+    ) -> impl FnOnce(serde_json::Error) -> EnvError + '_ {
+        move |source| EnvError::ParseInput {
+            source,
+            json: Either::Left(json.clone()),
+        }
+    }
+    pub fn from_parse_output(
+        json: &serde_json::Value,
+    ) -> impl FnOnce(serde_json::Error) -> EnvError + '_ {
+        move |source| EnvError::ParseOutput {
+            source,
+            json: Either::Left(json.clone()),
+        }
+    }
 }
 
 pub type Result<T, E = EnvError> = std::result::Result<T, E>;

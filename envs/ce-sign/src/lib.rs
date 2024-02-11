@@ -43,7 +43,15 @@ impl Env for SignEnv {
     type Output = SignOutput;
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let pg = ProgramGraph::new(input.determinism, input.commands.inner());
+        let pg = ProgramGraph::new(
+            input.determinism,
+            &input.commands.try_parse().map_err(|err| {
+                ce_core::EnvError::InvalidInputForProgram {
+                    message: "failed to parse commands".to_string(),
+                    source: Some(Box::new(err)),
+                }
+            })?,
+        );
 
         for t in pg.fv() {
             match t {
@@ -51,6 +59,7 @@ impl Env for SignEnv {
                     if input.assignment.get_var(&var).is_none() {
                         return Err(EnvError::InvalidInputForProgram {
                             message: format!("variable `{var}` was not in the given input"),
+                            source: None,
                         });
                     }
                 }
@@ -58,6 +67,7 @@ impl Env for SignEnv {
                     if input.assignment.get_arr(&arr).is_none() {
                         return Err(EnvError::InvalidInputForProgram {
                             message: format!("array `{arr}` was not in the given input"),
+                            source: None,
                         });
                     }
                 }
