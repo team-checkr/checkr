@@ -14,14 +14,15 @@
 			dot: 'digraph G {}'
 		}
 	);
-	const output = io.output;
+	const { results } = io;
+	$: output = $results.output;
 </script>
 
 <div class="grid grid-cols-[45ch_1fr] grid-rows-[1fr_auto]">
 	<StandardInput analysis="Graph" code="commands" {io} />
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
-			<Network dot={$output.dot || ''} />
+			<Network dot={output.dot || ''} />
 		</div>
 	</div>
 	<ValidationIndicator {io} />

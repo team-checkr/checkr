@@ -4,7 +4,8 @@
 	import { useIo } from '$lib/io';
 
 	const io = useIo('Parse', { commands: 'skip' }, { pretty: '' });
-	const output = io.output;
+	const { results } = io;
+	$: output = $results.output;
 </script>
 
 <div class="grid grid-cols-[45ch_1fr] grid-rows-[1fr_auto]">
@@ -12,7 +13,7 @@
 	<div class="relative">
 		<div class="absolute inset-0 grid overflow-auto">
 			<pre class="p-2"><code
-					>{#if $output}{$output.pretty}{/if}</code
+					>{#if output}{output.pretty}{/if}</code
 				></pre>
 		</div>
 	</div>

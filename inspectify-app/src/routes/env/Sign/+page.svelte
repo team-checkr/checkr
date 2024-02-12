@@ -15,8 +15,8 @@
 		},
 		{ nodes: {}, initial_node: '', final_node: '' }
 	);
-	const input = io.input;
-	const output = io.output;
+	const { input, results } = io;
+	$: output = $results.output;
 
 	$: commands = $input.commands;
 	$: determinism = $input.determinism.Case;
@@ -91,7 +91,7 @@
 				{#each vars as v}
 					<div class="border-none text-center">{v.name}</div>
 				{/each}
-				{#each Object.entries($output.nodes) as [node, mems]}
+				{#each Object.entries(output.nodes) as [node, mems]}
 					{#each mems as mem, idx}
 						{#if idx == 0}
 							<h2 class="px-2" style="grid-row: span {mems.length} / span {mems.length};">
