@@ -8,5 +8,5 @@ import Icons from 'unplugin-icons/vite';
 // process.env.INSPECTIFY_VERSION = commitHash;
 
 export default defineConfig({
-	plugins: [sveltekit(), Icons({ compiler: 'svelte' })]
+  plugins: [sveltekit(), Icons({ compiler: 'svelte' })],
 });
