@@ -4,7 +4,8 @@
 	import { useIo } from '$lib/io';
 
 	const io = useIo('Parse', { commands: 'skip' }, { pretty: 'skip' });
-	const { input, output } = io;
+	const { input, results } = io;
+	$: output = $results.output;
 </script>
 
 <div class="grid grid-cols-[45ch_1fr_1fr] grid-rows-[1fr_auto]">

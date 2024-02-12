@@ -10,14 +10,18 @@ type OutputState = 'None' | 'Stale' | 'Current';
 export type Input<A extends ce_shell.Analysis> = Mapping[A]['input'];
 export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
 
+export type Results<A extends ce_shell.Analysis> = {
+	outputState: OutputState;
+	output: Output<A>;
+	referenceOutput: Output<A>;
+	validation: ce_core.ValidationResult | { type: 'Failure'; message: string } | null;
+	latestJobId: driver.job.JobId | null;
+};
+
 export type Io<A extends ce_shell.Analysis> = {
 	input: Writable<Input<A>>;
-	output: Writable<Output<A>>;
-	referenceOutput: Writable<Output<A>>;
-	outputState: Writable<OutputState>;
-	validation: Writable<ce_core.ValidationResult | { type: 'Failure'; message: string } | null>;
+	results: Writable<Results<A>>;
 	generate: () => Promise<Input<A>>;
-	latestJobId: Writable<driver.job.JobId | null>;
 };
 
 const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
@@ -28,13 +32,13 @@ const initializeIo = <A extends ce_shell.Analysis>(
 	defaultOutput: Output<A>
 ): Io<A> => {
 	const input = writable<Input<A>>(defaultInput);
-	const output = writable<Output<A>>(defaultOutput);
-	const referenceOutput = writable<Output<A>>(defaultOutput);
-	const outputState = writable<OutputState>('None');
-	const validation = writable<
-		ce_core.ValidationResult | { type: 'Failure'; message: string } | null
-	>(null);
-	const latestJobId = writable<driver.job.JobId | null>(null);
+	const results = writable<Results<A>>({
+		outputState: 'None',
+		output: defaultOutput,
+		referenceOutput: defaultOutput,
+		validation: null,
+		latestJobId: null
+	});
 
 	let activeJob: driver.job.JobId | null = null;
 	let activeRequest: { abort: () => void } | null = null;
@@ -58,12 +62,11 @@ const initializeIo = <A extends ce_shell.Analysis>(
 				activeRequest = null;
 			}
 
-			outputState.set('Stale');
+			results.update((s) => ({ ...s, outputState: 'Stale' }));
 
-			const request = await debounceAnalysis(input);
-			const id = await request.data;
+			const id = await (await debounceAnalysis(input)).data;
 			activeJob = id;
-			latestJobId.set(id);
+			results.update((s) => ({ ...s, latestJobId: id }));
 			selectedJobId.set(id);
 			const innerRequest = api.jobsWait(id);
 			activeRequest = innerRequest;
@@ -74,13 +77,19 @@ const initializeIo = <A extends ce_shell.Analysis>(
 				else return;
 				if (result.kind == 'AnalysisSuccess') {
 					const { data } = result;
-					output.set(data.output.json as any);
-					referenceOutput.set(data.reference_output.json as any);
-					validation.set(data.validation as any);
-					outputState.set('Current');
+					results.update((s) => ({
+						...s,
+						output: data.output.json as any,
+						referenceOutput: data.reference_output.json as any,
+						validation: data.validation as any,
+						outputState: 'Current'
+					}));
 				} else if (result.kind == 'Failure') {
-					outputState.set('Current');
-					validation.set({ type: 'Failure', message: result.data.error });
+					results.update((s) => ({
+						...s,
+						validation: { type: 'Failure', message: result.data.error },
+						outputState: 'Current'
+					}));
 				}
 			});
 		}
@@ -96,12 +105,8 @@ const initializeIo = <A extends ce_shell.Analysis>(
 
 	return {
 		input,
-		output,
-		referenceOutput,
-		outputState,
-		validation,
-		generate,
-		latestJobId
+		results,
+		generate
 	};
 };
 

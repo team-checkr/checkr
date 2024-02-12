@@ -43,8 +43,8 @@
 						strokeColor: '#200020',
 						face: 'Menlo, Monaco, "Courier New", monospace'
 					}
-				}
-				// autoResize: true
+				},
+				autoResize: true
 			});
 		}
 	};
@@ -69,49 +69,6 @@
 	$: {
 		dot && network && redraw();
 	}
-
-	$: {
-		console.log({ dot });
-	}
-
-	// $: if (browser) {
-	// 	const run = async () => {
-	// 		const vis = await import('vis-network/esnext');
-	// 		const data = vis.parseDOTNetwork(dot);
-
-	// 		network = new vis.Network(container, data, {
-	// 			interaction: { zoomView: false },
-	// 			nodes: {
-	// 				color: {
-	// 					background: mirage.ui.fg.hex(),
-	// 					border: mirage.ui.fg.hex(),
-	// 					highlight: mirage.ui.fg.brighten(1).hex()
-	// 					// background: '#666666',
-	// 					// border: '#8080a0',
-	// 					// highlight: '#80a0ff',
-	// 				},
-	// 				font: {
-	// 					color: 'white'
-	// 				},
-	// 				borderWidth: 1,
-	// 				shape: 'circle',
-	// 				size: 30
-	// 			},
-	// 			edges: {
-	// 				// color: '#D0D0FF',
-	// 				color: mirage.syntax.constant.hex(),
-	// 				font: {
-	// 					color: 'white',
-	// 					strokeColor: '#200020',
-	// 					face: 'Menlo, Monaco, "Courier New", monospace'
-	// 				}
-	// 			},
-	// 			autoResize: true
-	// 		});
-	// 	};
-
-	// 	requestAnimationFrame(() => run().catch(console.error));
-	// }
 </script>
 
 <div class="relative h-full w-full">
