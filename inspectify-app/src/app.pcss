@@ -4,21 +4,21 @@
 @tailwind utilities;
 
 .prose :not(pre) > code {
-	/* TODO: There are some cases where this is nice, but in PV for example the
+  /* TODO: There are some cases where this is nice, but in PV for example the
             predicates get way too long and they need to be broken up */
-	/* @apply whitespace-nowrap; */
+  /* @apply whitespace-nowrap; */
 }
 .prose code::before {
-	content: '';
+  content: '';
 }
 .prose code::after {
-	content: '';
+  content: '';
 }
 
 @layer base {
-	*,
-	::before,
-	::after {
-		@apply border-slate-600;
-	}
+  *,
+  ::before,
+  ::after {
+    @apply border-slate-600;
+  }
 }
