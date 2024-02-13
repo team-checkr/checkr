@@ -65,7 +65,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
     pub fn exec_job(&self, input: &Input, meta: M) -> color_eyre::Result<Job<M>> {
         let mut args = self
             .config
-            .run
+            .run()
             .split(' ')
             .map(|s| s.to_string())
             .collect_vec();
