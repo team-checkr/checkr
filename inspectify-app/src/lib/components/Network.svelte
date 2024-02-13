@@ -18,7 +18,7 @@
       network.setData(data);
     } else {
       network = new vis.Network(container, data, {
-        interaction: { zoomView: false },
+        // interaction: { zoomView: false },
         nodes: {
           color: {
             background: mirage.ui.fg.hex(),
