@@ -99,7 +99,12 @@ impl AppState {
                     }
                 };
                 let validation = match input.analysis().output_from_str(&stdout) {
-                    Ok(output) => input.validate_output(&output).unwrap(),
+                    Ok(output) => match input.validate_output(&output) {
+                        Ok(output) => output,
+                        Err(e) => ValidationResult::Mismatch {
+                            reason: format!("failed to validate output: {e:?}"),
+                        },
+                    },
                     Err(e) => ValidationResult::Mismatch {
                         reason: format!("failed to parse output: {e:?}"),
                     },
@@ -215,7 +220,9 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
 
             for id in state.jobs() {
                 let job = state.job(id);
-                tx.send(Ok(Event::JobChanged { job })).await.unwrap();
+                if tx.send(Ok(Event::JobChanged { job })).await.is_err() {
+                    break;
+                }
             }
         }
     });
