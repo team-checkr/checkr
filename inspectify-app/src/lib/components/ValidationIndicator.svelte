@@ -22,7 +22,7 @@
           : 'bg-gray-500'
     : 'bg-gray-500'}"
 >
-  <div class="px-1.5 font-mono text-xs italic">
+  <div class="line-clamp-1 px-1.5 font-mono text-xs italic">
     {validation?.type == 'Failure'
       ? validation.message
       : validation?.type == 'Mismatch'
@@ -30,7 +30,7 @@
         : ''}
   </div>
   <button
-    class="h-full px-1.5 font-bold transition hover:bg-white/10"
+    class="h-full shrink-0 px-1.5 font-bold transition hover:bg-white/10"
     on:click={() => {
       $selectedJobId = latestJobId;
       $currentTab = 'Output';

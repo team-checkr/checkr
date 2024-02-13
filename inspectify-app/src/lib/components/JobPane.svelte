@@ -127,14 +127,27 @@
       <div class="flex text-sm">
         {#each tabs as tab}
           <button
-            class="flex-1 px-2 py-1 transition disabled:opacity-50 {tab == $currentTab ||
-            isDisabled(tab)
+            class="flex flex-1 items-center justify-center px-2 py-1 transition disabled:opacity-50 {tab ==
+              $currentTab || isDisabled(tab)
               ? 'bg-slate-700'
               : 'hover:bg-slate-800'}"
             on:click={() => ($currentTab = tab)}
             disabled={isDisabled(tab)}
           >
             {tab}
+            {#if tab == 'Validation'}
+              <span class="w-6">
+                {$selectedJob.analysis_data?.validation?.type == 'CorrectTerminated'
+                  ? '✅'
+                  : $selectedJob.analysis_data?.validation?.type == 'CorrectNonTerminated'
+                    ? '✅'
+                    : $selectedJob.analysis_data?.validation?.type == 'Mismatch'
+                      ? '❌'
+                      : $selectedJob.analysis_data?.validation?.type == 'TimeOut'
+                        ? '⚠️'
+                        : '…'}
+              </span>
+            {/if}
           </button>
         {/each}
       </div>

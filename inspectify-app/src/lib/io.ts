@@ -2,6 +2,7 @@ import { derived, writable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
 import { compilationStatusStore } from './events';
 import { selectedJobId } from './jobs';
+import { browser } from '$app/environment';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
 
@@ -101,7 +102,7 @@ const initializeIo = <A extends ce_shell.Analysis>(
       return result.json as any;
     });
 
-  generate();
+  if (browser) generate();
 
   return {
     input,

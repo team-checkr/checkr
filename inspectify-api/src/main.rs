@@ -4,7 +4,10 @@ mod history_broadcaster;
 
 use std::{net::SocketAddr, path::PathBuf, sync::Arc};
 
-use axum::Router;
+use axum::{
+    response::{Html, IntoResponse},
+    Router,
+};
 use clap::Parser;
 use endpoints::InspectifyJobMeta;
 use tapi::RouterExt;
@@ -92,10 +95,15 @@ async fn run() -> color_eyre::Result<()> {
             driver,
             checko,
         });
-    let app = Router::new().nest("/api", api);
+    let app = Router::new().nest("/api", api).fallback(static_dir);
 
-    if !populate_ts_client(&endpoints) {
-        println!("{}", endpoints.ts_client());
+    populate_ts_client(&endpoints);
+
+    if cli.open {
+        tokio::task::spawn(async move {
+            tokio::time::sleep(std::time::Duration::from_millis(200)).await;
+            open::that(format!("http://localhost:{}", cli.port)).unwrap();
+        });
     }
 
     let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
@@ -103,6 +111,45 @@ async fn run() -> color_eyre::Result<()> {
     axum::serve(listener, app).await?;
 
     Ok(())
+}
+
+pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
+    static UI_DIR: include_dir::Dir =
+        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../inspectify-app/build/");
+
+    if uri.path() == "/" {
+        let index = if let Some(index) = UI_DIR.get_file("index.html") {
+            index.contents_utf8().unwrap()
+        } else {
+            "Frontend has not been build for release yet! Visit <a href=\"http://localhost:3001/\">localhost:3001</a> for the development site!"
+        };
+        return Html(index).into_response();
+    }
+
+    let get = |path: String| UI_DIR.get_file(&path).map(|file| (path, file));
+
+    let plain = get(uri.path()[1..].to_string());
+    let html = get(format!("{}.html", &uri.path()[1..]));
+
+    match (plain, html) {
+        (Some((path, file)), _) | (_, Some((path, file))) => {
+            let mime_type = mime_guess::from_path(path)
+                .first_raw()
+                .map(axum::http::HeaderValue::from_static)
+                .unwrap_or_else(|| {
+                    axum::http::HeaderValue::from_str(
+                        mime_guess::mime::APPLICATION_OCTET_STREAM.as_ref(),
+                    )
+                    .unwrap()
+                });
+            (
+                [(axum::http::header::CONTENT_TYPE, mime_type)],
+                file.contents(),
+            )
+                .into_response()
+        }
+        _ => axum::http::StatusCode::NOT_FOUND.into_response(),
+    }
 }
 
 /// Write the TypeScript client to the inspectify-app/src/lib/api.ts file if it exists.

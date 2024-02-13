@@ -12,7 +12,7 @@ pub struct CalcInput {
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct CalcOutput {
     pub result: String,
-    pub error: Option<String>,
+    pub error: String,
 }
 
 impl Env for CalcEnv {
@@ -28,18 +28,39 @@ impl Env for CalcEnv {
             }
         })?;
         let (result, error) = match expr.semantics(&gcl::semantics::EmptySemanticsContext) {
-            Ok(result) => (result.to_string(), None),
+            Ok(result) => (result.to_string(), String::new()),
             Err(err) => {
                 let error = format!("{}", err);
-                (String::new(), Some(error))
+                (String::new(), error)
             }
         };
 
         Ok(CalcOutput { result, error })
     }
 
-    fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        Ok(ValidationResult::CorrectTerminated)
+    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+        let reference = Self::run(input)?;
+
+        match (
+            !reference.result.is_empty(),
+            !output.result.is_empty(),
+            !reference.error.is_empty(),
+            !output.error.is_empty(),
+        ) {
+            // Both results are present
+            (true, true, _, _) => Ok(ValidationResult::CorrectTerminated),
+            // Both errors are present
+            (_, _, true, true) => Ok(ValidationResult::CorrectTerminated),
+            (_, _, _, _) => {
+                let info = format!(
+                    "Output: result={:?}, error={:?}; Reference: result={:?}, error={:?}",
+                    output.result, output.error, reference.result, reference.error,
+                );
+                Ok(ValidationResult::Mismatch {
+                    reason: format!("Did not produce same as reference. {info}"),
+                })
+            }
+        }
     }
 }
 

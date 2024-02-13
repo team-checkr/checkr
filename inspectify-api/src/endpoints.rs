@@ -145,7 +145,9 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
         loop {
             let new = f();
             if Some(new.clone()) != last {
-                tx.send(Ok(g(&new))).await.unwrap();
+                if tx.send(Ok(g(&new))).await.is_err() {
+                    break;
+                }
                 last = Some(new);
             }
             tokio::time::sleep(interval).await;
@@ -413,7 +415,14 @@ async fn jobs_wait(State(state): State<AppState>, Json(id): Json<JobId>) -> Json
         match job.wait().await {
             driver::JobState::Succeeded => match job.kind() {
                 driver::JobKind::Analysis(input) => {
-                    let output = input.analysis().output_from_str(&job.stdout()).unwrap();
+                    let output = match input.analysis().output_from_str(&job.stdout()) {
+                        Ok(output) => output,
+                        Err(err) => {
+                            return Json(JobOutput::Failure {
+                                error: format!("failed to parse output: {err:?}"),
+                            })
+                        }
+                    };
                     let reference_output = input.reference_output().unwrap();
                     let validation = input.validate_output(&output).unwrap();
                     Json(JobOutput::AnalysisSuccess {
