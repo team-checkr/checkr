@@ -62,9 +62,11 @@ struct Cli {
 async fn run() -> color_eyre::Result<()> {
     let cli = Cli::parse();
 
+    let dir = dunce::canonicalize(&cli.dir)?;
+
     let hub = driver::Hub::new()?;
-    let run_toml_path = cli.dir.join("run.toml");
-    let driver = driver::Driver::new_from_path(hub.clone(), cli.dir.clone(), run_toml_path)?;
+    let run_toml_path = dir.join("run.toml");
+    let driver = driver::Driver::new_from_path(hub.clone(), dir.clone(), run_toml_path)?;
     if let Some(job) = driver.start_recompile(InspectifyJobMeta::default()) {
         job?;
     }
