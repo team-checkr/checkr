@@ -95,7 +95,8 @@ macro_rules! define_shell {
             pub fn output_from_str(self, src: &str) -> Result<Output, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
-                        let output = serde_json::from_str::<<$krate as Env>::Output>(src)
+                        let last_line = src.lines().last().unwrap_or_default();
+                        let output = serde_json::from_str::<<$krate as Env>::Output>(last_line)
                             .map_err($crate::io::Error::JsonError)?;
                         Ok(Output {
                             analysis: self,

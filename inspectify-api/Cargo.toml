@@ -21,10 +21,13 @@ dunce.workspace = true
 futures-util = "0.3.30"
 gcl.workspace = true
 hex = "0.4.3"
+include_dir = "0.7.3"
 indexmap.workspace = true
 itertools.workspace = true
 lz4_flex = "0.11.2"
 md5 = "0.7.0"
+mime_guess = "2.0.4"
+open = "5.0.1"
 rand.workspace = true
 rusqlite = { version = "0.30.0", features = ["bundled", "chrono"] }
 serde = { workspace = true, features = ["derive"] }
