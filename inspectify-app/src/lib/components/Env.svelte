@@ -8,13 +8,13 @@
   const notNull = <T,>(x: T | null): T => x!;
 </script>
 
-<div class="grid grid-cols-[45ch_1fr] grid-rows-[1fr_auto]">
-  <div class="relative row-span-2">
+<div class="grid h-full w-full grid-cols-[min-content_1fr] grid-rows-[1fr_auto]">
+  <div class="relative row-span-2 h-full w-[45ch] min-w-[20ch] max-w-[80vw] resize-x overflow-auto">
     <div class="absolute inset-0 grid">
       <slot name="input" />
     </div>
   </div>
-  <div class="relative">
+  <div class="relative h-full">
     <div class="absolute inset-0 grid">
       {#if $results.output && $results.referenceOutput}
         <slot
