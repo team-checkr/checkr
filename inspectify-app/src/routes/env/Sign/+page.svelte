@@ -14,8 +14,6 @@
   const { input } = io;
 
   $: commands = $input.commands;
-  $: determinism = $input.determinism.Case;
-  $: dotPromise = api.gclDot({ determinism: { Case: determinism }, commands }).data;
 
   $: vars = [] as inspectify_api.endpoints.Target[];
   $: if (browser) {
@@ -71,14 +69,10 @@
     </StandardInput>
   </svelte:fragment>
 
-  <svelte:fragment slot="output" let:output let:referenceOutput>
+  <svelte:fragment slot="output" let:output>
     <div class="relative border-r">
       <div class="absolute inset-0 grid overflow-auto">
-        {#if dotPromise}
-          {#await dotPromise then { dot }}
-            <Network {dot} />
-          {/await}
-        {/if}
+        <Network dot={output.dot} />
       </div>
     </div>
     <div class="relative">
