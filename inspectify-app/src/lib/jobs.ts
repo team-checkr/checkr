@@ -6,8 +6,8 @@ export const showStatus = writable(false);
 export const selectedJobId = writable<driver.job.JobId | null>(null);
 
 export const tabs = [
-  'Output',
   'Input JSON',
+  'Output',
   'Output JSON',
   'Reference Output',
   'Validation',
