@@ -61,6 +61,61 @@
       : Array.isArray(sign)
         ? sign.map(fmtSignOrSigns).join(' | ')
         : { Positive: '+', Zero: '0', Negative: '-' }[sign.Case];
+
+  const subscriptMap: Record<string, string | void> = {
+    '0': '₀',
+    '1': '₁',
+    '2': '₂',
+    '3': '₃',
+    '4': '₄',
+    '5': '₅',
+    '6': '₆',
+    '7': '₇',
+    '8': '₈',
+    '9': '₉',
+  };
+  const toSubscript = (str: string) =>
+    str
+      .split('')
+      .map((char) => subscriptMap[char] || char)
+      .join('');
+
+  type CharClass = 'Fst' | 'Alp' | 'Num' | 'Oth' | 'Lst';
+
+  const classifyChar = (c: string): CharClass =>
+    [
+      /[a-zA-Z]/.test(c) && 'Alp',
+      /\d/.test(c) && 'Num',
+      c === '▷' && 'Fst',
+      c === '◀' && 'Lst',
+      'Oth',
+    ].find(Boolean) as CharClass;
+
+  const naturalSort = (a: string, b: string) => {
+    const aC = Array.from(a).map(classifyChar);
+    const bC = Array.from(b).map(classifyChar);
+
+    for (let i = 0; i < Math.min(aC.length, bC.length); i++) {
+      const [x, y] = [aC[i], bC[i]];
+      if (x === y) continue;
+
+      if (x === 'Fst') return -1;
+      if (y === 'Fst') return 1;
+      if (x === 'Lst') return 1;
+      if (y === 'Lst') return -1;
+      if (x === 'Alp' && y === 'Num') return -1;
+      if (x === 'Num' && y === 'Alp') return 1;
+      if (x === 'Alp' && y === 'Oth') return -1;
+      if (x === 'Oth' && y === 'Alp') return 1;
+      if (x === 'Num' && y === 'Oth') return -1;
+      if (x === 'Oth' && y === 'Num') return 1;
+    }
+
+    return aC.length - bC.length;
+  };
+
+  const sortNodes = <T,>(nodes: [string, T][]): [string, T][] =>
+    nodes.sort(([a], [b]) => naturalSort(a, b));
 </script>
 
 <Env {io}>
@@ -98,37 +153,40 @@
   </svelte:fragment>
 
   <svelte:fragment slot="output" let:output>
-    <div class="relative border-r">
-      <div class="absolute inset-0 grid overflow-auto">
-        <Network dot={output.dot} />
-      </div>
-    </div>
-    <div class="relative">
-      <div class="absolute inset-0 overflow-auto">
+    <div class="grid grid-cols-[auto_1fr]">
+      <div class="border-r border-t bg-slate-900">
         <div
           class="grid w-full grid-flow-dense [&_*]:border-t"
-          style="grid-template-columns: repeat({vars.length + 1}, auto);"
+          style="grid-template-columns: min-content repeat({vars.length}, max-content);"
         >
           <div class="border-none"></div>
           {#each vars as v}
-            <div class="border-none text-center">{v.name}</div>
+            <div class="border-none px-6 text-center font-mono font-bold">{v.name}</div>
           {/each}
-          {#each Object.entries(output.nodes) as [node, mems]}
+          {#each sortNodes(Object.entries(output.nodes)) as [node, mems]}
             {#each mems as mem, idx}
               {#if idx == 0}
-                <h2 class="px-2" style="grid-row: span {mems.length} / span {mems.length};">
-                  {node}
+                <h2
+                  class="px-3 text-left font-bold"
+                  style="grid-row: span {mems.length} / span {mems.length};"
+                >
+                  {toSubscript(node)}
                 </h2>
               {/if}
               {#each vars as v}
-                <div class="px-2 py-0.5 font-mono text-sm">
-                  {v.name}: {v.kind == 'Array'
+                <div class="px-2 py-0.5 text-center font-mono text-sm">
+                  {v.kind == 'Array'
                     ? fmtSignOrSigns(mem.arrays[v.name])
                     : fmtSignOrSigns(mem.variables[v.name])}
                 </div>
               {/each}
             {/each}
           {/each}
+        </div>
+      </div>
+      <div class="relative">
+        <div class="absolute inset-0 grid overflow-auto">
+          <Network dot={output.dot} />
         </div>
       </div>
     </div>
