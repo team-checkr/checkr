@@ -9,8 +9,10 @@
 </script>
 
 <div class="relative grid grid-rows-[1fr_auto]">
-  <main class="grid">
-    <slot />
+  <main class="relative grid h-full">
+    <div class="absolute inset-0 grid">
+      <slot />
+    </div>
   </main>
 
   {#if $showStatus}

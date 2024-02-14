@@ -13,8 +13,8 @@ export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
 
 export type Results<A extends ce_shell.Analysis> = {
   outputState: OutputState;
-  output: Output<A>;
-  referenceOutput: Output<A>;
+  output: Output<A> | null;
+  referenceOutput: Output<A> | null;
   validation: ce_core.ValidationResult | { type: 'Failure'; message: string } | null;
   latestJobId: driver.job.JobId | null;
 };
@@ -27,16 +27,12 @@ export type Io<A extends ce_shell.Analysis> = {
 
 const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 
-const initializeIo = <A extends ce_shell.Analysis>(
-  analysis: A,
-  defaultInput: Input<A>,
-  defaultOutput: Output<A>,
-): Io<A> => {
+const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
   const input = writable<Input<A>>(defaultInput);
   const results = writable<Results<A>>({
     outputState: 'None',
-    output: defaultOutput,
-    referenceOutput: defaultOutput,
+    output: null,
+    referenceOutput: null,
     validation: null,
     latestJobId: null,
   });
@@ -111,13 +107,9 @@ const initializeIo = <A extends ce_shell.Analysis>(
   };
 };
 
-export const useIo = <A extends ce_shell.Analysis>(
-  analysis: A,
-  defaultInput: Input<A>,
-  defaultOutput: Output<A>,
-): Io<A> => {
+export const useIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
   if (!ios[analysis]) {
-    ios[analysis] = initializeIo(analysis, defaultInput, defaultOutput);
+    ios[analysis] = initializeIo(analysis, defaultInput);
   }
   return ios[analysis] as Io<A>;
 };
