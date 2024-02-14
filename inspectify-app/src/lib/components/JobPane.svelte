@@ -1,9 +1,9 @@
 <script lang="ts">
+  import { derived } from 'svelte/store';
   import { driver } from '$lib/api';
   import { jobsListStore, jobsStore } from '$lib/events';
-  import Ansi from '$lib/components/Ansi.svelte';
-  import JsonView from './JSONView.svelte';
-  import { derived } from 'svelte/store';
+  import { selectedJobId } from '$lib/jobs';
+  import JobTabs from './JobTabs.svelte';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
   import ArrowPath from '~icons/heroicons/arrow-path';
@@ -11,8 +11,6 @@
   import NoSymbol from '~icons/heroicons/no-symbol';
   import Fire from '~icons/heroicons/fire';
   import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
-  import { selectedJobId, type Tab, currentTab, tabs } from '$lib/jobs';
-  import TrackingScroll from './TrackingScroll.svelte';
 
   export let showGroup = false;
 
@@ -34,35 +32,6 @@
   $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
   // $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
   $: selectedJob = typeof $selectedJobId == 'number' ? $jobsStore[$selectedJobId] : null;
-  type Output =
-    | {
-        kind: 'parsed';
-        parsed: any;
-      }
-    | {
-        kind: 'parse error';
-        raw: string;
-      };
-  let output: Output | null = null;
-  $: if ($selectedJob) {
-    try {
-      output = {
-        kind: 'parsed',
-        parsed: JSON.parse($selectedJob.stdout),
-      };
-    } catch (e) {
-      output = {
-        kind: 'parse error',
-        raw: $selectedJob.stdout,
-      };
-    }
-  }
-
-  $: if ($selectedJob?.kind.kind == 'Compilation') {
-    $currentTab = 'Output';
-  }
-  $: isDisabled = (tab: Tab) =>
-    $selectedJob ? tab != 'Output' && $selectedJob.kind.kind == 'Compilation' : true;
 </script>
 
 <div
@@ -123,72 +92,7 @@
 
   <!-- Job view -->
   {#if $selectedJob}
-    <div class="grid grid-rows-[auto_1fr]">
-      <div class="flex text-sm">
-        {#each tabs as tab}
-          <button
-            class="flex flex-1 items-center justify-center px-2 py-1 transition disabled:opacity-50 {tab ==
-              $currentTab || isDisabled(tab)
-              ? 'bg-slate-700'
-              : 'hover:bg-slate-800'}"
-            on:click={() => ($currentTab = tab)}
-            disabled={isDisabled(tab)}
-          >
-            {tab}
-            {#if tab == 'Validation'}
-              <span class="w-6">
-                {$selectedJob.analysis_data?.validation?.type == 'CorrectTerminated'
-                  ? '✅'
-                  : $selectedJob.analysis_data?.validation?.type == 'CorrectNonTerminated'
-                    ? '✅'
-                    : $selectedJob.analysis_data?.validation?.type == 'Mismatch'
-                      ? '❌'
-                      : $selectedJob.analysis_data?.validation?.type == 'TimeOut'
-                        ? '⚠️'
-                        : '…'}
-              </span>
-            {/if}
-          </button>
-        {/each}
-      </div>
-      <div class="relative self-stretch bg-slate-900 text-xs">
-        <div class="absolute inset-0 overflow-auto">
-          {#if $currentTab == 'Output'}
-            <TrackingScroll>
-              <Ansi spans={$selectedJob.spans} />
-            </TrackingScroll>
-          {:else if $currentTab == 'Input JSON' && $selectedJob.kind.kind == 'Analysis'}
-            <JsonView json={$selectedJob.kind.data.json} />
-            <div class="[overflow-anchor:auto]" />
-          {:else if $currentTab == 'Output JSON'}
-            {#if output}
-              {#if output.kind == 'parsed'}
-                <JsonView json={output.parsed} />
-              {:else if output.kind == 'parse error'}
-                <div class="p-2">
-                  <div class="italic text-red-500">Failed to parse JSON</div>
-                  {#if output.raw.length > 0}
-                    <pre class="p-3 [overflow-anchor:none]"><code>{output.raw}</code></pre>
-                  {:else}
-                    <pre class="p-3 italic text-gray-400 [overflow-anchor:none]"><code
-                        >&lt;stdout was empty&gt;</code
-                      ></pre>
-                  {/if}
-                </div>
-              {/if}
-            {/if}
-            <!-- <JsonView json={JSON.parse(selectedJob.stdout)} /> -->
-            <div class="[overflow-anchor:auto]" />
-          {:else if $currentTab == 'Reference Output'}
-            <JsonView json={$selectedJob.analysis_data?.reference_output?.json} />
-            <div class="[overflow-anchor:auto]" />
-          {:else if $currentTab == 'Validation'}
-            <JsonView json={$selectedJob.analysis_data?.validation} />
-            <div class="[overflow-anchor:auto]" />
-          {/if}
-        </div>
-      </div>
-    </div>
+    <JobTabs selectedJob={$selectedJob} />
   {:else}
     <div class="bg-slate-900" />
   {/if}
