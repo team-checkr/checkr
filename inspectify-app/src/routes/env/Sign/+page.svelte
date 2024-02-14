@@ -1,4 +1,5 @@
 <script lang="ts">
+  import { derived } from 'svelte/store';
   import { browser } from '$app/environment';
   import { api, ce_sign, type inspectify_api } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
@@ -13,17 +14,46 @@
   });
   const { input } = io;
 
-  $: commands = $input.commands;
+  const commands = derived([input], ([input]) => input.commands);
 
-  $: vars = [] as inspectify_api.endpoints.Target[];
+  let vars: inspectify_api.endpoints.Target[] = [];
   $: if (browser) {
-    api.gclFreeVars(commands || 'skip').data.then((newVars) => {
+    api.gclFreeVars($commands || 'skip').data.then((newVars) => {
       newVars.sort((a, b) => (a.name > b.name ? 1 : -1));
       vars = newVars;
     });
   }
 
-  // TODO: update input signs when vars change
+  const canonicalizeSign = (sign: ce_sign.semantics.Sign): ce_sign.semantics.Sign =>
+    ce_sign.semantics.SIGN.find((s) => s.Case == sign.Case) || ce_sign.semantics.SIGN[0];
+
+  // NOTE: we need to supply the initial signs to new variables, and we also
+  // need to canonicalize the given signs, such that they will be the same in
+  // the `bind:group`.
+  $: if (browser) {
+    for (const v of vars) {
+      if (v.kind == 'Variable') {
+        if (!$input.assignment.variables[v.name]) {
+          $input.assignment.variables[v.name] = ce_sign.semantics.SIGN[0];
+        } else if (
+          $input.assignment.variables[v.name] !=
+          canonicalizeSign($input.assignment.variables[v.name])
+        ) {
+          $input.assignment.variables[v.name] = canonicalizeSign(
+            $input.assignment.variables[v.name],
+          );
+        }
+      } else if (v.kind == 'Array') {
+        if (!$input.assignment.arrays[v.name]) {
+          $input.assignment.arrays[v.name] = [ce_sign.semantics.SIGN[0]];
+        } else if (
+          $input.assignment.arrays[v.name].some((sign) => sign != canonicalizeSign(sign))
+        ) {
+          $input.assignment.arrays[v.name] = $input.assignment.arrays[v.name].map(canonicalizeSign);
+        }
+      }
+    }
+  }
 
   const fmtSignOrSigns = (sign: ce_sign.semantics.Sign | ce_sign.semantics.Signs | void): string =>
     !sign
@@ -50,9 +80,7 @@
                   type="radio"
                   name={v.name}
                   id="{v.name}-{sign.Case}"
-                  value={$input.assignment.variables[v.name].Case == sign.Case
-                    ? $input.assignment.variables[v.name]
-                    : sign}
+                  value={sign}
                   bind:group={$input.assignment.variables[v.name]}
                 />
               </div>
