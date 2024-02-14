@@ -15,7 +15,11 @@
     </div>
   </div>
   <div class="relative h-full">
-    <div class="absolute inset-0 grid">
+    <div
+      class="absolute inset-0 grid {$results.outputState == 'Stale'
+        ? 'opacity-20 transition delay-[400ms] duration-1000'
+        : 'transition'}"
+    >
       {#if $results.output && $results.referenceOutput}
         <slot
           name="output"
