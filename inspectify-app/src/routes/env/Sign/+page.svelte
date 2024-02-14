@@ -25,6 +25,7 @@
   $: vars = [] as inspectify_api.endpoints.Target[];
   $: if (browser) {
     api.gclFreeVars(commands || 'skip').data.then((newVars) => {
+      newVars.sort((a, b) => (a.name > b.name ? 1 : -1));
       vars = newVars;
     });
   }
