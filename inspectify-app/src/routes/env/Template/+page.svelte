@@ -1,14 +1,14 @@
 <script lang="ts">
+  import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import ValidationIndicator from '$lib/components/ValidationIndicator.svelte';
   import { useIo } from '$lib/io';
 
-  const io = useIo('Parse', { commands: 'skip' }, { pretty: 'skip' });
-  const { input, results } = io;
-  $: output = $results.output;
+  const io = useIo('Parse', { commands: 'skip' });
 </script>
 
-<div class="grid grid-cols-[45ch_1fr_1fr] grid-rows-[1fr_auto]">
-  <StandardInput analysis="Parse" {io} />
-  <ValidationIndicator {io} />
-</div>
+<Env {io}>
+  <svelte:fragment slot="input">
+    <StandardInput analysis="Parse" {io} />
+  </svelte:fragment>
+  <svelte:fragment slot="output" let:output let:referenceOutput></svelte:fragment>
+</Env>
