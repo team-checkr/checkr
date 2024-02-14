@@ -110,7 +110,7 @@ export namespace ce_shell {
 }
 export namespace ce_sign {
   export type SignInput = { commands: string, determinism: gcl.pg.Determinism, assignment: gcl.memory.Memory }
-  export type SignOutput = { initial_node: string, final_node: string, nodes: Record<string, gcl.memory.Memory[]> }
+  export type SignOutput = { initial_node: string, final_node: string, nodes: Record<string, gcl.memory.Memory[]>, dot: string }
   export namespace semantics {
     export type Sign = { "Case": "Positive" } | { "Case": "Zero" } | { "Case": "Negative" };
     export const SIGN: Sign[] = [{ "Case": "Positive" }, { "Case": "Zero" }, { "Case": "Negative" }];

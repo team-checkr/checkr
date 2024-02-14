@@ -35,6 +35,7 @@ pub struct SignOutput {
     pub initial_node: String,
     pub final_node: String,
     pub nodes: IndexMap<String, IndexSet<SignMemory>>,
+    pub dot: String,
 }
 
 impl Env for SignEnv {
@@ -88,6 +89,7 @@ impl Env for SignEnv {
             initial_node: Node::Start.to_string(),
             final_node: Node::End.to_string(),
             nodes,
+            dot: pg.dot(),
         })
     }
 
