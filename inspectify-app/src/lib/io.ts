@@ -1,6 +1,6 @@
-import { derived, writable, type Writable } from 'svelte/store';
+import { derived, writable, type Readable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
-import { compilationStatusStore } from './events';
+import { jobsStore } from './events';
 import { selectedJobId } from './jobs';
 import { browser } from '$app/environment';
 
@@ -21,7 +21,7 @@ export type Results<A extends ce_shell.Analysis> = {
 
 export type Io<A extends ce_shell.Analysis> = {
   input: Writable<Input<A>>;
-  results: Writable<Results<A>>;
+  results: Readable<Results<A>>;
   generate: () => Promise<Input<A>>;
 };
 
@@ -29,67 +29,94 @@ const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 
 const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
   const input = writable<Input<A>>(defaultInput);
-  const results = writable<Results<A>>({
-    outputState: 'None',
-    output: null,
-    referenceOutput: null,
-    validation: null,
-    latestJobId: null,
-  });
 
-  let activeJob: driver.job.JobId | null = null;
-  let activeRequest: { abort: () => void } | null = null;
+  const jobIdDerived = derived(
+    [input],
+    ([$input], set) => {
+      if (!browser) return;
 
-  const [debounceAnalysis] = debounce(
-    (input: Input<A>) => api.analysis({ analysis, json: input }),
-    200,
+      let cancel = () => {};
+      let stop = false;
+
+      const run = async () => {
+        await new Promise((resolve) => setTimeout(resolve, 200));
+        if (stop) return;
+
+        const analysisRequest = api.analysis({ analysis, json: $input });
+
+        cancel = () => {
+          analysisRequest.abort();
+          api.jobsCancel(jobId).data.catch(() => {});
+        };
+        const jobId = await analysisRequest.data;
+
+        set(jobId);
+      };
+
+      run();
+
+      return () => {
+        stop = true;
+        cancel();
+      };
+    },
+    null as number | null,
   );
 
-  derived([compilationStatusStore, input], (x) => x).subscribe(
-    async ([compilationStatus, input]) => {
-      if (!compilationStatus || !input) return;
-      if (compilationStatus.state != 'Succeeded') return;
+  jobIdDerived.subscribe(($jobId) => {
+    selectedJobId.set($jobId);
+  });
 
-      if (activeJob) {
-        api.jobsCancel(activeJob);
-        activeJob = null;
-      }
-      if (activeRequest) {
-        activeRequest.abort();
-        activeRequest = null;
-      }
+  const results = derived(
+    [jobIdDerived, jobsStore],
+    ([$jobId, $jobs], set) => {
+      if (typeof $jobId != 'number') return;
 
-      results.update((s) => ({ ...s, outputState: 'Stale' }));
+      let cancel = () => {};
+      let stop = false;
 
-      const id = await (await debounceAnalysis(input)).data;
-      activeJob = id;
-      results.update((s) => ({ ...s, latestJobId: id }));
-      selectedJobId.set(id);
-      const innerRequest = api.jobsWait(id);
-      activeRequest = innerRequest;
-      innerRequest.data.then((result) => {
-        if (innerRequest == activeRequest) activeRequest = null;
-        else return;
-        if (activeJob == id) activeJob = null;
-        else return;
-        if (result.kind == 'AnalysisSuccess') {
-          const { data } = result;
-          results.update((s) => ({
-            ...s,
-            output: data.output.json as any,
-            referenceOutput: data.reference_output.json as any,
-            validation: data.validation as any,
-            outputState: 'Current',
-          }));
-        } else if (result.kind == 'Failure') {
-          results.update((s) => ({
-            ...s,
-            validation: { type: 'Failure', message: result.data.error },
-            outputState: 'Current',
-          }));
+      const run = async () => {
+        set({
+          outputState: 'None',
+          output: null,
+          referenceOutput: null,
+          validation: null,
+          latestJobId: $jobId,
+        } as Results<A>);
+
+        let job = $jobs[$jobId];
+        while (!stop && !job) {
+          job = $jobs[$jobId];
+          if (!job) await new Promise((resolve) => setTimeout(resolve, 200));
         }
-      });
+
+        cancel = job.subscribe(($job) => {
+          if ($job.state == 'Succeeded') {
+            set({
+              outputState: 'Current',
+              output: $job.analysis_data?.output?.json as any,
+              referenceOutput: $job.analysis_data?.reference_output?.json as any,
+              validation: $job.analysis_data?.validation as any,
+              latestJobId: $jobId,
+            } as Results<A>);
+          }
+        });
+      };
+
+      run();
+
+      return () => {
+        stop = true;
+        cancel();
+      };
     },
+    {
+      outputState: 'None',
+      output: null,
+      referenceOutput: null,
+      validation: null,
+      latestJobId: null,
+    } as Results<A>,
   );
 
   const generate = () =>
@@ -102,7 +129,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
 
   return {
     input,
-    results,
+    results: results,
     generate,
   };
 };
@@ -113,25 +140,3 @@ export const useIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
   }
   return ios[analysis] as Io<A>;
 };
-
-function debounce<A = unknown, R = void>(
-  fn: (args: A) => R,
-  ms: number,
-): [(args: A) => Promise<R>, () => void] {
-  let timer: number;
-
-  const debouncedFunc = (args: A): Promise<R> =>
-    new Promise((resolve) => {
-      if (timer) {
-        clearTimeout(timer);
-      }
-
-      timer = setTimeout(() => {
-        resolve(fn(args));
-      }, ms);
-    });
-
-  const teardown = () => clearTimeout(timer);
-
-  return [debouncedFunc, teardown];
-}
