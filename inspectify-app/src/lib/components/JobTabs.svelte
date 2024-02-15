@@ -9,29 +9,6 @@
   export let selectedJob: Job;
   export let canHide = false;
   export let hidden = canHide;
-  type Output =
-    | {
-        kind: 'parsed';
-        parsed: any;
-      }
-    | {
-        kind: 'parse error';
-        raw: string;
-      };
-  let output: Output | null = null;
-  $: if (selectedJob) {
-    try {
-      output = {
-        kind: 'parsed',
-        parsed: JSON.parse(selectedJob.stdout),
-      };
-    } catch (e) {
-      output = {
-        kind: 'parse error',
-        raw: selectedJob.stdout,
-      };
-    }
-  }
 
   $: if (selectedJob?.kind.kind == 'Compilation') {
     $currentTab = 'Output';
@@ -88,21 +65,19 @@
           <JsonView json={selectedJob.kind.data.json} />
           <div class="[overflow-anchor:auto]" />
         {:else if $currentTab == 'Output JSON'}
-          {#if output}
-            {#if output.kind == 'parsed'}
-              <JsonView json={output.parsed} />
-            {:else if output.kind == 'parse error'}
-              <div class="p-2">
-                <div class="italic text-red-500">Failed to parse JSON</div>
-                {#if output.raw.length > 0}
-                  <pre class="p-3 [overflow-anchor:none]"><code>{output.raw}</code></pre>
-                {:else}
-                  <pre class="p-3 italic text-gray-400 [overflow-anchor:none]"><code
-                      >&lt;stdout was empty&gt;</code
-                    ></pre>
-                {/if}
-              </div>
-            {/if}
+          {#if selectedJob.analysis_data?.output}
+            <JsonView json={selectedJob.analysis_data.output.json} />
+          {:else}
+            <div class="p-2">
+              <div class="italic text-red-500">Failed to parse JSON</div>
+              {#if selectedJob.stdout.length > 0}
+                <pre class="p-3 [overflow-anchor:none]"><code>{selectedJob.stdout}</code></pre>
+              {:else}
+                <pre class="p-3 italic text-gray-400 [overflow-anchor:none]"><code
+                    >&lt;stdout was empty&gt;</code
+                  ></pre>
+              {/if}
+            </div>
           {/if}
           <div class="[overflow-anchor:auto]" />
         {:else if $currentTab == 'Reference Output'}

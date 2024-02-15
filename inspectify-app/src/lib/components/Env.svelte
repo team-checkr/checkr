@@ -38,7 +38,7 @@
       {/if}
     </div>
   </div>
-  <div class="grid {hideTabs ? 'grid-rows-[minmax(1fr,20vh)_auto]' : 'grid-rows-[20vh_auto]'}">
+  <div class="grid {hideTabs ? 'grid-rows-[1fr_auto]' : 'grid-rows-[30vh_auto]'}">
     {#if $latestJob}
       <div class="grid border-t">
         <JobTabs selectedJob={$latestJob} canHide bind:hidden={hideTabs} />

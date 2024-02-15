@@ -2,7 +2,7 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{extract::State, Json};
 use ce_core::ValidationResult;
-use ce_shell::{Analysis, EnvExt, Input};
+use ce_shell::{Analysis, Input};
 use driver::{HubEvent, JobId, JobKind, JobState};
 use gcl::{ast::TargetKind, stringify::Stringify};
 use rand::SeedableRng;
@@ -28,9 +28,7 @@ pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
         &generate::endpoint as E,
         &events::endpoint as E,
         &jobs_cancel::endpoint as E,
-        &jobs_wait::endpoint as E,
         &exec_analysis::endpoint as E,
-        &gcl_dot::endpoint as E,
         &gcl_free_vars::endpoint as E,
     ])
 }
@@ -68,8 +66,9 @@ struct Job {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 struct AnalysisData {
+    output: Option<ce_shell::Output>,
     reference_output: Option<ce_shell::Output>,
-    validation: ce_core::ValidationResult,
+    validation: Option<ce_core::ValidationResult>,
 }
 
 impl AppState {
@@ -98,18 +97,23 @@ impl AppState {
                         None
                     }
                 };
-                let validation = match input.analysis().output_from_str(&stdout) {
-                    Ok(output) => match input.validate_output(&output) {
-                        Ok(output) => output,
-                        Err(e) => ValidationResult::Mismatch {
-                            reason: format!("failed to validate output: {e:?}"),
-                        },
-                    },
-                    Err(e) => ValidationResult::Mismatch {
+                let output = input.analysis().output_from_str(&stdout);
+                let validation = match (state, &output) {
+                    (JobState::Succeeded, Ok(output)) => {
+                        Some(match input.validate_output(output) {
+                            Ok(output) => output,
+                            Err(e) => ValidationResult::Mismatch {
+                                reason: format!("failed to validate output: {e:?}"),
+                            },
+                        })
+                    }
+                    (JobState::Succeeded, Err(e)) => Some(ValidationResult::Mismatch {
                         reason: format!("failed to parse output: {e:?}"),
-                    },
+                    }),
+                    _ => None,
                 };
                 Some(AnalysisData {
+                    output: output.ok(),
                     reference_output,
                     validation,
                 })
@@ -143,8 +147,6 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
     mut g: impl FnMut(&T) -> S + Send + 'static,
     tx: tokio::sync::mpsc::Sender<Result<S, axum::BoxError>>,
 ) {
-    // let (tx, rx) = tokio::sync::mpsc::channel::<Result<S, axum::BoxError>>(1);
-
     tokio::spawn(async move {
         let mut last = None;
         loop {
@@ -158,18 +160,7 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
             tokio::time::sleep(interval).await;
         }
     });
-
-    // tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }
-
-// #[tapi::tapi(path = "/jobs/list", method = Get)]
-// async fn jobs_list(State(state): State<AppState>) -> tapi::Sse<Vec<JobId>> {
-//     periodic_stream(
-//         Duration::from_millis(100),
-//         move || state.jobs(),
-//         |jobs| jobs.clone(),
-//     )
-// }
 
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", content = "value")]
@@ -294,28 +285,6 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
         tx.clone(),
     );
 
-    // periodic_stream(
-    //     Duration::from_millis(100),
-    //     move || state.job(id),
-    //     |job| JobEvent::JobChanged {
-    //         id: job.id,
-    //         job: job.clone(),
-    //     },
-    //     tx.clone(),
-    // );
-
-    // tokio::spawn(async move {
-    //     let mut last = None;
-    //     loop {
-    //         let new = f();
-    //         if Some(new.clone()) != last {
-    //             tx.send(Ok(g(&new))).await.unwrap();
-    //             last = Some(new);
-    //         }
-    //         tokio::time::sleep(interval).await;
-    //     }
-    // });
-
     if let Some(checko) = state.checko.clone() {
         tokio::spawn({
             let tx = tx.clone();
@@ -414,81 +383,6 @@ enum JobOutput {
         error: String,
     },
     JobMissing,
-}
-
-#[tapi::tapi(path = "/jobs/wait", method = Post)]
-async fn jobs_wait(State(state): State<AppState>, Json(id): Json<JobId>) -> Json<JobOutput> {
-    if let Some(job) = state.hub.get_job(id) {
-        match job.wait().await {
-            driver::JobState::Succeeded => match job.kind() {
-                driver::JobKind::Analysis(input) => {
-                    let output = match input.analysis().output_from_str(&job.stdout()) {
-                        Ok(output) => output,
-                        Err(err) => {
-                            return Json(JobOutput::Failure {
-                                error: format!("failed to parse output: {err:?}"),
-                            })
-                        }
-                    };
-                    let reference_output = input.reference_output().unwrap();
-                    let validation = input.validate_output(&output).unwrap();
-                    Json(JobOutput::AnalysisSuccess {
-                        output,
-                        reference_output,
-                        validation,
-                    })
-                }
-                driver::JobKind::Compilation => todo!(),
-            },
-            state => Json(JobOutput::Failure {
-                error: format!("job failed: {:?}", state),
-            }),
-        }
-    } else {
-        Json(JobOutput::JobMissing)
-    }
-}
-
-#[derive(tapi::Tapi, Debug, Clone, serde::Deserialize)]
-struct GclDotInput {
-    determinism: gcl::pg::Determinism,
-    commands: Stringify<gcl::ast::Commands>,
-}
-
-#[tapi::tapi(path = "/gcl/dot", method = Post)]
-async fn gcl_dot(
-    State(state): State<AppState>,
-    Json(GclDotInput {
-        determinism,
-        commands,
-    }): Json<GclDotInput>,
-) -> Json<ce_graph::GraphOutput> {
-    let job = state
-        .driver
-        .exec_job(
-            &ce_graph::GraphEnv::generalize_input(&ce_graph::GraphInput {
-                commands: commands.clone(),
-                determinism,
-            }),
-            InspectifyJobMeta::default(),
-        )
-        .unwrap();
-
-    match job.wait().await {
-        driver::JobState::Succeeded => {
-            let output: ce_graph::GraphOutput = serde_json::from_str(&job.stdout()).unwrap();
-            Json(output)
-        }
-        driver::JobState::Failed => {
-            let pg = gcl::pg::ProgramGraph::new(determinism, &commands.try_parse().unwrap());
-            Json(ce_graph::GraphOutput { dot: pg.dot() })
-        }
-
-        driver::JobState::Queued => todo!(),
-        driver::JobState::Running => todo!(),
-        driver::JobState::Canceled => todo!(),
-        driver::JobState::Warning => todo!(),
-    }
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]

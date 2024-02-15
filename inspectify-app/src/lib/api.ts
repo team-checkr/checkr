@@ -92,8 +92,8 @@ export namespace ce_core {
   export type ValidationResult = { "type": "CorrectTerminated" } | { "type": "CorrectNonTerminated", "iterations": number } | { "type": "Mismatch", "reason": string } | { "type": "TimeOut" };
 }
 export namespace ce_graph {
-  export type GraphOutput = { dot: string }
   export type GraphInput = { commands: string, determinism: gcl.pg.Determinism }
+  export type GraphOutput = { dot: string }
 }
 export namespace ce_parse {
   export type ParseInput = { commands: string }
@@ -153,24 +153,20 @@ export namespace inspectify_api {
     }
   }
   export namespace endpoints {
-    export type JobOutput = { "kind": "AnalysisSuccess", "data": { "output": ce_shell.io.Output, "reference_output": ce_shell.io.Output, "validation": ce_core.ValidationResult } } | { "kind": "CompilationSuccess", "data": {  } } | { "kind": "Failure", "data": { "error": string } } | { "kind": "JobMissing", "data": {  } };
     export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } } | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } } | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } } | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
-    export type GclDotInput = { determinism: gcl.pg.Determinism, commands: string }
     export type GenerateParams = { analysis: ce_shell.Analysis }
     export type Target = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
     export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, group_name: (string | null), stdout: string, spans: inspectify_api.endpoints.Span[], analysis_data: (inspectify_api.endpoints.AnalysisData | null) }
     export type Program = { hash: number[], hash_str: string, input: ce_shell.io.Input }
     export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
     export type Span = { text: string, fg: (driver.ansi.Color | null), bg: (driver.ansi.Color | null) }
-    export type AnalysisData = { reference_output: (ce_shell.io.Output | null), validation: ce_core.ValidationResult }
+    export type AnalysisData = { output: (ce_shell.io.Output | null), reference_output: (ce_shell.io.Output | null), validation: (ce_core.ValidationResult | null) }
   }
 }
 export const api = {
     generate: request<inspectify_api.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
     events: sse<[], inspectify_api.endpoints.Event>(() => `/events`, "json"),
     jobsCancel: request<driver.job.JobId, unknown>("json", "POST", "/jobs/cancel", "none"),
-    jobsWait: request<driver.job.JobId, inspectify_api.endpoints.JobOutput>("json", "POST", "/jobs/wait", "json"),
     analysis: request<ce_shell.io.Input, driver.job.JobId>("json", "POST", "/analysis", "json"),
-    gclDot: request<inspectify_api.endpoints.GclDotInput, ce_graph.GraphOutput>("json", "POST", "/gcl/dot", "json"),
     gclFreeVars: request<string, inspectify_api.endpoints.Target[]>("json", "POST", "/gcl/free-vars", "json"),
 };
