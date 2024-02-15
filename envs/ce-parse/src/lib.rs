@@ -11,7 +11,7 @@ pub struct ParseInput {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct ParseOutput {
-    pretty: String,
+    pretty: Stringify<Commands>,
 }
 
 impl Env for ParseEnv {
@@ -21,19 +21,22 @@ impl Env for ParseEnv {
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(ParseOutput {
-            pretty: input
-                .commands
-                .try_parse()
-                .map_err(|err| ce_core::EnvError::InvalidInputForProgram {
+            pretty: Stringify::new(input.commands.try_parse().map_err(|err| {
+                ce_core::EnvError::InvalidInputForProgram {
                     message: "failed to parse commands".to_string(),
                     source: Some(Box::new(err)),
-                })?
-                .to_string(),
+                }
+            })?),
         })
     }
 
-    fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        Ok(ValidationResult::CorrectTerminated)
+    fn validate(_input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+        match output.pretty.try_parse() {
+            Ok(_) => Ok(ValidationResult::CorrectTerminated),
+            Err(err) => Ok(ValidationResult::Mismatch {
+                reason: format!("failed to parse pretty output: {:?}", err),
+            }),
+        }
     }
 }
 
