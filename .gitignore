@@ -1,3 +1,4 @@
 /target
 .docker-cache/
 inspectify-binaries/
+.env
