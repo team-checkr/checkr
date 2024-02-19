@@ -157,11 +157,12 @@ impl Execution {
             .unwrap_or(&self.initial_memory)
     }
     fn nexts(&self, pg: &ProgramGraph) -> Vec<Execution> {
+        let mem = self.current_mem();
         let exes = pg
             .outgoing(self.current_node())
             .iter()
             .filter_map(|Edge(_, action, next_node)| {
-                action.semantics(&self.initial_memory).ok().map(|next_mem| {
+                action.semantics(mem).ok().map(|next_mem| {
                     let mut next = self.clone();
                     next.trace.push((
                         Step {
