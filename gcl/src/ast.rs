@@ -15,6 +15,12 @@ pub enum TargetKind {
     Array,
 }
 
+#[derive(tapi::Tapi, Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+pub struct TargetDef {
+    pub name: Target,
+    pub kind: TargetKind,
+}
+
 #[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct Variable(pub String);

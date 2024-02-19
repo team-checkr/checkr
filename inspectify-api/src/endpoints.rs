@@ -4,7 +4,6 @@ use axum::{extract::State, Json};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Input};
 use driver::{HubEvent, JobId, JobKind, JobState};
-use gcl::{ast::TargetKind, stringify::Stringify};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
@@ -29,7 +28,6 @@ pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
         &events::endpoint as E,
         &jobs_cancel::endpoint as E,
         &exec_analysis::endpoint as E,
-        &gcl_free_vars::endpoint as E,
     ])
 }
 
@@ -66,6 +64,7 @@ struct Job {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 struct AnalysisData {
+    meta: ce_shell::Meta,
     output: Option<ce_shell::Output>,
     reference_output: Option<ce_shell::Output>,
     validation: Option<ce_core::ValidationResult>,
@@ -90,6 +89,7 @@ impl AppState {
 
         let analysis_data = match &kind {
             driver::JobKind::Analysis(input) => {
+                let meta = input.meta();
                 let reference_output = match input.reference_output() {
                     Ok(reference_output) => Some(reference_output),
                     Err(err) => {
@@ -113,6 +113,7 @@ impl AppState {
                     _ => None,
                 };
                 Some(AnalysisData {
+                    meta,
                     output: output.ok(),
                     reference_output,
                     validation,
@@ -351,16 +352,26 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
     tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }
 
+#[derive(tapi::Tapi, Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct AnalysisExecution {
+    id: JobId,
+    meta: ce_shell::Meta,
+}
+
 #[tapi::tapi(path = "/analysis", method = Post)]
 async fn exec_analysis(
     State(state): State<AppState>,
     Json(input): Json<ce_shell::Input>,
-) -> Json<JobId> {
+) -> Json<AnalysisExecution> {
     let output = state
         .driver
         .exec_job(&input, InspectifyJobMeta::default())
         .unwrap();
-    Json(output.id())
+    let id = output.id();
+    Json(AnalysisExecution {
+        id,
+        meta: input.meta(),
+    })
 }
 
 #[tapi::tapi(path = "/jobs/cancel", method = Post)]
@@ -383,31 +394,6 @@ enum JobOutput {
         error: String,
     },
     JobMissing,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-struct Target {
-    name: gcl::ast::Target,
-    kind: TargetKind,
-}
-
-#[tapi::tapi(path = "/gcl/free-vars", method = Post)]
-async fn gcl_free_vars(Json(commands): Json<Stringify<gcl::ast::Commands>>) -> Json<Vec<Target>> {
-    Json(
-        commands
-            .try_parse()
-            .unwrap()
-            .fv()
-            .into_iter()
-            .map(|target| Target {
-                name: target.clone(),
-                kind: match target {
-                    gcl::ast::Target::Variable(_) => TargetKind::Variable,
-                    gcl::ast::Target::Array(_, _) => TargetKind::Array,
-                },
-            })
-            .collect(),
-    )
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]

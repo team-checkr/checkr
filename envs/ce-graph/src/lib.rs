@@ -24,6 +24,8 @@ impl Env for GraphEnv {
 
     type Output = GraphOutput;
 
+    type Meta = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let dot = ProgramGraph::new(
             input.determinism,

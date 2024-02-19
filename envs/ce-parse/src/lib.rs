@@ -19,6 +19,8 @@ impl Env for ParseEnv {
 
     type Output = ParseOutput;
 
+    type Meta = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(ParseOutput {
             pretty: Stringify::new(input.commands.try_parse().map_err(|err| {

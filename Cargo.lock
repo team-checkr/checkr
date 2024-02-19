@@ -1745,7 +1745,6 @@ version = "0.1.21"
 dependencies = [
  "axum 0.7.3",
  "ce-core",
- "ce-graph",
  "ce-shell",
  "chrono",
  "clap",
@@ -1753,7 +1752,6 @@ dependencies = [
  "driver",
  "dunce",
  "futures-util",
- "gcl",
  "hex",
  "include_dir",
  "indexmap 2.1.0",

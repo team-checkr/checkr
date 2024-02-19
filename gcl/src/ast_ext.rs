@@ -6,7 +6,7 @@ use itertools::Either;
 use crate::{
     ast::{
         AExpr, AOp, Array, BExpr, Command, Commands, Flow, Function, Guard, LogicOp, RelOp, Target,
-        Variable,
+        TargetDef, TargetKind, Variable,
     },
     semantics::EmptySemanticsContext,
 };
@@ -46,6 +46,18 @@ impl<Idx> Target<Idx> {
         match self {
             Target::Variable(v) => v.is_logical(),
             Target::Array(a, _) => a.is_logical(),
+        }
+    }
+    pub fn def(&self) -> TargetDef {
+        match self {
+            Target::Variable(v) => TargetDef {
+                name: Target::Variable(v.clone()),
+                kind: TargetKind::Variable,
+            },
+            Target::Array(a, _) => TargetDef {
+                name: Target::Array(a.clone(), ()),
+                kind: TargetKind::Array,
+            },
         }
     }
 }

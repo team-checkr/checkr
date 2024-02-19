@@ -3,7 +3,7 @@
 mod def;
 mod io;
 
-pub use io::{Error, Input, Output};
+pub use io::{Error, Input, Meta, Output};
 
 pub trait EnvExt: Env {
     const ANALYSIS: Analysis;
