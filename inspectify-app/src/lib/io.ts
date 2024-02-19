@@ -1,6 +1,6 @@
 import { derived, writable, type Readable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
-import { jobsStore } from './events';
+import { jobsStore, type Job, compilationStatusStore } from './events';
 import { selectedJobId } from './jobs';
 import { browser } from '$app/environment';
 
@@ -16,7 +16,7 @@ export type Results<A extends ce_shell.Analysis> = {
   output: Output<A> | null;
   referenceOutput: Output<A> | null;
   validation: ce_core.ValidationResult | { type: 'Failure'; message: string } | null;
-  latestJobId: driver.job.JobId | null;
+  job: Readable<Job> | null;
 };
 
 export type Io<A extends ce_shell.Analysis> = {
@@ -31,9 +31,11 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
   const input = writable<Input<A>>(defaultInput);
 
   const jobIdDerived = derived(
-    [input],
-    ([$input], set) => {
+    [input, compilationStatusStore],
+    ([$input, $compilationStatus], set) => {
       if (!browser) return;
+
+      if ($compilationStatus?.state != 'Succeeded') return;
 
       let cancel = () => {};
       let stop = false;
@@ -46,9 +48,11 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
 
         cancel = () => {
           analysisRequest.abort();
-          api.jobsCancel(jobId).data.catch(() => {});
         };
         const jobId = await analysisRequest.data;
+        cancel = () => {
+          api.jobsCancel(jobId).data.catch(() => {});
+        };
 
         set(jobId);
       };
@@ -81,7 +85,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
           output: null,
           referenceOutput: null,
           validation: null,
-          latestJobId: $jobId,
+          job: null,
         } as Results<A>);
 
         let job = $jobs[$jobId];
@@ -91,14 +95,25 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         }
 
         cancel = job.subscribe(($job) => {
-          if ($job.state == 'Succeeded') {
-            set({
-              outputState: 'Current',
-              output: $job.analysis_data?.output?.json as any,
-              referenceOutput: $job.analysis_data?.reference_output?.json as any,
-              validation: $job.analysis_data?.validation as any,
-              latestJobId: $jobId,
-            } as Results<A>);
+          switch ($job.state) {
+            case 'Succeeded':
+              set({
+                outputState: 'Current',
+                // TODO: Add a toggle for showing the reference output in place of the output
+                output: $job.analysis_data?.output?.json as any,
+                referenceOutput: $job.analysis_data?.reference_output?.json as any,
+                validation: $job.analysis_data?.validation as any,
+                job,
+              } as Results<A>);
+              break;
+            case 'Failed':
+              set({
+                outputState: 'Current',
+                output: null,
+                referenceOutput: null,
+                validation: { type: 'Failure', message: $job.stdout },
+                job,
+              } as Results<A>);
           }
         });
       };
@@ -115,7 +130,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
       output: null,
       referenceOutput: null,
       validation: null,
-      latestJobId: null,
+      job: null,
     } as Results<A>,
   );
 

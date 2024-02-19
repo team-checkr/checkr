@@ -1,16 +1,27 @@
 <script lang="ts" generics="A extends ce_shell.Analysis">
+  import { crossfade } from 'svelte/transition';
+  import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
   import { jobsStore } from '$lib/events';
   import type { Io } from '$lib/io';
+  import Ansi from './Ansi.svelte';
   import JobTabs from './JobTabs.svelte';
+  import TrackingScroll from './TrackingScroll.svelte';
   import ValidationIndicator from './ValidationIndicator.svelte';
 
   export let io: Io<A>;
   const { results } = io;
   const notNull = <T,>(x: T | null): T => x!;
 
-  $: latestJob = $results.latestJobId ? $jobsStore[$results.latestJobId] : null;
+  $: latestJob = $results.job;
   let hideTabs = true;
+
+  const [send, receive] = crossfade({
+    delay: 200,
+    duration: 200,
+    easing: quintOut,
+  });
+  const key = '123';
 </script>
 
 <div class="grid h-full w-full grid-cols-[min-content_1fr] grid-rows-[1fr_auto]">
@@ -26,24 +37,60 @@
         : 'transition'}"
     >
       {#if $results.output && $results.referenceOutput}
-        <slot
-          name="output"
-          output={notNull($results.output)}
-          referenceOutput={notNull($results.referenceOutput)}
-        />
+        <div in:send={{ key }} out:receive={{ key }} class="grid">
+          <div class="grid grid-rows-[1fr_auto]">
+            <slot
+              name="output"
+              output={notNull($results.output)}
+              referenceOutput={notNull($results.referenceOutput)}
+            />
+            {#if $latestJob}
+              <div
+                class="grid border-t {hideTabs ? 'grid-rows-[1fr_auto]' : 'grid-rows-[30vh_auto]'}"
+              >
+                <JobTabs selectedJob={$latestJob} canHide bind:hidden={hideTabs} />
+              </div>
+            {/if}
+          </div>
+        </div>
+      {:else if $latestJob?.state == 'Failed'}
+        <div
+          in:send={{ key }}
+          out:receive={{ key }}
+          class="absolute inset-0 grid grid-rows-[auto_1fr_auto] text-xs"
+        >
+          <div class="border-y bg-slate-900 p-2 text-xl font-light italic">Analysis failed</div>
+          <div class="overflow-auto">
+            <TrackingScroll>
+              <Ansi spans={$latestJob.spans} />
+            </TrackingScroll>
+          </div>
+          {#if $latestJob}
+            <div
+              class="grid border-t {hideTabs ? 'grid-rows-[1fr_auto]' : 'grid-rows-[30vh_auto]'}"
+            >
+              <JobTabs selectedJob={$latestJob} canHide bind:hidden={hideTabs} />
+            </div>
+          {/if}
+        </div>
       {:else}
-        <div class="absolute inset-0 grid place-items-center">
-          <div class="text-2xl font-light italic">No output</div>
+        <div
+          in:send={{ key }}
+          out:receive={{ key }}
+          class="absolute inset-0 grid place-items-center"
+        >
+          <div class="text-2xl font-light italic">
+            {#if $results.outputState == 'Current'}
+              No output
+            {:else}
+              Loading...
+            {/if}
+          </div>
         </div>
       {/if}
     </div>
   </div>
-  <div class="grid {hideTabs ? 'grid-rows-[1fr_auto]' : 'grid-rows-[30vh_auto]'}">
-    {#if $latestJob}
-      <div class="grid border-t">
-        <JobTabs selectedJob={$latestJob} canHide bind:hidden={hideTabs} />
-      </div>
-    {/if}
+  <div class="grid">
     <ValidationIndicator {io} />
   </div>
 </div>
