@@ -484,6 +484,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-interpreter"
+version = "0.1.21"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "itertools 0.11.0",
+ "serde",
+ "serde_json",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-parse"
 version = "0.1.21"
 dependencies = [
@@ -501,6 +514,7 @@ dependencies = [
  "ce-calc",
  "ce-core",
  "ce-graph",
+ "ce-interpreter",
  "ce-parse",
  "ce-sign",
  "futures-util",

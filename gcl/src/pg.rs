@@ -2,6 +2,7 @@ pub mod analysis;
 
 use std::{
     collections::{BTreeMap, VecDeque},
+    str::FromStr,
     sync::atomic::AtomicU64,
 };
 
@@ -101,6 +102,12 @@ impl Action {
             Action::Skip => Default::default(),
             Action::Condition(b) => b.fv(),
         }
+    }
+}
+impl FromStr for Action {
+    type Err = crate::parse::ParseError;
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        crate::parse::parse_action(s)
     }
 }
 
