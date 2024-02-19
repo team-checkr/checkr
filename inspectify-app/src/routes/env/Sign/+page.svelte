@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { derived } from 'svelte/store';
   import { browser } from '$app/environment';
-  import { api, ce_sign, type inspectify_api } from '$lib/api';
+  import { ce_sign } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
@@ -13,17 +12,9 @@
     assignment: { variables: {}, arrays: {} },
     determinism: { Case: 'Deterministic' },
   });
-  const { input } = io;
+  const { input, meta } = io;
 
-  const commands = derived([input], ([input]) => input.commands);
-
-  let vars: inspectify_api.endpoints.Target[] = [];
-  $: if (browser) {
-    api.gclFreeVars($commands || 'skip').data.then((newVars) => {
-      newVars.sort((a, b) => (a.name > b.name ? 1 : -1));
-      vars = newVars;
-    });
-  }
+  $: vars = $meta ?? [];
 
   const canonicalizeSign = (sign: ce_sign.semantics.Sign): ce_sign.semantics.Sign =>
     ce_sign.semantics.SIGN.find((s) => s.Case == sign.Case) || ce_sign.semantics.SIGN[0];
@@ -98,15 +89,15 @@
     </StandardInput>
   </svelte:fragment>
 
-  <svelte:fragment slot="output" let:output>
+  <svelte:fragment slot="output" let:output let:meta>
     <div class="grid grid-cols-[auto_1fr]">
       <div class="border-r border-t bg-slate-900">
         <div
           class="grid w-full grid-flow-dense [&_*]:border-t"
-          style="grid-template-columns: min-content repeat({vars.length}, max-content);"
+          style="grid-template-columns: min-content repeat({meta.length}, max-content);"
         >
           <div class="border-none"></div>
-          {#each vars as v}
+          {#each meta as v}
             <div class="border-none px-6 text-center font-mono font-bold">{v.name}</div>
           {/each}
           {#each sortNodes(Object.entries(output.nodes)) as [node, mems]}
@@ -119,7 +110,7 @@
                   {toSubscript(node)}
                 </h2>
               {/if}
-              {#each vars as v}
+              {#each meta as v}
                 <div class="px-2 py-0.5 text-center font-mono text-sm">
                   {v.kind == 'Array'
                     ? fmtSignOrSigns(mem.arrays[v.name])

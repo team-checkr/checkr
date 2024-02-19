@@ -108,11 +108,12 @@ export namespace ce_parse {
   export type ParseOutput = { pretty: string }
 }
 export namespace ce_shell {
-  export type Envs = { "analysis": "Calc", "io": { "input": ce_calc.CalcInput, "output": ce_calc.CalcOutput } } | { "analysis": "Parse", "io": { "input": ce_parse.ParseInput, "output": ce_parse.ParseOutput } } | { "analysis": "Graph", "io": { "input": ce_graph.GraphInput, "output": ce_graph.GraphOutput } } | { "analysis": "Interpreter", "io": { "input": ce_interpreter.InterpreterInput, "output": ce_interpreter.InterpreterOutput } } | { "analysis": "Sign", "io": { "input": ce_sign.SignInput, "output": ce_sign.SignOutput } };
+  export type Envs = { "analysis": "Calc", "io": { "input": ce_calc.CalcInput, "output": ce_calc.CalcOutput, "meta": unknown } } | { "analysis": "Parse", "io": { "input": ce_parse.ParseInput, "output": ce_parse.ParseOutput, "meta": unknown } } | { "analysis": "Graph", "io": { "input": ce_graph.GraphInput, "output": ce_graph.GraphOutput, "meta": unknown } } | { "analysis": "Interpreter", "io": { "input": ce_interpreter.InterpreterInput, "output": ce_interpreter.InterpreterOutput, "meta": gcl.ast.TargetDef[] } } | { "analysis": "Sign", "io": { "input": ce_sign.SignInput, "output": ce_sign.SignOutput, "meta": gcl.ast.TargetDef[] } };
   export type Analysis = "Calc" | "Parse" | "Graph" | "Interpreter" | "Sign";
   export const ANALYSIS: Analysis[] = ["Calc", "Parse", "Graph", "Interpreter", "Sign"];
   export namespace io {
     export type Input = { analysis: ce_shell.Analysis, json: unknown }
+    export type Meta = { analysis: ce_shell.Analysis, json: unknown }
     export type Output = { analysis: ce_shell.Analysis, json: unknown }
   }
 }
@@ -139,6 +140,7 @@ export namespace driver {
 }
 export namespace gcl {
   export namespace ast {
+    export type TargetDef = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
     export type Target = string;
     export type TargetKind = "Variable" | "Array";
     export const TARGET_KIND: TargetKind[] = ["Variable", "Array"];
@@ -161,20 +163,19 @@ export namespace inspectify_api {
     }
   }
   export namespace endpoints {
+    export type AnalysisExecution = { id: driver.job.JobId, meta: ce_shell.io.Meta }
     export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } } | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } } | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } } | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
     export type GenerateParams = { analysis: ce_shell.Analysis }
-    export type Target = { name: gcl.ast.Target, kind: gcl.ast.TargetKind }
     export type Job = { id: driver.job.JobId, state: driver.job.JobState, kind: driver.job.JobKind, group_name: (string | null), stdout: string, spans: inspectify_api.endpoints.Span[], analysis_data: (inspectify_api.endpoints.AnalysisData | null) }
     export type Program = { hash: number[], hash_str: string, input: ce_shell.io.Input }
     export type CompilationStatus = { id: driver.job.JobId, state: driver.job.JobState, error_output: (inspectify_api.endpoints.Span[] | null) }
     export type Span = { text: string, fg: (driver.ansi.Color | null), bg: (driver.ansi.Color | null) }
-    export type AnalysisData = { output: (ce_shell.io.Output | null), reference_output: (ce_shell.io.Output | null), validation: (ce_core.ValidationResult | null) }
+    export type AnalysisData = { meta: ce_shell.io.Meta, output: (ce_shell.io.Output | null), reference_output: (ce_shell.io.Output | null), validation: (ce_core.ValidationResult | null) }
   }
 }
 export const api = {
     generate: request<inspectify_api.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
     events: sse<[], inspectify_api.endpoints.Event>(() => `/events`, "json"),
     jobsCancel: request<driver.job.JobId, unknown>("json", "POST", "/jobs/cancel", "none"),
-    analysis: request<ce_shell.io.Input, driver.job.JobId>("json", "POST", "/analysis", "json"),
-    gclFreeVars: request<string, inspectify_api.endpoints.Target[]>("json", "POST", "/gcl/free-vars", "json"),
+    analysis: request<ce_shell.io.Input, inspectify_api.endpoints.AnalysisExecution>("json", "POST", "/analysis", "json"),
 };

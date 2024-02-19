@@ -1,4 +1,4 @@
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ce_core::{
     define_env,
@@ -6,7 +6,7 @@ use ce_core::{
     Env, Generate, ValidationResult,
 };
 use gcl::{
-    ast::{Array, Commands, Int, Variable},
+    ast::{Array, Commands, Int, TargetDef, Variable},
     pg::{Determinism, Edge, Node, ProgramGraph},
     semantics::{SemanticsContext, SemanticsError},
     stringify::Stringify,
@@ -189,6 +189,16 @@ impl Env for InterpreterEnv {
     type Input = InterpreterInput;
 
     type Output = InterpreterOutput;
+
+    type Meta = BTreeSet<TargetDef>;
+
+    fn meta(input: &Self::Input) -> Self::Meta {
+        if let Ok(commands) = input.commands.try_parse() {
+            commands.fv().into_iter().map(|t| t.def()).collect()
+        } else {
+            Default::default()
+        }
+    }
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let pg = gcl::pg::ProgramGraph::new(

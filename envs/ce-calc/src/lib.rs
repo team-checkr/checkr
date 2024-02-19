@@ -20,6 +20,8 @@ impl Env for CalcEnv {
 
     type Output = CalcOutput;
 
+    type Meta = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let expr = input.expression.try_parse().map_err(|err| {
             ce_core::EnvError::InvalidInputForProgram {

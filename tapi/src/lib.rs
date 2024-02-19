@@ -3,7 +3,7 @@ mod tests;
 
 use std::{
     cell::{Cell, RefCell},
-    collections::{BTreeMap, HashMap, HashSet},
+    collections::{BTreeMap, BTreeSet, HashMap, HashSet},
     marker::PhantomData,
     rc::Rc,
     sync::Arc,
@@ -635,6 +635,7 @@ impl_generic!(
     Vec = "{}[]" & "z.array({})",
     Option = "({} | null)" & "z.optional({})",
     HashSet = "{}[]" & "z.array({})",
+    BTreeSet = "{}[]" & "z.array({})",
     IndexSet = "{}[]" & "z.array({})",
     Rc = "{}" & "{}",
     Arc = "{}" & "{}",

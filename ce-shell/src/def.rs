@@ -16,6 +16,7 @@ macro_rules! define_shell {
             $($name {
                 input: <$krate as Env>::Input,
                 output: <$krate as Env>::Output,
+                meta: <$krate as Env>::Meta,
             },)*
         }
 
@@ -121,6 +122,24 @@ macro_rules! define_shell {
         }
 
         impl Input {
+            #[tracing::instrument(skip_all, fields(analysis = self.analysis.to_string()))]
+            pub fn meta(&self) -> Meta {
+                match self.analysis {
+                    $(Analysis::$name => {
+                        let meta = if let Ok(input) = serde_json::from_value::<<$krate as Env>::Input>((*self.json).clone()) {
+                            <$krate>::meta(&input)
+                        } else {
+                            Default::default()
+                        };
+                        Meta {
+                            analysis: self.analysis,
+                            json: serde_json::to_value(&meta)
+                                .expect("all output should be serializable")
+                                .into(),
+                        }
+                    }),*
+                }
+            }
             #[tracing::instrument(skip_all, fields(analysis = self.analysis.to_string()))]
             pub fn reference_output(&self) -> Result<Output, EnvError> {
                 match self.analysis {

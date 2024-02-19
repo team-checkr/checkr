@@ -9,7 +9,7 @@
   import ValidationIndicator from './ValidationIndicator.svelte';
 
   export let io: Io<A>;
-  const { input, results } = io;
+  const { meta, results } = io;
   const notNull = <T,>(x: T | null): T => x!;
 
   $: latestJob = $results.job;
@@ -42,7 +42,8 @@
               <div class="absolute inset-0 grid overflow-auto">
                 <slot
                   name="output"
-                  input={$input}
+                  input={$results.input}
+                  meta={notNull($meta)}
                   output={notNull($results.output)}
                   referenceOutput={notNull($results.referenceOutput)}
                 />

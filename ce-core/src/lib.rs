@@ -99,6 +99,19 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
         + PartialEq
         + Send
         + Sync;
+    type Meta: Default
+        + Serialize
+        + for<'a> Deserialize<'a>
+        + tapi::Tapi
+        + std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Send
+        + Sync;
+
+    fn meta(_input: &Self::Input) -> Self::Meta {
+        Default::default()
+    }
 
     fn run(input: &Self::Input) -> Result<Self::Output>;
     fn validate(input: &Self::Input, output: &Self::Output) -> Result<ValidationResult>;

@@ -2,13 +2,15 @@
 
 mod semantics;
 
+use std::collections::BTreeSet;
+
 use ce_core::{
     define_env,
     rand::{self, seq::SliceRandom},
     Env, EnvError, Generate, ValidationResult,
 };
 use gcl::{
-    ast::{Array, Commands, Target, Variable},
+    ast::{Array, Commands, Target, TargetDef, Variable},
     pg::{
         analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
@@ -42,6 +44,16 @@ impl Env for SignEnv {
     type Input = SignInput;
 
     type Output = SignOutput;
+
+    type Meta = BTreeSet<TargetDef>;
+
+    fn meta(input: &Self::Input) -> Self::Meta {
+        if let Ok(commands) = input.commands.try_parse() {
+            commands.fv().into_iter().map(|t| t.def()).collect()
+        } else {
+            Default::default()
+        }
+    }
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let pg = ProgramGraph::new(

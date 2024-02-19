@@ -10,8 +10,10 @@ type OutputState = 'None' | 'Stale' | 'Current';
 
 export type Input<A extends ce_shell.Analysis> = Mapping[A]['input'];
 export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
+export type Meta<A extends ce_shell.Analysis> = Mapping[A]['meta'];
 
 export type Results<A extends ce_shell.Analysis> = {
+  input: Input<A>;
   outputState: OutputState;
   output: Output<A> | null;
   referenceOutput: Output<A> | null;
@@ -21,6 +23,7 @@ export type Results<A extends ce_shell.Analysis> = {
 
 export type Io<A extends ce_shell.Analysis> = {
   input: Writable<Input<A>>;
+  meta: Readable<Meta<A> | null>;
   results: Readable<Results<A>>;
   generate: () => Promise<Input<A>>;
 };
@@ -30,7 +33,7 @@ const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
   const input = writable<Input<A>>(defaultInput);
 
-  const jobIdDerived = derived(
+  const jobIdAndMetaDerived = derived(
     [input, compilationStatusStore],
     ([$input, $compilationStatus], set) => {
       if (!browser) return;
@@ -49,12 +52,12 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel = () => {
           analysisRequest.abort();
         };
-        const jobId = await analysisRequest.data;
+        const { id: jobId, meta } = await analysisRequest.data;
         cancel = () => {
           api.jobsCancel(jobId).data.catch(() => {});
         };
 
-        set(jobId);
+        set({ jobId, input: $input, meta: meta.json });
       };
 
       run();
@@ -64,17 +67,24 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel();
       };
     },
-    null as number | null,
+    null as { jobId: number; input: Input<A>; meta: Meta<A> } | null,
   );
+
+  const jobIdDerived = derived(
+    jobIdAndMetaDerived,
+    ($jobIdAndMeta) => $jobIdAndMeta?.jobId ?? null,
+  );
+  const meta = derived(jobIdAndMetaDerived, ($jobIdAndMeta) => $jobIdAndMeta?.meta);
+  const cachedInput = derived(jobIdAndMetaDerived, ($jobIdAndMeta) => $jobIdAndMeta?.input);
 
   jobIdDerived.subscribe(($jobId) => {
     selectedJobId.set($jobId);
   });
 
   const results = derived(
-    [jobIdDerived, jobsStore],
-    ([$jobId, $jobs], set) => {
-      if (typeof $jobId != 'number') return;
+    [jobIdDerived, cachedInput, jobsStore],
+    ([$jobId, $cachedInput, $jobs], set) => {
+      if (typeof $jobId != 'number' || !$cachedInput) return;
 
       let cancel = () => {};
       let stop = false;
@@ -98,6 +108,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
           switch ($job.state) {
             case 'Succeeded':
               set({
+                input: $cachedInput,
                 outputState: 'Current',
                 // TODO: Add a toggle for showing the reference output in place of the output
                 output: $job.analysis_data?.output?.json as any,
@@ -108,6 +119,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
               break;
             case 'Failed':
               set({
+                input: $cachedInput,
                 outputState: 'Current',
                 output: null,
                 referenceOutput: null,
@@ -144,6 +156,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
 
   return {
     input,
+    meta,
     results: results,
     generate,
   };
