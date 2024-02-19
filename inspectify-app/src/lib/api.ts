@@ -95,14 +95,22 @@ export namespace ce_graph {
   export type GraphInput = { commands: string, determinism: gcl.pg.Determinism }
   export type GraphOutput = { dot: string }
 }
+export namespace ce_interpreter {
+  export type InterpreterInput = { commands: string, determinism: gcl.pg.Determinism, assignment: ce_interpreter.InterpreterMemory, trace_length: number }
+  export type InterpreterOutput = { initial_node: string, final_node: string, dot: string, trace: ce_interpreter.Step[], termination: ce_interpreter.TerminationState }
+  export type InterpreterMemory = { variables: Record<gcl.ast.Variable, number>, arrays: Record<gcl.ast.Array, number[]> }
+  export type TerminationState = { "Case": "Running" } | { "Case": "Stuck" } | { "Case": "Terminated" };
+  export const TERMINATION_STATE: TerminationState[] = [{ "Case": "Running" }, { "Case": "Stuck" }, { "Case": "Terminated" }];
+  export type Step = { action: string, node: string, memory: ce_interpreter.InterpreterMemory }
+}
 export namespace ce_parse {
   export type ParseInput = { commands: string }
   export type ParseOutput = { pretty: string }
 }
 export namespace ce_shell {
-  export type Envs = { "analysis": "Calc", "io": { "input": ce_calc.CalcInput, "output": ce_calc.CalcOutput } } | { "analysis": "Parse", "io": { "input": ce_parse.ParseInput, "output": ce_parse.ParseOutput } } | { "analysis": "Graph", "io": { "input": ce_graph.GraphInput, "output": ce_graph.GraphOutput } } | { "analysis": "Sign", "io": { "input": ce_sign.SignInput, "output": ce_sign.SignOutput } };
-  export type Analysis = "Calc" | "Parse" | "Graph" | "Sign";
-  export const ANALYSIS: Analysis[] = ["Calc", "Parse", "Graph", "Sign"];
+  export type Envs = { "analysis": "Calc", "io": { "input": ce_calc.CalcInput, "output": ce_calc.CalcOutput } } | { "analysis": "Parse", "io": { "input": ce_parse.ParseInput, "output": ce_parse.ParseOutput } } | { "analysis": "Graph", "io": { "input": ce_graph.GraphInput, "output": ce_graph.GraphOutput } } | { "analysis": "Interpreter", "io": { "input": ce_interpreter.InterpreterInput, "output": ce_interpreter.InterpreterOutput } } | { "analysis": "Sign", "io": { "input": ce_sign.SignInput, "output": ce_sign.SignOutput } };
+  export type Analysis = "Calc" | "Parse" | "Graph" | "Interpreter" | "Sign";
+  export const ANALYSIS: Analysis[] = ["Calc", "Parse", "Graph", "Interpreter", "Sign"];
   export namespace io {
     export type Input = { analysis: ce_shell.Analysis, json: unknown }
     export type Output = { analysis: ce_shell.Analysis, json: unknown }

@@ -1,5 +1,5 @@
 use std::str::FromStr;
-use crate::ast::*;
+use crate::{ast::*, pg::Action};
 // use crate::security::{Flow, SecurityClass};
 
 grammar;
@@ -82,6 +82,14 @@ Var: String = r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 LogicalVar: String = r"_[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 
 Int: Int = r"[0-9]+" => Int::from_str(<>).unwrap();
+
+// Graph
+
+pub Action: Action = {
+    <Target> ":=" <AExpr> => Action::Assignment(<>),
+    "skip" => Action::Skip,
+    BExpr => Action::Condition(<>),
+};
 
 // Security lattice
 

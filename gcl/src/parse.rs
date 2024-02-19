@@ -86,6 +86,12 @@ pub fn parse_predicate(src: &str) -> Result<Predicate, ParseError> {
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }
 
+pub fn parse_action(src: &str) -> Result<crate::pg::Action, ParseError> {
+    static PARSER: Lazy<crate::gcl::ActionParser> = Lazy::new(crate::gcl::ActionParser::new);
+
+    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
+}
+
 pub fn parse_security_lattice(src: &str) -> Result<Vec<Flow<SecurityClass>>, ParseError> {
     static PARSER: Lazy<crate::gcl::SecurityLatticeParser> =
         Lazy::new(crate::gcl::SecurityLatticeParser::new);

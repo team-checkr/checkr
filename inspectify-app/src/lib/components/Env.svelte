@@ -2,7 +2,6 @@
   import { crossfade } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
-  import { jobsStore } from '$lib/events';
   import type { Io } from '$lib/io';
   import Ansi from './Ansi.svelte';
   import JobTabs from './JobTabs.svelte';
@@ -10,7 +9,7 @@
   import ValidationIndicator from './ValidationIndicator.svelte';
 
   export let io: Io<A>;
-  const { results } = io;
+  const { input, results } = io;
   const notNull = <T,>(x: T | null): T => x!;
 
   $: latestJob = $results.job;
@@ -39,11 +38,16 @@
       {#if $results.output && $results.referenceOutput}
         <div in:send={{ key }} out:receive={{ key }} class="grid">
           <div class="grid grid-rows-[1fr_auto]">
-            <slot
-              name="output"
-              output={notNull($results.output)}
-              referenceOutput={notNull($results.referenceOutput)}
-            />
+            <div class="relative">
+              <div class="absolute inset-0 grid overflow-auto">
+                <slot
+                  name="output"
+                  input={$input}
+                  output={notNull($results.output)}
+                  referenceOutput={notNull($results.referenceOutput)}
+                />
+              </div>
+            </div>
             {#if $latestJob}
               <div
                 class="grid border-t {hideTabs ? 'grid-rows-[1fr_auto]' : 'grid-rows-[30vh_auto]'}"

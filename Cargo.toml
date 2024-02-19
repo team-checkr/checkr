@@ -30,6 +30,7 @@ bitflags = "2.4.0"
 ce-calc = { path = "./envs/ce-calc" }
 ce-core = { path = "./ce-core" }
 ce-graph = { path = "./envs/ce-graph" }
+ce-interpreter = { path = "./envs/ce-interpreter" }
 ce-parse = { path = "./envs/ce-parse" }
 ce-shell = { path = "./ce-shell" }
 ce-sign = { path = "./envs/ce-sign" }
