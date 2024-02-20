@@ -218,7 +218,11 @@ impl Env for InterpreterEnv {
         for _ in 0..input.trace_length {
             if let Some(next) = exe.nexts(&pg).first().cloned() {
                 if next.is_stuck {
-                    termination = TerminationState::Stuck;
+                    termination = if next.current_node() == Node::End {
+                        TerminationState::Terminated
+                    } else {
+                        TerminationState::Stuck
+                    };
                     break;
                 }
                 exe = next;

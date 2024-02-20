@@ -1,7 +1,7 @@
 import { derived, writable, type Readable, type Writable } from 'svelte/store';
 import { ce_shell, api, driver, type ce_core } from './api';
 import { jobsStore, type Job, compilationStatusStore } from './events';
-import { selectedJobId } from './jobs';
+import { selectedJobId, showReference } from './jobs';
 import { browser } from '$app/environment';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
@@ -25,6 +25,7 @@ export type Io<A extends ce_shell.Analysis> = {
   input: Writable<Input<A>>;
   meta: Readable<Meta<A> | null>;
   results: Readable<Results<A>>;
+  reference: Readable<Results<A>>;
   generate: () => Promise<Input<A>>;
 };
 
@@ -33,10 +34,12 @@ const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
 const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
   const input = writable<Input<A>>(defaultInput);
 
-  const jobIdAndMetaDerived = derived(
-    [input, compilationStatusStore],
-    ([$input, $compilationStatus], set) => {
+  const jobIdAndInputDerived = derived(
+    [input, compilationStatusStore, showReference],
+    ([$input, $compilationStatus, $showReference], set) => {
       if (!browser) return;
+
+      if ($showReference) return;
 
       if ($compilationStatus?.state != 'Succeeded') return;
 
@@ -52,12 +55,12 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel = () => {
           analysisRequest.abort();
         };
-        const { id: jobId, meta } = await analysisRequest.data;
+        const { id: jobId } = await analysisRequest.data;
         cancel = () => {
           api.jobsCancel(jobId).data.catch(() => {});
         };
 
-        set({ jobId, input: $input, meta: meta.json });
+        set({ jobId, input: $input });
       };
 
       run();
@@ -67,19 +70,27 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel();
       };
     },
-    null as { jobId: number; input: Input<A>; meta: Meta<A> } | null,
+    null as { jobId: number; input: Input<A> } | null,
   );
 
   const jobIdDerived = derived(
-    jobIdAndMetaDerived,
+    jobIdAndInputDerived,
     ($jobIdAndMeta) => $jobIdAndMeta?.jobId ?? null,
   );
-  const meta = derived(jobIdAndMetaDerived, ($jobIdAndMeta) => $jobIdAndMeta?.meta);
-  const cachedInput = derived(jobIdAndMetaDerived, ($jobIdAndMeta) => $jobIdAndMeta?.input);
+  const cachedInput = derived(jobIdAndInputDerived, ($jobIdAndMeta) => $jobIdAndMeta?.input);
 
   jobIdDerived.subscribe(($jobId) => {
     selectedJobId.set($jobId);
   });
+
+  const defaultResults: Results<A> = {
+    input: defaultInput,
+    outputState: 'None',
+    output: null,
+    referenceOutput: null,
+    validation: null,
+    job: null,
+  };
 
   const results = derived(
     [jobIdDerived, cachedInput, jobsStore],
@@ -98,11 +109,13 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
           job: null,
         } as Results<A>);
 
-        let job = $jobs[$jobId];
+        let job = $jobs[$jobId] as Writable<Job> | undefined;
         while (!stop && !job) {
           job = $jobs[$jobId];
           if (!job) await new Promise((resolve) => setTimeout(resolve, 200));
         }
+
+        if (!job) return;
 
         cancel = job.subscribe(($job) => {
           switch ($job.state) {
@@ -137,14 +150,38 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel();
       };
     },
-    {
-      outputState: 'None',
-      output: null,
-      referenceOutput: null,
-      validation: null,
-      job: null,
-    } as Results<A>,
+    defaultResults,
   );
+
+  const referenceAndMeta = derived(
+    [input],
+    ([$input], set) => {
+      if (!browser) return;
+
+      const analysisRequest = api.reference({ analysis, json: $input });
+
+      analysisRequest.data.then(({ output, error, meta }) => {
+        set({
+          results: {
+            input: $input,
+            outputState: 'Current',
+            output: output?.json as any,
+            referenceOutput: output?.json as any,
+            validation: { type: 'CorrectTerminated' },
+            job: null,
+          },
+          meta: meta.json,
+        });
+      });
+
+      return () => {
+        analysisRequest.abort();
+      };
+    },
+    { results: defaultResults, meta: null as Meta<A> | null },
+  );
+  const reference = derived(referenceAndMeta, ($referenceAndMeta) => $referenceAndMeta.results);
+  const meta = derived(referenceAndMeta, ($referenceAndMeta) => $referenceAndMeta.meta);
 
   const generate = () =>
     api.generate({ analysis }).data.then((result) => {
@@ -157,7 +194,8 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
   return {
     input,
     meta,
-    results: results,
+    results,
+    reference,
     generate,
   };
 };

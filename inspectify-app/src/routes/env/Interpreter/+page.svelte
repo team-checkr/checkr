@@ -35,13 +35,13 @@
 <Env {io}>
   <svelte:fragment slot="input">
     <StandardInput analysis="Interpreter" code="commands" {io}>
-      <h1 class="border-y p-2 pb-1 text-lg font-bold">Initial sign assignment</h1>
-      <div class="grid grid-cols-[auto_1fr] place-items-center">
+      <h1 class="border-y p-2 pb-1 text-lg font-bold">Initialization of variables and arrays</h1>
+      <div class="grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
         {#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
           <div class="px-4 py-0.5 font-mono text-sm">
             {v.name}
           </div>
-          <div>
+          <div class="w-full font-mono">
             {#if v.kind == 'Array'}
               <ParsedInput bind:value={$input.assignment.arrays[v.name]} />
             {:else}
@@ -49,21 +49,48 @@
             {/if}
           </div>
         {/each}
-      </div></StandardInput
-    >
-  </svelte:fragment>
-  <svelte:fragment slot="output" let:input={cachedInput} let:output let:meta>
-    <div class="grid grid-rows-[1fr_minmax(auto,35vh)]">
-      <div class="relative">
-        <div class="absolute inset-0 grid overflow-auto">
-          <Network dot={output.dot} />
+      </div>
+      <h1 class="border-y p-2 pb-1 text-lg font-bold">Options</h1>
+      <div class="grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
+        <div class="px-2 py-0.5 font-mono text-sm">Number of steps</div>
+        <div class="w-full font-mono">
+          <ParsedInput bind:value={$input.trace_length} />
+        </div>
+        <div class="px-2 py-0.5 font-mono text-sm">Determinism</div>
+        <div class="grid w-full grid-cols-2 gap-x-2 font-mono">
+          {#each gcl.pg.DETERMINISM as determinism}
+            <div
+              class="flex items-center justify-center rounded text-sm transition {$input.determinism ==
+              determinism
+                ? 'bg-slate-500'
+                : 'bg-slate-800'}"
+            >
+              <label for="determinism-{determinism.Case}" class="cursor-pointer px-2 py-1">
+                {determinism.Case}
+              </label>
+              <input
+                class="hidden"
+                type="radio"
+                id="determinism-{determinism.Case}"
+                name="determinism"
+                value={determinism}
+                bind:group={$input.determinism}
+              />
+            </div>
+          {/each}
         </div>
       </div>
-
-      <div class="border-r border-t bg-slate-900">
+    </StandardInput>
+  </svelte:fragment>
+  <svelte:fragment slot="output" let:input={cachedInput} let:output let:meta>
+    <div class="grid min-h-0 grid-cols-[auto_1fr]">
+      <div class="overflow-auto border-r border-t bg-slate-900">
         <div
-          class="grid w-full gap-x-4 gap-y-0.5 px-4 py-2"
-          style="grid-template-columns: max-content min-content repeat({meta.length}, max-content);"
+          class="grid gap-x-4 px-4 py-2"
+          style="grid-template-columns: max-content min-content repeat({Math.max(
+            meta.length,
+            1,
+          )}, max-content);"
         >
           <div />
           <div />
@@ -79,6 +106,9 @@
             </div>
           {/each}
 
+          {#if meta.length == 0}
+            <div />
+          {/if}
           {#each meta as v}
             <div class="text-center font-mono font-bold">
               {v.name}
@@ -86,16 +116,38 @@
           {/each}
 
           {#each [{ action: '', node: output.initial_node, memory: cachedInput.assignment }, ...output.trace] as step}
-            <div class="text-xs"><code>{step.action}</code></div>
+            <div class="line-clamp-1 max-w-[25ch] text-sm">
+              <code>{step.action}</code>
+            </div>
             <div class="text-center">{toSubscript(step.node)}</div>
+            {#if meta.length == 0}
+              <div />
+            {/if}
             {#each meta as v}
-              <div class="px-1 text-right font-mono">
+              <div class="px-1 text-right font-mono text-slate-300">
                 {v.kind == 'Array'
                   ? JSON.stringify(step.memory.arrays[v.name])
                   : step.memory.variables[v.name]}
               </div>
             {/each}
           {/each}
+          <div class="flex">
+            {#if output.termination.Case == 'Running'}
+              <div class="my-1 rounded bg-blue-500 px-2 py-1 font-bold text-white">
+                Stopped after {output.trace.length} steps
+              </div>
+            {:else if output.termination.Case == 'Terminated'}
+              <div class="my-1 rounded bg-green-500 px-2 py-1 font-bold text-white">Terminated</div>
+            {:else if output.termination.Case == 'Stuck'}
+              <div class="my-1 rounded bg-red-500 px-2 py-1 font-bold text-white">Stuck</div>
+            {/if}
+          </div>
+        </div>
+      </div>
+
+      <div class="relative">
+        <div class="absolute inset-0 grid overflow-auto">
+          <Network dot={output.dot} />
         </div>
       </div>
     </div>

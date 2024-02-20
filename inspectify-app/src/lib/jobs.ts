@@ -3,6 +3,8 @@ import type { driver } from '$lib/api';
 
 export const showStatus = writable(false);
 
+export const showReference = writable(false);
+
 export const selectedJobId = writable<driver.job.JobId | null>(null);
 
 export const tabs = [
