@@ -14,6 +14,8 @@ impl Env for TemplateEnv {
 
     type Output = TemplateOutput;
 
+    type Meta = ();
+
     fn run(_input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(TemplateOutput::default())
     }
