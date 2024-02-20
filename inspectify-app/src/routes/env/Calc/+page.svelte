@@ -11,7 +11,7 @@
     <StandardInput analysis="Calc" code="expression" {io} />
   </svelte:fragment>
   <svelte:fragment slot="output" let:output let:referenceOutput>
-    <div class="grid grid-cols-2">
+    <div class="grid grid-cols-1">
       <div class="relative">
         <div class="absolute inset-0 flex flex-col border-r">
           <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Output</h1>
@@ -24,7 +24,7 @@
           {/if}
         </div>
       </div>
-      <div class="relative">
+      <!-- <div class="relative">
         <div class="absolute inset-0 flex flex-col border-r">
           <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Reference</h1>
           {#if referenceOutput.result}
@@ -35,7 +35,7 @@
             <pre class="overflow-auto rounded-md px-2 text-base">{referenceOutput.error}</pre>
           {/if}
         </div>
-      </div>
+      </div> -->
     </div>
   </svelte:fragment>
 </Env>

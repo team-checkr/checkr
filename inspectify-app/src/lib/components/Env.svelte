@@ -1,4 +1,6 @@
 <script lang="ts" generics="A extends ce_shell.Analysis">
+  import { showReference } from '$lib/jobs';
+
   import { crossfade } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
@@ -9,8 +11,10 @@
   import ValidationIndicator from './ValidationIndicator.svelte';
 
   export let io: Io<A>;
-  const { meta, results } = io;
+  const { meta, results: trueResults, reference: referenceResults } = io;
   const notNull = <T,>(x: T | null): T => x!;
+
+  $: results = $showReference ? referenceResults : trueResults;
 
   $: latestJob = $results.job;
   let hideTabs = true;
@@ -96,6 +100,8 @@
     </div>
   </div>
   <div class="grid">
-    <ValidationIndicator {io} />
+    {#if !$showReference}
+      <ValidationIndicator {io} />
+    {/if}
   </div>
 </div>

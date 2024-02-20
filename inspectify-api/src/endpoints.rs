@@ -28,6 +28,7 @@ pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
         &events::endpoint as E,
         &jobs_cancel::endpoint as E,
         &exec_analysis::endpoint as E,
+        &exec_reference::endpoint as E,
     ])
 }
 
@@ -355,7 +356,6 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize, serde::Deserialize)]
 struct AnalysisExecution {
     id: JobId,
-    meta: ce_shell::Meta,
 }
 
 #[tapi::tapi(path = "/analysis", method = Post)]
@@ -368,9 +368,24 @@ async fn exec_analysis(
         .exec_job(&input, InspectifyJobMeta::default())
         .unwrap();
     let id = output.id();
-    Json(AnalysisExecution {
-        id,
+    Json(AnalysisExecution { id })
+}
+
+#[derive(tapi::Tapi, Debug, Clone, serde::Serialize, serde::Deserialize)]
+struct ReferenceExecution {
+    meta: ce_shell::Meta,
+    output: Option<ce_shell::Output>,
+    error: Option<String>,
+}
+
+#[tapi::tapi(path = "/reference", method = Post)]
+async fn exec_reference(Json(input): Json<ce_shell::Input>) -> Json<ReferenceExecution> {
+    let output = input.reference_output();
+    let error = output.as_ref().err().map(|e| e.to_string());
+    Json(ReferenceExecution {
         meta: input.meta(),
+        output: output.ok(),
+        error,
     })
 }
 
