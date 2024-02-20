@@ -56,7 +56,7 @@
   </div>
   {#if !hidden}
     <div class="relative self-stretch bg-slate-900 text-xs">
-      <div class="absolute inset-0 overflow-auto">
+      <div class="absolute inset-0 flex overflow-auto">
         {#if $currentTab == 'Output'}
           <TrackingScroll>
             <Ansi spans={selectedJob.spans} />

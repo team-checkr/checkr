@@ -49,7 +49,7 @@
 </script>
 
 <div class="relative h-full w-full">
-  <div class="absolute inset-0" bind:this={editorContainer} />
+  <div class="absolute inset-0 overflow-hidden" bind:this={editorContainer} />
 </div>
 
 <style>
