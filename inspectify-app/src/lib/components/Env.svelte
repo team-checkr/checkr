@@ -69,7 +69,7 @@
           class="absolute inset-0 grid grid-rows-[auto_1fr_auto] text-xs"
         >
           <div class="border-y bg-slate-900 p-2 text-xl font-light italic">Analysis failed</div>
-          <div class="overflow-auto">
+          <div class="flex overflow-auto">
             <TrackingScroll>
               <Ansi spans={$latestJob.spans} />
             </TrackingScroll>
