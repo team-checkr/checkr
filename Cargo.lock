@@ -2332,6 +2332,7 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 [[package]]
 name = "tapi"
 version = "0.1.0"
+source = "git+https://github.com/oeb25/tapi.git#b807e5e15ca3653517ab78ae537ac443a4d947c1"
 dependencies = [
  "axum",
  "dyn-clone",
@@ -2348,6 +2349,7 @@ dependencies = [
 [[package]]
 name = "tapi-macro"
 version = "0.1.0"
+source = "git+https://github.com/oeb25/tapi.git#b807e5e15ca3653517ab78ae537ac443a4d947c1"
 dependencies = [
  "darling",
  "heck",
