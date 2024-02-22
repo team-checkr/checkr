@@ -372,6 +372,19 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-security"
+version = "0.1.21"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "itertools 0.11.0",
+ "serde",
+ "serde_json",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-shell"
 version = "0.1.21"
 dependencies = [
@@ -380,6 +393,7 @@ dependencies = [
  "ce-core",
  "ce-interpreter",
  "ce-parser",
+ "ce-security",
  "ce-sign",
  "futures-util",
  "itertools 0.11.0",
@@ -2332,7 +2346,7 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 [[package]]
 name = "tapi"
 version = "0.1.0"
-source = "git+https://github.com/oeb25/tapi.git#b807e5e15ca3653517ab78ae537ac443a4d947c1"
+source = "git+https://github.com/oeb25/tapi.git#0d909050ae319a3d286d3a0c84d2140ee2738ff3"
 dependencies = [
  "axum",
  "dyn-clone",
@@ -2349,7 +2363,7 @@ dependencies = [
 [[package]]
 name = "tapi-macro"
 version = "0.1.0"
-source = "git+https://github.com/oeb25/tapi.git#b807e5e15ca3653517ab78ae537ac443a4d947c1"
+source = "git+https://github.com/oeb25/tapi.git#0d909050ae319a3d286d3a0c84d2140ee2738ff3"
 dependencies = [
  "darling",
  "heck",

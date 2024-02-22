@@ -158,19 +158,30 @@ export namespace Parser {
 }
 export namespace SecurityAnalysis {
   export type Input = {
-    "classification": Record<string, SecurityAnalysis.SecurityClassification>,
+    "commands": string,
+    "classification": Record<string, string>,
     "lattice": SecurityAnalysis.SecurityLatticeInput
   };
   export type Output = {
-    "actual": [string, string][],
-    "allowed": [string, string][],
-    "violations": [string, string][],
+    "actual": SecurityAnalysis.Flow[],
+    "allowed": SecurityAnalysis.Flow[],
+    "violations": SecurityAnalysis.Flow[],
     "is_secure": boolean
   };
-  export type SecurityLatticeInput = {
-    "rules": [SecurityAnalysis.SecurityClassification, SecurityAnalysis.SecurityClassification][]
+  export type Meta = {
+    "lattice": SecurityAnalysis.SecurityLattice,
+    "targets": GCL.TargetDef[]
   };
-  export type SecurityClassification = string;
+  export type SecurityLatticeInput = {
+    "rules": SecurityAnalysis.Flow[]
+  };
+  export type SecurityLattice = {
+    "allowed": SecurityAnalysis.Flow[]
+  };
+  export type Flow = {
+    "from": string,
+    "into": string
+  };
 }
 export namespace SignAnalysis {
   export type Input = {
@@ -208,7 +219,7 @@ export namespace ce_shell {
     | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } }
     | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } }
     | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } }
-    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": void } };
+    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": SecurityAnalysis.Meta } };
   export type Analysis =
     | "Calculator"
     | "Parser"
@@ -284,11 +295,16 @@ export namespace inspectify_api {
     }
   }
   export namespace endpoints {
-    export type AnalysisExecution = {
-      "id": driver.job.JobId
+    export type ReferenceExecution = {
+      "meta": ce_shell.io.Meta,
+      "output": (ce_shell.io.Output | null),
+      "error": (string | null)
     };
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
+    };
+    export type AnalysisExecution = {
+      "id": driver.job.JobId
     };
     export type Event =
       | { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } }
@@ -297,11 +313,6 @@ export namespace inspectify_api {
       | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } }
       | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } }
       | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
-    export type ReferenceExecution = {
-      "meta": ce_shell.io.Meta,
-      "output": (ce_shell.io.Output | null),
-      "error": (string | null)
-    };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,

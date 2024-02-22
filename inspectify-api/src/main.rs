@@ -178,7 +178,7 @@ fn populate_ts_client(endpoints: &tapi::endpoints::Endpoints<AppState>) -> bool 
 ///
 /// Returns `true` if the file exists, `false` otherwise.
 fn populate_fs_types(tys: &[tapi::DynTapi]) -> bool {
-    let fs_types_path = std::path::PathBuf::from("./starters/fsharp-starter/Io.fs");
+    let fs_types_path = std::path::PathBuf::from("./starters/fsharp-starter/src/Io.fs");
     // write F# types if and only if the path already exists
     if fs_types_path.exists() {
         // only write if the contents are different

@@ -10,7 +10,7 @@
   <pre class="font-mono text-blue-600">{json}</pre>
 {:else if Array.isArray(json)}
   <div>
-    {#each json as value (value)}
+    {#each json as value}
       <div class="border px-2 py-1">
         <svelte:self json={value} />
       </div>
