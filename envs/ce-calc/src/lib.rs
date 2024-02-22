@@ -6,21 +6,21 @@ define_env!(CalcEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Calc")]
-pub struct CalcInput {
+pub struct Input {
     pub expression: Stringify<AExpr>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Calc")]
-pub struct CalcOutput {
+pub struct Output {
     pub result: String,
     pub error: String,
 }
 
 impl Env for CalcEnv {
-    type Input = CalcInput;
+    type Input = Input;
 
-    type Output = CalcOutput;
+    type Output = Output;
 
     type Meta = ();
 
@@ -39,7 +39,7 @@ impl Env for CalcEnv {
             }
         };
 
-        Ok(CalcOutput { result, error })
+        Ok(Output { result, error })
     }
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
@@ -70,7 +70,7 @@ impl Env for CalcEnv {
     }
 }
 
-impl Generate for CalcInput {
+impl Generate for Input {
     type Context = ();
 
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
@@ -95,7 +95,7 @@ impl Generate for CalcInput {
             expr = gen_expr();
         }
 
-        CalcInput {
+        Input {
             expression: Stringify::new(expr),
         }
     }

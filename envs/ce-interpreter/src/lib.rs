@@ -25,7 +25,7 @@ pub struct InterpreterMemory {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Interpreter")]
-pub struct InterpreterInput {
+pub struct Input {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
@@ -50,7 +50,7 @@ pub enum TerminationState {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Interpreter")]
-pub struct InterpreterOutput {
+pub struct Output {
     pub initial_node: String,
     pub final_node: String,
     pub dot: String,
@@ -144,7 +144,7 @@ struct Execution {
 }
 
 impl Execution {
-    fn new(input: &InterpreterInput) -> Self {
+    fn new(input: &Input) -> Self {
         Self {
             initial_memory: input.assignment.clone(),
             trace: vec![],
@@ -195,9 +195,9 @@ impl Execution {
 }
 
 impl Env for InterpreterEnv {
-    type Input = InterpreterInput;
+    type Input = Input;
 
-    type Output = InterpreterOutput;
+    type Output = Output;
 
     type Meta = BTreeSet<TargetDef>;
 
@@ -245,7 +245,7 @@ impl Env for InterpreterEnv {
             break;
         }
 
-        Ok(InterpreterOutput {
+        Ok(Output {
             initial_node: Node::Start.to_string(),
             final_node: Node::End.to_string(),
             dot: pg.dot(),
@@ -310,7 +310,7 @@ impl Env for InterpreterEnv {
     }
 }
 
-impl Generate for InterpreterInput {
+impl Generate for Input {
     type Context = ();
 
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
@@ -333,7 +333,7 @@ impl Generate for InterpreterInput {
             .choose(rng)
             .unwrap();
 
-        InterpreterInput {
+        Input {
             commands: Stringify::new(commands),
             determinism,
             assignment,

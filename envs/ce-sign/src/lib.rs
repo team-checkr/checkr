@@ -28,7 +28,7 @@ define_env!(SignEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "SignAnalysis")]
-pub struct SignInput {
+pub struct Input {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
     pub assignment: SignMemory,
@@ -36,7 +36,7 @@ pub struct SignInput {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
 #[tapi(path = "SignAnalysis")]
-pub struct SignOutput {
+pub struct Output {
     pub initial_node: String,
     pub final_node: String,
     pub nodes: IndexMap<String, IndexSet<SignMemory>>,
@@ -44,9 +44,9 @@ pub struct SignOutput {
 }
 
 impl Env for SignEnv {
-    type Input = SignInput;
+    type Input = Input;
 
-    type Output = SignOutput;
+    type Output = Output;
 
     type Meta = BTreeSet<TargetDef>;
 
@@ -100,7 +100,7 @@ impl Env for SignEnv {
         .into_iter()
         .map(|(k, v)| (format!("{k}"), v))
         .collect();
-        Ok(SignOutput {
+        Ok(Output {
             initial_node: Node::Start.to_string(),
             final_node: Node::End.to_string(),
             nodes,
@@ -140,8 +140,8 @@ impl Env for SignEnv {
     }
 }
 
-impl SignInput {
-    fn gen_from_commands<R: rand::Rng>(rng: &mut R, commands: Commands) -> SignInput {
+impl Input {
+    fn gen_from_commands<R: rand::Rng>(rng: &mut R, commands: Commands) -> Input {
         let assignment: SignMemory = Memory::from_targets_with(
             commands.fv(),
             rng,
@@ -150,7 +150,7 @@ impl SignInput {
         )
         .into();
 
-        SignInput {
+        Input {
             commands: Stringify::new(commands),
             assignment,
             determinism: Determinism::Deterministic,
@@ -158,12 +158,12 @@ impl SignInput {
     }
 }
 
-impl Generate for SignInput {
+impl Generate for Input {
     type Context = ();
 
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         let commands = Commands::gen(&mut Default::default(), rng);
-        SignInput::gen_from_commands(rng, commands)
+        Input::gen_from_commands(rng, commands)
     }
 }
 
