@@ -10,21 +10,21 @@ define_env!(GraphEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Graph")]
-pub struct GraphInput {
+pub struct Input {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Graph")]
-pub struct GraphOutput {
+pub struct Output {
     pub dot: String,
 }
 
 impl Env for GraphEnv {
-    type Input = GraphInput;
+    type Input = Input;
 
-    type Output = GraphOutput;
+    type Output = Output;
 
     type Meta = ();
 
@@ -39,7 +39,7 @@ impl Env for GraphEnv {
             })?,
         )
         .dot();
-        Ok(GraphOutput { dot })
+        Ok(Output { dot })
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
@@ -47,11 +47,11 @@ impl Env for GraphEnv {
     }
 }
 
-impl Generate for GraphInput {
+impl Generate for Input {
     type Context = ();
 
     fn gen<R: ce_core::rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
-        GraphInput {
+        Input {
             commands: Stringify::new(Commands::gen(&mut Default::default(), rng)),
             determinism: Determinism::NonDeterministic,
         }

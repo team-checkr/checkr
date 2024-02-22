@@ -6,25 +6,25 @@ define_env!(ParseEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Parser")]
-pub struct ParseInput {
+pub struct Input {
     commands: Stringify<Commands>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Parser")]
-pub struct ParseOutput {
+pub struct Output {
     pretty: Stringify<Commands>,
 }
 
 impl Env for ParseEnv {
-    type Input = ParseInput;
+    type Input = Input;
 
-    type Output = ParseOutput;
+    type Output = Output;
 
     type Meta = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        Ok(ParseOutput {
+        Ok(Output {
             pretty: Stringify::new(input.commands.try_parse().map_err(|err| {
                 ce_core::EnvError::InvalidInputForProgram {
                     message: "failed to parse commands".to_string(),
@@ -44,7 +44,7 @@ impl Env for ParseEnv {
     }
 }
 
-impl Generate for ParseInput {
+impl Generate for Input {
     type Context = ();
 
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {

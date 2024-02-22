@@ -86,8 +86,8 @@ const sse =
   };
 
 export namespace Calc {
-  export type CalcInput = { "expression": string };
-  export type CalcOutput = { "result": string, "error": string };
+  export type Input = { "expression": string };
+  export type Output = { "result": string, "error": string };
 }
 export namespace GCL {
   export type Determinism = "Deterministic" | "NonDeterministic";
@@ -99,24 +99,24 @@ export namespace GCL {
   export type Array = string;
 }
 export namespace Graph {
-  export type GraphInput = { "commands": string, "determinism": GCL.Determinism };
-  export type GraphOutput = { "dot": string };
+  export type Input = { "commands": string, "determinism": GCL.Determinism };
+  export type Output = { "dot": string };
 }
 export namespace Interpreter {
-  export type InterpreterInput = { "commands": string, "determinism": GCL.Determinism, "assignment": Interpreter.InterpreterMemory, "trace_length": number };
-  export type InterpreterOutput = { "initial_node": string, "final_node": string, "dot": string, "trace": Interpreter.Step[], "termination": Interpreter.TerminationState };
+  export type Input = { "commands": string, "determinism": GCL.Determinism, "assignment": Interpreter.InterpreterMemory, "trace_length": number };
+  export type Output = { "initial_node": string, "final_node": string, "dot": string, "trace": Interpreter.Step[], "termination": Interpreter.TerminationState };
   export type InterpreterMemory = { "variables": Record<GCL.Variable, number>, "arrays": Record<GCL.Array, number[]> };
   export type TerminationState = "Running" | "Stuck" | "Terminated";
   export const TERMINATION_STATE: TerminationState[] = ["Running", "Stuck", "Terminated"];
   export type Step = { "action": string, "node": string, "memory": Interpreter.InterpreterMemory };
 }
 export namespace Parser {
-  export type ParseInput = { "commands": string };
-  export type ParseOutput = { "pretty": string };
+  export type Input = { "commands": string };
+  export type Output = { "pretty": string };
 }
 export namespace SignAnalysis {
-  export type SignInput = { "commands": string, "determinism": GCL.Determinism, "assignment": SignAnalysis.SignMemory };
-  export type SignOutput = { "initial_node": string, "final_node": string, "nodes": Record<string, SignAnalysis.SignMemory[]>, "dot": string };
+  export type Input = { "commands": string, "determinism": GCL.Determinism, "assignment": SignAnalysis.SignMemory };
+  export type Output = { "initial_node": string, "final_node": string, "nodes": Record<string, SignAnalysis.SignMemory[]>, "dot": string };
   export type SignMemory = { "variables": Record<GCL.Variable, SignAnalysis.Sign>, "arrays": Record<GCL.Array, SignAnalysis.Sign[]> };
   export type Sign = "Positive" | "Zero" | "Negative";
   export const SIGN: Sign[] = ["Positive", "Zero", "Negative"];
@@ -125,7 +125,7 @@ export namespace ce_core {
   export type ValidationResult = { "type": "CorrectTerminated" } | { "type": "CorrectNonTerminated", "iterations": number } | { "type": "Mismatch", "reason": string } | { "type": "TimeOut" };
 }
 export namespace ce_shell {
-  export type Envs = { "analysis": "Calc", "io": { "input": Calc.CalcInput, "output": Calc.CalcOutput, "meta": void } } | { "analysis": "Parse", "io": { "input": Parser.ParseInput, "output": Parser.ParseOutput, "meta": void } } | { "analysis": "Graph", "io": { "input": Graph.GraphInput, "output": Graph.GraphOutput, "meta": void } } | { "analysis": "Interpreter", "io": { "input": Interpreter.InterpreterInput, "output": Interpreter.InterpreterOutput, "meta": GCL.TargetDef[] } } | { "analysis": "Sign", "io": { "input": SignAnalysis.SignInput, "output": SignAnalysis.SignOutput, "meta": GCL.TargetDef[] } };
+  export type Envs = { "analysis": "Calc", "io": { "input": Calc.Input, "output": Calc.Output, "meta": void } } | { "analysis": "Parse", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } } | { "analysis": "Graph", "io": { "input": Graph.Input, "output": Graph.Output, "meta": void } } | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } } | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
   export type Analysis = "Calc" | "Parse" | "Graph" | "Interpreter" | "Sign";
   export const ANALYSIS: Analysis[] = ["Calc", "Parse", "Graph", "Interpreter", "Sign"];
   export namespace io {
