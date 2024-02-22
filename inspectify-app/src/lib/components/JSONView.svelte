@@ -6,7 +6,7 @@
   let raw = false;
 </script>
 
-<div class="relative p-1">
+<div class="relative p-1 w-full">
   <div class="absolute right-1 top-1">
     <label for="raw">Raw</label>
     <input type="checkbox" id="raw" bind:checked={raw} />
