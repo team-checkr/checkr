@@ -309,7 +309,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ce-calc"
+name = "ce-calculator"
 version = "0.1.21"
 dependencies = [
  "ce-core",
@@ -375,7 +375,7 @@ dependencies = [
 name = "ce-shell"
 version = "0.1.21"
 dependencies = [
- "ce-calc",
+ "ce-calculator",
  "ce-compiler",
  "ce-core",
  "ce-interpreter",
