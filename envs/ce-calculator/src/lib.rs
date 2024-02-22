@@ -5,13 +5,13 @@ use serde::{Deserialize, Serialize};
 define_env!(CalcEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[tapi(path = "Calc")]
+#[tapi(path = "Calculator")]
 pub struct Input {
     pub expression: Stringify<AExpr>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[tapi(path = "Calc")]
+#[tapi(path = "Calculator")]
 pub struct Output {
     pub result: String,
     pub error: String,

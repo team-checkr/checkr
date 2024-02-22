@@ -24,7 +24,7 @@ license = "MIT OR Apache-2.0"
 axum = { version = "0.7.3", features = ["macros", "ws"] }
 axum-macros = "0.3.1"
 bitflags = "2.4.0"
-ce-calc = { path = "./envs/ce-calc" }
+ce-calculator = { path = "./envs/ce-calculator" }
 ce-compiler = { path = "./envs/ce-compiler" }
 ce-core = { path = "./ce-core" }
 ce-interpreter = { path = "./envs/ce-interpreter" }

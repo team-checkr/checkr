@@ -14,7 +14,7 @@ enum Cli {
     /// Create a new environment
     ///
     /// Example usage:
-    ///   cargo xtask new-env --short-name "calc" --long-name "Calculator"
+    ///   cargo xtask new-env --short-name "calculator" --long-name "Calculator"
     NewEnv {
         /// The short name of the environment
         ///

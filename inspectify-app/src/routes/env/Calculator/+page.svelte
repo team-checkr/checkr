@@ -3,12 +3,12 @@
   import StandardInput from '$lib/components/StandardInput.svelte';
   import { useIo } from '$lib/io';
 
-  const io = useIo('Calc', { expression: '1 + 2' });
+  const io = useIo('Calculator', { expression: '1 + 2' });
 </script>
 
 <Env {io}>
   <svelte:fragment slot="input">
-    <StandardInput analysis="Calc" code="expression" {io} />
+    <StandardInput analysis="Calculator" code="expression" {io} />
   </svelte:fragment>
   <svelte:fragment slot="output" let:output let:referenceOutput>
     <div class="grid grid-cols-1">

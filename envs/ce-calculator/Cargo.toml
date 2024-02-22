@@ -1,5 +1,5 @@
 [package]
-name = "ce-calc"
+name = "ce-calculator"
 edition = "2021"
 version.workspace = true
 repository.workspace = true
