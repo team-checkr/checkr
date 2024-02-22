@@ -129,6 +129,14 @@ pub enum ParseError {
         err_span: SourceSpan,
         expected: String,
     },
+    #[error("Integer is too large")]
+    #[diagnostic(help("The integer is too large to be represented"))]
+    IntegerTooLarge {
+        #[source_code]
+        src: String,
+        #[label = "The integer is too large to be represented"]
+        err_span: SourceSpan,
+    },
 }
 // impl ParseError {
 //     pub fn span(&self) -> Span {
@@ -143,10 +151,14 @@ pub enum ParseError {
 //     }
 // }
 
+pub(crate) enum CustomError {
+    IntegerTooLarge { from: usize, to: usize },
+}
+
 impl ParseError {
     pub(crate) fn new(
         src: &str,
-        e: lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token, &str>,
+        e: lalrpop_util::ParseError<usize, lalrpop_util::lexer::Token, CustomError>,
     ) -> Self {
         let prep_src = || format!("{src}\n");
 
@@ -172,7 +184,12 @@ impl ParseError {
                 }
             }
             lalrpop_util::ParseError::ExtraToken { .. } => todo!(),
-            lalrpop_util::ParseError::User { .. } => todo!(),
+            lalrpop_util::ParseError::User { error } => match error {
+                CustomError::IntegerTooLarge { from, to } => ParseError::IntegerTooLarge {
+                    src: prep_src(),
+                    err_span: (from, to).into(),
+                },
+            },
         }
     }
 }

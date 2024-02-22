@@ -4,6 +4,10 @@ use crate::{ast::*, pg::Action};
 
 grammar;
 
+extern {
+    type Error = crate::parse::CustomError;
+}
+
 match {
     // Skip whitespace and comments
     r"\s*" => { },
@@ -81,7 +85,9 @@ RelOp: RelOp = {
 Var: String = r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 LogicalVar: String = r"_[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 
-Int: Int = r"[0-9]+" => Int::from_str(<>).unwrap();
+Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| lalrpop_util::ParseError::User {
+    error: crate::parse::CustomError::IntegerTooLarge { from, to },
+});
 
 // Graph
 
