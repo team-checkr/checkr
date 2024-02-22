@@ -10,8 +10,8 @@ license.workspace = true
 
 [dependencies]
 ce-calc.workspace = true
+ce-compiler.workspace = true
 ce-core.workspace = true
-ce-graph.workspace = true
 ce-interpreter.workspace = true
 ce-parse.workspace = true
 ce-sign.workspace = true

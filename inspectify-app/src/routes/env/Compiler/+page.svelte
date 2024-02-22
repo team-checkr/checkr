@@ -4,7 +4,7 @@
   import StandardInput from '$lib/components/StandardInput.svelte';
   import { useIo } from '$lib/io';
 
-  const io = useIo('Graph', {
+  const io = useIo('Compiler', {
     commands: 'skip',
     determinism: 'Deterministic',
   });
@@ -12,7 +12,7 @@
 
 <Env {io}>
   <svelte:fragment slot="input">
-    <StandardInput analysis="Graph" code="commands" {io} />
+    <StandardInput analysis="Compiler" code="commands" {io} />
   </svelte:fragment>
   <svelte:fragment slot="output" let:output>
     <div class="relative">

@@ -322,6 +322,16 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-compiler"
+version = "0.1.21"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "serde",
+ "tapi",
+]
+
+[[package]]
 name = "ce-core"
 version = "0.1.21"
 dependencies = [
@@ -335,16 +345,6 @@ dependencies = [
  "thiserror",
  "tokio",
  "tracing",
-]
-
-[[package]]
-name = "ce-graph"
-version = "0.1.21"
-dependencies = [
- "ce-core",
- "gcl",
- "serde",
- "tapi",
 ]
 
 [[package]]
@@ -376,8 +376,8 @@ name = "ce-shell"
 version = "0.1.21"
 dependencies = [
  "ce-calc",
+ "ce-compiler",
  "ce-core",
- "ce-graph",
  "ce-interpreter",
  "ce-parse",
  "ce-sign",
