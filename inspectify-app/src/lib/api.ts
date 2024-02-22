@@ -125,9 +125,9 @@ export namespace ce_core {
   export type ValidationResult = { "type": "CorrectTerminated" } | { "type": "CorrectNonTerminated", "iterations": number } | { "type": "Mismatch", "reason": string } | { "type": "TimeOut" };
 }
 export namespace ce_shell {
-  export type Envs = { "analysis": "Calc", "io": { "input": Calc.Input, "output": Calc.Output, "meta": void } } | { "analysis": "Parse", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } } | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } } | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } } | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
-  export type Analysis = "Calc" | "Parse" | "Compiler" | "Interpreter" | "Sign";
-  export const ANALYSIS: Analysis[] = ["Calc", "Parse", "Compiler", "Interpreter", "Sign"];
+  export type Envs = { "analysis": "Calc", "io": { "input": Calc.Input, "output": Calc.Output, "meta": void } } | { "analysis": "Parser", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } } | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } } | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } } | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
+  export type Analysis = "Calc" | "Parser" | "Compiler" | "Interpreter" | "Sign";
+  export const ANALYSIS: Analysis[] = ["Calc", "Parser", "Compiler", "Interpreter", "Sign"];
   export namespace io {
     export type Input = { "analysis": ce_shell.Analysis, "json": any };
     export type Meta = { "analysis": ce_shell.Analysis, "json": any };
@@ -155,9 +155,9 @@ export namespace inspectify_api {
   }
   export namespace endpoints {
     export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } } | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } } | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } } | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
-    export type AnalysisExecution = { "id": driver.job.JobId };
     export type GenerateParams = { "analysis": ce_shell.Analysis };
     export type ReferenceExecution = { "meta": ce_shell.io.Meta, "output": (ce_shell.io.Output | null), "error": (string | null) };
+    export type AnalysisExecution = { "id": driver.job.JobId };
     export type Job = { "id": driver.job.JobId, "state": driver.job.JobState, "kind": driver.job.JobKind, "group_name": (string | null), "stdout": string, "spans": inspectify_api.endpoints.Span[], "analysis_data": (inspectify_api.endpoints.AnalysisData | null) };
     export type Program = { "hash": number[], "hash_str": string, "input": ce_shell.io.Input };
     export type CompilationStatus = { "id": driver.job.JobId, "state": driver.job.JobState, "error_output": (inspectify_api.endpoints.Span[] | null) };

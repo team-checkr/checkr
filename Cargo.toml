@@ -28,7 +28,7 @@ ce-calc = { path = "./envs/ce-calc" }
 ce-compiler = { path = "./envs/ce-compiler" }
 ce-core = { path = "./ce-core" }
 ce-interpreter = { path = "./envs/ce-interpreter" }
-ce-parse = { path = "./envs/ce-parse" }
+ce-parser = { path = "./envs/ce-parser" }
 ce-shell = { path = "./ce-shell" }
 ce-sign = { path = "./envs/ce-sign" }
 checkr = { path = "./checkr" }

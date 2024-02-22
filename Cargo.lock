@@ -361,7 +361,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "ce-parse"
+name = "ce-parser"
 version = "0.1.21"
 dependencies = [
  "ce-core",
@@ -379,7 +379,7 @@ dependencies = [
  "ce-compiler",
  "ce-core",
  "ce-interpreter",
- "ce-parse",
+ "ce-parser",
  "ce-sign",
  "futures-util",
  "itertools 0.11.0",
