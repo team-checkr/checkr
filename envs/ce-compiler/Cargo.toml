@@ -1,5 +1,5 @@
 [package]
-name = "ce-graph"
+name = "ce-compiler"
 edition = "2021"
 version.workspace = true
 repository.workspace = true

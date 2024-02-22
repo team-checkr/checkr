@@ -6,22 +6,22 @@ use gcl::{
 };
 use serde::{Deserialize, Serialize};
 
-define_env!(GraphEnv);
+define_env!(CompilerEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[tapi(path = "Graph")]
+#[tapi(path = "Compiler")]
 pub struct Input {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[tapi(path = "Graph")]
+#[tapi(path = "Compiler")]
 pub struct Output {
     pub dot: String,
 }
 
-impl Env for GraphEnv {
+impl Env for CompilerEnv {
     type Input = Input;
 
     type Output = Output;

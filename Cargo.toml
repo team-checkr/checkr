@@ -25,8 +25,8 @@ axum = { version = "0.7.3", features = ["macros", "ws"] }
 axum-macros = "0.3.1"
 bitflags = "2.4.0"
 ce-calc = { path = "./envs/ce-calc" }
+ce-compiler = { path = "./envs/ce-compiler" }
 ce-core = { path = "./ce-core" }
-ce-graph = { path = "./envs/ce-graph" }
 ce-interpreter = { path = "./envs/ce-interpreter" }
 ce-parse = { path = "./envs/ce-parse" }
 ce-shell = { path = "./ce-shell" }
