@@ -2,7 +2,7 @@ use ce_core::{define_env, rand, Env, Generate, ValidationResult};
 use gcl::{ast::Commands, stringify::Stringify};
 use serde::{Deserialize, Serialize};
 
-define_env!(ParseEnv);
+define_env!(ParserEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Parser")]
@@ -16,7 +16,7 @@ pub struct Output {
     pretty: Stringify<Commands>,
 }
 
-impl Env for ParseEnv {
+impl Env for ParserEnv {
     type Input = Input;
 
     type Output = Output;

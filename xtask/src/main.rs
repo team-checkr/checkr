@@ -113,7 +113,7 @@ async fn run() -> Result<()> {
 
             let template_src =
                 include_str!("../../inspectify-app/src/routes/env/Template/+page.svelte")
-                    .replace("Parse", &short_name.to_pascal_case());
+                    .replace("Parser", &short_name.to_pascal_case());
             sh.create_dir(short_name.to_pascal_case())?;
             sh.change_dir(short_name.to_pascal_case());
             sh.write_file("./+page.svelte", template_src)?;

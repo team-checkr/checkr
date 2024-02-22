@@ -1,8 +1,8 @@
-[[envs.Parse]]
+[[envs.Parser]]
 seed = 125234
 shown = true
 
-[[envs.Parse]]
+[[envs.Parser]]
 seed = 1252341
 shown = true
 
