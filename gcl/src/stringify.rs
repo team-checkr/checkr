@@ -57,19 +57,11 @@ impl<T: FromStr + Display + 'static> tapi::Tapi for Stringify<T> {
         std::any::TypeId::of::<Stringify<T>>()
     }
 
-    fn dependencies() -> Vec<&'static dyn tapi::Typed> {
-        vec![]
-    }
-
     fn path() -> Vec<&'static str> {
         vec![]
     }
 
-    fn ts_name() -> String {
-        "string".to_string()
-    }
-
-    fn zod_name() -> String {
-        "z.string()".to_string()
+    fn kind() -> tapi::kind::TypeKind {
+        tapi::kind::TypeKind::Builtin(tapi::kind::BuiltinTypeKind::String)
     }
 }

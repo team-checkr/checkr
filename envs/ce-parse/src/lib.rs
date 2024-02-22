@@ -5,11 +5,13 @@ use serde::{Deserialize, Serialize};
 define_env!(ParseEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Parser")]
 pub struct ParseInput {
     commands: Stringify<Commands>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Parser")]
 pub struct ParseOutput {
     pretty: Stringify<Commands>,
 }

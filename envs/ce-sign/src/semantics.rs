@@ -1,6 +1,7 @@
+use std::collections::BTreeMap;
+
 use gcl::{
-    ast::{AExpr, BExpr, Int, Target},
-    memory::Memory,
+    ast::{AExpr, Array, BExpr, Int, Target, Variable},
     pg::{
         analysis::{Direction, MonotoneFramework},
         Action, Edge, ProgramGraph,
@@ -32,7 +33,7 @@ pub struct SignAnalysis {
     Serialize,
     Deserialize,
 )]
-#[serde(tag = "Case")]
+#[tapi(path = "SignAnalysis")]
 pub enum Sign {
     #[default]
     Positive,
@@ -62,13 +63,28 @@ impl Sign {
 }
 
 bitflags::bitflags! {
-    #[derive(tapi::Tapi, PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
+    // TODO: derive tapi::Tapi
+    #[derive(PartialEq, Eq, PartialOrd, Ord, Hash, Debug, Clone, Copy, Serialize, Deserialize)]
     #[serde(into = "Vec<Sign>", try_from = "Vec<Sign>")]
     pub struct Signs: u8 {
         const POSITIVE = 0b001;
         const ZERO = 0b010;
         const NEGATIVE = 0b100;
         const ALL = Self::POSITIVE.bits() | Self::ZERO.bits() | Self::NEGATIVE.bits();
+    }
+}
+
+impl tapi::Tapi for Signs {
+    fn name() -> &'static str {
+        "Signs"
+    }
+
+    fn kind() -> tapi::kind::TypeKind {
+        tapi::kind::TypeKind::List(Sign::boxed())
+    }
+
+    fn path() -> Vec<&'static str> {
+        Vec::new()
     }
 }
 
@@ -198,7 +214,35 @@ impl FromIterator<bool> for Bools {
     }
 }
 
-pub type SignMemory = Memory<Sign, Signs>;
+#[derive(tapi::Tapi, Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[tapi(path = "SignAnalysis")]
+pub struct SignMemory {
+    pub variables: BTreeMap<Variable, Sign>,
+    pub arrays: BTreeMap<Array, Signs>,
+}
+impl SignMemory {
+    pub fn with_var(mut self, var: &Variable, value: Sign) -> Self {
+        *self
+            .variables
+            .get_mut(var)
+            .unwrap_or_else(|| panic!("variable `{var}` not declared")) = value;
+        self
+    }
+    pub fn get_var(&self, var: &Variable) -> Option<Sign> {
+        self.variables.get(var).copied()
+    }
+    pub fn get_arr(&self, arr: &Array) -> Option<Signs> {
+        self.arrays.get(arr).copied()
+    }
+}
+impl From<gcl::memory::Memory<Sign, Signs>> for SignMemory {
+    fn from(mem: gcl::memory::Memory<Sign, Signs>) -> Self {
+        Self {
+            variables: mem.variables,
+            arrays: mem.arrays,
+        }
+    }
+}
 
 impl MonotoneFramework for SignAnalysis {
     type Domain = IndexSet<SignMemory>;
@@ -351,7 +395,6 @@ impl SemanticSign for AExpr {
             AExpr::Number(n) => [sign_of(*n)].into_iter().collect(),
             AExpr::Reference(Target::Variable(x)) => [mem
                 .get_var(x)
-                .copied()
                 .unwrap_or_else(|| panic!("could not get sign of '{x}'"))]
             .into_iter()
             .collect(),

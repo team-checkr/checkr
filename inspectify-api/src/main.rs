@@ -10,7 +10,7 @@ use axum::{
 };
 use clap::Parser;
 use endpoints::InspectifyJobMeta;
-use tapi::RouterExt;
+use tapi::{endpoints::RouterExt, Tapi};
 use tracing_subscriber::prelude::*;
 
 use crate::endpoints::AppState;
@@ -100,6 +100,7 @@ async fn run() -> color_eyre::Result<()> {
     let app = Router::new().nest("/api", api).fallback(static_dir);
 
     populate_ts_client(&endpoints);
+    populate_fs_types(&ce_shell::Envs::all_dependencies());
 
     if cli.open {
         tokio::task::spawn(async move {
@@ -157,15 +158,34 @@ pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoRespon
 /// Write the TypeScript client to the inspectify-app/src/lib/api.ts file if it exists.
 ///
 /// Returns `true` if the file exists, `false` otherwise.
-fn populate_ts_client(endpoints: &tapi::Endpoints<AppState>) -> bool {
+fn populate_ts_client(endpoints: &tapi::endpoints::Endpoints<AppState>) -> bool {
     let ts_client_path = std::path::PathBuf::from("./inspectify-app/src/lib/api.ts");
     // write TypeScript client if and only if the path already exists
     if ts_client_path.exists() {
         // only write if the contents are different
-        let ts_client = endpoints.ts_client();
+        let contents = endpoints.ts_client();
         let prev = std::fs::read_to_string(&ts_client_path).unwrap_or_default();
-        if prev != ts_client {
-            let _ = std::fs::write(&ts_client_path, ts_client);
+        if prev != contents {
+            let _ = std::fs::write(&ts_client_path, contents);
+        }
+        true
+    } else {
+        false
+    }
+}
+
+/// Write the F# types to the starters/fsharp-starter/Io.fs
+///
+/// Returns `true` if the file exists, `false` otherwise.
+fn populate_fs_types(tys: &[tapi::DynTapi]) -> bool {
+    let fs_types_path = std::path::PathBuf::from("./starters/fsharp-starter/Io.fs");
+    // write F# types if and only if the path already exists
+    if fs_types_path.exists() {
+        // only write if the contents are different
+        let contents = tapi::targets::fs::builder().types(tys.iter().copied());
+        let prev = std::fs::read_to_string(&fs_types_path).unwrap_or_default();
+        if prev != contents {
+            let _ = std::fs::write(&fs_types_path, contents);
         }
         true
     } else {

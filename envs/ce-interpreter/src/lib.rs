@@ -17,12 +17,14 @@ use serde::{Deserialize, Serialize};
 define_env!(InterpreterEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Interpreter")]
 pub struct InterpreterMemory {
     pub variables: BTreeMap<Variable, i64>,
     pub arrays: BTreeMap<Array, Vec<i64>>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Interpreter")]
 pub struct InterpreterInput {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
@@ -31,6 +33,7 @@ pub struct InterpreterInput {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Interpreter")]
 pub struct Step {
     pub action: Stringify<gcl::pg::Action>,
     pub node: String,
@@ -38,7 +41,7 @@ pub struct Step {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "Case")]
+#[tapi(path = "Interpreter")]
 pub enum TerminationState {
     Running,
     Stuck,
@@ -46,6 +49,7 @@ pub enum TerminationState {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Interpreter")]
 pub struct InterpreterOutput {
     pub initial_node: String,
     pub final_node: String,
@@ -157,6 +161,10 @@ impl Execution {
             .unwrap_or(&self.initial_memory)
     }
     fn nexts(&self, pg: &ProgramGraph) -> Vec<Execution> {
+        if self.is_stuck {
+            return vec![];
+        }
+
         let mem = self.current_mem();
         let exes = pg
             .outgoing(self.current_node())
@@ -257,18 +265,12 @@ impl Env for InterpreterEnv {
             })?,
         );
         let mut possible_executions = vec![Execution::new(input)];
-        let mut could_get_stuck = false;
 
         for step in &output.trace {
             possible_executions = possible_executions
                 .iter()
                 .flat_map(|exe| exe.nexts(&pg))
-                .filter(|exe| {
-                    if exe.is_stuck {
-                        could_get_stuck = true
-                    }
-                    exe.current_mem() == &step.memory
-                })
+                .filter(|exe| exe.current_mem() == &step.memory)
                 .collect();
 
             if possible_executions.is_empty() {
@@ -284,14 +286,22 @@ impl Env for InterpreterEnv {
             });
         }
 
-        if output.trace.len() < input.trace_length as usize && could_get_stuck {
-            return Ok(ValidationResult::Mismatch {
-                reason: format!(
-                    "Not enough traces were produced. Expected '{}' found '{}'",
-                    input.trace_length,
-                    output.trace.len()
-                ),
-            });
+        if output.trace.len() < input.trace_length as usize
+            || output.termination == TerminationState::Stuck
+        {
+            if output.termination != TerminationState::Stuck {
+                return Ok(ValidationResult::Mismatch {
+                    reason: "Not enough traces were produced".to_string(),
+                });
+            }
+
+            if !possible_executions.iter().any(|exe| exe.is_stuck) {
+                return Ok(ValidationResult::Mismatch {
+                    reason: "No stuck execution found".to_string(),
+                });
+            }
+
+            return Ok(ValidationResult::CorrectTerminated);
         }
 
         // TODO: check termination status is correct

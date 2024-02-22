@@ -21,9 +21,9 @@ pub struct AppState {
     pub checko: Option<Arc<checko::Checko>>,
 }
 
-pub fn endpoints() -> tapi::Endpoints<'static, AppState> {
-    type E = &'static dyn tapi::Endpoint<AppState>;
-    tapi::Endpoints::new([
+pub fn endpoints() -> tapi::endpoints::Endpoints<'static, AppState> {
+    type E = &'static dyn tapi::endpoints::Endpoint<AppState>;
+    tapi::endpoints::Endpoints::new([
         &generate::endpoint as E,
         &events::endpoint as E,
         &jobs_cancel::endpoint as E,
@@ -197,7 +197,7 @@ pub struct Program {
 }
 
 #[tapi::tapi(path = "/events", method = Get)]
-async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
+async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, axum::BoxError>>(1);
 
     tokio::spawn({
@@ -350,7 +350,7 @@ async fn events(State(state): State<AppState>) -> tapi::Sse<Event> {
         });
     }
 
-    tapi::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+    tapi::endpoints::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
 }
 
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize, serde::Deserialize)]

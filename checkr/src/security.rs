@@ -153,8 +153,8 @@ impl SecurityAnalysisOutput {
         let actual = cmds.flows();
         let violations = actual
             .iter()
+            .filter(|&flow| !allowed.contains(flow))
             .cloned()
-            .filter(|flow| !allowed.contains(flow))
             .sorted()
             .dedup()
             .collect();

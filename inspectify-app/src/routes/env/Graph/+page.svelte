@@ -6,7 +6,7 @@
 
   const io = useIo('Graph', {
     commands: 'skip',
-    determinism: { Case: 'Deterministic' },
+    determinism: 'Deterministic',
   });
 </script>
 

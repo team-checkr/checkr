@@ -9,12 +9,14 @@ use serde::{Deserialize, Serialize};
 define_env!(GraphEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Graph")]
 pub struct GraphInput {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "Graph")]
 pub struct GraphOutput {
     pub dot: String,
 }
