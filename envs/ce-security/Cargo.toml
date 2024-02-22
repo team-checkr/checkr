@@ -1,5 +1,5 @@
 [package]
-name = "ce-shell"
+name = "ce-security"
 edition = "2021"
 version.workspace = true
 repository.workspace = true
@@ -9,19 +9,10 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-ce-calculator.workspace = true
-ce-compiler.workspace = true
 ce-core.workspace = true
-ce-interpreter.workspace = true
-ce-parser.workspace = true
-ce-security.workspace = true
-ce-sign.workspace = true
-futures-util = "0.3.28"
+gcl.workspace = true
 itertools.workspace = true
-md5 = "0.7.0"
-rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tapi.workspace = true
-thiserror.workspace = true
 tracing.workspace = true

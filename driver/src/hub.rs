@@ -101,6 +101,12 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
+        // Terminate the job if it has been running for longer than the timeout.
+        // We give a generous timeout for compilation jobs, and a more strict one for analysis jobs.
+        let timeout = match &kind {
+            JobKind::Analysis(_) => Duration::from_secs(10),
+            JobKind::Compilation => Duration::from_secs(60),
+        };
         let data = Arc::new(RwLock::new(JobData::new(kind, meta)));
 
         let mut join_set = tokio::task::JoinSet::new();
@@ -154,8 +160,6 @@ impl<M: Send + Sync + 'static> Hub<M> {
         self.jobs.write().unwrap().push(job.clone());
         self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
 
-        // Terminate the job if it has been running for longer than the timeout
-        let timeout = Duration::from_secs(10);
         tokio::spawn({
             let job = job.clone();
             async move {
