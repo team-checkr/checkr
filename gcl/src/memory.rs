@@ -5,7 +5,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::ast::{Array, Target, Variable};
 
-#[derive(tapi::Tapi, Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(Debug, Clone, Default, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub struct Memory<T, A = T> {
     pub variables: BTreeMap<Variable, T>,
     pub arrays: BTreeMap<Array, A>,

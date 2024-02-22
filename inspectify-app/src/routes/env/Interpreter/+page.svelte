@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { gcl } from '$lib/api';
+  import { GCL } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
@@ -10,7 +10,7 @@
 
   const io = useIo('Interpreter', {
     commands: 'skip',
-    determinism: gcl.pg.DETERMINISM[0],
+    determinism: GCL.DETERMINISM[0],
     assignment: { variables: {}, arrays: {} },
     trace_length: 10,
   });
@@ -58,20 +58,20 @@
         </div>
         <div class="px-2 py-0.5 font-mono text-sm">Determinism</div>
         <div class="grid w-full grid-cols-2 gap-x-2 font-mono">
-          {#each gcl.pg.DETERMINISM as determinism}
+          {#each GCL.DETERMINISM as determinism}
             <div
               class="flex items-center justify-center rounded text-sm transition {$input.determinism ==
               determinism
                 ? 'bg-slate-500'
                 : 'bg-slate-800'}"
             >
-              <label for="determinism-{determinism.Case}" class="cursor-pointer px-2 py-1">
-                {determinism.Case}
+              <label for="determinism-{determinism}" class="cursor-pointer px-2 py-1">
+                {determinism}
               </label>
               <input
                 class="hidden"
                 type="radio"
-                id="determinism-{determinism.Case}"
+                id="determinism-{determinism}"
                 name="determinism"
                 value={determinism}
                 bind:group={$input.determinism}
@@ -132,13 +132,13 @@
             {/each}
           {/each}
           <div class="flex">
-            {#if output.termination.Case == 'Running'}
+            {#if output.termination == 'Running'}
               <div class="my-1 rounded bg-blue-500 px-2 py-1 font-bold text-white">
                 Stopped after {output.trace.length} steps
               </div>
-            {:else if output.termination.Case == 'Terminated'}
+            {:else if output.termination == 'Terminated'}
               <div class="my-1 rounded bg-green-500 px-2 py-1 font-bold text-white">Terminated</div>
-            {:else if output.termination.Case == 'Stuck'}
+            {:else if output.termination == 'Stuck'}
               <div class="my-1 rounded bg-red-500 px-2 py-1 font-bold text-white">Stuck</div>
             {/if}
           </div>

@@ -32,7 +32,6 @@ impl std::ops::DerefMut for InterpreterMemory {
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, Serialize, Deserialize)]
-#[serde(tag = "Case")]
 pub enum TerminationState {
     Running,
     Stuck,

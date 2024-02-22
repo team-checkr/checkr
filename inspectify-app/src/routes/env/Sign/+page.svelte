@@ -1,6 +1,6 @@
 <script lang="ts">
   import { browser } from '$app/environment';
-  import { ce_sign } from '$lib/api';
+  import { SignAnalysis } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
@@ -10,49 +10,33 @@
   const io = useIo('Sign', {
     commands: 'skip',
     assignment: { variables: {}, arrays: {} },
-    determinism: { Case: 'Deterministic' },
+    determinism: 'Deterministic' ,
   });
   const { input, meta } = io;
 
   $: vars = $meta ?? [];
 
-  const canonicalizeSign = (sign: ce_sign.semantics.Sign): ce_sign.semantics.Sign =>
-    ce_sign.semantics.SIGN.find((s) => s.Case == sign.Case) || ce_sign.semantics.SIGN[0];
-
-  // NOTE: we need to supply the initial signs to new variables, and we also
-  // need to canonicalize the given signs, such that they will be the same in
-  // the `bind:group`.
+  // NOTE: we need to supply the initial signs to new variables
   $: if (browser) {
     for (const v of vars) {
       if (v.kind == 'Variable') {
         if (!$input.assignment.variables[v.name]) {
-          $input.assignment.variables[v.name] = ce_sign.semantics.SIGN[0];
-        } else if (
-          $input.assignment.variables[v.name] !=
-          canonicalizeSign($input.assignment.variables[v.name])
-        ) {
-          $input.assignment.variables[v.name] = canonicalizeSign(
-            $input.assignment.variables[v.name],
-          );
+          $input.assignment.variables[v.name] = SignAnalysis.SIGN[0];
         }
       } else if (v.kind == 'Array') {
         if (!$input.assignment.arrays[v.name]) {
-          $input.assignment.arrays[v.name] = [ce_sign.semantics.SIGN[0]];
-        } else if (
-          $input.assignment.arrays[v.name].some((sign) => sign != canonicalizeSign(sign))
-        ) {
-          $input.assignment.arrays[v.name] = $input.assignment.arrays[v.name].map(canonicalizeSign);
+          $input.assignment.arrays[v.name] = [SignAnalysis.SIGN[0]];
         }
       }
     }
   }
 
-  const fmtSignOrSigns = (sign: ce_sign.semantics.Sign | ce_sign.semantics.Signs | void): string =>
+  const fmtSignOrSigns = (sign: SignAnalysis.Sign | SignAnalysis.Sign[] | void): string =>
     !sign
       ? '...'
       : Array.isArray(sign)
         ? sign.map(fmtSignOrSigns).join(' | ')
-        : { Positive: '+', Zero: '0', Negative: '-' }[sign.Case];
+        : { Positive: '+', Zero: '0', Negative: '-' }[sign];
 </script>
 
 <Env {io}>
@@ -64,14 +48,14 @@
           <div class="px-4 py-0.5 font-mono text-sm">
             {v.name}
           </div>
-          {#each ce_sign.semantics.SIGN as sign}
+          {#each SignAnalysis.SIGN as sign}
             {#if v.kind == 'Variable'}
               <div>
-                <label for="{v.name}-{sign.Case}">{fmtSignOrSigns(sign)}</label>
+                <label for="{v.name}-{sign}">{fmtSignOrSigns(sign)}</label>
                 <input
                   type="radio"
                   name={v.name}
-                  id="{v.name}-{sign.Case}"
+                  id="{v.name}-{sign}"
                   value={sign}
                   bind:group={$input.assignment.variables[v.name]}
                 />

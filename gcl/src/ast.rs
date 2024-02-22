@@ -10,22 +10,26 @@ pub enum Target<Idx = ()> {
 #[derive(
     tapi::Tapi, Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
+#[tapi(path = "GCL")]
 pub enum TargetKind {
     Variable,
     Array,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialOrd, Ord, PartialEq, Eq, Serialize, Deserialize)]
+#[tapi(path = "GCL")]
 pub struct TargetDef {
     pub name: Target,
     pub kind: TargetKind,
 }
 
 #[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[tapi(path = "GCL")]
 #[serde(transparent)]
 pub struct Variable(pub String);
 
 #[derive(tapi::Tapi, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
+#[tapi(path = "GCL")]
 #[serde(transparent)]
 pub struct Array(pub String);
 

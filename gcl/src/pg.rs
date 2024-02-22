@@ -22,7 +22,7 @@ pub struct ProgramGraph {
 #[derive(
     tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
-#[serde(tag = "Case")]
+#[tapi(path = "GCL")]
 pub enum Determinism {
     Deterministic,
     NonDeterministic,

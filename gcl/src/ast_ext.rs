@@ -98,24 +98,12 @@ impl tapi::Tapi for Target {
         "Target"
     }
 
-    fn id() -> std::any::TypeId {
-        std::any::TypeId::of::<Target>()
+    fn kind() -> tapi::kind::TypeKind {
+        tapi::kind::TypeKind::Builtin(tapi::kind::BuiltinTypeKind::String)
     }
 
-    fn dependencies() -> Vec<&'static dyn tapi::Typed> {
-        Vec::new()
-    }
-
-    fn ts_name() -> String {
-        "Target".to_string()
-    }
-
-    fn zod_name() -> String {
-        "Target".to_string()
-    }
-
-    fn ts_decl() -> Option<String> {
-        Some("export type Target = string;".to_string())
+    fn path() -> Vec<&'static str> {
+        vec![]
     }
 }
 impl Variable {
@@ -265,7 +253,7 @@ impl BExpr {
             BExpr::Not(x) => x.fv(),
             BExpr::Quantified(_, x, b) => {
                 let mut fv = b.fv();
-                fv.remove(x);
+                fv.shift_remove(x);
                 fv
             }
         }

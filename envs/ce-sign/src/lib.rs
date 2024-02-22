@@ -10,7 +10,8 @@ use ce_core::{
     Env, EnvError, Generate, ValidationResult,
 };
 use gcl::{
-    ast::{Array, Commands, Target, TargetDef, Variable},
+    ast::{Commands, Target, TargetDef},
+    memory::Memory,
     pg::{
         analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
@@ -26,6 +27,7 @@ pub use semantics::{Bools, Sign, SignAnalysis, SignMemory, Signs};
 define_env!(SignEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "SignAnalysis")]
 pub struct SignInput {
     pub commands: Stringify<Commands>,
     pub determinism: Determinism,
@@ -33,6 +35,7 @@ pub struct SignInput {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Serialize, Deserialize)]
+#[tapi(path = "SignAnalysis")]
 pub struct SignOutput {
     pub initial_node: String,
     pub final_node: String,
@@ -138,26 +141,14 @@ impl Env for SignEnv {
 }
 
 impl SignInput {
-    fn set_sign(&self, var: &Variable, sign: Sign) -> SignInput {
-        let mut new = self.clone();
-        new.assignment.variables.insert(var.clone(), sign);
-        new
-    }
-    fn set_signs(&self, arr: &Array, signs: Signs) -> SignInput {
-        let mut new = self.clone();
-        new.assignment.arrays.insert(arr.clone(), signs);
-        new
-    }
-}
-
-impl SignInput {
     fn gen_from_commands<R: rand::Rng>(rng: &mut R, commands: Commands) -> SignInput {
-        let assignment = SignMemory::from_targets_with(
+        let assignment: SignMemory = Memory::from_targets_with(
             commands.fv(),
             rng,
             |rng, _| Generate::gen(&mut (), rng),
             |rng, _| Generate::gen(&mut (), rng),
-        );
+        )
+        .into();
 
         SignInput {
             commands: Stringify::new(commands),
