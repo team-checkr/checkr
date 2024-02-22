@@ -147,7 +147,6 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             Duration::from_millis(200),
             move |res: notify_debouncer_mini::DebounceEventResult| match res {
                 Ok(events) => {
-                    // tracing::debug!("a file was saved: {events:?}");
                     if !events.iter().any(|e| {
                         let p = match e.path.strip_prefix(&debouncer_dir) {
                             Ok(p) => p,
@@ -161,6 +160,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                     }) {
                         return;
                     }
+                    tracing::debug!("a file was saved: {events:?}");
 
                     tx.send(()).expect("sending to file watcher failed");
                 }
