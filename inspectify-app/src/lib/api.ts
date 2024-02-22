@@ -86,83 +86,252 @@ const sse =
   };
 
 export namespace Calculator {
-  export type Input = { "expression": string };
-  export type Output = { "result": string, "error": string };
+  export type Input = {
+    "expression": string
+  };
+  export type Output = {
+    "result": string,
+    "error": string
+  };
 }
 export namespace Compiler {
-  export type Input = { "commands": string, "determinism": GCL.Determinism };
-  export type Output = { "dot": string };
+  export type Input = {
+    "commands": string,
+    "determinism": GCL.Determinism
+  };
+  export type Output = {
+    "dot": string
+  };
 }
 export namespace GCL {
-  export type Determinism = "Deterministic" | "NonDeterministic";
+  export type Determinism =
+    | "Deterministic"
+    | "NonDeterministic";
   export const DETERMINISM: Determinism[] = ["Deterministic", "NonDeterministic"];
-  export type TargetDef = { "name": string, "kind": GCL.TargetKind };
-  export type TargetKind = "Variable" | "Array";
+  export type TargetDef = {
+    "name": string,
+    "kind": GCL.TargetKind
+  };
+  export type TargetKind =
+    | "Variable"
+    | "Array";
   export const TARGET_KIND: TargetKind[] = ["Variable", "Array"];
   export type Variable = string;
   export type Array = string;
 }
 export namespace Interpreter {
-  export type Input = { "commands": string, "determinism": GCL.Determinism, "assignment": Interpreter.InterpreterMemory, "trace_length": number };
-  export type Output = { "initial_node": string, "final_node": string, "dot": string, "trace": Interpreter.Step[], "termination": Interpreter.TerminationState };
-  export type InterpreterMemory = { "variables": Record<GCL.Variable, number>, "arrays": Record<GCL.Array, number[]> };
-  export type TerminationState = "Running" | "Stuck" | "Terminated";
+  export type Input = {
+    "commands": string,
+    "determinism": GCL.Determinism,
+    "assignment": Interpreter.InterpreterMemory,
+    "trace_length": number
+  };
+  export type Output = {
+    "initial_node": string,
+    "final_node": string,
+    "dot": string,
+    "trace": Interpreter.Step[],
+    "termination": Interpreter.TerminationState
+  };
+  export type InterpreterMemory = {
+    "variables": Record<GCL.Variable, number>,
+    "arrays": Record<GCL.Array, number[]>
+  };
+  export type TerminationState =
+    | "Running"
+    | "Stuck"
+    | "Terminated";
   export const TERMINATION_STATE: TerminationState[] = ["Running", "Stuck", "Terminated"];
-  export type Step = { "action": string, "node": string, "memory": Interpreter.InterpreterMemory };
+  export type Step = {
+    "action": string,
+    "node": string,
+    "memory": Interpreter.InterpreterMemory
+  };
 }
 export namespace Parser {
-  export type Input = { "commands": string };
-  export type Output = { "pretty": string };
+  export type Input = {
+    "commands": string
+  };
+  export type Output = {
+    "pretty": string
+  };
+}
+export namespace SecurityAnalysis {
+  export type Input = {
+    "classification": Record<string, SecurityAnalysis.SecurityClassification>,
+    "lattice": SecurityAnalysis.SecurityLatticeInput
+  };
+  export type Output = {
+    "actual": [string, string][],
+    "allowed": [string, string][],
+    "violations": [string, string][],
+    "is_secure": boolean
+  };
+  export type SecurityLatticeInput = {
+    "rules": [SecurityAnalysis.SecurityClassification, SecurityAnalysis.SecurityClassification][]
+  };
+  export type SecurityClassification = string;
 }
 export namespace SignAnalysis {
-  export type Input = { "commands": string, "determinism": GCL.Determinism, "assignment": SignAnalysis.SignMemory };
-  export type Output = { "initial_node": string, "final_node": string, "nodes": Record<string, SignAnalysis.SignMemory[]>, "dot": string };
-  export type SignMemory = { "variables": Record<GCL.Variable, SignAnalysis.Sign>, "arrays": Record<GCL.Array, SignAnalysis.Sign[]> };
-  export type Sign = "Positive" | "Zero" | "Negative";
+  export type Input = {
+    "commands": string,
+    "determinism": GCL.Determinism,
+    "assignment": SignAnalysis.SignMemory
+  };
+  export type Output = {
+    "initial_node": string,
+    "final_node": string,
+    "nodes": Record<string, SignAnalysis.SignMemory[]>,
+    "dot": string
+  };
+  export type SignMemory = {
+    "variables": Record<GCL.Variable, SignAnalysis.Sign>,
+    "arrays": Record<GCL.Array, SignAnalysis.Sign[]>
+  };
+  export type Sign =
+    | "Positive"
+    | "Zero"
+    | "Negative";
   export const SIGN: Sign[] = ["Positive", "Zero", "Negative"];
 }
 export namespace ce_core {
-  export type ValidationResult = { "type": "CorrectTerminated" } | { "type": "CorrectNonTerminated", "iterations": number } | { "type": "Mismatch", "reason": string } | { "type": "TimeOut" };
+  export type ValidationResult =
+    | { "type": "CorrectTerminated" }
+    | { "type": "CorrectNonTerminated", "iterations": number }
+    | { "type": "Mismatch", "reason": string }
+    | { "type": "TimeOut" };
 }
 export namespace ce_shell {
-  export type Envs = { "analysis": "Calculator", "io": { "input": Calculator.Input, "output": Calculator.Output, "meta": void } } | { "analysis": "Parser", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } } | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } } | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } } | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
-  export type Analysis = "Calculator" | "Parser" | "Compiler" | "Interpreter" | "Sign";
-  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "Sign"];
+  export type Envs =
+    | { "analysis": "Calculator", "io": { "input": Calculator.Input, "output": Calculator.Output, "meta": void } }
+    | { "analysis": "Parser", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } }
+    | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } }
+    | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } }
+    | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } }
+    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": void } };
+  export type Analysis =
+    | "Calculator"
+    | "Parser"
+    | "Compiler"
+    | "Interpreter"
+    | "Sign"
+    | "Security";
+  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "Sign", "Security"];
   export namespace io {
-    export type Input = { "analysis": ce_shell.Analysis, "json": any };
-    export type Meta = { "analysis": ce_shell.Analysis, "json": any };
-    export type Output = { "analysis": ce_shell.Analysis, "json": any };
+    export type Input = {
+      "analysis": ce_shell.Analysis,
+      "json": any
+    };
+    export type Meta = {
+      "analysis": ce_shell.Analysis,
+      "json": any
+    };
+    export type Output = {
+      "analysis": ce_shell.Analysis,
+      "json": any
+    };
   }
 }
 export namespace driver {
   export namespace ansi {
-    export type Color = "Black" | "Red" | "Green" | "Yellow" | "Blue" | "Magenta" | "Cyan" | "White" | "Default" | "BrightBlack" | "BrightRed" | "BrightGreen" | "BrightYellow" | "BrightBlue" | "BrightMagenta" | "BrightCyan" | "BrightWhite";
+    export type Color =
+      | "Black"
+      | "Red"
+      | "Green"
+      | "Yellow"
+      | "Blue"
+      | "Magenta"
+      | "Cyan"
+      | "White"
+      | "Default"
+      | "BrightBlack"
+      | "BrightRed"
+      | "BrightGreen"
+      | "BrightYellow"
+      | "BrightBlue"
+      | "BrightMagenta"
+      | "BrightCyan"
+      | "BrightWhite";
     export const COLOR: Color[] = ["Black", "Red", "Green", "Yellow", "Blue", "Magenta", "Cyan", "White", "Default", "BrightBlack", "BrightRed", "BrightGreen", "BrightYellow", "BrightBlue", "BrightMagenta", "BrightCyan", "BrightWhite"];
   }
   export namespace job {
     export type JobId = number;
-    export type JobState = "Queued" | "Running" | "Succeeded" | "Canceled" | "Failed" | "Warning";
+    export type JobState =
+      | "Queued"
+      | "Running"
+      | "Succeeded"
+      | "Canceled"
+      | "Failed"
+      | "Warning";
     export const JOB_STATE: JobState[] = ["Queued", "Running", "Succeeded", "Canceled", "Failed", "Warning"];
-    export type JobKind = { "kind": "Compilation" } | { "kind": "Analysis", "data": ce_shell.io.Input };
+    export type JobKind =
+      | { "kind": "Compilation" }
+      | { "kind": "Analysis", "data": ce_shell.io.Input };
   }
 }
 export namespace inspectify_api {
   export namespace checko {
     export namespace config {
-      export type GroupsConfig = { "groups": inspectify_api.checko.config.GroupConfig[] };
-      export type GroupConfig = { "name": string, "git": (string | null), "path": (string | null), "run": (string | null) };
+      export type GroupsConfig = {
+        "groups": inspectify_api.checko.config.GroupConfig[]
+      };
+      export type GroupConfig = {
+        "name": string,
+        "git": (string | null),
+        "path": (string | null),
+        "run": (string | null)
+      };
     }
   }
   export namespace endpoints {
-    export type Event = { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } } | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } } | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } } | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } } | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } } | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
-    export type AnalysisExecution = { "id": driver.job.JobId };
-    export type GenerateParams = { "analysis": ce_shell.Analysis };
-    export type ReferenceExecution = { "meta": ce_shell.io.Meta, "output": (ce_shell.io.Output | null), "error": (string | null) };
-    export type Job = { "id": driver.job.JobId, "state": driver.job.JobState, "kind": driver.job.JobKind, "group_name": (string | null), "stdout": string, "spans": inspectify_api.endpoints.Span[], "analysis_data": (inspectify_api.endpoints.AnalysisData | null) };
-    export type Program = { "hash": number[], "hash_str": string, "input": ce_shell.io.Input };
-    export type CompilationStatus = { "id": driver.job.JobId, "state": driver.job.JobState, "error_output": (inspectify_api.endpoints.Span[] | null) };
-    export type Span = { "text": string, "fg": (driver.ansi.Color | null), "bg": (driver.ansi.Color | null) };
-    export type AnalysisData = { "meta": ce_shell.io.Meta, "output": (ce_shell.io.Output | null), "reference_output": (ce_shell.io.Output | null), "validation": (ce_core.ValidationResult | null) };
+    export type AnalysisExecution = {
+      "id": driver.job.JobId
+    };
+    export type GenerateParams = {
+      "analysis": ce_shell.Analysis
+    };
+    export type Event =
+      | { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } }
+      | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } }
+      | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
+      | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } }
+      | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } }
+      | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
+    export type ReferenceExecution = {
+      "meta": ce_shell.io.Meta,
+      "output": (ce_shell.io.Output | null),
+      "error": (string | null)
+    };
+    export type Job = {
+      "id": driver.job.JobId,
+      "state": driver.job.JobState,
+      "kind": driver.job.JobKind,
+      "group_name": (string | null),
+      "stdout": string,
+      "spans": inspectify_api.endpoints.Span[],
+      "analysis_data": (inspectify_api.endpoints.AnalysisData | null)
+    };
+    export type Program = {
+      "hash": number[],
+      "hash_str": string,
+      "input": ce_shell.io.Input
+    };
+    export type CompilationStatus = {
+      "id": driver.job.JobId,
+      "state": driver.job.JobState,
+      "error_output": (inspectify_api.endpoints.Span[] | null)
+    };
+    export type Span = {
+      "text": string,
+      "fg": (driver.ansi.Color | null),
+      "bg": (driver.ansi.Color | null)
+    };
+    export type AnalysisData = {
+      "meta": ce_shell.io.Meta,
+      "output": (ce_shell.io.Output | null),
+      "reference_output": (ce_shell.io.Output | null),
+      "validation": (ce_core.ValidationResult | null)
+    };
   }
 }
 export const api = {
