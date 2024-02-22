@@ -140,8 +140,11 @@ impl Env for SignEnv {
     }
 }
 
-impl Input {
-    fn gen_from_commands<R: rand::Rng>(rng: &mut R, commands: Commands) -> Input {
+impl Generate for Input {
+    type Context = ();
+
+    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+        let commands = Commands::gen(&mut Default::default(), rng);
         let assignment: SignMemory = Memory::from_targets_with(
             commands.fv(),
             rng,
@@ -155,15 +158,6 @@ impl Input {
             assignment,
             determinism: Determinism::Deterministic,
         }
-    }
-}
-
-impl Generate for Input {
-    type Context = ();
-
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
-        let commands = Commands::gen(&mut Default::default(), rng);
-        Input::gen_from_commands(rng, commands)
     }
 }
 
