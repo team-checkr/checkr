@@ -4,7 +4,7 @@
   import '../app.pcss';
 
   import CommandLineIcon from '~icons/heroicons/command-line';
-  import QuestionMarkCircleIcon from '~icons/heroicons/question-mark-circle';
+  // import QuestionMarkCircleIcon from '~icons/heroicons/question-mark-circle';
   import { showReference } from '$lib/jobs';
 
   const { ANALYSIS } = ce_shell;
@@ -55,13 +55,13 @@
       />
     </div>
 
-    <a
+    <!-- <a
       href="/guide"
       class="flex items-center space-x-1 p-2 text-sm font-semibold text-slate-300 transition hover:text-white"
     >
       <span>Guide</span>
       <QuestionMarkCircleIcon class="w-4" />
-    </a>
+    </a> -->
   </nav>
 
   <slot />
