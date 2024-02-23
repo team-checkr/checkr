@@ -14,9 +14,8 @@ release-patch args="":
     git checkout HEAD -- CHANGELOG.md
     cargo release patch {{args}}
 
-build-ci:
-    cargo build -p inspectify
-    cargo build -p checko
+build-ui:
+    cd inspectify-app && (npm install && npm run build)
 
 release-hook:
     git cliff -t $NEW_VERSION -o CHANGELOG.md
