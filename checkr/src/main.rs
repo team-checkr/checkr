@@ -1,3 +1,12 @@
+//! # `checkr`
+//!
+//! This crate is the entrypoint to the reference implementation. It is what is
+//! described by the `run.toml` as the binary used for testing inspectify.
+//!
+//! `checkr` contains no code for actual analysis, but rather parses the input
+//! and delegates the analysis to the `ce-shell` crate which is the join point
+//! for all analysis.
+
 use std::time::Duration;
 
 use clap::{Parser, Subcommand};
