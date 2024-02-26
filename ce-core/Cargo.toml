@@ -9,7 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-futures-util = "0.3.28"
+futures-util.workspace = true
 gcl.workspace = true
 itertools.workspace = true
 rand.workspace = true

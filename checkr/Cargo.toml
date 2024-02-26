@@ -10,7 +10,7 @@ publish = false
 
 [dependencies]
 ce-shell.workspace = true
-clap = { version = "4.0.32", features = ["derive"] }
+clap.workspace = true
 color-eyre.workspace = true
 tracing.workspace = true
 tracing-subscriber.workspace = true
