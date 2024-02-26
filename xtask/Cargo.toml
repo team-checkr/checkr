@@ -1,9 +1,9 @@
 [package]
 name = "xtask"
 edition = "2021"
-version = { workspace = true }
-license = { workspace = true }
-repository = { workspace = true }
+version.workspace = true
+license.workspace = true
+repository.workspace = true
 publish = false
 
 # NOTE: This has issues with cargo-dist: https://github.com/axodotdev/cargo-dist/issues/79
@@ -14,13 +14,13 @@ publish = false
 # binswap-github = "0.1.7"
 ce-core.workspace = true
 clap = { version = "4.1.4", features = ["derive"] }
-color-eyre = { workspace = true }
+color-eyre.workspace = true
 heck = "0.4.1"
 itertools.workspace = true
 serde.workspace = true
 serde_json.workspace = true
 tapi.workspace = true
-tokio = { workspace = true }
+tokio.workspace = true
 toml_edit = "0.20.0"
 tracing.workspace = true
 xshell = "0.2.3"
