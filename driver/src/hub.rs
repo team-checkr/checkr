@@ -120,28 +120,36 @@ impl<M: Send + Sync + 'static> Hub<M> {
             let events_tx1 = events_tx.clone();
             let main_task = async move {
                 let mut bytes_left = max_output;
+                let mut exit_status = None;
+                let mut stderr_empty = false;
+                let mut stdout_empty = false;
                 loop {
                     stderr_buf.clear();
                     stdout_buf.clear();
                     tokio::select! {
-                        Ok(n) = stderr.read_buf(&mut stderr_buf) => {
+                        Ok(n) = stderr.read_buf(&mut stderr_buf), if !stderr_empty => {
+                            stderr_empty = n == 0;
                             bytes_left = bytes_left.saturating_sub(n);
                             let mut data = data1.write().unwrap();
                             data.stderr.extend_from_slice(&stderr_buf[..n]);
                             data.combined.extend_from_slice(&stderr_buf[..n]);
                         }
-                        Ok(n) = stdout.read_buf(&mut stdout_buf) => {
+                        Ok(n) = stdout.read_buf(&mut stdout_buf), if !stdout_empty => {
+                            stdout_empty = n == 0;
                             bytes_left = bytes_left.saturating_sub(n);
                             let mut data = data1.write().unwrap();
                             data.stdout.extend_from_slice(&stdout_buf[..n]);
                             data.combined.extend_from_slice(&stdout_buf[..n]);
                         }
-                        Ok(exit_status) = child.wait() => {
-                            tracing::debug!("closed");
-                            break Exit::ExitStatus( exit_status);
-                        }
+                        Ok(es) = child.wait(), if exit_status.is_none() => {
+                            exit_status = Some(es);
+                        },
                         else => {
-                            todo!()
+                            break if let Some(exit_status) = exit_status {
+                                Exit::ExitStatus(exit_status)
+                            } else {
+                                Exit::Terminated
+                            };
                         }
                     }
                     if bytes_left == 0 {
