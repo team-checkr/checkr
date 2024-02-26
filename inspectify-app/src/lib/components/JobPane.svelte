@@ -11,6 +11,8 @@
   import NoSymbol from '~icons/heroicons/no-symbol';
   import Fire from '~icons/heroicons/fire';
   import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
+  import Clock from '~icons/heroicons/clock';
+  import Trash from '~icons/heroicons/trash';
 
   export let showGroup = false;
 
@@ -21,6 +23,8 @@
     Canceled: [NoSymbol, 'text-slate-400'],
     Failed: [Fire, 'text-red-300'],
     Warning: [ExclamationTriangle, 'text-yellow-300'],
+    Timeout: [Clock, 'text-blue-300'],
+    OutputLimitExceeded: [Trash, 'text-orange-300'],
   };
 
   const Icon = (state: driver.job.JobState) => icons[state][0];

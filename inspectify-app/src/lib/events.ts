@@ -1,9 +1,9 @@
 import { browser } from '$app/environment';
 import { readonly, writable, type Writable } from 'svelte/store';
-import { api, driver, type inspectify_api } from './api';
+import { api, driver, type inspectify } from './api';
 import { produce } from 'immer';
 
-export type Job = Omit<inspectify_api.endpoints.Job, 'kind'> & {
+export type Job = Omit<inspectify.endpoints.Job, 'kind'> & {
   kind: driver.job.JobKind | { kind: 'Waiting'; data: {} };
 };
 
@@ -11,12 +11,12 @@ const jobsListWritableStore = writable<driver.job.JobId[]>([]);
 export const jobsListStore = readonly(jobsListWritableStore);
 export const jobsStore: Writable<Record<driver.job.JobId, Writable<Job>>> = writable({});
 
-export const compilationStatusStore: Writable<inspectify_api.endpoints.CompilationStatus | null> =
+export const compilationStatusStore: Writable<inspectify.endpoints.CompilationStatus | null> =
   writable(null);
 
-export const groupsConfigStore: Writable<inspectify_api.checko.config.GroupsConfig | null> =
+export const groupsConfigStore: Writable<inspectify.checko.config.GroupsConfig | null> =
   writable(null);
-export const programsStore: Writable<inspectify_api.endpoints.Program[]> = writable([]);
+export const programsStore: Writable<inspectify.endpoints.Program[]> = writable([]);
 
 export const groupProgramJobAssignedStore: Writable<
   Record<string, Record<string, driver.job.JobId>>
@@ -36,6 +36,15 @@ if (browser) {
       connectionStore.set('connected');
 
       switch (msg.data.type) {
+        case 'Reset': {
+          jobsListWritableStore.set([]);
+          jobsStore.set({});
+          compilationStatusStore.set(null);
+          groupsConfigStore.set(null);
+          programsStore.set([]);
+          groupProgramJobAssignedStore.set({});
+          break;
+        }
         case 'CompilationStatus': {
           compilationStatusStore.set(msg.data.value.status);
           break;

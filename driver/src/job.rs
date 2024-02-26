@@ -6,8 +6,7 @@ use std::{
 };
 
 use serde::{Deserialize, Serialize};
-use tokio::{sync::Mutex, task::JoinSet};
-use tracing::Instrument;
+use tokio::sync::Mutex;
 
 #[derive(tapi::Tapi, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize)]
 #[serde(transparent)]
@@ -22,12 +21,8 @@ pub struct Job<T> {
 }
 #[derive(Debug)]
 pub(crate) struct JobInner<M> {
-    pub(crate) id: JobId,
-    pub(crate) child: tokio::sync::RwLock<Option<tokio::process::Child>>,
-    pub(crate) stdin: Option<tokio::process::ChildStdin>,
-    pub(crate) events_tx: Arc<tokio::sync::broadcast::Sender<JobEvent>>,
+    pub(crate) task: Arc<Mutex<Option<tokio::task::JoinHandle<()>>>>,
     pub(crate) events_rx: Arc<tokio::sync::broadcast::Receiver<JobEvent>>,
-    pub(crate) join_set: Mutex<JoinSet<()>>,
     pub(crate) data: Arc<RwLock<JobData<M>>>,
     pub(crate) wait_lock: Arc<Mutex<WaitStatus>>,
 }
@@ -62,37 +57,16 @@ impl<M> JobData<M> {
     }
 }
 
-#[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum JobEventSource {
-    Stdout,
-    Stderr,
-}
-
 impl std::fmt::Debug for JobId {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         f.debug_tuple("JobId").field(&self.value).finish()
     }
 }
 
-impl std::fmt::Display for JobEventSource {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            JobEventSource::Stdout => write!(f, "stdout"),
-            JobEventSource::Stderr => write!(f, "stderr"),
-        }
-    }
-}
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum JobEvent {
-    Wrote {
-        src: JobEventSource,
-        from: usize,
-        to: usize,
-    },
-    Closed {
-        src: JobEventSource,
-    },
+    Wrote,
     Finished,
 }
 
@@ -118,47 +92,11 @@ impl<T: Send + Sync + 'static> Job<T> {
     pub(crate) fn new(id: JobId, inner: JobInner<T>) -> Job<T> {
         let started = Instant::now();
 
-        let job = Job {
+        Job {
             id,
             started,
             inner: Arc::new(inner),
-        };
-
-        tokio::spawn({
-            let job = job.clone();
-            async move {
-                job.wait().await;
-                job.inner.events_tx.send(JobEvent::Finished).unwrap();
-                tracing::debug!("all streams closed");
-            }
-        });
-
-        tokio::spawn({
-            let job = job.clone();
-            let mut events_rx = job.inner.events_rx.resubscribe();
-            async move {
-                while let Ok(ev) = events_rx.recv().await {
-                    match ev {
-                        JobEvent::Wrote { src, from, to } => {
-                            let data = &mut *job.inner.data.write().unwrap();
-                            match src {
-                                JobEventSource::Stdout => {
-                                    data.combined.extend_from_slice(&data.stdout[from..to])
-                                }
-                                JobEventSource::Stderr => {
-                                    data.combined.extend_from_slice(&data.stderr[from..to])
-                                }
-                            }
-                        }
-                        JobEvent::Closed { src: _ } => {}
-                        JobEvent::Finished => {}
-                    }
-                }
-            }
-            .instrument(tracing::info_span!("job", id=?job.id))
-        });
-
-        job
+        }
     }
     pub fn id(&self) -> JobId {
         self.id
@@ -207,23 +145,9 @@ impl<T: Send + Sync + 'static> Job<T> {
             WaitStatus::Finished => return self.state(),
         }
 
-        while self.inner.join_set.lock().await.join_next().await.is_some() {}
-        let mut guard = self.inner.child.write().await;
-        let child = guard.take();
-        if let Some(mut child) = child {
-            match child.wait().await {
-                Ok(es) => {
-                    tracing::debug!(?es, "set state");
-                    let mut data = self.data_mut();
-                    if data.state != JobState::Canceled {
-                        data.state = if es.success() {
-                            JobState::Succeeded
-                        } else {
-                            JobState::Failed
-                        }
-                    }
-                }
-                Err(_) => todo!(),
+        if let Some(t) = self.inner.task.lock().await.take() {
+            if let Err(err) = t.await {
+                tracing::error!("Error waiting for job: {:?}", err);
             }
         }
         *wait_lock = WaitStatus::Finished;
@@ -233,12 +157,11 @@ impl<T: Send + Sync + 'static> Job<T> {
     pub fn kill(&self) {
         let job = self.clone();
         tokio::spawn(async move {
-            if let Some(child) = &mut *job.inner.child.write().await {
+            if job.inner.task.lock().await.take().is_some() {
                 let mut data = job.data_mut();
                 if let JobState::Queued | JobState::Running = data.state {
                     data.state = JobState::Canceled
                 }
-                child.start_kill().unwrap();
             }
         });
     }
@@ -280,6 +203,8 @@ pub enum JobState {
     Canceled,
     Failed,
     Warning,
+    Timeout,
+    OutputLimitExceeded,
 }
 
 impl Display for JobKind {
@@ -300,6 +225,8 @@ impl Display for JobState {
             JobState::Canceled => write!(f, "Canceled"),
             JobState::Failed => write!(f, "Failed"),
             JobState::Warning => write!(f, "Warning"),
+            JobState::Timeout => write!(f, "Timeout"),
+            JobState::OutputLimitExceeded => write!(f, "Output limit exceeded"),
         }
     }
 }

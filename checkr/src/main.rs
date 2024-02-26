@@ -37,6 +37,12 @@ fn main() -> color_eyre::Result<()> {
         std::thread::sleep(Duration::from_secs(1_000_000));
     }
 
+    if cli.spam {
+        loop {
+            println!("spam");
+        }
+    }
+
     match &cli.cmd {
         Cmd::Reference { analysis, input } => {
             let input = analysis.input_from_str(input)?;
