@@ -6,14 +6,9 @@ license.workspace = true
 repository.workspace = true
 publish = false
 
-# NOTE: This has issues with cargo-dist: https://github.com/axodotdev/cargo-dist/issues/79
-# [package.metadata.release]
-# release = false
-
 [dependencies]
-# binswap-github = "0.1.7"
 ce-core.workspace = true
-clap = { version = "4.1.4", features = ["derive"] }
+clap.workspace = true
 color-eyre.workspace = true
 heck = "0.4.1"
 itertools.workspace = true
