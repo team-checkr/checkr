@@ -167,6 +167,7 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
 #[derive(tapi::Tapi, Debug, Clone, serde::Serialize)]
 #[serde(tag = "type", content = "value")]
 enum Event {
+    Reset,
     CompilationStatus {
         status: Option<CompilationStatus>,
     },
@@ -199,6 +200,8 @@ pub struct Program {
 #[tapi::tapi(path = "/events", method = Get)]
 async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, axum::BoxError>>(1);
+
+    let _ = tx.send(Ok(Event::Reset)).await;
 
     tokio::spawn({
         let state = state.clone();

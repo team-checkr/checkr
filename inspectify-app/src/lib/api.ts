@@ -273,18 +273,20 @@ export namespace driver {
       | "Succeeded"
       | "Canceled"
       | "Failed"
-      | "Warning";
-    export const JOB_STATE: JobState[] = ["Queued", "Running", "Succeeded", "Canceled", "Failed", "Warning"];
+      | "Warning"
+      | "Timeout"
+      | "OutputLimitExceeded";
+    export const JOB_STATE: JobState[] = ["Queued", "Running", "Succeeded", "Canceled", "Failed", "Warning", "Timeout", "OutputLimitExceeded"];
     export type JobKind =
       | { "kind": "Compilation" }
       | { "kind": "Analysis", "data": ce_shell.io.Input };
   }
 }
-export namespace inspectify_api {
+export namespace inspectify {
   export namespace checko {
     export namespace config {
       export type GroupsConfig = {
-        "groups": inspectify_api.checko.config.GroupConfig[]
+        "groups": inspectify.checko.config.GroupConfig[]
       };
       export type GroupConfig = {
         "name": string,
@@ -295,32 +297,33 @@ export namespace inspectify_api {
     }
   }
   export namespace endpoints {
-    export type ReferenceExecution = {
-      "meta": ce_shell.io.Meta,
-      "output": (ce_shell.io.Output | null),
-      "error": (string | null)
-    };
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
     };
     export type AnalysisExecution = {
       "id": driver.job.JobId
     };
+    export type ReferenceExecution = {
+      "meta": ce_shell.io.Meta,
+      "output": (ce_shell.io.Output | null),
+      "error": (string | null)
+    };
     export type Event =
-      | { "type": "CompilationStatus", "value": { "status": (inspectify_api.endpoints.CompilationStatus | null) } }
-      | { "type": "JobChanged", "value": { "job": inspectify_api.endpoints.Job } }
+      | { "type": "Reset" }
+      | { "type": "CompilationStatus", "value": { "status": (inspectify.endpoints.CompilationStatus | null) } }
+      | { "type": "JobChanged", "value": { "job": inspectify.endpoints.Job } }
       | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
-      | { "type": "GroupsConfig", "value": { "config": inspectify_api.checko.config.GroupsConfig } }
-      | { "type": "ProgramsConfig", "value": { "programs": inspectify_api.endpoints.Program[] } }
-      | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify_api.endpoints.Program, "job_id": driver.job.JobId } };
+      | { "type": "GroupsConfig", "value": { "config": inspectify.checko.config.GroupsConfig } }
+      | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } }
+      | { "type": "GroupProgramJobAssigned", "value": { "group": string, "program": inspectify.endpoints.Program, "job_id": driver.job.JobId } };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
       "kind": driver.job.JobKind,
       "group_name": (string | null),
       "stdout": string,
-      "spans": inspectify_api.endpoints.Span[],
-      "analysis_data": (inspectify_api.endpoints.AnalysisData | null)
+      "spans": inspectify.endpoints.Span[],
+      "analysis_data": (inspectify.endpoints.AnalysisData | null)
     };
     export type Program = {
       "hash": number[],
@@ -330,7 +333,7 @@ export namespace inspectify_api {
     export type CompilationStatus = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
-      "error_output": (inspectify_api.endpoints.Span[] | null)
+      "error_output": (inspectify.endpoints.Span[] | null)
     };
     export type Span = {
       "text": string,
@@ -346,9 +349,9 @@ export namespace inspectify_api {
   }
 }
 export const api = {
-    generate: request<inspectify_api.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
-    events: sse<[], inspectify_api.endpoints.Event>(() => `/events`, "json"),
+    generate: request<inspectify.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
+    events: sse<[], inspectify.endpoints.Event>(() => `/events`, "json"),
     jobsCancel: request<driver.job.JobId, void>("json", "POST", "/jobs/cancel", "none"),
-    analysis: request<ce_shell.io.Input, inspectify_api.endpoints.AnalysisExecution>("json", "POST", "/analysis", "json"),
-    reference: request<ce_shell.io.Input, inspectify_api.endpoints.ReferenceExecution>("json", "POST", "/reference", "json"),
+    analysis: request<ce_shell.io.Input, inspectify.endpoints.AnalysisExecution>("json", "POST", "/analysis", "json"),
+    reference: request<ce_shell.io.Input, inspectify.endpoints.ReferenceExecution>("json", "POST", "/reference", "json"),
 };

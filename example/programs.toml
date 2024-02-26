@@ -12,7 +12,7 @@ shown = true
 
 [[envs.Compiler]]
 input = '''
-{"commands":"x := y ; y := -x","determinism":{"Case":"NonDeterministic"}}
+{"commands":"x := y ; y := -x","determinism":"NonDeterministic"}
 '''
 
 [[envs.Compiler]]

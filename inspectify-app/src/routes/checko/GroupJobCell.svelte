@@ -1,6 +1,7 @@
 <script lang="ts">
-  import { type inspectify_api, type driver } from '$lib/api';
+  import { type inspectify, type driver } from '$lib/api';
   import { groupProgramJobAssignedStore, jobsStore } from '$lib/events';
+  import { selectedJobId, showStatus } from '$lib/jobs';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
   import ArrowPath from '~icons/heroicons/arrow-path';
@@ -8,10 +9,11 @@
   import NoSymbol from '~icons/heroicons/no-symbol';
   import Fire from '~icons/heroicons/fire';
   import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
-  import { selectedJobId, showStatus } from '$lib/jobs';
+  import Clock from '~icons/heroicons/clock';
+  import Trash from '~icons/heroicons/Trash';
 
-  export let group: inspectify_api.checko.config.GroupConfig;
-  export let program: inspectify_api.endpoints.Program;
+  export let group: inspectify.checko.config.GroupConfig;
+  export let program: inspectify.endpoints.Program;
 
   $: jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
   $: job = $jobsStore[jobId];
@@ -23,12 +25,12 @@
     Canceled: [NoSymbol, '', 'bg-slate-400'],
     Failed: [Fire, '', 'bg-red-500'],
     Warning: [ExclamationTriangle, '', 'bg-yellow-400'],
+    Timeout: [Clock, '', 'bg-blue-400'],
+    OutputLimitExceeded: [Trash, '', 'bg-orange-400'],
   };
   const Icon = (state: driver.job.JobState) => icons[state][0];
 
   $: state = $job?.state ?? 'Queued';
-
-  $: console.log(program.hash_str, $job);
 </script>
 
 <button

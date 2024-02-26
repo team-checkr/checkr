@@ -8,12 +8,11 @@ use std::{
 };
 
 use color_eyre::eyre::Context;
-use tokio::{io::AsyncReadExt, sync::Mutex, task::JoinSet};
-use tracing::Instrument;
+use tokio::{io::AsyncReadExt, sync::Mutex};
 
 use crate::{
-    job::{Job, JobData, JobEvent, JobEventSource, JobInner, JobKind},
-    JobId,
+    job::{Job, JobData, JobEvent, JobInner, JobKind},
+    JobId, JobState,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -95,9 +94,8 @@ impl<M: Send + Sync + 'static> Hub<M> {
             .spawn()
             .with_context(|| format!("failed to spawn {:?}", cmd))?;
 
-        let stdin = child.stdin.take().expect("we piped stdin");
-        let stderr = child.stderr.take().expect("we piped stderr");
-        let stdout = child.stdout.take().expect("we piped stdout");
+        let mut stderr = child.stderr.take().expect("we piped stderr");
+        let mut stdout = child.stdout.take().expect("we piped stdout");
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
@@ -107,51 +105,84 @@ impl<M: Send + Sync + 'static> Hub<M> {
             JobKind::Analysis(_) => Duration::from_secs(10),
             JobKind::Compilation => Duration::from_secs(60),
         };
+        let max_output = 2usize.pow(14);
         let data = Arc::new(RwLock::new(JobData::new(kind, meta)));
 
-        let mut join_set = tokio::task::JoinSet::new();
-        spawn_reader(
-            JobEventSource::Stderr,
-            &mut join_set,
-            stderr,
-            events_tx.clone(),
-            {
-                let data = data.clone();
-                move |bytes| {
-                    let mut data = data.write().unwrap();
-                    let from = data.stderr.len();
-                    data.stderr.extend_from_slice(bytes);
-                    let to = data.stderr.len();
-                    (from, to)
+        enum Exit {
+            ExitStatus(std::process::ExitStatus),
+            Terminated,
+        }
+
+        let mut stderr_buf = Vec::with_capacity(1024);
+        let mut stdout_buf = Vec::with_capacity(1024);
+        let task = tokio::spawn({
+            let data1 = Arc::clone(&data);
+            let events_tx1 = events_tx.clone();
+            let main_task = async move {
+                let mut bytes_left = max_output;
+                loop {
+                    stderr_buf.clear();
+                    stdout_buf.clear();
+                    tokio::select! {
+                        Ok(n) = stderr.read_buf(&mut stderr_buf) => {
+                            bytes_left = bytes_left.saturating_sub(n);
+                            let mut data = data1.write().unwrap();
+                            data.stderr.extend_from_slice(&stderr_buf[..n]);
+                            data.combined.extend_from_slice(&stderr_buf[..n]);
+                        }
+                        Ok(n) = stdout.read_buf(&mut stdout_buf) => {
+                            bytes_left = bytes_left.saturating_sub(n);
+                            let mut data = data1.write().unwrap();
+                            data.stdout.extend_from_slice(&stdout_buf[..n]);
+                            data.combined.extend_from_slice(&stdout_buf[..n]);
+                        }
+                        Ok(exit_status) = child.wait() => {
+                            tracing::debug!("closed");
+                            break Exit::ExitStatus( exit_status);
+                        }
+                        else => {
+                            todo!()
+                        }
+                    }
+                    if bytes_left == 0 {
+                        data1.write().unwrap().state = JobState::OutputLimitExceeded;
+                        let _ = child.kill().await;
+                        break Exit::Terminated;
+                    }
+                    events_tx1.send(JobEvent::Wrote {}).unwrap();
                 }
-            },
-        );
-        spawn_reader(
-            JobEventSource::Stdout,
-            &mut join_set,
-            stdout,
-            events_tx.clone(),
-            {
-                let data = data.clone();
-                move |bytes| {
-                    let mut data = data.write().unwrap();
-                    let from = data.stdout.len();
-                    data.stdout.extend_from_slice(bytes);
-                    let to = data.stdout.len();
-                    (from, to)
+            };
+            let data2 = Arc::clone(&data);
+            let events_tx2 = events_tx.clone();
+            async move {
+                match tokio::time::timeout(timeout, main_task).await {
+                    Ok(exit) => {
+                        let mut data = data2.write().unwrap();
+                        data.state = match exit {
+                            Exit::ExitStatus(exit_status) => {
+                                if exit_status.success() {
+                                    JobState::Succeeded
+                                } else {
+                                    JobState::Failed
+                                }
+                            }
+                            Exit::Terminated => JobState::OutputLimitExceeded,
+                        };
+                    }
+                    Err(_elasped) => {
+                        let mut data = data2.write().unwrap();
+                        data.state = JobState::Timeout;
+                    }
                 }
-            },
-        );
+                events_tx2.send(JobEvent::Finished).unwrap();
+            }
+        });
 
         let job = Job::new(
             id,
             JobInner {
-                id,
-                child: tokio::sync::RwLock::new(Some(child)),
-                stdin: Some(stdin),
-                events_tx: Arc::new(events_tx),
+                task: Arc::new(Mutex::new(Some(task))),
                 events_rx: Arc::new(events_rx),
-                join_set: Mutex::new(join_set),
                 data,
                 wait_lock: Default::default(),
             },
@@ -159,15 +190,6 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         self.jobs.write().unwrap().push(job.clone());
         self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
-
-        tokio::spawn({
-            let job = job.clone();
-            async move {
-                tokio::time::sleep(timeout).await;
-                job.kill();
-                // TODO: indicate that it timed out
-            }
-        });
 
         Ok(job)
     }
@@ -187,14 +209,10 @@ impl<M: Send + Sync + 'static> Hub<M> {
     pub fn add_finished_job(&self, j: JobData<M>) -> Job<M> {
         let id = self.next_job_id();
 
-        let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
+        let (_events_tx, events_rx) = tokio::sync::broadcast::channel(128);
         let inner = JobInner {
-            id,
-            child: Default::default(),
-            stdin: Default::default(),
-            events_tx: Arc::new(events_tx),
+            task: Arc::new(Mutex::new(None)),
             events_rx: Arc::new(events_rx),
-            join_set: Default::default(),
             data: Arc::new(RwLock::new(j)),
             wait_lock: Default::default(),
         };
@@ -204,31 +222,4 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         job
     }
-}
-
-#[tracing::instrument(skip_all, fields(spawn_reader=%src))]
-fn spawn_reader(
-    src: JobEventSource,
-    join_set: &mut JoinSet<()>,
-    mut reader: impl AsyncReadExt + Sized + Unpin + Send + 'static,
-    event_tx: tokio::sync::broadcast::Sender<JobEvent>,
-    mut write: impl FnMut(&[u8]) -> (usize, usize) + 'static + Send + Sync,
-) {
-    join_set.spawn({
-        async move {
-            let mut buf = Vec::with_capacity(1024);
-            loop {
-                buf.clear();
-                let read_n = reader.read_buf(&mut buf).await.expect("read failed");
-                if read_n == 0 {
-                    tracing::debug!("closed");
-                    event_tx.send(JobEvent::Closed { src }).unwrap();
-                    break;
-                }
-                let (from, to) = write(&buf);
-                event_tx.send(JobEvent::Wrote { src, from, to }).unwrap();
-            }
-        }
-        .in_current_span()
-    });
 }
