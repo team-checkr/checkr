@@ -328,6 +328,7 @@ dependencies = [
  "ce-core",
  "gcl",
  "serde",
+ "serde_json",
  "tapi",
 ]
 

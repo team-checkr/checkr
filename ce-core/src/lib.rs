@@ -138,7 +138,10 @@ macro_rules! define_env {
                     | $crate::ValidationResult::CorrectNonTerminated { .. } => {
                         // Ok!
                     }
-                    res => panic!("validation failed! {res:?}"),
+                    res => {
+                        eprintln!("{}", serde_json::to_string_pretty(&input).unwrap());
+                        panic!("validation failed! {res:?}")
+                    }
                 }
             }
         }
