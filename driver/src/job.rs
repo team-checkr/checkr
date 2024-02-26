@@ -63,7 +63,6 @@ impl std::fmt::Debug for JobId {
     }
 }
 
-
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum JobEvent {
     Wrote,
