@@ -1,9 +1,9 @@
 [package]
 name = "checkr"
 edition = "2021"
-version = { workspace = true }
-license = { workspace = true }
-repository = { workspace = true }
+version.workspace = true
+license.workspace = true
+repository.workspace = true
 publish = false
 
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
@@ -11,6 +11,6 @@ publish = false
 [dependencies]
 ce-shell.workspace = true
 clap = { version = "4.0.32", features = ["derive"] }
-color-eyre = { workspace = true }
-tracing = { workspace = true }
-tracing-subscriber = { workspace = true }
+color-eyre.workspace = true
+tracing.workspace = true
+tracing-subscriber.workspace = true
