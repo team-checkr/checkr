@@ -1123,7 +1123,7 @@ dependencies = [
 ]
 
 [[package]]
-name = "inspectify-api"
+name = "inspectify"
 version = "0.1.21"
 dependencies = [
  "axum",

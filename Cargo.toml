@@ -7,7 +7,7 @@ members = [
     "driver",
     "envs/*",
     "gcl",
-    "inspectify-api",
+    "inspectify",
     "xtask",
 ]
 
