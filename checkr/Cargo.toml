@@ -15,7 +15,6 @@ ce-sign.workspace = true
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
 comfy-table = { workspace = true }
-egg = "0.9.3"
 gcl = { workspace = true }
 graphviz-rust = "0.6.1"
 indexmap = { version = "2.0.0", features = ["serde"] }
