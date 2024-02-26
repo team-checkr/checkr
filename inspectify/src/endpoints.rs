@@ -133,13 +133,10 @@ impl AppState {
             analysis_data,
         }
     }
-    fn jobs(&self) -> Vec<JobId> {
+    fn jobs(&self) -> Vec<driver::Job<InspectifyJobMeta>> {
         self.hub
             // .jobs(Some(25))
             .jobs(None)
-            .into_iter()
-            .map(|job| job.id())
-            .collect()
     }
 }
 
@@ -197,6 +194,42 @@ pub struct Program {
     pub input: Input,
 }
 
+async fn start_listening_on_job(
+    state: AppState,
+    tx: tokio::sync::mpsc::Sender<Result<Event, axum::BoxError>>,
+    job: driver::Job<InspectifyJobMeta>,
+) -> bool {
+    let event = Event::JobsChanged {
+        jobs: state.jobs().into_iter().map(|j| j.id()).collect(),
+    };
+    if tx.send(Ok(event)).await.is_err() {
+        return false;
+    }
+    let event = Event::JobChanged {
+        job: state.job(job.id()),
+    };
+    if tx.send(Ok(event)).await.is_err() {
+        return false;
+    }
+
+    tokio::spawn({
+        let state = state.clone();
+        let tx = tx.clone();
+        async move {
+            let mut events = job.events();
+            while let Ok(_event) = events.recv().await {
+                let job = state.job(job.id());
+                let event = Event::JobChanged { job };
+                if tx.send(Ok(event)).await.is_err() {
+                    break;
+                }
+            }
+        }
+    });
+
+    true
+}
+
 #[tapi::tapi(path = "/events", method = Get)]
 async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<Event, axum::BoxError>>(1);
@@ -209,14 +242,15 @@ async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
         async move {
             tokio::time::sleep(Duration::from_millis(100)).await;
 
-            let event = Event::JobsChanged { jobs: state.jobs() };
+            let event = Event::JobsChanged {
+                jobs: state.jobs().into_iter().map(|j| j.id()).collect(),
+            };
             if tx.send(Ok(event)).await.is_err() {
                 return;
             }
 
-            for id in state.jobs() {
-                let job = state.job(id);
-                if tx.send(Ok(Event::JobChanged { job })).await.is_err() {
+            for job in state.jobs() {
+                if !start_listening_on_job(state.clone(), tx.clone(), job).await {
                     break;
                 }
             }
@@ -231,25 +265,10 @@ async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
             while let Ok(event) = events.recv().await {
                 match event {
                     HubEvent::JobAdded(id) => {
-                        let event = Event::JobsChanged { jobs: state.jobs() };
-                        if tx.send(Ok(event)).await.is_err() {
+                        let job = state.hub.get_job(id).unwrap();
+                        if !start_listening_on_job(state.clone(), tx.clone(), job).await {
                             break;
                         }
-
-                        tokio::spawn({
-                            let state = state.clone();
-                            let tx = tx.clone();
-                            async move {
-                                let mut events = state.hub.get_job(id).unwrap().events();
-                                while let Ok(_event) = events.recv().await {
-                                    let job = state.job(id);
-                                    let event = Event::JobChanged { job };
-                                    if tx.send(Ok(event)).await.is_err() {
-                                        break;
-                                    }
-                                }
-                            }
-                        });
                     }
                 }
             }
