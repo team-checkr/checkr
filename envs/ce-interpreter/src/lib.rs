@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::collections::{BTreeMap, BTreeSet};
 
 use ce_core::{
@@ -16,7 +19,7 @@ use serde::{Deserialize, Serialize};
 
 define_env!(InterpreterEnv);
 
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Interpreter")]
 pub struct InterpreterMemory {
     pub variables: BTreeMap<Variable, i64>,
@@ -140,7 +143,6 @@ impl SemanticsContext for InterpreterMemory {
 struct Execution {
     initial_memory: InterpreterMemory,
     trace: Vec<(Step, Node)>,
-    is_stuck: bool,
 }
 
 impl Execution {
@@ -148,7 +150,6 @@ impl Execution {
         Self {
             initial_memory: input.assignment.clone(),
             trace: vec![],
-            is_stuck: false,
         }
     }
     fn current_node(&self) -> Node {
@@ -160,14 +161,21 @@ impl Execution {
             .map(|(s, _)| &s.memory)
             .unwrap_or(&self.initial_memory)
     }
+    fn is_finished(&self) -> bool {
+        self.current_node() == Node::End
+    }
+    fn is_stuck(&self, pg: &ProgramGraph) -> bool {
+        pg.outgoing(self.current_node())
+            .iter()
+            .all(|Edge(_, action, _)| action.semantics(self.current_mem()).is_err())
+    }
     fn nexts(&self, pg: &ProgramGraph) -> Vec<Execution> {
-        if self.is_stuck {
+        if self.is_stuck(pg) {
             return vec![];
         }
 
         let mem = self.current_mem();
-        let exes = pg
-            .outgoing(self.current_node())
+        pg.outgoing(self.current_node())
             .iter()
             .filter_map(|Edge(_, action, next_node)| {
                 action.semantics(mem).ok().map(|next_mem| {
@@ -183,14 +191,7 @@ impl Execution {
                     next
                 })
             })
-            .collect_vec();
-        if exes.is_empty() {
-            let mut next = self.clone();
-            next.is_stuck = true;
-            vec![next]
-        } else {
-            exes
-        }
+            .collect_vec()
     }
 }
 
@@ -225,19 +226,20 @@ impl Env for InterpreterEnv {
 
         for _ in 0..input.trace_length {
             if let Some(next) = exe.nexts(&pg).first().cloned() {
-                if next.is_stuck {
-                    termination = if next.current_node() == Node::End {
+                if next.is_stuck(&pg) {
+                    termination = if next.is_finished() {
                         TerminationState::Terminated
                     } else {
                         TerminationState::Stuck
                     };
+                    exe = next;
                     break;
                 }
                 exe = next;
                 continue;
             }
 
-            termination = if exe.current_node() == Node::End {
+            termination = if exe.is_finished() {
                 TerminationState::Terminated
             } else {
                 TerminationState::Stuck
@@ -286,16 +288,25 @@ impl Env for InterpreterEnv {
             });
         }
 
+        if output.termination == TerminationState::Terminated {
+            if possible_executions.iter().any(|s| s.is_finished()) {
+                return Ok(ValidationResult::CorrectTerminated);
+            }
+            return Ok(ValidationResult::Mismatch {
+                reason: "No execution reached the end".to_string(),
+            });
+        }
+
         if output.trace.len() < input.trace_length as usize
             || output.termination == TerminationState::Stuck
         {
-            if output.termination != TerminationState::Stuck {
+            if output.termination == TerminationState::Running {
                 return Ok(ValidationResult::Mismatch {
                     reason: "Not enough traces were produced".to_string(),
                 });
             }
 
-            if !possible_executions.iter().any(|exe| exe.is_stuck) {
+            if !possible_executions.iter().any(|exe| exe.is_stuck(&pg)) {
                 return Ok(ValidationResult::Mismatch {
                     reason: "No stuck execution found".to_string(),
                 });

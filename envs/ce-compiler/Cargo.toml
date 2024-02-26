@@ -12,4 +12,5 @@ license.workspace = true
 ce-core.workspace = true
 gcl.workspace = true
 serde.workspace = true
+serde_json.workspace = true
 tapi.workspace = true
