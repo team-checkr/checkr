@@ -9,27 +9,8 @@ publish = false
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
-bitflags = "2.4.0"
 ce-shell.workspace = true
-ce-sign.workspace = true
 clap = { version = "4.0.32", features = ["derive"] }
 color-eyre = { workspace = true }
-comfy-table = { workspace = true }
-gcl = { workspace = true }
-graphviz-rust = "0.6.1"
-indexmap = { version = "2.0.0", features = ["serde"] }
-itertools = { workspace = true }
-miette = { workspace = true }
-once_cell = { workspace = true }
-petgraph.workspace = true
-rand = { workspace = true }
-serde = { workspace = true }
-serde_json = { workspace = true }
-thiserror = { workspace = true }
-tokio = { workspace = true, features = ["full"] }
 tracing = { workspace = true }
 tracing-subscriber = { workspace = true }
-typeshare = { workspace = true }
-
-[dev-dependencies]
-pretty_assertions = "1.3.0"
