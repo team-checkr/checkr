@@ -7,6 +7,8 @@
   import { useIo } from '$lib/io';
   import { toSubscript } from '$lib/fmt';
   import ParsedInput from './ParsedInput.svelte';
+  import InputOptions from '$lib/components/InputOptions.svelte';
+  import InputOption from '$lib/components/InputOption.svelte';
 
   const io = useIo('Interpreter', {
     commands: 'skip',
@@ -35,51 +37,53 @@
 <Env {io}>
   <svelte:fragment slot="input">
     <StandardInput analysis="Interpreter" code="commands" {io}>
-      <h1 class="border-y p-2 pb-1 text-lg font-bold">Initialization of variables and arrays</h1>
-      <div class="grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
-        {#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
-          <div class="px-4 py-0.5 font-mono text-sm">
-            {v.name}
-          </div>
-          <div class="w-full font-mono">
-            {#if v.kind == 'Array'}
-              <ParsedInput bind:value={$input.assignment.arrays[v.name]} />
-            {:else}
-              <ParsedInput bind:value={$input.assignment.variables[v.name]} />
-            {/if}
-          </div>
-        {/each}
-      </div>
-      <h1 class="border-y p-2 pb-1 text-lg font-bold">Options</h1>
-      <div class="grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
-        <div class="px-2 py-0.5 font-mono text-sm">Number of steps</div>
-        <div class="w-full font-mono">
-          <ParsedInput bind:value={$input.trace_length} />
-        </div>
-        <div class="px-2 py-0.5 font-mono text-sm">Determinism</div>
-        <div class="grid w-full grid-cols-2 gap-x-2 font-mono">
-          {#each GCL.DETERMINISM as determinism}
-            <div
-              class="flex items-center justify-center rounded text-sm transition {$input.determinism ==
-              determinism
-                ? 'bg-slate-500'
-                : 'bg-slate-800'}"
-            >
-              <label for="determinism-{determinism}" class="cursor-pointer px-2 py-1">
-                {determinism}
-              </label>
-              <input
-                class="hidden"
-                type="radio"
-                id="determinism-{determinism}"
-                name="determinism"
-                value={determinism}
-                bind:group={$input.determinism}
-              />
+      <InputOptions title="Initialization of variables and arrays">
+        <div class="col-span-full grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
+          {#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
+            <div class="px-4 py-0.5 font-mono text-sm">
+              {v.name}
+            </div>
+            <div class="w-full font-mono">
+              {#if v.kind == 'Array'}
+                <ParsedInput bind:value={$input.assignment.arrays[v.name]} />
+              {:else}
+                <ParsedInput bind:value={$input.assignment.variables[v.name]} />
+              {/if}
             </div>
           {/each}
         </div>
-      </div>
+      </InputOptions>
+      <InputOptions>
+        <InputOption title="Number of steps">
+          <div class="w-full font-mono">
+            <ParsedInput bind:value={$input.trace_length} />
+          </div>
+        </InputOption>
+        <InputOption title="Determinism">
+          <div class="grid w-full grid-cols-2 gap-x-2 font-mono">
+            {#each GCL.DETERMINISM as determinism}
+              <div
+                class="flex items-center justify-center rounded text-sm transition {$input.determinism ==
+                determinism
+                  ? 'bg-slate-500'
+                  : 'bg-slate-800'}"
+              >
+                <label for="determinism-{determinism}" class="cursor-pointer px-2 py-1">
+                  {determinism}
+                </label>
+                <input
+                  class="hidden"
+                  type="radio"
+                  id="determinism-{determinism}"
+                  name="determinism"
+                  value={determinism}
+                  bind:group={$input.determinism}
+                />
+              </div>
+            {/each}
+          </div>
+        </InputOption>
+      </InputOptions>
     </StandardInput>
   </svelte:fragment>
   <svelte:fragment slot="output" let:input={cachedInput} let:output let:meta>
