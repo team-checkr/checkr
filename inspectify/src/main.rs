@@ -51,6 +51,9 @@ struct Cli {
     /// The port to host the server on
     #[clap(short, long, default_value = "3000")]
     port: u16,
+    /// Watch for file changes and recompile automatically
+    #[clap(long, default_value = "true")]
+    watch: Option<bool>,
     // /// Update the binary to the latest release from GitHub
     // #[clap(short = 'u', long, default_value_t = false)]
     // self_update: bool,
@@ -83,7 +86,9 @@ async fn run() -> color_eyre::Result<()> {
         Some(checko)
         // return Ok(());
     } else {
-        driver.spawn_watcher(InspectifyJobMeta::default())?;
+        if cli.watch != Some(false) {
+            driver.spawn_watcher(InspectifyJobMeta::default())?;
+        }
         None
     };
 
