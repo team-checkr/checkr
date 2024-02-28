@@ -74,7 +74,7 @@ pub enum Command {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct Guard(pub BExpr, pub Commands);
 
-pub type Int = i64;
+pub type Int = i32;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AExpr {

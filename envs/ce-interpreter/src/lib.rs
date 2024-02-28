@@ -22,8 +22,8 @@ define_env!(InterpreterEnv);
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "Interpreter")]
 pub struct InterpreterMemory {
-    pub variables: BTreeMap<Variable, i64>,
-    pub arrays: BTreeMap<Array, Vec<i64>>,
+    pub variables: BTreeMap<Variable, Int>,
+    pub arrays: BTreeMap<Array, Vec<Int>>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
