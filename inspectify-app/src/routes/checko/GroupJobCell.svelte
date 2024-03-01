@@ -17,6 +17,7 @@
 
   $: jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
   $: job = $jobsStore[jobId];
+  $: validation = $job?.analysis_data?.validation?.type;
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse', ''],
@@ -28,17 +29,20 @@
     Timeout: [Clock, '', 'bg-blue-400'],
     OutputLimitExceeded: [Trash, '', 'bg-orange-400'],
   };
-  const Icon = (state: driver.job.JobState) => icons[state][0];
 
-  $: state = $job?.state ?? 'Queued';
+  $: state = validation == 'Mismatch' ? 'Warning' : $job?.state ?? 'Queued';
+
+  $: icon = icons[state][0];
+  $: iconClass = icons[state][1];
+  $: containerClass = icons[state][2];
 </script>
 
 <button
-  class="grid h-full place-items-center p-2 transition {icons[state][2]}"
+  class="grid h-full place-items-center p-2 transition {containerClass}"
   on:click={() => {
     $selectedJobId = jobId;
     $showStatus = true;
   }}
 >
-  <svelte:component this={Icon(state)} class="h-6 w-6 text-white transition {icons[state][1]}" />
+  <svelte:component this={icon} class="h-6 w-6 text-white transition {iconClass}" />
 </button>

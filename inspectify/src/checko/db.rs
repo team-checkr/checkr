@@ -50,10 +50,18 @@ impl<T: serde::Serialize + for<'a> serde::Deserialize<'a>> Compressed<T> {
     }
 }
 
-#[derive(Debug)]
 pub struct Id<T> {
     pub id: usize,
     _ph: PhantomData<T>,
+}
+
+impl<T> std::fmt::Debug for Id<T> {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        f.debug_tuple("Id")
+            .field(&std::any::type_name::<T>())
+            .field(&self.id)
+            .finish()
+    }
 }
 
 impl<T> Clone for Id<T> {
@@ -162,6 +170,8 @@ impl CompressedRun {
 
 impl CheckoDb {
     pub fn open(path: &Path) -> color_eyre::Result<Self> {
+        tracing::debug!(?path, "opening db");
+
         let conn = rusqlite::Connection::open(path)?;
 
         conn.execute_batch(

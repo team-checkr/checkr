@@ -7,7 +7,6 @@ use std::{
     time::Duration,
 };
 
-use color_eyre::eyre::Context;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 
 use crate::{
@@ -69,7 +68,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
         meta: M,
         program: impl AsRef<OsStr> + Debug,
         args: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
-    ) -> color_eyre::Result<Job<M>>
+    ) -> Job<M>
     where
         M: Debug,
     {
@@ -90,9 +89,16 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         tracing::debug!(?cmd, "spawning");
 
-        let mut child = cmd
-            .spawn()
-            .with_context(|| format!("failed to spawn {:?}", cmd))?;
+        let mut child = match cmd.spawn() {
+            Ok(child) => child,
+            Err(e) => {
+                let mut data = JobData::new(kind, meta);
+                data.state = JobState::Failed;
+                data.stderr = format!("{:?}", e).into();
+                data.combined = data.stderr.clone();
+                return self.add_finished_job(data);
+            }
+        };
 
         let mut stderr = child.stderr.take().expect("we piped stderr");
         let mut stdout = child.stdout.take().expect("we piped stdout");
@@ -199,7 +205,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
         self.jobs.write().unwrap().push(job.clone());
         self.events_tx.send(HubEvent::JobAdded(id)).unwrap();
 
-        Ok(job)
+        job
     }
     pub fn jobs(&self, count: Option<usize>) -> Vec<Job<M>> {
         if let Some(count) = count {

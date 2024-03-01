@@ -385,10 +385,7 @@ async fn exec_analysis(
     State(state): State<AppState>,
     Json(input): Json<ce_shell::Input>,
 ) -> Json<AnalysisExecution> {
-    let output = state
-        .driver
-        .exec_job(&input, InspectifyJobMeta::default())
-        .unwrap();
+    let output = state.driver.exec_job(&input, InspectifyJobMeta::default());
     let id = output.id();
     Json(AnalysisExecution { id })
 }
