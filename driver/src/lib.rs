@@ -62,7 +62,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
         })
     }
     #[tracing::instrument(skip_all, fields(analysis=%input.analysis()))]
-    pub fn exec_job(&self, input: &Input, meta: M) -> color_eyre::Result<Job<M>> {
+    pub fn exec_job(&self, input: &Input, meta: M) -> Job<M> {
         let mut args = self
             .config
             .run()
@@ -81,7 +81,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn start_recompile(&self, meta: M) -> Option<color_eyre::Result<Job<M>>>
+    pub fn start_recompile(&self, meta: M) -> Option<Job<M>>
     where
         M: Clone,
     {
@@ -91,13 +91,9 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             }
 
             let args = compile.split(' ').collect_vec();
-            let job = self.hub.exec_command(
-                JobKind::Compilation,
-                &self.cwd,
-                meta,
-                args[0],
-                &args[1..],
-            )?;
+            let job =
+                self.hub
+                    .exec_command(JobKind::Compilation, &self.cwd, meta, args[0], &args[1..]);
             self.current_compilation
                 .write()
                 .unwrap()
@@ -114,7 +110,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                     }
                 }
             });
-            Ok(job)
+            job
         })
     }
     pub fn config(&self) -> &RunOption {
@@ -173,9 +169,9 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
 
         Ok(tokio::spawn(
             async move {
-                let mut last_job: Option<color_eyre::Result<Job<M>>> = None;
+                let mut last_job: Option<Job<M>> = None;
                 while let Some(()) = rx.recv().await {
-                    if let Some(Ok(last_job)) = last_job {
+                    if let Some(last_job) = last_job {
                         last_job.kill();
                     }
                     last_job = driver.start_recompile(meta.clone());
@@ -197,15 +193,15 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
     }
 
     #[tracing::instrument(skip_all)]
-    pub fn ensure_compile(&self, meta: M) -> color_eyre::Result<Option<Job<M>>>
+    pub fn ensure_compile(&self, meta: M) -> Option<Job<M>>
     where
         M: Clone,
     {
         let current_compilation_job = self.current_compilation.read().unwrap().clone();
         if let Some(job) = current_compilation_job {
-            Ok(Some(job))
+            Some(job)
         } else {
-            self.start_recompile(meta).transpose()
+            self.start_recompile(meta)
         }
     }
 }

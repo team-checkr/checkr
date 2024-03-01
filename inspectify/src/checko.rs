@@ -12,6 +12,7 @@ use color_eyre::eyre::{Context, ContextCompat};
 use driver::{Driver, Hub, Job, JobData, JobId, JobKind};
 use indexmap::IndexMap;
 use itertools::Itertools;
+use tracing::Instrument;
 
 use crate::endpoints::InspectifyJobMeta;
 
@@ -53,12 +54,15 @@ impl Checko {
     pub fn open(hub: Hub<InspectifyJobMeta>, path: &Path) -> color_eyre::Result<Self> {
         let path = dunce::canonicalize(path)
             .wrap_err_with(|| format!("could not canonicalize path: '{}'", path.display()))?;
+        tracing::debug!(?path, "opening checko");
 
         let runs_db_path = path.join("runs.db3");
         let groups_path = dunce::canonicalize(path.join("groups.toml"))
             .wrap_err_with(|| format!("missing groups.toml at '{}'", path.display()))?;
         let programs_path = dunce::canonicalize(path.join("programs.toml"))
             .wrap_err_with(|| format!("missing programs.toml at '{}'", path.display()))?;
+
+        tracing::debug!(?runs_db_path, ?groups_path, ?programs_path, "checko paths");
 
         let db = db::CheckoDb::open(&runs_db_path).wrap_err("could not open db")?;
         let groups = config::read_groups(groups_path)?;
@@ -84,6 +88,7 @@ impl Checko {
 
     pub fn repopulate_hub(&self) -> color_eyre::Result<()> {
         for run in self.db.all_runs()? {
+            tracing::debug!(run_id=?run.id, "repopulating hub");
             let data = run.data.decompress();
             let kind = data.kind.clone();
             let job = self.hub.add_finished_job(data);
@@ -113,6 +118,7 @@ impl Checko {
         group_name: &str,
         analysis: Analysis,
     ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
+        tracing::debug!(?group_name, ?analysis, "getting group state");
         let mut group_states = self.group_states.lock().unwrap();
 
         let key = (group_name.to_string(), analysis);
@@ -139,6 +145,7 @@ impl Checko {
         group_name: &str,
         analysis: Analysis,
     ) -> color_eyre::Result<Arc<GroupState>> {
+        tracing::debug!(?group_name, "building group state");
         let config = self
             .groups_config
             .groups
@@ -147,9 +154,11 @@ impl Checko {
             .wrap_err_with(|| format!("group '{}' not found", group_name))?;
         match self.build_group_driver(config, analysis) {
             Ok(driver) => {
+                tracing::debug!(?group_name, "ensuring compile job");
                 let compile_job = driver.ensure_compile(InspectifyJobMeta {
                     group_name: Some(group_name.to_string()),
-                })?;
+                });
+                tracing::debug!(?group_name, "group state built successfully");
                 let state = Arc::new(GroupState {
                     config: config.clone(),
                     driver: GroupDriver::Driver(driver),
@@ -159,6 +168,7 @@ impl Checko {
                 Ok(state)
             }
             Err(err) => {
+                tracing::error!(?err, "could not build group driver");
                 let state = Arc::new(GroupState {
                     config: config.clone(),
                     driver: GroupDriver::Missing {
@@ -179,7 +189,7 @@ impl Checko {
         analysis: Analysis,
     ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
         let group_path = match (&config.git, &config.path) {
-            (Some(git), _) => {
+            (Some(git), then_path) => {
                 let group_path = self
                     .path
                     .join("groups")
@@ -191,6 +201,10 @@ impl Checko {
                         group_path.display()
                     )
                 })?;
+
+                // TODO: we should retry git operations a couple of times, and
+                // not rely on sleeping for a bit
+                std::thread::sleep(std::time::Duration::from_secs(2));
 
                 std::process::Command::new("git")
                     .arg("clone")
@@ -213,9 +227,7 @@ impl Checko {
                 // checkout latest commit before a set date
                 if let Some(date) = date {
                     let commit_rev_bytes = std::process::Command::new("git")
-                        .arg("rev-list")
-                        .arg("-n")
-                        .arg("1")
+                        .args(["rev-list", "-n", "1"])
                         .arg(format!("--before={date}"))
                         .arg("HEAD")
                         .current_dir(&group_path)
@@ -235,7 +247,11 @@ impl Checko {
                         })?;
                 }
 
-                group_path
+                if let Some(then_path) = then_path {
+                    group_path.join(then_path)
+                } else {
+                    group_path
+                }
             }
             (_, Some(path)) => dunce::canonicalize(PathBuf::from(path))
                 .wrap_err_with(|| format!("could not canonicalize group path: '{}'", path))?,
@@ -268,62 +284,76 @@ impl Checko {
             let mut join_set = tokio::task::JoinSet::new();
 
             for run in self.db.unfinished_runs(10)? {
+                tracing::debug!(name=?run.group_name, "found unfinished run");
                 let Some(input) = run.input() else {
+                    tracing::error!(name=?run.group_name, "could not get input for run");
                     continue;
                 };
                 let group_state = self.group_state(&run.group_name, input.analysis())?;
                 let db = self.db.clone();
                 let events_tx = self.events_tx.clone();
-                join_set.spawn(async move {
-                    let group_state = group_state.await;
-                    let GroupDriver::Driver(driver) = &group_state.driver else {
-                        db.finish_run(
-                            run.id,
-                            &JobData {
-                                stderr: Default::default(),
-                                stdout: Default::default(),
-                                combined: Default::default(),
-                                kind: JobKind::Analysis(input),
-                                state: driver::JobState::Warning,
-                                meta: InspectifyJobMeta {
-                                    group_name: Some(run.group_name.clone()),
+                join_set.spawn(
+                    async move {
+                        tracing::debug!(name=?run.group_name, "getting driver from group state");
+                        let group_state = group_state.await;
+                        let GroupDriver::Driver(driver) = &group_state.driver else {
+                            tracing::error!(name=?run.group_name, "group driver missing");
+                            db.finish_run(
+                                run.id,
+                                &JobData {
+                                    stderr: Default::default(),
+                                    stdout: Default::default(),
+                                    combined: Default::default(),
+                                    kind: JobKind::Analysis(input),
+                                    state: driver::JobState::Warning,
+                                    meta: InspectifyJobMeta {
+                                        group_name: Some(run.group_name.clone()),
+                                    },
                                 },
+                            )?;
+                            return Ok::<_, color_eyre::Report>(());
+                        };
+                        tracing::debug!(name=?run.group_name, "starting run");
+                        db.start_run(run.id)?;
+                        let job = driver.exec_job(
+                            &input,
+                            InspectifyJobMeta {
+                                group_name: Some(run.group_name.clone()),
                             },
-                        )?;
-                        return Ok::<_, color_eyre::Report>(());
-                    };
-                    db.start_run(run.id)?;
-                    let job = driver.exec_job(
-                        &input,
-                        InspectifyJobMeta {
-                            group_name: Some(run.group_name.clone()),
-                        },
-                    )?;
-                    group_state.active_jobs.lock().unwrap().push(job.clone());
-                    events_tx
-                        .send(CheckoEvent::JobAssigned {
-                            group: run.group_name.clone(),
-                            kind: JobKind::Analysis(input),
-                            job_id: job.id(),
-                        })
-                        .unwrap();
-                    job.wait().await;
-                    group_state
-                        .active_jobs
-                        .lock()
-                        .unwrap()
-                        .retain(|j| j.id() != job.id());
+                        );
+                        group_state.active_jobs.lock().unwrap().push(job.clone());
+                        events_tx
+                            .send(CheckoEvent::JobAssigned {
+                                group: run.group_name.clone(),
+                                kind: JobKind::Analysis(input),
+                                job_id: job.id(),
+                            })
+                            .unwrap();
+                        tracing::debug!(name=?run.group_name, "waiting for job");
+                        job.wait().await;
+                        tracing::debug!(name=?run.group_name, "job finished");
+                        group_state
+                            .active_jobs
+                            .lock()
+                            .unwrap()
+                            .retain(|j| j.id() != job.id());
 
-                    db.finish_run(run.id, &job.data())?;
-                    Ok::<_, color_eyre::Report>(())
-                });
+                        db.finish_run(run.id, &job.data())?;
+                        Ok::<_, color_eyre::Report>(())
+                    }
+                    .in_current_span(),
+                );
             }
 
             if join_set.is_empty() {
                 break;
             }
 
-            while join_set.join_next().await.is_some() {}
+            while let Some(res) = join_set.join_next().await {
+                if let Err(err) = res? {
+                    tracing::error!(?err, "error in join set");
+                }
+            }
         }
 
         Ok(())

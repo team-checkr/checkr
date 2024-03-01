@@ -70,9 +70,7 @@ async fn run() -> color_eyre::Result<()> {
     let hub = driver::Hub::new()?;
     let run_toml_path = dir.join("run.toml");
     let driver = driver::Driver::new_from_path(hub.clone(), dir.clone(), run_toml_path)?;
-    if let Some(job) = driver.start_recompile(InspectifyJobMeta::default()) {
-        job?;
-    }
+    let _: Option<_> = driver.start_recompile(InspectifyJobMeta::default());
 
     let checko = if let Some(checko_path) = cli.checko {
         let checko = Arc::new(checko::Checko::open(hub.clone(), &checko_path)?);
