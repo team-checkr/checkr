@@ -72,10 +72,9 @@ impl Env for SecurityEnv {
             input
                 .commands
                 .try_parse()
-                .map_err(|err| ce_core::EnvError::InvalidInputForProgram {
-                    message: "failed to parse commands".to_string(),
-                    source: Some(Box::new(err)),
-                })
+                .map_err(ce_core::EnvError::invalid_input_for_program(
+                    "failed to parse commands",
+                ))
         else {
             return Default::default();
         };
@@ -87,12 +86,13 @@ impl Env for SecurityEnv {
     }
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let commands = input.commands.try_parse().map_err(|err| {
-            ce_core::EnvError::InvalidInputForProgram {
-                message: "failed to parse commands".to_string(),
-                source: Some(Box::new(err)),
-            }
-        })?;
+        let commands =
+            input
+                .commands
+                .try_parse()
+                .map_err(ce_core::EnvError::invalid_input_for_program(
+                    "failed to parse commands",
+                ))?;
 
         let lattice = SecurityLattice::new(&input.lattice.rules);
 

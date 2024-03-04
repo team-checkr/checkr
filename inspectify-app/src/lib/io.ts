@@ -55,12 +55,13 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         cancel = () => {
           analysisRequest.abort();
         };
-        const { id: jobId } = await analysisRequest.data;
+        const res = await analysisRequest.data;
+        if (!res) return;
         cancel = () => {
-          api.jobsCancel(jobId).data.catch(() => {});
+          api.jobsCancel(res.id).data.catch(() => {});
         };
 
-        set({ jobId, input: $input });
+        set({ jobId: res.id, input: $input });
       };
 
       run();

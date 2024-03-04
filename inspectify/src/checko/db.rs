@@ -227,7 +227,8 @@ impl CheckoDb {
     pub fn unfinished_runs(&self, count: usize) -> color_eyre::Result<Vec<WithId<CompressedRun>>> {
         let conn = self.conn();
         let mut stmt = conn.prepare(
-            "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE finished IS NULL ORDER BY queued LIMIT ?1",
+            // "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE finished IS NULL ORDER BY queued LIMIT ?1",
+            "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE finished IS NULL ORDER BY input_md5 LIMIT ?1",
         )?;
         let runs = stmt
             .query_map([count], |row| {

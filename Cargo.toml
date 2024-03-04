@@ -35,6 +35,7 @@ ce-sign = { path = "./envs/ce-sign" }
 checkr = { path = "./checkr" }
 clap = { version = "4.4.4", features = ["derive"] }
 color-eyre = "0.6.2"
+dashmap = "5.5.3"
 driver = { path = "./driver" }
 dunce = "1.0.4"
 futures-util = "0.3.28"
@@ -43,7 +44,7 @@ indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = "0.11.0"
 md5 = "0.7.0"
 miette = { version = "5.10.0", features = ["fancy"] }
-once_cell = "1.18.0"
+once_cell = "1.19.0"
 petgraph = { version = "0.6.3" }
 rand = { version = "0.8.5", features = ["small_rng"] }
 serde = { version = "1.0.152", features = ["derive", "rc"] }

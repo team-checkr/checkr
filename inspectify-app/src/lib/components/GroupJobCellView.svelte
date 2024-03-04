@@ -1,7 +1,6 @@
 <script lang="ts">
-  import { type inspectify, type driver } from '$lib/api';
-  import { groupProgramJobAssignedStore, jobsStore } from '$lib/events';
-  import { selectedJobId, showStatus } from '$lib/jobs';
+  import { type driver } from '$lib/api';
+  import { createEventDispatcher } from 'svelte';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
   import ArrowPath from '~icons/heroicons/arrow-path';
@@ -12,13 +11,9 @@
   import Clock from '~icons/heroicons/clock';
   import Trash from '~icons/heroicons/Trash';
 
-  export let group: inspectify.checko.config.GroupConfig;
-  export let program: inspectify.endpoints.Program;
+  export let state: driver.job.JobState;
 
-  $: jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
-  $: job = $jobsStore[jobId];
-  $: validation = $job?.analysis_data?.validation?.type;
-  $: state = validation == 'Mismatch' ? 'Warning' : $job?.state ?? 'Queued';
+  const dispatch = createEventDispatcher<{ click: void }>();
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse', ''],
@@ -38,10 +33,7 @@
 
 <button
   class="grid h-full place-items-center p-2 transition {containerClass}"
-  on:click={() => {
-    $selectedJobId = jobId;
-    $showStatus = true;
-  }}
+  on:click={() => dispatch('click')}
 >
   <svelte:component this={icon} class="h-6 w-6 text-white transition {iconClass}" />
 </button>

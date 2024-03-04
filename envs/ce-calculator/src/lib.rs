@@ -25,12 +25,13 @@ impl Env for CalcEnv {
     type Meta = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let expr = input.expression.try_parse().map_err(|err| {
-            ce_core::EnvError::InvalidInputForProgram {
-                message: "failed to parse expression".to_string(),
-                source: Some(Box::new(err)),
-            }
-        })?;
+        let expr =
+            input
+                .expression
+                .try_parse()
+                .map_err(ce_core::EnvError::invalid_input_for_program(
+                    "failed to parse expression",
+                ))?;
         let (result, error) = match expr.semantics(&gcl::semantics::EmptySemanticsContext) {
             Ok(result) => (result.to_string(), String::new()),
             Err(err) => {
