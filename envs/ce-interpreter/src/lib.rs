@@ -53,15 +53,13 @@ impl Env for InterpreterEnv {
     }
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let pg = gcl::pg::ProgramGraph::new(
-            input.determinism,
-            &input.commands.try_parse().map_err(|err| {
-                ce_core::EnvError::InvalidInputForProgram {
-                    message: "failed to parse commands".to_string(),
-                    source: Some(Box::new(err)),
-                }
-            })?,
-        );
+        let pg =
+            gcl::pg::ProgramGraph::new(
+                input.determinism,
+                &input.commands.try_parse().map_err(
+                    ce_core::EnvError::invalid_input_for_program("failed to parse commands"),
+                )?,
+            );
 
         let mut exe = Execution::new(input.assignment.clone());
 
@@ -88,15 +86,13 @@ impl Env for InterpreterEnv {
     }
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        let pg = gcl::pg::ProgramGraph::new(
-            input.determinism,
-            &input.commands.try_parse().map_err(|err| {
-                ce_core::EnvError::InvalidInputForProgram {
-                    message: "failed to parse commands".to_string(),
-                    source: Some(Box::new(err)),
-                }
-            })?,
-        );
+        let pg =
+            gcl::pg::ProgramGraph::new(
+                input.determinism,
+                &input.commands.try_parse().map_err(
+                    ce_core::EnvError::invalid_input_for_program("failed to parse commands"),
+                )?,
+            );
         let mut possible_executions = vec![Execution::new(input.assignment.clone())];
 
         for step in &output.trace {

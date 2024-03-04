@@ -1,28 +1,30 @@
 pub mod gen;
 
+use std::sync::Arc;
+
 pub use gen::Generate;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
 
 pub use rand;
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, Clone, thiserror::Error)]
 pub enum EnvError {
     #[error("failed to parse json input: {source}")]
     ParseInput {
-        source: serde_json::Error,
+        source: Arc<serde_json::Error>,
         json: Either<serde_json::Value, String>,
     },
     #[error("failed to parse json output: {source}")]
     ParseOutput {
-        source: serde_json::Error,
+        source: Arc<serde_json::Error>,
         json: Either<serde_json::Value, String>,
     },
     #[error("input is not valid for the current program: {message}")]
     InvalidInputForProgram {
         message: String,
         #[source]
-        source: Option<Box<dyn std::error::Error + Send + Sync + 'static>>,
+        source: Option<Arc<dyn std::error::Error + Send + Sync + 'static>>,
     },
 }
 
@@ -31,7 +33,7 @@ impl EnvError {
         json: &serde_json::Value,
     ) -> impl FnOnce(serde_json::Error) -> EnvError + '_ {
         move |source| EnvError::ParseInput {
-            source,
+            source: Arc::new(source),
             json: Either::Left(json.clone()),
         }
     }
@@ -39,8 +41,16 @@ impl EnvError {
         json: &serde_json::Value,
     ) -> impl FnOnce(serde_json::Error) -> EnvError + '_ {
         move |source| EnvError::ParseOutput {
-            source,
+            source: Arc::new(source),
             json: Either::Left(json.clone()),
+        }
+    }
+    pub fn invalid_input_for_program<E: std::error::Error + Send + Sync + 'static>(
+        message: impl std::fmt::Display,
+    ) -> impl FnOnce(E) -> EnvError {
+        move |source| EnvError::InvalidInputForProgram {
+            message: message.to_string(),
+            source: Some(Arc::new(source)),
         }
     }
 }

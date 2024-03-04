@@ -22,7 +22,7 @@ pub struct Checko {
     db: db::CheckoDb,
     groups_config: config::GroupsConfig,
     programs_config: config::ProgramsConfig,
-    group_states: Mutex<IndexMap<(String, Analysis), Arc<GroupState>>>,
+    group_states: tokio::sync::Mutex<IndexMap<(String, Analysis), Arc<GroupState>>>,
     events_tx: crate::history_broadcaster::Sender<CheckoEvent>,
     events_rx: crate::history_broadcaster::Receiver<CheckoEvent>,
 }
@@ -113,20 +113,21 @@ impl Checko {
     }
 
     #[tracing::instrument(skip(self))]
-    pub fn group_state(
+    pub async fn group_state(
         &self,
         group_name: &str,
         analysis: Analysis,
     ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
         tracing::debug!(?group_name, ?analysis, "getting group state");
-        let mut group_states = self.group_states.lock().unwrap();
 
         let key = (group_name.to_string(), analysis);
 
-        let state = if group_states.contains_key(&key) {
-            Arc::clone(&group_states[&key])
+        let gs = self.group_states.lock().await.get(&key).cloned();
+        let state = if let Some(gs) = gs {
+            gs
         } else {
-            let state = self.build_group_state(group_name, analysis)?;
+            let state = self.build_group_state(group_name, analysis).await?;
+            let mut group_states = self.group_states.lock().await;
             group_states.insert(key, Arc::clone(&state));
             state
         };
@@ -140,7 +141,7 @@ impl Checko {
     }
 
     #[tracing::instrument(skip(self))]
-    fn build_group_state(
+    async fn build_group_state(
         &self,
         group_name: &str,
         analysis: Analysis,
@@ -152,7 +153,7 @@ impl Checko {
             .iter()
             .find(|g| g.name == group_name)
             .wrap_err_with(|| format!("group '{}' not found", group_name))?;
-        match self.build_group_driver(config, analysis) {
+        match self.build_group_driver(config, analysis).await {
             Ok(driver) => {
                 tracing::debug!(?group_name, "ensuring compile job");
                 let compile_job = driver.ensure_compile(InspectifyJobMeta {
@@ -183,7 +184,7 @@ impl Checko {
     }
 
     #[tracing::instrument(skip(self))]
-    fn build_group_driver(
+    async fn build_group_driver(
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
@@ -202,26 +203,52 @@ impl Checko {
                     )
                 })?;
 
-                // TODO: we should retry git operations a couple of times, and
-                // not rely on sleeping for a bit
-                std::thread::sleep(std::time::Duration::from_secs(2));
+                let git_pull_result: color_eyre::Result<()> = tokio_retry::Retry::spawn(
+                    tokio_retry::strategy::FixedInterval::new(std::time::Duration::from_secs(5))
+                        .take(15),
+                    || async {
+                        if !group_path.join(".git").try_exists().unwrap_or(false) {
+                            tracing::info!(?git, "cloning group git repository");
+                            let status = tokio::process::Command::new("git")
+                                .arg("clone")
+                                .arg(git)
+                                .args(["."])
+                                .current_dir(&group_path)
+                                .stderr(std::process::Stdio::inherit())
+                                .stdout(std::process::Stdio::inherit())
+                                .status()
+                                .await
+                                .wrap_err_with(|| {
+                                    format!("could not clone group git repository: '{git}'")
+                                })?;
+                            tracing::debug!(code=?status.code(), "git clone status");
+                            if !status.success() {
+                                return Err(color_eyre::eyre::eyre!("git clone failed"));
+                            }
+                        } else {
+                            tracing::info!(?git, "pulling group git repository");
+                            let status = tokio::process::Command::new("git")
+                                .arg("pull")
+                                .current_dir(&group_path)
+                                .stderr(std::process::Stdio::inherit())
+                                .stdout(std::process::Stdio::inherit())
+                                .status()
+                                .await
+                                .wrap_err_with(|| {
+                                    format!("could not pull group git repository: '{git}'")
+                                })?;
+                            tracing::debug!(code=?status.code(), "git pull status");
+                            if !status.success() {
+                                return Err(color_eyre::eyre::eyre!("git pull failed"));
+                            }
+                        }
 
-                std::process::Command::new("git")
-                    .arg("clone")
-                    .arg(git)
-                    .args(["."])
-                    .current_dir(&group_path)
-                    .stderr(std::process::Stdio::inherit())
-                    .stdout(std::process::Stdio::inherit())
-                    .output()
-                    .wrap_err_with(|| format!("could not clone group git repository: '{git}'"))?;
-                std::process::Command::new("git")
-                    .arg("pull")
-                    .current_dir(&group_path)
-                    .stderr(std::process::Stdio::inherit())
-                    .stdout(std::process::Stdio::inherit())
-                    .output()
-                    .wrap_err_with(|| format!("could not pull group git repository: '{git}'"))?;
+                        Ok(())
+                    },
+                )
+                .await;
+
+                git_pull_result?;
 
                 let date: Option<&str> = None;
                 // checkout latest commit before a set date
@@ -289,7 +316,7 @@ impl Checko {
                     tracing::error!(name=?run.group_name, "could not get input for run");
                     continue;
                 };
-                let group_state = self.group_state(&run.group_name, input.analysis())?;
+                let group_state = self.group_state(&run.group_name, input.analysis()).await?;
                 let db = self.db.clone();
                 let events_tx = self.events_tx.clone();
                 join_set.spawn(

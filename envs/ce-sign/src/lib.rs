@@ -59,15 +59,13 @@ impl Env for SignEnv {
     }
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let pg = ProgramGraph::new(
-            input.determinism,
-            &input.commands.try_parse().map_err(|err| {
-                ce_core::EnvError::InvalidInputForProgram {
-                    message: "failed to parse commands".to_string(),
-                    source: Some(Box::new(err)),
-                }
-            })?,
-        );
+        let pg =
+            ProgramGraph::new(
+                input.determinism,
+                &input.commands.try_parse().map_err(
+                    ce_core::EnvError::invalid_input_for_program("failed to parse commands"),
+                )?,
+            );
 
         for t in pg.fv() {
             match t {

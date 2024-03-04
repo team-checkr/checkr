@@ -1,14 +1,57 @@
 <script lang="ts">
-  import { ce_shell } from '$lib/api';
+  import { ce_shell, driver, type inspectify } from '$lib/api';
   import JobPane from '$lib/components/JobPane.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
-  import { groupsConfigStore, programsStore } from '$lib/events';
+  import {
+    groupProgramJobAssignedStore,
+    groupsConfigStore,
+    jobsStore,
+    programsStore,
+  } from '$lib/events';
   import { showStatus } from '$lib/jobs';
+  import { derived, readonly, writable } from 'svelte/store';
   import GroupJobCell from './GroupJobCell.svelte';
 
   $: includedAnalysis = ce_shell.ANALYSIS.filter((a) =>
     $programsStore.find((p) => p.input.analysis == a),
   );
+
+  // $: computeGroupState = (group: inspectify.checko.config.GroupConfig) => {
+  //   const states = $programsStore.map((program) => {
+  //     const jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
+  //     const job = $jobsStore[jobId];
+  //     if (!job) return writable('Queued' as const);
+  //     return derived([job], ([job]) => {
+  //       const validation = job?.analysis_data?.validation?.type;
+  //       return validation == 'Mismatch' ? 'Warning' : job?.state ?? 'Queued';
+  //     });
+  //   });
+
+  //   return derived(
+  //     states,
+  //     (states) =>
+  //       states.filter((s) => s == 'Succeeded').length - states.filter((s) => s == 'Failed').length,
+  //   );
+  // };
+
+  // $: scores = derived(
+  //   $groupsConfigStore?.groups.map((group) => {
+  //     return computeGroupState(group);
+  //   }) || [],
+  //   (xs) => xs,
+  // );
+
+  // $: sortedGroups =
+  //   $groupsConfigStore?.groups.slice().sort((a, b) => {
+  //     const aIndex = $groupsConfigStore?.groups.indexOf(a) ?? -1;
+  //     const bIndex = $groupsConfigStore?.groups.indexOf(b) ?? -1;
+
+  //     if (aIndex == -1 || bIndex == -1) return 0;
+
+  //     return $scores[bIndex] - $scores[aIndex];
+  //   }) || [];
+
+  $: sortedGroups = $groupsConfigStore?.groups || [];
 </script>
 
 <div class="grid {showStatus ? 'grid-cols-[auto_1fr]' : ''}">
@@ -31,7 +74,7 @@
             {analysis}
           </div>
         {/each}
-        {#each $groupsConfigStore.groups as group (group.name)}
+        {#each sortedGroups as group (group.name)}
           <div class="flex items-center border bg-slate-800 px-1 font-bold">
             {group.name}
           </div>

@@ -97,7 +97,7 @@ async fn run() -> color_eyre::Result<()> {
         .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(AppState {
             hub,
-            driver,
+            driver: Some(driver),
             checko,
         });
     let app = Router::new().nest("/api", api).fallback(static_dir);

@@ -42,6 +42,10 @@ impl Output {
     pub fn data(&self) -> Arc<serde_json::Value> {
         self.json.clone()
     }
+
+    pub fn hash(&self) -> [u8; 16] {
+        md5::compute(format!("{:?}::{self}", self.analysis())).0
+    }
 }
 
 impl Meta {

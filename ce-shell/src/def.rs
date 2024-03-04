@@ -66,7 +66,7 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            // #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
             pub fn input_from_str(self, src: &str) -> Result<Input, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
@@ -79,7 +79,7 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            // #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
             pub fn input_from_slice(self, src: &[u8]) -> Result<Input, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
@@ -92,7 +92,7 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            // #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
             pub fn output_from_str(self, src: &str) -> Result<Output, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
@@ -106,7 +106,7 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
+            // #[tracing::instrument(skip_all, fields(analysis = self.to_string(), ?src))]
             pub fn output_from_from_bytes(self, src: &[u8]) -> Result<Output, $crate::io::Error> {
                 match self {
                     $(Analysis::$name => {
@@ -160,7 +160,14 @@ macro_rules! define_shell {
             pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
                 assert_eq!(self.analysis(), output.analysis());
 
-                match self.analysis {
+                static VALIDATION: once_cell::sync::Lazy<dashmap::DashMap<([u8; 16], [u8; 16]),  Result<ValidationResult, EnvError>>> = once_cell::sync::Lazy::new(Default::default);
+
+                let key = (self.hash(), output.hash());
+                if let Some(result) = VALIDATION.get(&key) {
+                    return result.clone();
+                }
+
+                let result = (|| match self.analysis {
                     $(Analysis::$name => {
                         let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone())
                             .map_err(EnvError::from_parse_input(&self.json))?;
@@ -168,7 +175,11 @@ macro_rules! define_shell {
                             .map_err(EnvError::from_parse_output(&output.json))?;
                         <$krate as Env>::validate(&input, &output)
                     }),*
-                }
+                })();
+
+                VALIDATION.insert(key, result.clone());
+
+                result
             }
         }
 
