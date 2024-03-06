@@ -74,7 +74,6 @@ async fn run() -> color_eyre::Result<()> {
 
     let checko = if let Some(checko_path) = cli.checko {
         let checko = Arc::new(checko::Checko::open(hub.clone(), &checko_path)?);
-        checko.repopulate_hub()?;
         tokio::spawn({
             let checko = Arc::clone(&checko);
             async move {

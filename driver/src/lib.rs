@@ -85,7 +85,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
     where
         M: Clone,
     {
-        self.config.compile.as_ref().map(|compile| {
+        if let Some(compile) = &self.config.compile {
             if let Some(job) = self.current_compilation.write().unwrap().take() {
                 job.kill();
             }
@@ -98,20 +98,25 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                 .write()
                 .unwrap()
                 .replace(job.clone());
-            tokio::spawn({
-                let driver = self.clone();
-                let job = job.clone();
-                async move {
-                    tracing::debug!("waiting for it to compile...");
-                    let state = job.wait().await;
-                    tracing::debug!(?state, "finished!");
-                    if let JobState::Succeeded = state {
-                        *driver.latest_successfull_compile.write().unwrap() = Some(job)
+            tokio::spawn(
+                {
+                    let driver = self.clone();
+                    let job = job.clone();
+                    async move {
+                        tracing::debug!("waiting for it to compile...");
+                        let state = job.wait().await;
+                        tracing::debug!(?state, "finished!");
+                        if let JobState::Succeeded = state {
+                            *driver.latest_successfull_compile.write().unwrap() = Some(job)
+                        }
                     }
                 }
-            });
-            job
-        })
+                .in_current_span(),
+            );
+            Some(job)
+        } else {
+            None
+        }
     }
     pub fn config(&self) -> &RunOption {
         &self.config
