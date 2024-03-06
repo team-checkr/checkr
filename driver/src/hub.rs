@@ -7,6 +7,7 @@ use std::{
     time::Duration,
 };
 
+use itertools::Either;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 
 use crate::{
@@ -19,12 +20,23 @@ pub enum HubEvent {
     JobAdded(JobId),
 }
 
-#[derive(Debug, Clone)]
+#[derive(Debug)]
 pub struct Hub<M> {
     next_job_id: Arc<AtomicUsize>,
     jobs: Arc<RwLock<Vec<Job<M>>>>,
     events_tx: Arc<tokio::sync::broadcast::Sender<HubEvent>>,
     events_rx: Arc<tokio::sync::broadcast::Receiver<HubEvent>>,
+}
+
+impl<M> Clone for Hub<M> {
+    fn clone(&self) -> Self {
+        Self {
+            next_job_id: self.next_job_id.clone(),
+            jobs: self.jobs.clone(),
+            events_tx: self.events_tx.clone(),
+            events_rx: self.events_rx.clone(),
+        }
+    }
 }
 
 impl<M> PartialEq for Hub<M> {
@@ -72,6 +84,8 @@ impl<M: Send + Sync + 'static> Hub<M> {
     where
         M: Debug,
     {
+        static JOB_SEMAPHORE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(10);
+
         let id = self.next_job_id();
 
         let mut cmd = tokio::process::Command::new(program);
@@ -86,22 +100,6 @@ impl<M: Send + Sync + 'static> Hub<M> {
         cmd.kill_on_drop(true);
 
         cmd.env("CARGO_TERM_COLOR", "always");
-
-        tracing::debug!(?cmd, "spawning");
-
-        let mut child = match cmd.spawn() {
-            Ok(child) => child,
-            Err(e) => {
-                let mut data = JobData::new(kind, meta);
-                data.state = JobState::Failed;
-                data.stderr = format!("{:?}", e).into();
-                data.combined = data.stderr.clone();
-                return self.add_finished_job(data);
-            }
-        };
-
-        let mut stderr = child.stderr.take().expect("we piped stderr");
-        let mut stdout = child.stdout.take().expect("we piped stdout");
 
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
@@ -125,6 +123,20 @@ impl<M: Send + Sync + 'static> Hub<M> {
             let data1 = Arc::clone(&data);
             let events_tx1 = events_tx.clone();
             let main_task = async move {
+                let mut child = match cmd.spawn() {
+                    Ok(child) => child,
+                    Err(e) => {
+                        let mut data = data1.write().unwrap();
+                        data.state = JobState::Failed;
+                        data.stderr = format!("{:?}", e).into();
+                        data.combined = data.stderr.clone();
+                        return Either::Left(());
+                    }
+                };
+
+                let mut stderr = child.stderr.take().expect("we piped stderr");
+                let mut stdout = child.stdout.take().expect("we piped stdout");
+
                 let mut bytes_left = max_output;
                 let mut exit_status = None;
                 let mut stderr_empty = false;
@@ -151,17 +163,17 @@ impl<M: Send + Sync + 'static> Hub<M> {
                             exit_status = Some(es);
                         },
                         else => {
-                            break if let Some(exit_status) = exit_status {
+                            break Either::Right(if let Some(exit_status) = exit_status {
                                 Exit::ExitStatus(exit_status)
                             } else {
                                 Exit::Terminated
-                            };
+                            });
                         }
                     }
                     if bytes_left == 0 {
                         data1.write().unwrap().state = JobState::OutputLimitExceeded;
                         let _ = child.kill().await;
-                        break Exit::Terminated;
+                        break Either::Right(Exit::Terminated);
                     }
                     events_tx1.send(JobEvent::Wrote {}).unwrap();
                 }
@@ -169,10 +181,12 @@ impl<M: Send + Sync + 'static> Hub<M> {
             let data2 = Arc::clone(&data);
             let events_tx2 = events_tx.clone();
             async move {
+                let _permit = JOB_SEMAPHORE.acquire().await;
+
                 match tokio::time::timeout(timeout, main_task).await {
-                    Ok(exit) => {
-                        let mut data = data2.write().unwrap();
-                        data.state = match exit {
+                    Ok(Either::Left(())) => {}
+                    Ok(Either::Right(exit)) => {
+                        data2.write().unwrap().state = match exit {
                             Exit::ExitStatus(exit_status) => {
                                 if exit_status.success() {
                                     JobState::Succeeded
@@ -197,7 +211,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
             JobInner {
                 task: Arc::new(Mutex::new(Some(task))),
                 events_rx: Arc::new(events_rx),
-                data,
+                data: Arc::clone(&data),
                 wait_lock: Default::default(),
             },
         );

@@ -9,7 +9,7 @@ use std::{
 
 use ce_shell::Analysis;
 use color_eyre::eyre::{Context, ContextCompat};
-use driver::{Driver, Hub, Job, JobData, JobId, JobKind};
+use driver::{Driver, Hub, Job, JobId, JobKind};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use tracing::Instrument;
@@ -22,6 +22,7 @@ pub struct Checko {
     db: db::CheckoDb,
     groups_config: config::GroupsConfig,
     programs_config: config::ProgramsConfig,
+    group_repos: tokio::sync::Mutex<IndexMap<(String, Analysis), GroupRepo>>,
     group_states: tokio::sync::Mutex<IndexMap<(String, Analysis), Arc<GroupState>>>,
     events_tx: crate::history_broadcaster::Sender<CheckoEvent>,
     events_rx: crate::history_broadcaster::Receiver<CheckoEvent>,
@@ -47,6 +48,12 @@ pub struct GroupState {
     driver: GroupDriver,
     compile_job: Option<Job<InspectifyJobMeta>>,
     active_jobs: Mutex<Vec<Job<InspectifyJobMeta>>>,
+}
+
+#[derive(Debug, Clone)]
+pub struct GroupRepo {
+    pub path: PathBuf,
+    pub git_hash: Option<String>,
 }
 
 impl Checko {
@@ -76,6 +83,7 @@ impl Checko {
             db,
             groups_config: groups,
             programs_config: programs,
+            group_repos: Default::default(),
             group_states: Default::default(),
             events_tx,
             events_rx,
@@ -84,24 +92,6 @@ impl Checko {
 
     pub fn events(&self) -> crate::history_broadcaster::Receiver<CheckoEvent> {
         self.events_rx.resubscribe()
-    }
-
-    pub fn repopulate_hub(&self) -> color_eyre::Result<()> {
-        for run in self.db.all_runs()? {
-            tracing::debug!(run_id=?run.id, "repopulating hub");
-            let data = run.data.decompress();
-            let kind = data.kind.clone();
-            let job = self.hub.add_finished_job(data);
-            self.events_tx
-                .send(CheckoEvent::JobAssigned {
-                    group: run.group_name.clone(),
-                    kind,
-                    job_id: job.id(),
-                })
-                .unwrap();
-        }
-
-        Ok(())
     }
 
     pub fn groups_config(&self) -> &config::GroupsConfig {
@@ -113,13 +103,36 @@ impl Checko {
     }
 
     #[tracing::instrument(skip(self))]
+    pub async fn group_repo(
+        &self,
+        group_name: &str,
+        analysis: Analysis,
+    ) -> color_eyre::Result<GroupRepo> {
+        let key = (group_name.to_string(), analysis);
+
+        let gs = self.group_repos.lock().await.get(&key).cloned();
+        if let Some(repo) = gs {
+            Ok(repo)
+        } else {
+            let config = self
+                .groups_config
+                .groups
+                .iter()
+                .find(|g| g.name == group_name)
+                .wrap_err_with(|| format!("group '{}' not found", group_name))?;
+            let repo = self.update_group_repo(config, analysis).await?;
+            let mut group_repos = self.group_repos.lock().await;
+            group_repos.insert(key, repo.clone());
+            Ok(repo)
+        }
+    }
+
+    #[tracing::instrument(skip(self))]
     pub async fn group_state(
         &self,
         group_name: &str,
         analysis: Analysis,
     ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
-        tracing::debug!(?group_name, ?analysis, "getting group state");
-
         let key = (group_name.to_string(), analysis);
 
         let gs = self.group_states.lock().await.get(&key).cloned();
@@ -184,12 +197,12 @@ impl Checko {
     }
 
     #[tracing::instrument(skip(self))]
-    async fn build_group_driver(
+    async fn update_group_repo(
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
-    ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
-        let group_path = match (&config.git, &config.path) {
+    ) -> color_eyre::Result<GroupRepo> {
+        match (&config.git, &config.path) {
             (Some(git), then_path) => {
                 let group_path = self
                     .path
@@ -203,6 +216,8 @@ impl Checko {
                     )
                 })?;
 
+                let git_ssh_command = "ssh -o ControlPath=~/.ssh/cm_socket/%r@%h:%p -o ControlMaster=auto -o ControlPersist=60";
+
                 let git_pull_result: color_eyre::Result<()> = tokio_retry::Retry::spawn(
                     tokio_retry::strategy::FixedInterval::new(std::time::Duration::from_secs(5))
                         .take(15),
@@ -213,6 +228,7 @@ impl Checko {
                                 .arg("clone")
                                 .arg(git)
                                 .args(["."])
+                                .env("GIT_SSH_COMMAND", git_ssh_command)
                                 .current_dir(&group_path)
                                 .stderr(std::process::Stdio::inherit())
                                 .stdout(std::process::Stdio::inherit())
@@ -229,6 +245,7 @@ impl Checko {
                             tracing::info!(?git, "pulling group git repository");
                             let status = tokio::process::Command::new("git")
                                 .arg("pull")
+                                .env("GIT_SSH_COMMAND", git_ssh_command)
                                 .current_dir(&group_path)
                                 .stderr(std::process::Stdio::inherit())
                                 .stdout(std::process::Stdio::inherit())
@@ -274,20 +291,51 @@ impl Checko {
                         })?;
                 }
 
-                if let Some(then_path) = then_path {
+                let path = if let Some(then_path) = then_path {
                     group_path.join(then_path)
                 } else {
                     group_path
-                }
+                };
+
+                let git_hash = std::process::Command::new("git")
+                    .arg("rev-parse")
+                    .arg("HEAD")
+                    .current_dir(&path)
+                    .output()
+                    .wrap_err("could not get git hash for group")?
+                    .stdout;
+                let git_hash = std::str::from_utf8(&git_hash).unwrap().trim().to_string();
+
+                Ok(GroupRepo {
+                    path,
+                    git_hash: Some(git_hash),
+                })
             }
-            (_, Some(path)) => dunce::canonicalize(PathBuf::from(path))
-                .wrap_err_with(|| format!("could not canonicalize group path: '{}'", path))?,
+            (_, Some(path)) => {
+                let path = dunce::canonicalize(PathBuf::from(path))
+                    .wrap_err_with(|| format!("could not canonicalize group path: '{}'", path))?;
+                Ok(GroupRepo {
+                    path,
+                    git_hash: None,
+                })
+            }
             _ => todo!(),
-        };
+        }
+    }
+
+    #[tracing::instrument(skip(self))]
+    async fn build_group_driver(
+        &self,
+        config: &config::GroupConfig,
+        analysis: Analysis,
+    ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
+        let group_git = self.group_repo(&config.name, analysis).await?;
         let driver = Driver::new_from_path(
             self.hub.clone(),
-            &group_path,
-            group_path.join(config.run.as_deref().unwrap_or("run.toml")),
+            &group_git.path,
+            group_git
+                .path
+                .join(config.run.as_deref().unwrap_or("run.toml")),
         )?;
         Ok(driver)
     }
@@ -296,52 +344,68 @@ impl Checko {
     pub async fn work(&self) -> color_eyre::Result<()> {
         let inputs = self.programs_config.inputs().collect_vec();
 
+        let work_queue = Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new()));
+
         for g in &self.groups_config.groups {
             for i in &inputs {
-                let run_id = self.db.run_by_group_and_input(&g.name, i)?;
-                if run_id.is_none() {
-                    tracing::debug!(name=?g.name, analysis=?i.analysis(), "creating run for");
-                    let run = db::Run::new(g.name.clone(), i.clone())?;
-                    self.db.create_run(run)?;
-                }
+                tracing::debug!(name=?g.name, analysis=?i.analysis(), "creating run for");
+                let run = db::Run::new(g.name.clone(), i.clone())?;
+                // self.db.create_run(run.clone())?;
+                work_queue.lock().await.push_back(run);
             }
         }
 
         loop {
             let mut join_set = tokio::task::JoinSet::new();
 
-            for run in self.db.unfinished_runs(10)? {
-                tracing::debug!(name=?run.group_name, "found unfinished run");
+            static JOB_SEMAPHORE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(10);
+
+            // for run in self.db.unfinished_runs(100)? {
+            for run in work_queue.lock().await.drain(..) {
                 let Some(input) = run.input() else {
                     tracing::error!(name=?run.group_name, "could not get input for run");
                     continue;
                 };
+
+                let group_repo = self.group_repo(&run.group_name, input.analysis()).await?;
+
+                if let Some(git_hash) = &group_repo.git_hash {
+                    if let Some(data) = self.db.get_cached_run(
+                        &db::CacheKeyInput {
+                            group_name: &run.group_name,
+                            git_hash,
+                            input: &input,
+                        }
+                        .key(),
+                    )? {
+                        let job = self.hub.add_finished_job(data);
+                        self.events_tx
+                            .send(CheckoEvent::JobAssigned {
+                                group: run.group_name.clone(),
+                                kind: JobKind::Analysis(input),
+                                job_id: job.id(),
+                            })
+                            .unwrap();
+                        continue;
+                    }
+                }
+
                 let group_state = self.group_state(&run.group_name, input.analysis()).await?;
                 let db = self.db.clone();
                 let events_tx = self.events_tx.clone();
                 join_set.spawn(
                     async move {
+                        let _permit = JOB_SEMAPHORE.acquire().await;
+
                         tracing::debug!(name=?run.group_name, "getting driver from group state");
                         let group_state = group_state.await;
                         let GroupDriver::Driver(driver) = &group_state.driver else {
                             tracing::error!(name=?run.group_name, "group driver missing");
-                            db.finish_run(
-                                run.id,
-                                &JobData {
-                                    stderr: Default::default(),
-                                    stdout: Default::default(),
-                                    combined: Default::default(),
-                                    kind: JobKind::Analysis(input),
-                                    state: driver::JobState::Warning,
-                                    meta: InspectifyJobMeta {
-                                        group_name: Some(run.group_name.clone()),
-                                    },
-                                },
-                            )?;
+
                             return Ok::<_, color_eyre::Report>(());
                         };
                         tracing::debug!(name=?run.group_name, "starting run");
-                        db.start_run(run.id)?;
+                        // db.start_run(run.id)?;
                         let job = driver.exec_job(
                             &input,
                             InspectifyJobMeta {
@@ -352,7 +416,7 @@ impl Checko {
                         events_tx
                             .send(CheckoEvent::JobAssigned {
                                 group: run.group_name.clone(),
-                                kind: JobKind::Analysis(input),
+                                kind: JobKind::Analysis(input.clone()),
                                 job_id: job.id(),
                             })
                             .unwrap();
@@ -365,7 +429,18 @@ impl Checko {
                             .unwrap()
                             .retain(|j| j.id() != job.id());
 
-                        db.finish_run(run.id, &job.data())?;
+                        if let Some(git_hash) = &group_repo.git_hash {
+                            db.insert_cached_run(
+                                &db::CacheKeyInput {
+                                    group_name: &run.group_name,
+                                    git_hash,
+                                    input: &input,
+                                }
+                                .key(),
+                                &job.data(),
+                            )?;
+                        }
+
                         Ok::<_, color_eyre::Report>(())
                     }
                     .in_current_span(),

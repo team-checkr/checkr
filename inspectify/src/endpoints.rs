@@ -10,7 +10,7 @@ use serde::{Deserialize, Serialize};
 
 use crate::checko;
 
-#[derive(Debug, Default, Clone, Serialize, Deserialize)]
+#[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {
     pub group_name: Option<String>,
 }

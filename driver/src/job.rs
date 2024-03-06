@@ -34,7 +34,7 @@ pub(crate) enum WaitStatus {
     Finished,
 }
 
-#[derive(Debug, serde::Serialize, serde::Deserialize)]
+#[derive(Debug, Clone, PartialEq, serde::Serialize, serde::Deserialize)]
 pub struct JobData<M> {
     pub stderr: Vec<u8>,
     pub stdout: Vec<u8>,

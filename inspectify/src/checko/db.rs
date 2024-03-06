@@ -5,6 +5,7 @@ use std::{
 };
 
 use ce_shell::Input;
+use color_eyre::eyre::Context;
 use driver::JobKind;
 use rusqlite::{types::FromSql, OptionalExtension, ToSql};
 
@@ -99,6 +100,7 @@ impl<T> std::ops::Deref for WithId<T> {
     }
 }
 
+#[derive(Clone)]
 pub struct Run<T = JobData> {
     pub group_name: String,
     input_md5: [u8; 16],
@@ -159,10 +161,10 @@ impl Run {
     }
 }
 
-impl CompressedRun {
+impl Run {
     pub fn input(&self) -> Option<Input> {
-        match self.data.decompress().kind {
-            JobKind::Analysis(input) => Some(input),
+        match &self.data.kind {
+            JobKind::Analysis(input) => Some(input.clone()),
             _ => None,
         }
     }
@@ -177,14 +179,9 @@ impl CheckoDb {
         conn.execute_batch(
             r#"
             PRAGMA foreign_keys = ON;
-            CREATE TABLE IF NOT EXISTS runs (
-                id INTEGER PRIMARY KEY,
-                group_name TEXT NOT NULL,
-                input_md5 BLOB NOT NULL,
-                data BLOB NOT NULL,
-                queued TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
-                started TIMESTAMP,
-                finished TIMESTAMP
+            CREATE TABLE IF NOT EXISTS cached_runs (
+                cache_key TEXT PRIMARY KEY,
+                data BLOB NOT NULL
             );
             "#,
         )?;
@@ -198,114 +195,62 @@ impl CheckoDb {
         self.conn.lock().unwrap()
     }
 
-    pub fn create_run(&self, run: Run) -> color_eyre::Result<()> {
-        let run: CompressedRun = run.into();
-        self.conn().execute(
-            "INSERT INTO runs (group_name, input_md5, data, started, finished) VALUES (?1, ?2, ?3, ?4, ?5)",
-            (&run.group_name, &run.input_md5, &run.data, &run.started, &run.finished),
-        )?;
-        Ok(())
-    }
-
-    pub fn start_run(&self, id: Id<CompressedRun>) -> color_eyre::Result<()> {
-        self.conn().execute(
-            "UPDATE runs SET started = CURRENT_TIMESTAMP WHERE id = ?1",
-            [id.id],
-        )?;
-        Ok(())
-    }
-
-    pub fn finish_run(&self, id: Id<CompressedRun>, data: &JobData) -> color_eyre::Result<()> {
-        let data = Compressed::compress(data);
-        self.conn().execute(
-            "UPDATE runs SET finished = CURRENT_TIMESTAMP, data = ?2 WHERE id = ?1",
-            (id.id, data),
-        )?;
-        Ok(())
-    }
-
-    pub fn unfinished_runs(&self, count: usize) -> color_eyre::Result<Vec<WithId<CompressedRun>>> {
+    pub fn get_cached_run(&self, key: &CacheKey) -> color_eyre::Result<Option<JobData>> {
         let conn = self.conn();
-        let mut stmt = conn.prepare(
-            // "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE finished IS NULL ORDER BY queued LIMIT ?1",
-            "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE finished IS NULL ORDER BY input_md5 LIMIT ?1",
-        )?;
-        let runs = stmt
-            .query_map([count], |row| {
-                let id = row.get(0)?;
-                let data = Run {
-                    group_name: row.get(1)?,
-                    input_md5: row.get(2)?,
-                    data: row.get(3)?,
-                    queued: row.get(4)?,
-                    started: row.get(5)?,
-                    finished: row.get(6)?,
-                };
-                Ok(WithId { id, data })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(runs)
-    }
-
-    pub fn run_by_group_and_input(
-        &self,
-        group_name: &str,
-        input: &Input,
-    ) -> color_eyre::Result<Option<Id<CompressedRun>>> {
-        let input_md5 = input.hash();
-        let conn = self.conn();
-        let mut stmt =
-            conn.prepare("SELECT id FROM runs WHERE group_name = ?1 AND input_md5 = ?2")?;
-        let id = stmt
-            .query_row((group_name, input_md5), |row| row.get(0))
+        let mut stmt = conn.prepare("SELECT data FROM cached_runs WHERE cache_key = ?1")?;
+        let run = stmt
+            .query_row([&key.0], |row| {
+                let data: Compressed<JobData> = row.get(0)?;
+                Ok(data.decompress())
+            })
             .optional()?;
-        Ok(id)
+        Ok(run)
     }
 
-    pub fn runs_by_group(
-        &self,
-        group_name: &str,
-    ) -> color_eyre::Result<Vec<WithId<CompressedRun>>> {
-        let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs WHERE group_name = ?1",
-        )?;
-        let runs = stmt
-            .query_map([group_name], |row| {
-                let id = row.get(0)?;
-                let data = Run {
-                    group_name: row.get(1)?,
-                    input_md5: row.get(2)?,
-                    data: row.get(3)?,
-                    queued: row.get(4)?,
-                    started: row.get(5)?,
-                    finished: row.get(6)?,
-                };
-                Ok(WithId { id, data })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(runs)
+    pub fn insert_cached_run(&self, key: &CacheKey, data: &JobData) -> color_eyre::Result<()> {
+        if let Some(prev) = self.get_cached_run(key)? {
+            if prev != *data {
+                tracing::error!(
+                    "cached run for git_hash: {:?}, input: {:?} already exists but with different data", key.1.git_hash, key.1.input);
+            }
+            return Ok(());
+        }
+        let data = Compressed::compress(data);
+        // TODO: Fix multiple repos being at the same git-hash causing a unique constraint violation
+        self.conn()
+            .execute(
+                "INSERT INTO cached_runs (cache_key, data) VALUES (?1, ?2)",
+                (&key.0, data),
+            )
+            .wrap_err_with(|| {
+                format!(
+                    "could not insert cached run for git_hash: {:?}, input: {:?}",
+                    key.1.git_hash, key.1.input
+                )
+            })?;
+        Ok(())
     }
+}
 
-    pub fn all_runs(&self) -> color_eyre::Result<Vec<WithId<CompressedRun>>> {
-        let conn = self.conn();
-        let mut stmt = conn.prepare(
-            "SELECT id, group_name, input_md5, data, queued, started, finished FROM runs",
-        )?;
-        let runs = stmt
-            .query_map([], |row| {
-                let id = row.get(0)?;
-                let data = Run {
-                    group_name: row.get(1)?,
-                    input_md5: row.get(2)?,
-                    data: row.get(3)?,
-                    queued: row.get(4)?,
-                    started: row.get(5)?,
-                    finished: row.get(6)?,
-                };
-                Ok(WithId { id, data })
-            })?
-            .collect::<Result<Vec<_>, _>>()?;
-        Ok(runs)
+#[derive(Clone, Copy)]
+pub struct CacheKeyInput<'a> {
+    pub group_name: &'a str,
+    pub git_hash: &'a str,
+    pub input: &'a Input,
+}
+
+pub struct CacheKey<'a>(String, CacheKeyInput<'a>);
+
+impl<'a> CacheKeyInput<'a> {
+    pub fn key(self) -> CacheKey<'a> {
+        CacheKey(
+            format!(
+                "{}:{}:{:?}",
+                self.group_name,
+                self.git_hash,
+                self.input.hash()
+            ),
+            self,
+        )
     }
 }
