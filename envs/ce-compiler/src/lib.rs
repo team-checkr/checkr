@@ -1,6 +1,6 @@
 mod dot;
 
-use std::collections::BTreeMap;
+use std::collections::{BTreeMap, BTreeSet};
 
 use ce_core::{define_env, Env, Generate, ValidationResult};
 use gcl::{
@@ -56,9 +56,9 @@ impl Env for CompilerEnv {
         let o_g =
             dot::dot_to_petgraph(&Self::run(input)?.dot).expect("we always produce valid dot");
 
-        if degree_bag(&o_g) != degree_bag(&t_g) {
+        if action_bag(&o_g) != action_bag(&t_g) {
             Ok(ValidationResult::Mismatch {
-                reason: "invalid node degree bag".to_string(),
+                reason: "the graphs have different structure".to_string(),
             })
         } else {
             Ok(ValidationResult::CorrectTerminated)
@@ -77,15 +77,42 @@ impl Generate for Input {
     }
 }
 
-fn degree_bag(g: &dot::ParsedGraph) -> BTreeMap<(usize, usize), usize> {
+fn action_bag(
+    g: &dot::ParsedGraph,
+) -> BTreeMap<(BTreeSet<ActionKind>, BTreeSet<ActionKind>), usize> {
     let mut counts = BTreeMap::new();
 
     for i in g.graph.node_indices() {
-        let out_degree = g.graph.neighbors_directed(i, petgraph::Outgoing).count();
-        let in_degree = g.graph.neighbors_directed(i, petgraph::Incoming).count();
-        let count = counts.entry((out_degree, in_degree)).or_insert(0);
+        let outgoing = g
+            .graph
+            .edges_directed(i, petgraph::Outgoing)
+            .map(|e| ActionKind::from(e.weight()))
+            .collect::<BTreeSet<_>>();
+        let ingoing = g
+            .graph
+            .edges_directed(i, petgraph::Incoming)
+            .map(|e| ActionKind::from(e.weight()))
+            .collect::<BTreeSet<_>>();
+        let count = counts.entry((outgoing, ingoing)).or_insert(0);
         *count += 1;
     }
 
     counts
+}
+
+impl From<&'_ gcl::pg::Action> for ActionKind {
+    fn from(action: &'_ gcl::pg::Action) -> Self {
+        match action {
+            gcl::pg::Action::Assignment(t, _) => ActionKind::Assignment(t.clone().map_idx(|_| ())),
+            gcl::pg::Action::Skip => ActionKind::Skip,
+            gcl::pg::Action::Condition(_) => ActionKind::Condition,
+        }
+    }
+}
+
+#[derive(Debug, PartialEq, Eq, PartialOrd, Ord, Hash)]
+enum ActionKind {
+    Assignment(gcl::ast::Target<()>),
+    Skip,
+    Condition,
 }

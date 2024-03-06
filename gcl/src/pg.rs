@@ -270,15 +270,9 @@ impl ProgramGraph {
             "digraph G {{\n{}\n}}",
             self.edges
                 .iter()
-                .map(|e| format!(
-                    "  {:?}[label=\"{}\"]; {:?} -> {:?}[label={:?}]; {:?}[label=\"{}\"];",
-                    e.0,
-                    e.0,
-                    e.0,
-                    e.2,
-                    e.1.to_string(),
-                    e.2,
-                    e.2,
+                .map(|Edge(a, t, b)| format!(
+                    "  {a:?}[label=\"{a}\"]; {a:?} -> {b:?}[label={:?}]; {b:?}[label=\"{b}\"];",
+                    t.to_string(),
                 ))
                 .format("  \n")
         )
