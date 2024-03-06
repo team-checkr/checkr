@@ -7,7 +7,7 @@ use petgraph::graph::NodeIndex;
 pub struct ParsedGraph {
     pub nodes: BTreeMap<String, Node>,
     pub node_mapping: BTreeMap<String, NodeIndex>,
-    pub graph: petgraph::Graph<String, String>,
+    pub graph: petgraph::Graph<String, gcl::pg::Action>,
 }
 
 #[derive(Debug, Default)]
@@ -20,7 +20,7 @@ pub struct Node {
 pub fn dot_to_petgraph(dot: &str) -> Result<ParsedGraph, String> {
     let mut nodes = BTreeMap::<String, Node>::new();
     let mut node_mapping = BTreeMap::<String, NodeIndex>::new();
-    let mut graph = petgraph::Graph::<String, String>::new();
+    let mut graph = petgraph::Graph::<String, gcl::pg::Action>::new();
 
     let parsed = graphviz_rust::parse(dot)?;
 
@@ -52,19 +52,20 @@ pub fn dot_to_petgraph(dot: &str) -> Result<ParsedGraph, String> {
                                 let b_id = *node_mapping
                                     .entry(b.0.to_string())
                                     .or_insert_with_key(|k| graph.add_node(k.to_string()));
-                                graph.add_edge(
-                                    a_id,
-                                    b_id,
-                                    e.attributes
-                                        .iter()
-                                        .find_map(|a| match (&a.0, &a.1) {
-                                            (Id::Plain(l), Id::Escaped(v)) if l == "label" => {
-                                                Some(v.to_string())
-                                            }
-                                            _ => None,
-                                        })
-                                        .ok_or("edge label not found")?,
-                                );
+                                let label = e
+                                    .attributes
+                                    .iter()
+                                    .find_map(|a| match (&a.0, &a.1) {
+                                        (Id::Plain(l), Id::Escaped(v)) if l == "label" => {
+                                            Some(v.to_string())
+                                        }
+                                        _ => None,
+                                    })
+                                    .ok_or("edge label not found")?;
+                                let label = label.trim_matches('"');
+                                let action = gcl::parse::parse_action(label)
+                                    .map_err(|e| format!("failed to parse action: {label}. {e}"))?;
+                                graph.add_edge(a_id, b_id, action);
 
                                 nodes
                                     .entry(a.0.to_string())
