@@ -21,6 +21,7 @@ notify-debouncer-mini = { version = "0.4.1", default-features = false }
 once_cell.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+stdx.workspace = true
 tapi.workspace = true
 tokio.workspace = true
 toml.workspace = true

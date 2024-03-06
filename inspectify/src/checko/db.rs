@@ -1,5 +1,4 @@
 use std::{
-    marker::PhantomData,
     path::Path,
     sync::{Arc, Mutex},
 };
@@ -7,97 +6,14 @@ use std::{
 use ce_shell::Input;
 use color_eyre::eyre::Context;
 use driver::JobKind;
-use rusqlite::{types::FromSql, OptionalExtension, ToSql};
+use rusqlite::OptionalExtension;
+use stdx::compression::Compressed;
 
 use crate::endpoints::InspectifyJobMeta;
 
 #[derive(Clone)]
 pub struct CheckoDb {
     conn: Arc<Mutex<rusqlite::Connection>>,
-}
-pub struct Compressed<T> {
-    data: Vec<u8>,
-    _ph: PhantomData<T>,
-}
-
-impl FromSql for Compressed<JobData> {
-    fn column_result(value: rusqlite::types::ValueRef) -> rusqlite::types::FromSqlResult<Self> {
-        Ok(Self {
-            data: FromSql::column_result(value)?,
-            _ph: PhantomData,
-        })
-    }
-}
-
-impl ToSql for Compressed<JobData> {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        self.data.to_sql()
-    }
-}
-
-impl<T: serde::Serialize + for<'a> serde::Deserialize<'a>> Compressed<T> {
-    pub fn compress(data: &T) -> Self {
-        let data = serde_json::to_vec(data).unwrap();
-        let data = lz4_flex::compress_prepend_size(&data);
-        Self {
-            data,
-            _ph: PhantomData,
-        }
-    }
-    #[tracing::instrument(skip_all)]
-    pub fn decompress(&self) -> T {
-        let data = lz4_flex::decompress_size_prepended(&self.data).unwrap();
-        serde_json::from_slice(&data).unwrap()
-    }
-}
-
-pub struct Id<T> {
-    pub id: usize,
-    _ph: PhantomData<T>,
-}
-
-impl<T> std::fmt::Debug for Id<T> {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        f.debug_tuple("Id")
-            .field(&std::any::type_name::<T>())
-            .field(&self.id)
-            .finish()
-    }
-}
-
-impl<T> Clone for Id<T> {
-    fn clone(&self) -> Self {
-        *self
-    }
-}
-
-impl<T> Copy for Id<T> {}
-
-impl<T> FromSql for Id<T> {
-    fn column_result(value: rusqlite::types::ValueRef) -> rusqlite::types::FromSqlResult<Self> {
-        Ok(Self {
-            id: FromSql::column_result(value)?,
-            _ph: PhantomData,
-        })
-    }
-}
-
-impl<T> ToSql for Id<T> {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
-        self.id.to_sql()
-    }
-}
-
-pub struct WithId<T> {
-    pub id: Id<T>,
-    data: T,
-}
-
-impl<T> std::ops::Deref for WithId<T> {
-    type Target = T;
-    fn deref(&self) -> &Self::Target {
-        &self.data
-    }
 }
 
 #[derive(Clone)]
@@ -216,7 +132,6 @@ impl CheckoDb {
             return Ok(());
         }
         let data = Compressed::compress(data);
-        // TODO: Fix multiple repos being at the same git-hash causing a unique constraint violation
         self.conn()
             .execute(
                 "INSERT INTO cached_runs (cache_key, data) VALUES (?1, ?2)",
