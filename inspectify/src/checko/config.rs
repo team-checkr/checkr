@@ -16,7 +16,14 @@ pub struct GroupsConfig {
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProgramsConfig {
     #[serde(default)]
+    pub deadlines: IndexMap<Analysis, ProgramsDeadline>,
+    #[serde(default)]
     pub envs: IndexMap<Analysis, ProgramsEnvConfig>,
+}
+
+#[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
+pub struct ProgramsDeadline {
+    pub time: Option<toml::value::Datetime>,
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
@@ -29,7 +36,6 @@ pub struct ProgramsEnvConfig {
 pub struct ProgramConfig {
     pub seed: Option<u64>,
     pub input: Option<String>,
-    // pub deadline: Option<chrono::NaiveDate>,
     #[serde(default)]
     pub shown: bool,
 }
