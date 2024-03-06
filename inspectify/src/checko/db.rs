@@ -11,69 +11,30 @@ use stdx::compression::Compressed;
 
 use crate::endpoints::InspectifyJobMeta;
 
+use super::config::GroupConfig;
+
 #[derive(Clone)]
 pub struct CheckoDb {
     conn: Arc<Mutex<rusqlite::Connection>>,
 }
 
 #[derive(Clone)]
-pub struct Run<T = JobData> {
-    pub group_name: String,
-    input_md5: [u8; 16],
-    pub data: T,
-    queued: chrono::DateTime<chrono::Utc>,
-    started: Option<chrono::DateTime<chrono::Utc>>,
-    finished: Option<chrono::DateTime<chrono::Utc>>,
+pub struct Run {
+    pub group_config: Arc<GroupConfig>,
+    pub data: JobData,
 }
 
 pub type JobData = driver::JobData<InspectifyJobMeta>;
 
-pub type CompressedRun = Run<Compressed<JobData>>;
-
-impl From<Run> for CompressedRun {
-    fn from(run: Run) -> Self {
-        let data = Compressed::compress(&run.data);
-        Self {
-            group_name: run.group_name,
-            input_md5: run.input_md5,
-            data,
-            queued: run.queued,
-            started: run.started,
-            finished: run.finished,
-        }
-    }
-}
-
-impl From<CompressedRun> for Run {
-    fn from(run: CompressedRun) -> Self {
-        let data = run.data.decompress();
-        Self {
-            group_name: run.group_name,
-            input_md5: run.input_md5,
-            data,
-            queued: run.queued,
-            started: run.started,
-            finished: run.finished,
-        }
-    }
-}
-
 impl Run {
-    pub fn new(group_name: String, input: Input) -> color_eyre::Result<Self> {
-        let input_md5 = input.hash();
-        Ok(Self {
-            group_name: group_name.clone(),
-            input_md5,
-            data: JobData::new(
-                JobKind::Analysis(input),
-                InspectifyJobMeta {
-                    group_name: Some(group_name),
-                },
-            ),
-            queued: chrono::Utc::now(),
-            started: None,
-            finished: None,
-        })
+    pub fn new(group_config: Arc<GroupConfig>, input: Input) -> color_eyre::Result<Self> {
+        let data = JobData::new(
+            JobKind::Analysis(input),
+            InspectifyJobMeta {
+                group_name: Some(group_config.name.clone()),
+            },
+        );
+        Ok(Self { group_config, data })
     }
 }
 

@@ -8,11 +8,11 @@ use itertools::Itertools;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
-use crate::checko;
+use crate::checko::{self, config::GroupName};
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {
-    pub group_name: Option<String>,
+    pub group_name: Option<GroupName>,
 }
 
 #[derive(Clone)]
@@ -59,7 +59,7 @@ struct Job {
     id: JobId,
     state: driver::JobState,
     kind: driver::JobKind,
-    group_name: Option<String>,
+    group_name: Option<GroupName>,
     stdout: String,
     spans: Vec<Span>,
     analysis_data: Option<AnalysisData>,
@@ -184,7 +184,7 @@ enum Event {
         programs: Vec<Program>,
     },
     GroupProgramJobAssigned {
-        group: String,
+        group: GroupName,
         program: Program,
         job_id: JobId,
     },
@@ -449,7 +449,7 @@ pub struct PublicAnalysis {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PublicGroup {
-    name: String,
+    name: GroupName,
     analysis_results: Vec<PublicAnalysisResults>,
 }
 
