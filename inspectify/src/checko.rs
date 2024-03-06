@@ -107,6 +107,7 @@ impl Checko {
         &self,
         group_name: &str,
         analysis: Analysis,
+        deadline: Option<chrono::NaiveDateTime>,
     ) -> color_eyre::Result<GroupRepo> {
         let key = (group_name.to_string(), analysis);
 
@@ -120,7 +121,7 @@ impl Checko {
                 .iter()
                 .find(|g| g.name == group_name)
                 .wrap_err_with(|| format!("group '{}' not found", group_name))?;
-            let repo = self.update_group_repo(config, analysis).await?;
+            let repo = self.update_group_repo(config, analysis, deadline).await?;
             let mut group_repos = self.group_repos.lock().await;
             group_repos.insert(key, repo.clone());
             Ok(repo)
@@ -132,6 +133,7 @@ impl Checko {
         &self,
         group_name: &str,
         analysis: Analysis,
+        deadline: Option<chrono::NaiveDateTime>,
     ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
         let key = (group_name.to_string(), analysis);
 
@@ -139,7 +141,9 @@ impl Checko {
         let state = if let Some(gs) = gs {
             gs
         } else {
-            let state = self.build_group_state(group_name, analysis).await?;
+            let state = self
+                .build_group_state(group_name, analysis, deadline)
+                .await?;
             let mut group_states = self.group_states.lock().await;
             group_states.insert(key, Arc::clone(&state));
             state
@@ -158,6 +162,7 @@ impl Checko {
         &self,
         group_name: &str,
         analysis: Analysis,
+        deadline: Option<chrono::NaiveDateTime>,
     ) -> color_eyre::Result<Arc<GroupState>> {
         tracing::debug!(?group_name, "building group state");
         let config = self
@@ -166,7 +171,7 @@ impl Checko {
             .iter()
             .find(|g| g.name == group_name)
             .wrap_err_with(|| format!("group '{}' not found", group_name))?;
-        match self.build_group_driver(config, analysis).await {
+        match self.build_group_driver(config, analysis, deadline).await {
             Ok(driver) => {
                 tracing::debug!(?group_name, "ensuring compile job");
                 let compile_job = driver.ensure_compile(InspectifyJobMeta {
@@ -201,6 +206,7 @@ impl Checko {
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
+        deadline: Option<chrono::NaiveDateTime>,
     ) -> color_eyre::Result<GroupRepo> {
         match (&config.git, &config.path) {
             (Some(git), then_path) => {
@@ -328,8 +334,9 @@ impl Checko {
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
+        deadline: Option<chrono::NaiveDateTime>,
     ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
-        let group_git = self.group_repo(&config.name, analysis).await?;
+        let group_git = self.group_repo(&config.name, analysis, deadline).await?;
         let driver = Driver::new_from_path(
             self.hub.clone(),
             &group_git.path,
@@ -367,7 +374,29 @@ impl Checko {
                     continue;
                 };
 
-                let group_repo = self.group_repo(&run.group_name, input.analysis()).await?;
+                let deadline = self
+                    .programs_config
+                    .deadlines
+                    .get(&input.analysis())
+                    .and_then(|d| {
+                        let time = d.time?;
+                        let date = time.date?;
+                        let time = time.time?;
+                        let date: chrono::NaiveDate = chrono::NaiveDate::from_ymd_opt(
+                            date.year as _,
+                            date.month as _,
+                            date.day as _,
+                        )?;
+                        let time = chrono::NaiveTime::from_hms_opt(
+                            time.hour as _,
+                            time.minute as _,
+                            time.second as _,
+                        )?;
+                        Some(chrono::NaiveDateTime::new(date, time))
+                    });
+                let group_repo = self
+                    .group_repo(&run.group_name, input.analysis(), deadline)
+                    .await?;
 
                 if let Some(git_hash) = &group_repo.git_hash {
                     if let Some(data) = self.db.get_cached_run(
@@ -390,7 +419,9 @@ impl Checko {
                     }
                 }
 
-                let group_state = self.group_state(&run.group_name, input.analysis()).await?;
+                let group_state = self
+                    .group_state(&run.group_name, input.analysis(), deadline)
+                    .await?;
                 let db = self.db.clone();
                 let events_tx = self.events_tx.clone();
                 join_set.spawn(
