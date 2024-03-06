@@ -84,7 +84,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
     where
         M: Debug,
     {
-        static JOB_SEMAPHORE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(10);
+        static JOB_SEMAPHORE: stdx::concurrency::Semaphore = stdx::concurrency::semaphore();
 
         let id = self.next_job_id();
 

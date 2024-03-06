@@ -365,7 +365,7 @@ impl Checko {
         loop {
             let mut join_set = tokio::task::JoinSet::new();
 
-            static JOB_SEMAPHORE: tokio::sync::Semaphore = tokio::sync::Semaphore::const_new(10);
+            static JOB_SEMAPHORE: stdx::concurrency::Semaphore = stdx::concurrency::semaphore();
 
             // for run in self.db.unfinished_runs(100)? {
             for run in work_queue.lock().await.drain(..) {

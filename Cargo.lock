@@ -300,7 +300,7 @@ version = "0.1.21"
 dependencies = [
  "ce-core",
  "gcl",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "tapi",
@@ -326,7 +326,7 @@ version = "0.1.21"
 dependencies = [
  "futures-util",
  "gcl",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "rand",
  "serde",
  "serde_json",
@@ -342,7 +342,7 @@ version = "0.1.21"
 dependencies = [
  "ce-core",
  "gcl",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "tapi",
@@ -366,7 +366,7 @@ version = "0.1.21"
 dependencies = [
  "ce-core",
  "gcl",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "tapi",
@@ -386,7 +386,7 @@ dependencies = [
  "ce-sign",
  "dashmap",
  "futures-util",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "md5",
  "once_cell",
  "rand",
@@ -405,7 +405,7 @@ dependencies = [
  "ce-core",
  "gcl",
  "indexmap",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "tapi",
@@ -673,12 +673,13 @@ dependencies = [
  "dunce",
  "futures-util",
  "glob",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "notify",
  "notify-debouncer-mini",
  "once_cell",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tokio",
  "toml",
@@ -856,7 +857,7 @@ name = "gcl"
 version = "0.1.21"
 dependencies = [
  "indexmap",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "lalrpop",
  "lalrpop-util",
  "miette",
@@ -961,9 +962,9 @@ dependencies = [
 
 [[package]]
 name = "hashlink"
-version = "0.8.4"
+version = "0.9.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "e8094feaf31ff591f651a2664fb9cfd92bba7a60ce3197265e9482ebe753c8f7"
+checksum = "692eaaf7f7607518dd3cef090f1474b61edc5301d8012f09579920df68b725ee"
 dependencies = [
  "hashbrown",
 ]
@@ -1179,8 +1180,7 @@ dependencies = [
  "hex",
  "include_dir",
  "indexmap",
- "itertools 0.11.0",
- "lz4_flex",
+ "itertools 0.12.1",
  "md5",
  "mime_guess",
  "once_cell",
@@ -1189,6 +1189,7 @@ dependencies = [
  "rusqlite",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tokio",
  "tokio-retry",
@@ -1367,9 +1368,9 @@ dependencies = [
 
 [[package]]
 name = "libsqlite3-sys"
-version = "0.27.0"
+version = "0.28.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "cf4e226dcd58b4be396f7bd3c20da8fdee2911400705297ba7d2d7cc2c30f716"
+checksum = "0c10584274047cb335c23d3e61bcef8e323adae7c5c8c760540f73610177fc3f"
 dependencies = [
  "cc",
  "pkg-config",
@@ -1884,9 +1885,9 @@ checksum = "c08c74e62047bb2de4ff487b251e4a92e24f48745648451635cec7d591162d9f"
 
 [[package]]
 name = "rusqlite"
-version = "0.30.0"
+version = "0.31.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a78046161564f5e7cd9008aff3b2990b3850dc8e0349119b98e8f251e099f24d"
+checksum = "b838eba278d213a8beaf485bd313fd580ca4505a00d5871caeb1457c55322cae"
 dependencies = [
  "bitflags 2.4.2",
  "chrono",
@@ -2109,6 +2110,19 @@ name = "static_assertions"
 version = "1.1.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "a2eb9349b6444b326872e140eb1cf5e7c522154d69e7a0ffb0fb81c06b37543f"
+
+[[package]]
+name = "stdx"
+version = "0.1.21"
+dependencies = [
+ "lz4_flex",
+ "once_cell",
+ "rusqlite",
+ "serde",
+ "serde_json",
+ "tokio",
+ "tracing",
+]
 
 [[package]]
 name = "string_cache"
@@ -3010,7 +3024,7 @@ dependencies = [
  "clap",
  "color-eyre",
  "heck",
- "itertools 0.11.0",
+ "itertools 0.12.1",
  "serde",
  "serde_json",
  "tapi",
