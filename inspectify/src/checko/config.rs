@@ -155,9 +155,38 @@ impl ProgramConfig {
     // }
 }
 
+#[derive(tapi::Tapi, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[serde(transparent)]
+pub struct GroupName(pub String);
+
+impl std::fmt::Debug for GroupName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{:?}", self.0)
+    }
+}
+
+impl GroupName {
+    pub fn as_str(&self) -> &str {
+        self
+    }
+}
+
+impl std::fmt::Display for GroupName {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.0)
+    }
+}
+
+impl std::ops::Deref for GroupName {
+    type Target = str;
+    fn deref(&self) -> &Self::Target {
+        &self.0
+    }
+}
+
 #[derive(tapi::Tapi, Debug, Default, Clone, Hash, Serialize, Deserialize)]
 pub struct GroupConfig {
-    pub name: String,
+    pub name: GroupName,
     pub git: Option<String>,
     pub path: Option<String>,
     pub run: Option<String>,
