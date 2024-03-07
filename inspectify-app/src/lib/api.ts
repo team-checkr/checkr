@@ -310,14 +310,14 @@ export namespace inspectify {
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
     };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.endpoints.PublicState };
     export type ReferenceExecution = {
       "meta": ce_shell.io.Meta,
       "output": (ce_shell.io.Output | null),
       "error": (string | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.endpoints.PublicState };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,

@@ -5,9 +5,12 @@ use std::collections::{BTreeMap, BTreeSet};
 use ce_core::{define_env, Env, Generate, ValidationResult};
 use gcl::{
     ast::Commands,
+    interpreter::InterpreterMemory,
     pg::{Determinism, ProgramGraph},
     stringify::Stringify,
 };
+use itertools::Itertools;
+use rand::Rng;
 use serde::{Deserialize, Serialize};
 
 define_env!(CompilerEnv);
@@ -45,6 +48,34 @@ impl Env for CompilerEnv {
     }
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+        let commands =
+            input
+                .commands
+                .try_parse()
+                .map_err(ce_core::EnvError::invalid_input_for_program(
+                    "failed to parse commands",
+                ))?;
+        let o_dot = ProgramGraph::new(input.determinism, &commands).dot();
+
+        let mut rng = <rand::rngs::SmallRng as rand::SeedableRng>::seed_from_u64(0xCEC34);
+        let sample_mems = (0..10)
+            .map(|_| {
+                let initial_memory = gcl::memory::Memory::from_targets_with(
+                    commands.fv(),
+                    &mut rng,
+                    |rng, _| rng.gen_range(-10..=10),
+                    |rng, _| {
+                        let len = rng.gen_range(5..=10);
+                        (0..len).map(|_| rng.gen_range(-10..=10)).collect()
+                    },
+                );
+                InterpreterMemory {
+                    variables: initial_memory.variables,
+                    arrays: initial_memory.arrays,
+                }
+            })
+            .collect_vec();
+
         let t_g = match dot::dot_to_petgraph(&output.dot) {
             Ok(t_g) => t_g,
             Err(err) => {
@@ -53,10 +84,9 @@ impl Env for CompilerEnv {
                 })
             }
         };
-        let o_g =
-            dot::dot_to_petgraph(&Self::run(input)?.dot).expect("we always produce valid dot");
+        let o_g = dot::dot_to_petgraph(&o_dot).expect("we always produce valid dot");
 
-        if action_bag(&o_g) != action_bag(&t_g) {
+        if action_bag(&o_g, &sample_mems) != action_bag(&t_g, &sample_mems) {
             Ok(ValidationResult::Mismatch {
                 reason: "the graphs have different structure".to_string(),
             })
@@ -79,25 +109,29 @@ impl Generate for Input {
 
 fn action_bag(
     g: &dot::ParsedGraph,
-) -> BTreeMap<(BTreeSet<ActionKind>, BTreeSet<ActionKind>), usize> {
+    mems: &[InterpreterMemory],
+) -> BTreeMap<[BTreeSet<Fingerprint>; 2], usize> {
     let mut counts = BTreeMap::new();
 
     for i in g.graph.node_indices() {
-        let outgoing = g
-            .graph
-            .edges_directed(i, petgraph::Outgoing)
-            .map(|e| ActionKind::from(e.weight()))
-            .collect::<BTreeSet<_>>();
-        let ingoing = g
-            .graph
-            .edges_directed(i, petgraph::Incoming)
-            .map(|e| ActionKind::from(e.weight()))
-            .collect::<BTreeSet<_>>();
-        let count = counts.entry((outgoing, ingoing)).or_insert(0);
-        *count += 1;
+        let id = [petgraph::Incoming, petgraph::Outgoing].map(|dir| {
+            g.graph
+                .edges_directed(i, dir)
+                .map(|e| fingerprint(e.weight(), mems))
+                .collect()
+        });
+        *counts.entry(id).or_insert(0) += 1;
     }
 
     counts
+}
+
+type Fingerprint = (ActionKind, Vec<Option<InterpreterMemory>>);
+fn fingerprint(a: &gcl::pg::Action, mems: &[InterpreterMemory]) -> Fingerprint {
+    (
+        a.into(),
+        mems.iter().map(|mem| a.semantics(mem).ok()).collect(),
+    )
 }
 
 impl From<&'_ gcl::pg::Action> for ActionKind {

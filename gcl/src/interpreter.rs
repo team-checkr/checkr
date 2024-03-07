@@ -9,7 +9,9 @@ use crate::{
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
 
-#[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[derive(
+    tapi::Tapi, Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[tapi(path = "Interpreter")]
 pub struct InterpreterMemory {
     pub variables: BTreeMap<Variable, Int>,
