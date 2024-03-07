@@ -54,9 +54,12 @@ struct Cli {
     /// Watch for file changes and recompile automatically
     #[clap(long, default_value = "true")]
     watch: Option<bool>,
-    // /// Update the binary to the latest release from GitHub
-    // #[clap(short = 'u', long, default_value_t = false)]
-    // self_update: bool,
+    /// Start the default driver
+    ///
+    /// If false, the server will not start the default driver and will not
+    /// watch for file changes.
+    #[clap(long, default_value = "true")]
+    driver: Option<bool>,
     /// The path to the checko SQLite database
     #[clap(long)]
     checko: Option<PathBuf>,
@@ -68,9 +71,14 @@ async fn run() -> color_eyre::Result<()> {
     let dir = dunce::canonicalize(&cli.dir)?;
 
     let hub = driver::Hub::new()?;
-    let run_toml_path = dir.join("run.toml");
-    let driver = driver::Driver::new_from_path(hub.clone(), dir.clone(), run_toml_path)?;
-    let _: Option<_> = driver.start_recompile(InspectifyJobMeta::default());
+    let driver = if cli.driver == Some(false) {
+        None
+    } else {
+        let run_toml_path = dir.join("run.toml");
+        let driver = driver::Driver::new_from_path(hub.clone(), dir.clone(), run_toml_path)?;
+        let _: Option<_> = driver.start_recompile(InspectifyJobMeta::default());
+        Some(driver)
+    };
 
     let checko = if let Some(checko_path) = cli.checko {
         let checko = Arc::new(checko::Checko::open(hub.clone(), &checko_path)?);
@@ -83,8 +91,10 @@ async fn run() -> color_eyre::Result<()> {
         Some(checko)
         // return Ok(());
     } else {
-        if cli.watch != Some(false) {
-            driver.spawn_watcher(InspectifyJobMeta::default())?;
+        if let Some(driver) = &driver {
+            if cli.watch != Some(false) {
+                driver.spawn_watcher(InspectifyJobMeta::default())?;
+            }
         }
         None
     };
@@ -96,7 +106,7 @@ async fn run() -> color_eyre::Result<()> {
         .layer(tower_http::cors::CorsLayer::permissive())
         .with_state(AppState {
             hub,
-            driver: Some(driver),
+            driver,
             checko,
         });
     let app = Router::new().nest("/api", api).fallback(static_dir);

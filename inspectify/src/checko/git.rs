@@ -29,7 +29,7 @@ pub async fn clone_or_pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Res
 pub async fn clone(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
     let _permit = GIT_SSH_SEMAPHORE.acquire().await;
 
-    tracing::info!(?git, "cloning group git repository");
+    tracing::debug!(?git, "cloning group git repository");
     let status = Command::new("git")
         .arg("clone")
         .arg(git)
@@ -49,7 +49,7 @@ pub async fn clone(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> 
 }
 
 pub async fn checkout_main(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
-    tracing::info!(?git, "checking out main branch");
+    tracing::debug!(?git, "checking out main branch");
     let status = Command::new("git")
         .arg("checkout")
         .arg("main")
@@ -72,7 +72,7 @@ pub async fn checkout_main(git: &str, path: impl AsRef<Path>) -> color_eyre::Res
 pub async fn pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
     let _permit = GIT_SSH_SEMAPHORE.acquire().await;
 
-    tracing::info!(?git, "pulling group git repository");
+    tracing::debug!(?git, "pulling group git repository");
     let status = Command::new("git")
         .arg("pull")
         .env("GIT_SSH_COMMAND", GIT_SSH_COMMAND.as_str())
@@ -107,17 +107,23 @@ pub async fn hash(path: impl AsRef<Path>) -> color_eyre::Result<String> {
 }
 
 pub async fn checkout_latest_before(
+    git: &str,
     path: impl AsRef<Path>,
-    before: chrono::NaiveDateTime,
-) -> color_eyre::Result<()> {
-    tracing::info!(?before, "checking out latest commit before");
+    before: chrono::DateTime<chrono::FixedOffset>,
+    ignored_authors: &[String],
+) -> color_eyre::Result<bool> {
     let path = path.as_ref();
+    checkout_main(git, path).await?;
+    tracing::debug!(?before, "checking out latest commit before");
     let before = before.format("%Y-%m-%d %H:%M:%S").to_string();
-    let result = Command::new("git")
-        .args(["rev-list", "-n", "1"])
+    let mut cmd = Command::new("git");
+    cmd.args(["rev-list", "-n", "1"])
         .arg(format!("--before={before}"))
+        .arg("--perl-regexp")
+        .arg(format!("--author='^(?!{})'", ignored_authors.join("|")))
         .arg("HEAD")
-        .current_dir(path)
+        .current_dir(path);
+    let result = cmd
         .output()
         .await
         .wrap_err_with(|| format!("could not get latest commit before {before}"))?;
@@ -126,6 +132,10 @@ pub async fn checkout_latest_before(
     }
     let commit_rev_bytes = result.stdout;
     let commit_rev = std::str::from_utf8(&commit_rev_bytes).unwrap().trim();
+    if commit_rev.is_empty() {
+        tracing::warn!("no commit found before {before}");
+        return Ok(false);
+    }
     tracing::debug!(?commit_rev, ?path, "latest commit before");
     let result = Command::new("git")
         .arg("checkout")
@@ -140,5 +150,5 @@ pub async fn checkout_latest_before(
     if !result.status.success() {
         bail!("git checkout failed");
     }
-    Ok(())
+    Ok(true)
 }

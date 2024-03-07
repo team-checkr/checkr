@@ -61,7 +61,7 @@
   });
 </script>
 
-<div class="flex items-center justify-center border bg-slate-800 px-1 font-mono font-bold">
+<div class="flex items-center justify-center border bg-slate-800 px-1 font-mono text-xs font-bold">
   {group.name}
 </div>
-<canvas class="h-10 w-full" bind:this={canvas} />
+<canvas class="h-6 w-full" bind:this={canvas} />

@@ -466,6 +466,7 @@ pub struct PublicProgramResult {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PublicState {
+    last_finished: Option<chrono::DateTime<chrono::FixedOffset>>,
     analysis: Vec<PublicAnalysis>,
     groups: Vec<PublicGroup>,
 }
@@ -603,7 +604,11 @@ async fn checko_public(State(state): State<AppState>) -> tapi::endpoints::Sse<Pu
                             ))
                         })
                         .collect();
-                    PublicEvent::StateChanged(PublicState { analysis, groups })
+                    PublicEvent::StateChanged(PublicState {
+                        last_finished: checko.last_finished(),
+                        analysis,
+                        groups,
+                    })
                 }
             },
             |x| x.clone(),

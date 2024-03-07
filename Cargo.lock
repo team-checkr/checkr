@@ -2209,7 +2209,7 @@ checksum = "2047c6ded9c721764247e62cd3b03c09ffc529b2ba5b10ec482ae507a4a70160"
 [[package]]
 name = "tapi"
 version = "0.1.0"
-source = "git+https://github.com/oeb25/tapi.git#1678ba0d4cafb825ec1a3a74f3f980c178b86e5d"
+source = "git+https://github.com/oeb25/tapi.git#438ede7b0cc6e35bb470b67e0717dd96b8a946f2"
 dependencies = [
  "axum",
  "chrono",
@@ -2228,7 +2228,7 @@ dependencies = [
 [[package]]
 name = "tapi-macro"
 version = "0.1.0"
-source = "git+https://github.com/oeb25/tapi.git#1678ba0d4cafb825ec1a3a74f3f980c178b86e5d"
+source = "git+https://github.com/oeb25/tapi.git#438ede7b0cc6e35bb470b67e0717dd96b8a946f2"
 dependencies = [
  "darling",
  "heck",

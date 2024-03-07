@@ -9,5 +9,5 @@
     "tailwindCSS.includeLanguages": {
         "rust": "html"
     },
-    "tailwindCSS.experimental.configFile": "inspectify-app/tailwind.config.cjs"
+    "tailwindCSS.experimental.configFile": "inspectify-app/tailwind.config.ts"
 }
