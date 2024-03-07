@@ -3,4 +3,4 @@ import { setGlobalApiBase } from '$lib/api';
 
 export const prerender = true;
 
-setGlobalApiBase(PUBLIC_API_BASE || 'http://0.0.0.0:3000/api');
+setGlobalApiBase(PUBLIC_API_BASE || '/api');

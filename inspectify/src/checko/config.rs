@@ -10,6 +10,8 @@ use serde::{Deserialize, Serialize};
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct GroupsConfig {
+    #[serde(default)]
+    pub ignored_authors: Vec<String>,
     pub groups: Vec<GroupConfig>,
 }
 
@@ -23,7 +25,7 @@ pub struct ProgramsConfig {
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct ProgramsDeadline {
-    pub time: Option<toml::value::Datetime>,
+    pub time: Option<chrono::DateTime<chrono::FixedOffset>>,
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]

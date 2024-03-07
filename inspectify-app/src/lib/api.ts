@@ -286,6 +286,7 @@ export namespace inspectify {
   export namespace checko {
     export namespace config {
       export type GroupsConfig = {
+        "ignored_authors": string[],
         "groups": inspectify.checko.config.GroupConfig[]
       };
       export type GroupName = string;
@@ -309,14 +310,14 @@ export namespace inspectify {
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.endpoints.PublicState };
     export type ReferenceExecution = {
       "meta": ce_shell.io.Meta,
       "output": (ce_shell.io.Output | null),
       "error": (string | null)
     };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.endpoints.PublicState };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
@@ -332,6 +333,7 @@ export namespace inspectify {
       "input": ce_shell.io.Input
     };
     export type PublicState = {
+      "last_finished": (string | null),
       "analysis": inspectify.endpoints.PublicAnalysis[],
       "groups": inspectify.endpoints.PublicGroup[]
     };

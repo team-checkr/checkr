@@ -8,6 +8,9 @@ export const publicDataAnalysisStore = readonly(publicDataAnalysis);
 const publicDataGroups = writable<inspectify.endpoints.PublicGroup[]>([]);
 export const publicDataGroupsStore = readonly(publicDataGroups);
 
+const lastFinished = writable<Date | null>(null);
+export const lastFinishedStore = readonly(lastFinished);
+
 if (browser) {
   setTimeout(() => {
     api.checkoPublic([]).listen((msg) => {
@@ -19,11 +22,15 @@ if (browser) {
         case 'Reset': {
           publicDataAnalysis.set([]);
           publicDataGroups.set([]);
+          lastFinished.set(null);
           break;
         }
         case 'StateChanged': {
           publicDataAnalysis.set(msg.data.value.analysis);
           publicDataGroups.set(msg.data.value.groups);
+          if (msg.data.value.last_finished) {
+            lastFinished.set(new Date(msg.data.value.last_finished));
+          }
           break;
         }
       }

@@ -27,6 +27,7 @@ pub struct Checko {
     db: db::CheckoDb,
     groups_config: config::GroupsConfig,
     programs_config: config::ProgramsConfig,
+    last_finished: std::sync::Mutex<Option<chrono::DateTime<chrono::FixedOffset>>>,
     group_repos: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), GroupRepo>>,
     group_states: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), Arc<GroupState>>>,
     events_tx: crate::history_broadcaster::Sender<CheckoEvent>,
@@ -89,6 +90,7 @@ impl Checko {
             programs_config: programs,
             group_repos: Default::default(),
             group_states: Default::default(),
+            last_finished: Default::default(),
             events_tx,
             events_rx,
         })
@@ -111,7 +113,7 @@ impl Checko {
         &self,
         config: &GroupConfig,
         analysis: Analysis,
-        deadline: Option<chrono::NaiveDateTime>,
+        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
     ) -> color_eyre::Result<GroupRepo> {
         let key = (config.name.clone(), analysis);
 
@@ -131,7 +133,7 @@ impl Checko {
         &self,
         config: &GroupConfig,
         analysis: Analysis,
-        deadline: Option<chrono::NaiveDateTime>,
+        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
     ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
         let key = (config.name.clone(), analysis);
 
@@ -158,7 +160,7 @@ impl Checko {
         &self,
         config: &GroupConfig,
         analysis: Analysis,
-        deadline: Option<chrono::NaiveDateTime>,
+        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
     ) -> color_eyre::Result<Arc<GroupState>> {
         tracing::debug!("building group state");
         match self.build_group_driver(config, analysis, deadline).await {
@@ -194,7 +196,7 @@ impl Checko {
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
-        deadline: Option<chrono::NaiveDateTime>,
+        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
     ) -> color_eyre::Result<GroupRepo> {
         match (&config.git, &config.path) {
             (Some(git), then_path) => {
@@ -219,7 +221,16 @@ impl Checko {
                 git_pull_result?;
 
                 if let Some(deadline) = deadline {
-                    git::checkout_latest_before(&group_path, deadline).await?;
+                    let _found_any = git::checkout_latest_before(
+                        git,
+                        &group_path,
+                        deadline,
+                        &self.groups_config.ignored_authors,
+                    )
+                    .await?;
+                    // TODO: perhaps do something since we did not find any
+                    // meaningful commits, but for now, we just go on with the
+                    // latest commit
                 }
 
                 let path = if let Some(then_path) = then_path {
@@ -252,7 +263,7 @@ impl Checko {
         &self,
         config: &config::GroupConfig,
         analysis: Analysis,
-        deadline: Option<chrono::NaiveDateTime>,
+        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
     ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
         let group_git = self.group_repo(config, analysis, deadline).await?;
         let driver = Driver::new_from_path(
@@ -263,6 +274,10 @@ impl Checko {
                 .join(config.run.as_deref().unwrap_or("run.toml")),
         )?;
         Ok(driver)
+    }
+
+    pub fn last_finished(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
+        *self.last_finished.lock().unwrap()
     }
 
     #[tracing::instrument(skip(self))]
@@ -307,22 +322,7 @@ impl Checko {
                         .programs_config
                         .deadlines
                         .get(&input.analysis())
-                        .and_then(|d| {
-                            let time = d.time?;
-                            let date = time.date?;
-                            let time = time.time?;
-                            let date: chrono::NaiveDate = chrono::NaiveDate::from_ymd_opt(
-                                date.year as _,
-                                date.month as _,
-                                date.day as _,
-                            )?;
-                            let time = chrono::NaiveTime::from_hms_opt(
-                                time.hour as _,
-                                time.minute as _,
-                                time.second as _,
-                            )?;
-                            Some(chrono::NaiveDateTime::new(date, time))
-                        });
+                        .and_then(|d| d.time);
                     let group_repo = self
                         .group_repo(&run.group_config, input.analysis(), deadline)
                         .await?;
@@ -416,6 +416,7 @@ impl Checko {
                 }
             }
 
+            *self.last_finished.lock().unwrap() = Some(chrono::Utc::now().fixed_offset());
             tracing::info!("waiting for next batch of runs");
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
