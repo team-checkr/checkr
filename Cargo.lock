@@ -1191,6 +1191,7 @@ dependencies = [
  "serde_json",
  "stdx",
  "tapi",
+ "tempfile",
  "tokio",
  "tokio-retry",
  "tokio-stream",

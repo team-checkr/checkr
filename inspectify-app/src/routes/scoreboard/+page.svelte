@@ -1,11 +1,12 @@
 <script lang="ts">
-  import GroupJobCellView from '$lib/components/GroupJobCellView.svelte';
-  import { publicData } from '$lib/public';
+  import { publicDataAnalysisStore, publicDataGroupsStore } from '$lib/public';
   import { onMount } from 'svelte';
   import { flip } from 'svelte/animate';
+  import GroupRow from './GroupRow.svelte';
 
-  let data = $publicData;
-  $: numberOfPrograms = data.analysis.reduce((acc, analysis) => {
+  let analysisStore = $publicDataAnalysisStore;
+  let groupsStore = $publicDataGroupsStore;
+  $: numberOfPrograms = $publicDataAnalysisStore.reduce((acc, analysis) => {
     return acc + analysis.programs.length;
   }, 0);
 
@@ -13,7 +14,8 @@
 
   onMount(() => {
     const interval = setInterval(() => {
-      data = $publicData;
+      analysisStore = $publicDataAnalysisStore;
+      groupsStore = $publicDataGroupsStore;
     }, animationDuration * 2);
     return () => clearInterval(interval);
   });
@@ -25,7 +27,7 @@
     style="grid-template-columns: var(--name-width) repeat({numberOfPrograms}, 1fr);"
   >
     <div />
-    {#each data.analysis as analysis}
+    {#each analysisStore as analysis (analysis)}
       <div
         class="border px-3 py-2 text-center text-xl font-bold italic"
         style="grid-column: span {analysis.programs.length}"
@@ -33,23 +35,14 @@
         {analysis.analysis}
       </div>
     {/each}
-    {#each data.groups as group, index (group.name)}
+    {#each groupsStore as group, index (group.name)}
       <div
         animate:flip={{ duration: animationDuration }}
-        class="col-span-full grid"
-        style="z-index: {data.groups.length - index};
-               grid-template-columns: var(--name-width) repeat({numberOfPrograms},1fr);"
+        class="col-span-full grid transform-gpu will-change-transform"
+        style="z-index: {groupsStore.length - index};
+               grid-template-columns: var(--name-width) 1fr;"
       >
-        <div class="flex items-center justify-center border bg-slate-800 px-1 font-mono font-bold">
-          {group.name}
-        </div>
-        {#each group.analysis_results as analysis}
-          {#each analysis.results as res}
-            <div class="-my-0.5 grid w-full">
-              <GroupJobCellView state={res.state} />
-            </div>
-          {/each}
-        {/each}
+        <GroupRow {group} {numberOfPrograms} />
       </div>
     {/each}
   </div>

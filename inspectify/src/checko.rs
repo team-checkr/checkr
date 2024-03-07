@@ -14,6 +14,7 @@ use color_eyre::eyre::Context;
 use driver::{Driver, Hub, Job, JobId, JobKind};
 use indexmap::IndexMap;
 use itertools::Itertools;
+use rand::seq::SliceRandom;
 use tracing::Instrument;
 
 use crate::endpoints::InspectifyJobMeta;
@@ -268,84 +269,92 @@ impl Checko {
     pub async fn work(&self) -> color_eyre::Result<()> {
         let inputs = self.programs_config.inputs().collect_vec();
 
-        let work_queue = Arc::new(tokio::sync::Mutex::new(std::collections::VecDeque::new()));
+        let work_queue = Arc::new(tokio::sync::Mutex::new(Vec::new()));
 
-        for g in &self.groups_config.groups {
-            let g = Arc::new(g.clone());
-            for i in &inputs {
-                tracing::debug!(name=?g.name, analysis=?i.analysis(), "creating run for");
-                let run = db::Run::new(Arc::clone(&g), i.clone())?;
-                // self.db.create_run(run.clone())?;
-                work_queue.lock().await.push_back(run);
-            }
-        }
+        let mut groups = self
+            .groups_config
+            .groups
+            .iter()
+            .map(|g| Arc::new(g.clone()))
+            .collect_vec();
 
         loop {
-            let mut join_set = tokio::task::JoinSet::new();
+            groups.shuffle(&mut rand::thread_rng());
 
-            static JOB_SEMAPHORE: stdx::concurrency::Semaphore = stdx::concurrency::semaphore();
+            self.group_repos.lock().await.clear();
+            self.group_states.lock().await.clear();
 
-            // for run in self.db.unfinished_runs(100)? {
-            for run in work_queue.lock().await.drain(..) {
-                let Some(input) = run.input() else {
-                    tracing::error!(name=?run.group_config, "could not get input for run");
-                    continue;
-                };
-
-                let deadline = self
-                    .programs_config
-                    .deadlines
-                    .get(&input.analysis())
-                    .and_then(|d| {
-                        let time = d.time?;
-                        let date = time.date?;
-                        let time = time.time?;
-                        let date: chrono::NaiveDate = chrono::NaiveDate::from_ymd_opt(
-                            date.year as _,
-                            date.month as _,
-                            date.day as _,
-                        )?;
-                        let time = chrono::NaiveTime::from_hms_opt(
-                            time.hour as _,
-                            time.minute as _,
-                            time.second as _,
-                        )?;
-                        Some(chrono::NaiveDateTime::new(date, time))
-                    });
-                let group_repo = self
-                    .group_repo(&run.group_config, input.analysis(), deadline)
-                    .await?;
-
-                if let Some(git_hash) = &group_repo.git_hash {
-                    if let Some(data) = self.db.get_cached_run(
-                        &db::CacheKeyInput {
-                            group_name: &run.group_config.name,
-                            git_hash,
-                            input: &input,
-                        }
-                        .key(),
-                    )? {
-                        let job = self.hub.add_finished_job(data);
-                        self.events_tx
-                            .send(CheckoEvent::JobAssigned {
-                                group: run.group_config.name.clone(),
-                                kind: JobKind::Analysis(input),
-                                job_id: job.id(),
-                            })
-                            .unwrap();
-                        continue;
-                    }
+            for g in &groups {
+                for i in &inputs {
+                    tracing::debug!(name=?g.name, analysis=?i.analysis(), "creating run for");
+                    let run = db::Run::new(Arc::clone(g), i.clone())?;
+                    work_queue.lock().await.push(run);
                 }
+            }
 
-                let group_state = self
-                    .group_state(&run.group_config, input.analysis(), deadline)
-                    .await?;
-                let db = self.db.clone();
-                let events_tx = self.events_tx.clone();
-                join_set.spawn(
+            work_queue.lock().await.shuffle(&mut rand::thread_rng());
+
+            loop {
+                let mut join_set = tokio::task::JoinSet::new();
+
+                for run in work_queue.lock().await.drain(..) {
+                    let Some(input) = run.input() else {
+                        tracing::error!(name=?run.group_config, "could not get input for run");
+                        continue;
+                    };
+
+                    let deadline = self
+                        .programs_config
+                        .deadlines
+                        .get(&input.analysis())
+                        .and_then(|d| {
+                            let time = d.time?;
+                            let date = time.date?;
+                            let time = time.time?;
+                            let date: chrono::NaiveDate = chrono::NaiveDate::from_ymd_opt(
+                                date.year as _,
+                                date.month as _,
+                                date.day as _,
+                            )?;
+                            let time = chrono::NaiveTime::from_hms_opt(
+                                time.hour as _,
+                                time.minute as _,
+                                time.second as _,
+                            )?;
+                            Some(chrono::NaiveDateTime::new(date, time))
+                        });
+                    let group_repo = self
+                        .group_repo(&run.group_config, input.analysis(), deadline)
+                        .await?;
+
+                    if let Some(git_hash) = &group_repo.git_hash {
+                        if let Some(data) = self.db.get_cached_run(
+                            &db::CacheKeyInput {
+                                group_name: &run.group_config.name,
+                                git_hash,
+                                input: &input,
+                            }
+                            .key(),
+                        )? {
+                            let job = self.hub.add_finished_job(data);
+                            self.events_tx
+                                .send(CheckoEvent::JobAssigned {
+                                    group: run.group_config.name.clone(),
+                                    kind: JobKind::Analysis(input),
+                                    job_id: job.id(),
+                                })
+                                .unwrap();
+                            continue;
+                        }
+                    }
+
+                    let group_state = self
+                        .group_state(&run.group_config, input.analysis(), deadline)
+                        .await?;
+                    let db = self.db.clone();
+                    let events_tx = self.events_tx.clone();
+                    join_set.spawn(
                     async move {
-                        let _permit = JOB_SEMAPHORE.acquire().await;
-
                         tracing::debug!(name=?run.group_config, "getting driver from group state");
                         let group_state = group_state.await;
                         let GroupDriver::Driver(driver) = &group_state.driver else {
@@ -394,19 +403,21 @@ impl Checko {
                     }
                     .in_current_span(),
                 );
-            }
+                }
 
-            if join_set.is_empty() {
-                break;
-            }
+                if join_set.is_empty() {
+                    break;
+                }
 
-            while let Some(res) = join_set.join_next().await {
-                if let Err(err) = res? {
-                    tracing::error!(?err, "error in join set");
+                while let Some(res) = join_set.join_next().await {
+                    if let Err(err) = res? {
+                        tracing::error!(?err, "error in join set");
+                    }
                 }
             }
-        }
 
-        Ok(())
+            tracing::info!("waiting for next batch of runs");
+            tokio::time::sleep(Duration::from_secs(60)).await;
+        }
     }
 }

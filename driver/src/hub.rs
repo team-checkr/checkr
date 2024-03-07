@@ -181,7 +181,11 @@ impl<M: Send + Sync + 'static> Hub<M> {
             let data2 = Arc::clone(&data);
             let events_tx2 = events_tx.clone();
             async move {
+                data2.write().unwrap().state = JobState::Queued;
+                events_tx2.send(JobEvent::Wrote).unwrap();
                 let _permit = JOB_SEMAPHORE.acquire().await;
+                data2.write().unwrap().state = JobState::Running;
+                events_tx2.send(JobEvent::Wrote).unwrap();
 
                 match tokio::time::timeout(timeout, main_task).await {
                     Ok(Either::Left(())) => {}
