@@ -16,7 +16,8 @@
   const dispatch = createEventDispatcher<{ click: void }>();
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
-    Queued: [EllipsisHorizontal, 'animate-pulse', ''],
+    // Queued: [EllipsisHorizontal, 'animate-pulse', ''],
+    Queued: [EllipsisHorizontal, '', ''],
     Running: [ArrowPath, 'animate-spin', 'bg-slate-400'],
     Succeeded: [Check, '', 'bg-green-500'],
     Canceled: [NoSymbol, '', 'bg-slate-400'],
@@ -32,8 +33,8 @@
 </script>
 
 <button
-  class="grid h-full place-items-center p-2 transition {containerClass}"
+  class="grid h-full place-items-center p-2 transition-colors {containerClass}"
   on:click={() => dispatch('click')}
 >
-  <svelte:component this={icon} class="h-6 w-6 text-white transition {iconClass}" />
+  <svelte:component this={icon} class="h-6 w-6 text-white transition-colors {iconClass}" />
 </button>

@@ -2,11 +2,11 @@ import { browser } from '$app/environment';
 import { readonly, writable } from 'svelte/store';
 import { api, type inspectify } from './api';
 
-const publicDataStore = writable<inspectify.endpoints.PublicState>({
-  analysis: [],
-  groups: [],
-});
-export const publicData = readonly(publicDataStore);
+const publicDataAnalysis = writable<inspectify.endpoints.PublicAnalysis[]>([]);
+export const publicDataAnalysisStore = readonly(publicDataAnalysis);
+
+const publicDataGroups = writable<inspectify.endpoints.PublicGroup[]>([]);
+export const publicDataGroupsStore = readonly(publicDataGroups);
 
 if (browser) {
   setTimeout(() => {
@@ -17,14 +17,13 @@ if (browser) {
 
       switch (msg.data.type) {
         case 'Reset': {
-          publicDataStore.set({
-            analysis: [],
-            groups: [],
-          });
+          publicDataAnalysis.set([]);
+          publicDataGroups.set([]);
           break;
         }
         case 'StateChanged': {
-          publicDataStore.set(msg.data.value);
+          publicDataAnalysis.set(msg.data.value.analysis);
+          publicDataGroups.set(msg.data.value.groups);
           break;
         }
       }
