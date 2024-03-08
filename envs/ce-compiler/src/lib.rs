@@ -10,7 +10,7 @@ use gcl::{
     stringify::Stringify,
 };
 use itertools::Itertools;
-use rand::Rng;
+use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
 
 define_env!(CompilerEnv);
@@ -100,9 +100,13 @@ impl Generate for Input {
     type Context = ();
 
     fn gen<R: ce_core::rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+        let determinism = *[Determinism::Deterministic, Determinism::NonDeterministic]
+            .choose(rng)
+            .unwrap();
+
         Input {
             commands: Stringify::new(Commands::gen(&mut Default::default(), rng)),
-            determinism: Determinism::NonDeterministic,
+            determinism,
         }
     }
 }
