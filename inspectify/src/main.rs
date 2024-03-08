@@ -2,7 +2,7 @@ mod checko;
 mod endpoints;
 mod history_broadcaster;
 
-use std::{net::SocketAddr, path::PathBuf, sync::Arc};
+use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use axum::{
     response::{Html, IntoResponse},
@@ -80,6 +80,7 @@ async fn run() -> color_eyre::Result<()> {
         Some(driver)
     };
 
+    let public_state = Arc::new(std::sync::RwLock::new(None));
     let checko = if let Some(checko_path) = cli.checko {
         let checko = Arc::new(checko::Checko::open(hub.clone(), &checko_path)?);
         tokio::spawn({
@@ -88,8 +89,19 @@ async fn run() -> color_eyre::Result<()> {
                 checko.work().await.unwrap();
             }
         });
+        tokio::spawn({
+            let hub = hub.clone();
+            let checko = Arc::clone(&checko);
+            let public_state = Arc::clone(&public_state);
+            async move {
+                loop {
+                    *public_state.write().unwrap() =
+                        Some(checko::public::compute_public_state(&hub, &checko));
+                    tokio::time::sleep(Duration::from_millis(200)).await;
+                }
+            }
+        });
         Some(checko)
-        // return Ok(());
     } else {
         if let Some(driver) = &driver {
             if cli.watch != Some(false) {
@@ -108,6 +120,7 @@ async fn run() -> color_eyre::Result<()> {
             hub,
             driver,
             checko,
+            public_state,
         });
     let app = Router::new().nest("/api", api).fallback(static_dir);
 

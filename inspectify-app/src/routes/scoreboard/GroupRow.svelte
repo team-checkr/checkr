@@ -3,7 +3,7 @@
   import { onMount } from 'svelte';
 
   export let numberOfPrograms: number;
-  export let group: inspectify.endpoints.PublicGroup;
+  export let group: inspectify.checko.public.PublicGroup;
 
   let canvas: HTMLCanvasElement;
 

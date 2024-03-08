@@ -1,6 +1,7 @@
 pub mod config;
 mod db;
 mod git;
+pub mod public;
 
 use std::{
     future::Future,
