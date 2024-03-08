@@ -4,11 +4,10 @@ use axum::{extract::State, Json};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Input};
 use driver::{HubEvent, JobId, JobKind, JobState};
-use itertools::Itertools;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
-use crate::checko::{self, config::GroupName};
+use crate::checko::{self, config::GroupName, public::PublicState};
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {
@@ -20,6 +19,7 @@ pub struct AppState {
     pub hub: driver::Hub<InspectifyJobMeta>,
     pub driver: Option<driver::Driver<InspectifyJobMeta>>,
     pub checko: Option<Arc<checko::Checko>>,
+    pub public_state: Arc<std::sync::RwLock<Option<PublicState>>>,
 }
 
 pub fn endpoints() -> tapi::endpoints::Endpoints<'static, AppState> {
@@ -442,173 +442,29 @@ struct CompilationStatus {
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PublicAnalysis {
-    analysis: Analysis,
-    programs: Vec<Option<Input>>,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PublicGroup {
-    name: GroupName,
-    analysis_results: Vec<PublicAnalysisResults>,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PublicAnalysisResults {
-    analysis: Analysis,
-    results: Vec<PublicProgramResult>,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PublicProgramResult {
-    state: JobState,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
-pub struct PublicState {
-    last_finished: Option<chrono::DateTime<chrono::FixedOffset>>,
-    analysis: Vec<PublicAnalysis>,
-    groups: Vec<PublicGroup>,
-}
-
-#[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 #[serde(tag = "type", content = "value")]
 pub enum PublicEvent {
     Reset,
     StateChanged(PublicState),
 }
 
-fn compute_public_groups(
-    hub: &driver::Hub<InspectifyJobMeta>,
-    checko: &checko::Checko,
-) -> Vec<PublicGroup> {
-    let jobs = hub.jobs(None);
-    let groups = checko.groups_config().groups.iter().map(|group| {
-        let analysis_results = checko
-            .programs_config()
-            .envs
-            .iter()
-            .map(|(analysis, ps)| {
-                let results = ps
-                    .programs
-                    .iter()
-                    .map(|p| {
-                        let input = analysis.input_from_str(&p.input).unwrap();
-                        let job = jobs.iter().find(|j| {
-                            j.meta().group_name.as_deref() == Some(group.name.as_str())
-                                && j.kind() == JobKind::Analysis(input.clone())
-                        });
-                        let state = job
-                            .map(|j| {
-                                let output = input.analysis().output_from_str(&j.stdout());
-                                let validation = match (j.state(), &output) {
-                                    (JobState::Succeeded, Ok(output)) => {
-                                        Some(match input.validate_output(output) {
-                                            Ok(output) => output,
-                                            Err(e) => ValidationResult::Mismatch {
-                                                reason: format!("failed to validate output: {e:?}"),
-                                            },
-                                        })
-                                    }
-                                    (JobState::Succeeded, Err(e)) => {
-                                        Some(ValidationResult::Mismatch {
-                                            reason: format!("failed to parse output: {e:?}"),
-                                        })
-                                    }
-                                    _ => None,
-                                };
-
-                                match (j.state(), validation) {
-                                    (
-                                        JobState::Succeeded,
-                                        Some(
-                                            ValidationResult::CorrectNonTerminated { .. }
-                                            | ValidationResult::CorrectTerminated,
-                                        ),
-                                    ) => JobState::Succeeded,
-                                    (
-                                        JobState::Succeeded,
-                                        Some(ValidationResult::Mismatch { .. }),
-                                    ) => JobState::Warning,
-                                    (JobState::Succeeded, Some(ValidationResult::TimeOut)) => {
-                                        JobState::Timeout
-                                    }
-                                    (state, _) => state,
-                                }
-                            })
-                            .unwrap_or(JobState::Queued);
-                        (PublicProgramResult { state }, input.hash())
-                    })
-                    .sorted_by_key(|(_, hash)| *hash)
-                    .map(|(res, _)| res);
-                PublicAnalysisResults {
-                    analysis: *analysis,
-                    results: results.collect(),
-                }
-            })
-            .collect();
-        PublicGroup {
-            name: group.name.clone(),
-            analysis_results,
-        }
-    });
-    groups.collect()
-}
-
 #[tapi::tapi(path = "/checko-public", method = Get)]
 async fn checko_public(State(state): State<AppState>) -> tapi::endpoints::Sse<PublicEvent> {
     let (tx, rx) = tokio::sync::mpsc::channel::<Result<PublicEvent, axum::BoxError>>(16);
 
-    if let Some(checko) = state.checko.clone() {
+    if state.checko.is_some() {
         let _ = tx.send(Ok(PublicEvent::Reset)).await;
 
         periodic_stream(
-            std::time::Duration::from_millis(100),
+            std::time::Duration::from_millis(500),
             {
                 let state = state.clone();
-                let checko = checko.clone();
                 move || {
-                    let start = std::time::Instant::now();
-                    let analysis = checko
-                        .programs_config()
-                        .envs
-                        .iter()
-                        .map(|(analysis, ps)| PublicAnalysis {
-                            analysis: *analysis,
-                            programs: ps
-                                .programs
-                                .iter()
-                                .map(|p| {
-                                    let input = analysis.input_from_str(&p.input).unwrap();
-                                    Some(input)
-                                })
-                                .collect(),
-                        })
-                        .collect();
-                    let groups = compute_public_groups(&state.hub, &checko)
-                        .into_iter()
-                        .sorted_by_key(|g| {
-                            std::cmp::Reverse((
-                                g.analysis_results
-                                    .iter()
-                                    .flat_map(|a| {
-                                        a.results.iter().filter(|x| x.state == JobState::Succeeded)
-                                    })
-                                    .count(),
-                                g.analysis_results
-                                    .iter()
-                                    .flat_map(|a| {
-                                        a.results.iter().filter(|x| x.state == JobState::Warning)
-                                    })
-                                    .count(),
-                            ))
-                        })
-                        .collect();
-                    PublicEvent::StateChanged(PublicState {
-                        last_finished: checko.last_finished(),
-                        analysis,
-                        groups,
-                    })
+                    if let Some(public_state) = &*state.public_state.read().unwrap() {
+                        PublicEvent::StateChanged(public_state.clone())
+                    } else {
+                        PublicEvent::Reset
+                    }
                 }
             },
             |x| x.clone(),

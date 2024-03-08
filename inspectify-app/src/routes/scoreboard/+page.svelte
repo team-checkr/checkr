@@ -68,7 +68,7 @@
     {#each groupsStore as group, index (group.name)}
       <div
         animate:flip={{ duration: animationDuration }}
-        class="col-span-full grid transform-gpu will-change-transform"
+        class="col-span-full grid transform-gpu transition will-change-transform hover:saturate-200"
         style="z-index: {groupsStore.length - index};
                grid-template-columns: var(--name-width) 1fr;"
       >
