@@ -25,7 +25,10 @@ release-hook:
 checko-debug:
     # rm -rf example/runs.db3
     # rm -rf example/groups/
-    RUST_LOG=debug cargo run -p inspectify -- --checko example
+    # rm -rf ../2024/checko-data/runs.db3
+    # rm -rf ../2024/checko-data/groups/
+    RUST_LOG=debug cargo run --release -p inspectify -- --checko ../2024/checko-data
+    # CARGO_PROFILE_RELEASE_DEBUG=true RUST_LOG=debug cargo flamegraph --root -p inspectify -- --checko ../2024/checko-data
 
 # Patch inspectify binaries
 
@@ -45,6 +48,14 @@ patch-inspectify-binaries-macos:
     strip inspectify-binaries/inspectify-macos-x86_64
     strip inspectify-binaries/inspectify-linux
     cd inspectify-binaries && git add . && git commit -m "Update binaries" && git push
+
+CHECKO_REMOTE_HOST := "$CHECKO_REMOTE_HOST"
+CHECKO_REMOTE_PATH := "$CHECKO_REMOTE_PATH"
+
+patch-checko:
+    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cd inspectify-app && npm run build
+    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
+    scp target/x86_64-unknown-linux-gnu/release/inspectify {{CHECKO_REMOTE_HOST}}:{{CHECKO_REMOTE_PATH}}
 
 WIN_REMOTE_HOST := "$WIN_REMOTE_HOST"
 WIN_REMOTE_PATH := "$WIN_REMOTE_PATH"
