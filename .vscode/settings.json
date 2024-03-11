@@ -1,6 +1,7 @@
 {
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
+        "chip-wasm/Cargo.toml"
     ],
     "FSharp.showExplorerOnStartup": false,
     "tailwindCSS.experimental.classRegex": [

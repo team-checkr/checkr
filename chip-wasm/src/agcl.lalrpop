@@ -1,0 +1,164 @@
+use std::str::FromStr;
+use crate::ast::*;
+
+grammar;
+
+extern {
+    type Error = crate::parse::CustomError;
+}
+
+match {
+    // Skip whitespace and comments
+    r"\s*" => { },
+    r"//[^\n\r]*[\n\r]*" => { }, // `// comment`
+    r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => { }, // `/* comment */`
+    _
+}
+
+Sep<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+SepNonEmpty<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T> =>{
+        v.push(e);
+        v
+    }
+};
+
+#[inline]
+Target: Target<Box<AExpr>> = {
+    Variable => Target::Variable(<>),
+    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, Box::new(idx)),
+}
+#[inline]
+Variable: Variable = Var => Variable(<>);
+#[inline]
+Array: Array = Var => Array(<>);
+
+Function<X>: Function = {
+    "division" "(" <X> "," <X> ")"  => Function::Division(<>),
+    "min" "(" <X> "," <X> ")"       => Function::Min(<>),
+    "max" "(" <X> "," <X> ")"       => Function::Max(<>),
+    "count" "(" <Array> "," <X> ")"     => Function::Count(<>),
+    "length" "(" <Array> ")"                => Function::Length(<>),
+    "fac" "(" <X> ")"                   => Function::Fac(<>),
+    "fib" "(" <X> ")"                   => Function::Fib(<>),
+};
+
+
+pub BExpr: BExpr = {
+    #[precedence(level="0")]
+    <l:AExpr_> <op:RelOp> <r:AExpr_> => BExpr::Rel(l, op, r),
+    "true" => BExpr::Bool(true),
+    "false" => BExpr::Bool(false),
+    "!" <BExpr> => BExpr::Not(Box::new(<>)),
+    "(" <BExpr_> ")",
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <l:BExpr> "&" <r:BExpr> => BExpr::logic(l, LogicOp::Land, r),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:BExpr> "|" <r:BExpr> => BExpr::logic(l, LogicOp::Lor, r),
+};
+BExpr_: BExpr = BExpr;
+
+RelOp: RelOp = {
+    "<"  => RelOp::Lt,
+    ">"  => RelOp::Gt,
+    "<=" => RelOp::Le,
+    ">=" => RelOp::Ge,
+    "="  => RelOp::Eq,
+    "!=" => RelOp::Ne,
+};
+
+Var: String = r"[_a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+
+Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| lalrpop_util::ParseError::User {
+    error: crate::parse::CustomError::IntegerTooLarge { from, to },
+});
+
+// Predicates
+
+pub Commands: Commands = SepNonEmpty<Command, ";"> => Commands(<>);
+
+Command: Command = {
+    <pre_predicates:PredicateBlock*> <kind:CommandKind> <post_predicates:PredicateBlock*> =>
+        Command {
+            pre_predicates,
+            kind,
+            post_predicates,
+            span: (0, 0).into(),
+        }
+};
+
+CommandKind: CommandKind = {
+    <Target> ":=" <AExpr>                       => CommandKind::Assignment(<>),
+    "skip"                                      => CommandKind::Skip,
+    "if" <Guards> "fi"                          => CommandKind::If(<>),
+    "do" "[" <PredicateBlock> "]" <Guards> "od" => CommandKind::Loop(<>),
+};
+
+Guards: Vec<Guard> = SepNonEmpty<Guard, "[]">;
+
+Guard: Guard = {
+    <BExpr> "->" <Commands> => Guard(<>),
+};
+
+PredicateBlock: PredicateBlock = {
+    <l:@L> "{" <predicate:Predicate> "}" <r:@R> => PredicateBlock {
+        predicate,
+        span: (l, r - l).into(),
+    }
+};
+
+pub Predicate: Predicate = {
+    #[precedence(level="0")]
+    <l:AExpr_> <op:RelOp> <r:AExpr_> => Predicate::Rel(l, op, r),
+    "true" => Predicate::Bool(true),
+    "false" => Predicate::Bool(false),
+    "!" <Predicate> => Predicate::Not(Box::new(<>)),
+    "(" <Predicate_> ")",
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <l:Predicate> "&" <r:Predicate> => Predicate::logic(l, LogicOp::Land, r),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:Predicate> "|" <r:Predicate> => Predicate::logic(l, LogicOp::Lor, r),
+
+    #[precedence(level="3")] #[assoc(side="right")]
+    <l:Predicate> "==>" <r:Predicate> => Predicate::logic(l, LogicOp::Implies, r),
+
+    #[precedence(level="4")]
+    <q:Quantifier> <v:Var> "::" <p:Predicate> => Predicate::Quantified(q, Target::Variable(Variable(v)), Box::new(p)),
+};
+Predicate_: Predicate = Predicate;
+
+Quantifier: Quantifier = {
+    "exists" => Quantifier::Exists,
+    "forall" => Quantifier::Forall,
+};
+
+AExpr_ = AExpr;
+pub AExpr: AExpr = {
+    #[precedence(level="1")]
+    Int => AExpr::Number(<>),
+    Target => AExpr::Reference(<>),
+    Function<AExprBox> => AExpr::Function(<>),
+    "-" <AExpr> => AExpr::Minus(Box::new(<>)),
+    "(" <AExpr_> ")",
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:AExpr> "*" <r:AExpr> => AExpr::binary(l, AOp::Times, r),
+    <l:AExpr> "/" <r:AExpr> => AExpr::binary(l, AOp::Divide, r),
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:AExpr> "+" <r:AExpr> => AExpr::binary(l, AOp::Plus, r),
+    <l:AExpr> "-" <r:AExpr> => AExpr::binary(l, AOp::Minus, r),
+};
+AExprBox: Box<AExpr> = AExpr => Box::new(<>);
