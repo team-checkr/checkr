@@ -41,7 +41,6 @@ export const run = async (query: string, onStart?: () => void) =>
 		const results: string[] = [];
 
 		for (const l of query.split('\n')) {
-			console.info("evaluating", l);
 			const timeStart =new Date().getTime();
 			const res = await Z3.eval_smtlib2_string(ctx, l);
 			const timeEnd = new Date().getTime();

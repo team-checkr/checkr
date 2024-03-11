@@ -23,12 +23,12 @@ od
   program = `{a=1}
 do[a=1] true -> a := 2 od`;
 
-  let result: ParseResult = {
+  let result = writable<ParseResult>({
     parse_error: false,
     assertions: [],
     markers: [],
     is_fully_annotated: false,
-  };
+  });
   let verifications = writable<MarkerData[]>([]);
 
   let parseError = writable(false);
@@ -44,7 +44,7 @@ do[a=1] true -> a := 2 od`;
       await init();
       const res = parse(program);
       if (res.parse_error) parseError.set(true);
-      result = res;
+      result.set(res);
     };
     run().catch(console.error);
   }
@@ -57,11 +57,14 @@ do[a=1] true -> a := 2 od`;
         verifications.set([]);
         state.set('verifying');
         let errors = false;
-        for (const t of result.assertions) {
+        for (const t of $result.assertions) {
           const res = await z3.run(t.smt);
           const valid = res[res.length - 1].trim() === 'unsat';
 
-          if (thisRun !== runId) return;
+          if (thisRun !== runId) {
+            console.log('aborted', thisRun, runId, result, res);
+            return;
+          }
 
           if (!valid) {
             errors = true;
@@ -100,7 +103,7 @@ do[a=1] true -> a := 2 od`;
 </script>
 
 <div class="relative grid grid-rows-[2fr_auto_auto] overflow-hidden bg-slate-800">
-  <Editor bind:value={program} markers={[...result.markers, ...$verifications]} />
+  <Editor bind:value={program} markers={[...$result.markers, ...$verifications]} />
   <div
     class="flex items-center p-2 text-2xl text-white transition duration-500 {$parseError
       ? 'bg-purple-600'
@@ -124,7 +127,7 @@ do[a=1] true -> a := 2 od`;
     <div class="flex-1" />
     <span class="text-xl">
       {#if !$parseError && $state == 'verified'}
-        {#if result.is_fully_annotated}
+        {#if $result.is_fully_annotated}
           The program is <b>fully annotated</b>
         {:else}
           The program is <b><i>not</i> fully annotated</b>

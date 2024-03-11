@@ -64,7 +64,7 @@ impl Command {
                 p.predicate.clone(),
                 Source {
                     span: p.span,
-                    text: Some(format!("{:?} doesn't hold", p.predicate)),
+                    text: Some(format!("`{}` doesn't hold", p.predicate)),
                     related: None,
                 },
             )]
@@ -170,11 +170,17 @@ impl Command {
         }
 
         for p in self.pre_predicates.iter().rev() {
+            for (old_p, old_src) in acc.predicate_spans {
+                acc.assertions.insert(Assertion {
+                    predicate: p.predicate.clone().implies(old_p),
+                    source: old_src,
+                });
+            }
             acc.predicate_spans = [(
                 p.predicate.clone(),
                 Source {
                     span: p.span,
-                    text: Some(format!("{:?} doesn't hold", p.predicate)),
+                    text: Some(format!("`{}` doesn't hold", p.predicate)),
                     related: None,
                 },
             )]
