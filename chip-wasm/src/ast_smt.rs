@@ -1,6 +1,6 @@
 use smtlib::Sort;
 
-use crate::ast::{AExpr, AOp, BExpr, LogicOp, RelOp};
+use crate::ast::{AExpr, AOp, BExpr, LogicOp, Quantifier, RelOp};
 
 impl BExpr {
     pub fn smt(&self) -> smtlib::Bool {
@@ -30,7 +30,13 @@ impl BExpr {
                     LogicOp::Implies => lhs.implies(rhs),
                 }
             }
-            BExpr::Quantified(_, _, _) => todo!(),
+            BExpr::Quantified(q, t, e) => {
+                let v = smtlib::Int::from_name(t.name());
+                match q {
+                    Quantifier::Exists => smtlib::terms::exists(v, e.smt()),
+                    Quantifier::Forall => smtlib::terms::forall(v, e.smt()),
+                }
+            }
         }
     }
 }

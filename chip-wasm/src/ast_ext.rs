@@ -147,7 +147,7 @@ fn guards_fv(guards: &[Guard]) -> IndexSet<Target> {
 }
 impl Guard {
     pub fn fv(&self) -> IndexSet<Target> {
-        self.0.fv().union(&self.1.fv()).cloned().collect()
+        self.guard.fv().union(&self.cmds.fv()).cloned().collect()
     }
 }
 impl Target<Box<AExpr>> {
@@ -211,6 +211,9 @@ impl BExpr {
     }
     pub fn and(self, rhs: Self) -> Self {
         Self::logic(self, LogicOp::And, rhs)
+    }
+    pub fn or(self, rhs: Self) -> Self {
+        Self::logic(self, LogicOp::Or, rhs)
     }
     pub fn fv(&self) -> IndexSet<Target> {
         match self {
