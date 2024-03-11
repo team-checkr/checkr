@@ -29,6 +29,11 @@ export const run = async (query: string, onStart?: () => void) =>
 	borrow(async ({ Z3 }) => {
 		onStart?.();
 
+		const timeout = 1000;
+
+		Z3.global_param_set('timeout', String(timeout));
+
+		// TODO: Add a timeout of like 30 seconds
 		const cfg = Z3.mk_config();
 		const ctx = Z3.mk_context(cfg);
 		Z3.del_config(cfg);
@@ -36,8 +41,17 @@ export const run = async (query: string, onStart?: () => void) =>
 		const results: string[] = [];
 
 		for (const l of query.split('\n')) {
+			console.info("evaluating", l);
+			const timeStart =new Date().getTime();
 			const res = await Z3.eval_smtlib2_string(ctx, l);
-			results.push(res);
+			const timeEnd = new Date().getTime();
+			if (timeEnd - timeStart >= timeout) {
+
+				results.push('timeout');
+			} else {
+
+				results.push(res);
+			}
 		}
 
 		Z3.del_context(ctx);

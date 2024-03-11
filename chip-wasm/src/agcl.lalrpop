@@ -34,19 +34,14 @@ SepNonEmpty<T, S>: Vec<T> = {
 #[inline]
 Target: Target<Box<AExpr>> = {
     Variable => Target::Variable(<>),
-    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, Box::new(idx)),
 }
 #[inline]
 Variable: Variable = Var => Variable(<>);
-#[inline]
-Array: Array = Var => Array(<>);
 
 Function<X>: Function = {
     "division" "(" <X> "," <X> ")"  => Function::Division(<>),
     "min" "(" <X> "," <X> ")"       => Function::Min(<>),
     "max" "(" <X> "," <X> ")"       => Function::Max(<>),
-    "count" "(" <Array> "," <X> ")"     => Function::Count(<>),
-    "length" "(" <Array> ")"                => Function::Length(<>),
     "fac" "(" <X> ")"                   => Function::Fac(<>),
     "fib" "(" <X> ")"                   => Function::Fib(<>),
 };
@@ -101,17 +96,24 @@ CommandKind: CommandKind = {
     <Target> ":=" <AExpr>                       => CommandKind::Assignment(<>),
     "skip"                                      => CommandKind::Skip,
     "if" <Guards> "fi"                          => CommandKind::If(<>),
-    "do" "[" <PredicateBlock> "]" <Guards> "od" => CommandKind::Loop(<>),
+    "do" <PredicateInv> <Guards> "od" => CommandKind::Loop(<>),
 };
 
 Guards: Vec<Guard> = SepNonEmpty<Guard, "[]">;
 
 Guard: Guard = {
-    <BExpr> "->" <Commands> => Guard(<>),
+    <l:@L> <guard:BExpr> <r:@R> "->" <cmds:Commands> => Guard { guard, cmds, guard_span: (l, r - l).into() },
 };
 
 PredicateBlock: PredicateBlock = {
     <l:@L> "{" <predicate:Predicate> "}" <r:@R> => PredicateBlock {
+        predicate,
+        span: (l, r - l).into(),
+    }
+};
+
+PredicateInv: PredicateBlock = {
+    <l:@L> "[" <predicate:Predicate> "]" <r:@R> => PredicateBlock {
         predicate,
         span: (l, r - l).into(),
     }

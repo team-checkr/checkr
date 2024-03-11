@@ -67,8 +67,8 @@ impl Display for Guard {
         write!(
             f,
             "{} ->\n{}",
-            self.0,
-            self.1
+            self.guard,
+            self.cmds
                 .to_string()
                 .lines()
                 .map(|l| format!("   {l}"))

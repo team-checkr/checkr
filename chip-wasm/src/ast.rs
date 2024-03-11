@@ -47,7 +47,11 @@ pub enum CommandKind {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Guard(pub BExpr, pub Commands);
+pub struct Guard {
+    pub guard_span: SourceSpan,
+    pub guard: BExpr,
+    pub cmds: Commands,
+}
 
 pub type Int = i32;
 

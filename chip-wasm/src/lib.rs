@@ -26,6 +26,8 @@ pub struct Assertion {
     implication: String,
     smt: String,
     span: MonacoSpan,
+    text: Option<String>,
+    related: Option<(String, MonacoSpan)>,
 }
 
 #[derive(Debug, Clone, Serialize, Tsify)]
@@ -34,6 +36,7 @@ pub struct ParseResult {
     pub parse_error: bool,
     pub assertions: Vec<Assertion>,
     pub markers: Vec<MarkerData>,
+    pub is_fully_annotated: bool,
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -163,10 +166,22 @@ pub fn parse(src: &str) -> ParseResult {
                 .map(|t| Assertion {
                     implication: t.predicate.to_string(),
                     smt: t.smt().join("\n"),
-                    span: MonacoSpan::from_offset_len(src, t.span.offset(), t.span.len()),
+                    text: t.source.text,
+                    span: MonacoSpan::from_offset_len(
+                        src,
+                        t.source.span.offset(),
+                        t.source.span.len(),
+                    ),
+                    related: t.source.related.map(|(s, span)| {
+                        (
+                            s,
+                            MonacoSpan::from_offset_len(src, span.offset(), span.len()),
+                        )
+                    }),
                 })
                 .collect(),
             markers: vec![],
+            is_fully_annotated: ast.is_fully_annotated(),
         },
         Err(err) => ParseResult {
             parse_error: true,
@@ -183,6 +198,7 @@ pub fn parse(src: &str) -> ParseResult {
                     span: MonacoSpan::from_offset_len(src, l.offset(), l.len()),
                 })
                 .collect(),
+            is_fully_annotated: false,
         },
     }
 }
