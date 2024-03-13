@@ -360,9 +360,6 @@ impl SemanticSign for BExpr {
                 .collect()
             }
             BExpr::Not(b) => b.semantics_sign(mem).map(|i| !i),
-            BExpr::Quantified(_, _, _) => {
-                todo!("tried to compute signs of a quantified expression")
-            }
         }
     }
 }
@@ -437,7 +434,6 @@ impl SemanticSign for AExpr {
                 }
             }
             AExpr::Minus(n) => n.semantics_sign(mem).map(|x| -x),
-            AExpr::Function(_) => todo!("sign of a function"),
         }
     }
 }

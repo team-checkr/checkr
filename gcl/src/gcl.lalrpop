@@ -1,6 +1,5 @@
 use std::str::FromStr;
 use crate::{ast::*, pg::Action};
-// use crate::security::{Flow, SecurityClass};
 
 grammar;
 
@@ -26,7 +25,7 @@ Sep<T, S>: Vec<T> = {
     }
 };
 SepNonEmpty<T, S>: Vec<T> = {
-    <mut v:(<T> S)*> <e:T> =>{
+    <mut v:(<T> S)*> <e:T> => {
         v.push(e);
         v
     }
@@ -41,19 +40,6 @@ Target: Target<Box<AExpr>> = {
 Variable: Variable = Var => Variable(<>);
 #[inline]
 Array: Array = Var => Array(<>);
-
-Function<X>: Function = {
-    "division" "(" <X> "," <X> ")"  => Function::Division(<>),
-    "min" "(" <X> "," <X> ")"       => Function::Min(<>),
-    "max" "(" <X> "," <X> ")"       => Function::Max(<>),
-    "count" "(" <Array> "," <X> ")"     => Function::Count(<>),
-    "count" "(" <LArray> "," <X> ")"    => Function::LogicalCount(<>),
-    "length" "(" <Array> ")"                => Function::Length(<>),
-    "length" "(" <LArray> ")"               => Function::LogicalLength(<>),
-    "fac" "(" <X> ")"                   => Function::Fac(<>),
-    "fib" "(" <X> ")"                   => Function::Fib(<>),
-};
-
 
 pub BExpr: BExpr = {
     #[precedence(level="0")]
@@ -83,7 +69,6 @@ RelOp: RelOp = {
 };
 
 Var: String = r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
-LogicalVar: String = r"_[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
 
 Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| lalrpop_util::ParseError::User {
     error: crate::parse::CustomError::IntegerTooLarge { from, to },
@@ -103,20 +88,13 @@ pub SecurityLattice: Vec<Flow<SecurityClass>> = Sep<SecurityLatticeFlow, ",">;
 SecurityLatticeFlow: Flow<SecurityClass> = <from:SecurityClass> "<" <into:SecurityClass> => Flow { <> };
 SecurityClass: SecurityClass = Var => SecurityClass(<>);
 
-// Predicates
-
-pub AnnotatedCommand: Command = PredicateBlock Commands PredicateBlock => Command::Annotated(<>);
-
 pub Commands: Commands = SepNonEmpty<Command, ";"> => Commands(<>);
 
 Command: Command = {
-    <Target> ":=" <AExpr>                 => Command::Assignment(<>),
-    "if" <Guards> "fi"                   => Command::If(<>),
-    "do" <Guards> "od"  => Command::Loop(<>),
-    "do" <PredicateBlock> <Guards> "od"  => Command::EnrichedLoop(<>),
-    "skip"                                => Command::Skip,
-    "continue"                            => Command::Continue,
-    "break"                               => Command::Break,
+    <Target> ":=" <AExpr>   => Command::Assignment(<>),
+    "if" <Guards> "fi"      => Command::If(<>),
+    "do" <Guards> "od"      => Command::Loop(<>),
+    "skip"                  => Command::Skip,
 };
 
 Guards: Vec<Guard> = Sep<Guard, "[]">;
@@ -125,44 +103,11 @@ Guard: Guard = {
     <BExpr> "->" <Commands> => Guard(<>),
 };
 
-PredicateBlock = "{" <Predicate> "}";
-
-pub Predicate: Predicate = {
-    #[precedence(level="0")]
-    <l:AExpr_> <op:RelOp> <r:AExpr_> => Predicate::Rel(l, op, r),
-    "true" => Predicate::Bool(true),
-    "false" => Predicate::Bool(false),
-    "!" <Predicate> => Predicate::Not(Box::new(<>)),
-    "(" <Predicate_> ")",
-
-    #[precedence(level="1")] #[assoc(side="left")]
-    <l:Predicate> "&" <r:Predicate> => Predicate::logic(l, LogicOp::Land, r),
-    <l:Predicate> "&&" <r:Predicate> => Predicate::logic(l, LogicOp::And, r),
-
-    #[precedence(level="2")] #[assoc(side="left")]
-    <l:Predicate> "|" <r:Predicate> => Predicate::logic(l, LogicOp::Lor, r),
-    <l:Predicate> "||" <r:Predicate> => Predicate::logic(l, LogicOp::Or, r),
-
-    #[precedence(level="3")] #[assoc(side="right")]
-    <l:Predicate> "==>" <r:Predicate> => Predicate::logic(l, LogicOp::Implies, r),
-
-    #[precedence(level="4")]
-    <q:Quantifier> <v:LogicalVar> "::" <p:Predicate> => Predicate::Quantified(q, Target::Variable(Variable(v)), Box::new(p)),
-};
-Predicate_: Predicate = Predicate;
-
-Quantifier: Quantifier = {
-    "exists" => Quantifier::Exists,
-    "forall" => Quantifier::Forall,
-};
-
 AExpr_ = AExpr;
 pub AExpr: AExpr = {
     #[precedence(level="1")]
     Int => AExpr::Number(<>),
     Target => AExpr::Reference(<>),
-    LTarget => AExpr::Reference(<>),
-    Function<AExprBox> => AExpr::Function(<>),
     "-" <AExpr> => AExpr::Minus(Box::new(<>)),
     "(" <AExpr_> ")",
 
@@ -177,14 +122,3 @@ pub AExpr: AExpr = {
     <l:AExpr> "+" <r:AExpr> => AExpr::binary(l, AOp::Plus, r),
     <l:AExpr> "-" <r:AExpr> => AExpr::binary(l, AOp::Minus, r),
 };
-AExprBox: Box<AExpr> = AExpr => Box::new(<>);
-
-#[inline]
-LTarget: Target<Box<AExpr>> = {
-    LVariable => Target::Variable(<>),
-    <arr:LArray> "[" <idx:AExpr> "]" => Target::Array(arr, Box::new(idx)),
-}
-#[inline]
-LVariable: Variable = LogicalVar => Variable(<>);
-#[inline]
-LArray: Array = LogicalVar => Array(<>);
