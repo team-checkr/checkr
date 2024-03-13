@@ -1,11 +1,20 @@
 <script lang="ts" generics="T">
   export let value: T;
+  export let type: T extends number ? 'int' : 'array';
   let input: string = '';
 
   const f = (x: T) => (input = JSON.stringify(x));
   const fInv = (x: string) => {
     try {
-      value = JSON.parse(x);
+      const val = JSON.parse(x);
+      switch (type) {
+        case 'int':
+          if (typeof val === 'number') value = Math.floor(val) as T;
+          break;
+        case 'array':
+          if (Array.isArray(val)) value = val as T;
+          break;
+      }
     } catch (err) {}
   };
 
