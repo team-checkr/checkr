@@ -45,9 +45,9 @@
             </div>
             <div class="w-full font-mono">
               {#if v.kind == 'Array'}
-                <ParsedInput bind:value={$input.assignment.arrays[v.name]} />
+                <ParsedInput type="array" bind:value={$input.assignment.arrays[v.name]} />
               {:else}
-                <ParsedInput bind:value={$input.assignment.variables[v.name]} />
+                <ParsedInput type="int" bind:value={$input.assignment.variables[v.name]} />
               {/if}
             </div>
           {/each}
@@ -56,7 +56,7 @@
       <InputOptions>
         <InputOption title="Number of steps">
           <div class="w-full font-mono">
-            <ParsedInput bind:value={$input.trace_length} />
+            <ParsedInput type="int" bind:value={$input.trace_length} />
           </div>
         </InputOption>
         <InputOption title="Determinism">
