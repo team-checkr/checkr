@@ -182,19 +182,11 @@ impl Function {
             Function::Division(a, b) | Function::Min(a, b) | Function::Max(a, b) => {
                 Either::Left([a.as_ref(), b.as_ref()].into_iter())
             }
-            Function::Count(_, x) | Function::Fac(x) | Function::Fib(x) => {
-                Either::Right(Either::Left([x.as_ref()].into_iter()))
-            }
-            Function::Length(_) => Either::Right(Either::Right(std::iter::empty())),
+            Function::Fac(x) | Function::Fib(x) => Either::Right([x.as_ref()].into_iter()),
         }
     }
     pub fn fv(&self) -> IndexSet<Target> {
         match self {
-            Function::Count(a, x) => [Target::Array(a.clone(), ())]
-                .into_iter()
-                .chain(x.fv())
-                .collect(),
-            Function::Length(a) => [Target::Array(a.clone(), ())].into_iter().collect(),
             _ => self.exprs().flat_map(|x| x.fv()).collect(),
         }
     }
@@ -280,10 +272,6 @@ impl Function {
             Function::Max(a, b) => {
                 Function::Max(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
             }
-            Function::Count(arr, idx) => {
-                Function::Count(arr.clone(), Box::new(idx.subst_var(t, x)))
-            }
-            Function::Length(arr) => Function::Length(arr.clone()),
             Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
             Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
         }

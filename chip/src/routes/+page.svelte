@@ -14,14 +14,11 @@
 {n >= 0}
 i := 0 ; sum := 0 ;
 do[i <= n & sum = i * (i-1)/2]
-    i < n ->
-        sum := sum + i ;
-        i := i + 1
+  i < n ->
+    sum := sum + i ;
+    i := i + 1
 od
 {sum = n * (n-1)/2}`;
-
-  program = `{a=1}
-do[a=1] true -> a := 2 od`;
 
   let result = writable<ParseResult>({
     parse_error: false,
@@ -49,58 +46,61 @@ do[a=1] true -> a := 2 od`;
     run().catch(console.error);
   }
   let runId = 0;
-  $: {
-    if (browser) {
-      const run = async () => {
-        const thisRun = ++runId;
-        const z3 = await import('$lib/z3');
-        verifications.set([]);
-        state.set('verifying');
-        let errors = false;
-        for (const t of $result.assertions) {
-          const res = await z3.run(t.smt);
-          const valid = res[res.length - 1].trim() === 'unsat';
+  $: if (browser) {
+    const run = async () => {
+      const thisRun = ++runId;
+      const z3 = await import('$lib/z3');
+      verifications.set([]);
+      state.set('verifying');
+      let errors = false;
+      for (const t of $result.assertions) {
+        const res = await z3.run(t.smt);
+        const valid = res[res.length - 1].trim() === 'unsat';
 
-          if (thisRun !== runId) {
-            console.log('aborted', thisRun, runId, result, res);
-            return;
-          }
+        if (thisRun !== runId) {
+          console.log('aborted', thisRun, runId, result, res);
+          return;
+        }
 
-          if (!valid) {
-            errors = true;
-            verifications.update((res) => [
-              ...res,
-              {
-                severity: 'Error',
-                tags: [],
-                message: t.text ? t.text : 'Verification failed',
-                span: t.span,
-                relatedInformation: [],
-              },
-              ...(t.related
-                ? [
-                    {
-                      severity: 'Info' as MarkerSeverity,
-                      tags: [],
-                      message: t.related[0],
-                      span: t.related[1],
-                      relatedInformation: [],
-                    },
-                  ]
-                : []),
-            ]);
-          }
+        if (!valid) {
+          errors = true;
+          verifications.update((res) => [
+            ...res,
+            {
+              severity: 'Error',
+              tags: [],
+              message: t.text ? t.text : 'Verification failed',
+              span: t.span,
+              relatedInformation: [],
+            },
+            ...(t.related
+              ? [
+                  {
+                    severity: 'Info' as MarkerSeverity,
+                    tags: [],
+                    message: t.related[0],
+                    span: t.related[1],
+                    relatedInformation: [],
+                  },
+                ]
+              : []),
+          ]);
         }
-        if (errors) {
-          state.set('error');
-        } else {
-          state.set('verified');
-        }
-      };
-      run().catch(console.error);
-    }
+      }
+      if (errors) {
+        state.set('error');
+      } else {
+        state.set('verified');
+      }
+    };
+    run().catch(console.error);
   }
 </script>
+
+<svelte:head>
+  <title>Chip</title>
+  <meta name="description" content="Chip" />
+</svelte:head>
 
 <div class="relative grid grid-rows-[2fr_auto_auto] overflow-hidden bg-slate-800">
   <Editor bind:value={program} markers={[...$result.markers, ...$verifications]} />

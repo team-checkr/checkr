@@ -77,8 +77,6 @@ pub enum Function {
     Division(Box<AExpr>, Box<AExpr>),
     Min(Box<AExpr>, Box<AExpr>),
     Max(Box<AExpr>, Box<AExpr>),
-    Count(Array, Box<AExpr>),
-    Length(Array),
     Fac(Box<AExpr>),
     Fib(Box<AExpr>),
 }

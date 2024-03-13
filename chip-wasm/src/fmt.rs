@@ -110,8 +110,6 @@ impl Display for Function {
             Function::Division(a, b) => write!(f, "division({a}, {b})"),
             Function::Min(a, b) => write!(f, "min({a}, {b})"),
             Function::Max(a, b) => write!(f, "max({a}, {b})"),
-            Function::Count(a, b) => write!(f, "count({a}, {b})"),
-            Function::Length(x) => write!(f, "length({x})"),
             Function::Fac(x) => write!(f, "fac({x})"),
             Function::Fib(x) => write!(f, "fib({x})"),
         }

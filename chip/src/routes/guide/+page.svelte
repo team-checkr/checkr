@@ -1,3 +1,8 @@
+<svelte:head>
+  <title>Chip – Guide</title>
+  <meta name="description" content="Guide" />
+</svelte:head>
+
 <div class="bg-slate-800 py-10">
   <article class="prose prose-invert mx-auto">
     <h1>Guide</h1>
