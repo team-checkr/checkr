@@ -51,33 +51,10 @@ pub struct CanonicalProgramsConfig {
     Debug, Default, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 pub struct ProgramId(usize);
-impl CanonicalProgramsConfig {
-    pub(crate) fn get(&self, analysis: Analysis, input: ProgramId) -> &CanonicalProgramConfig {
-        &self.envs[&analysis].programs[input.0]
-    }
-}
-
-// impl CanonicalProgramConfig {
-//     pub fn generated_program(&self, analysis: Analysis) -> Result<GeneratedProgram> {
-//         let builder = analysis.setup_generation();
-//         Ok(builder.from_cmds_and_input(
-//             gcl::parse::parse_commands(&self.src).unwrap(),
-//             analysis.input_from_str(&self.input)?,
-//         ))
-//     }
-// }
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 #[serde(transparent)]
 pub struct CanonicalProgramsEnvConfig {
     pub programs: Vec<CanonicalProgramConfig>,
-}
-impl CanonicalProgramsEnvConfig {
-    pub(crate) fn programs(&self) -> impl Iterator<Item = (ProgramId, &CanonicalProgramConfig)> {
-        self.programs
-            .iter()
-            .enumerate()
-            .map(|(idx, p)| (ProgramId(idx), p))
-    }
 }
 #[derive(tapi::Tapi, Debug, Clone, Serialize, Deserialize)]
 pub struct CanonicalProgramConfig {
@@ -85,15 +62,6 @@ pub struct CanonicalProgramConfig {
     pub shown: bool,
 }
 impl ProgramsConfig {
-    pub fn extend(&mut self, other: Self) {
-        for (analysis, env) in other.envs {
-            self.envs
-                .entry(analysis)
-                .or_default()
-                .programs
-                .extend_from_slice(&env.programs);
-        }
-    }
     pub fn canonicalize(&self) -> Result<CanonicalProgramsConfig> {
         let envs = self
             .envs

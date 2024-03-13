@@ -142,19 +142,19 @@ async fn run() -> color_eyre::Result<()> {
 }
 
 pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
-    static UI_DIR: include_dir::Dir =
-        include_dir::include_dir!("$CARGO_MANIFEST_DIR/../inspectify-app/build/");
+    #[derive(rust_embed::RustEmbed)]
+    #[folder = "../inspectify-app/build/"]
+    struct Frontend;
 
     if uri.path() == "/" {
-        let index = if let Some(index) = UI_DIR.get_file("index.html") {
-            index.contents_utf8().unwrap()
+        if let Some(index) = Frontend::get("index.html") {
+            return Html(index.data).into_response();
         } else {
-            "Frontend has not been build for release yet! Visit <a href=\"http://localhost:3001/\">localhost:3001</a> for the development site!"
-        };
-        return Html(index).into_response();
+            return Html("Frontend has not been build for release yet! Visit <a href=\"http://localhost:3001/\">localhost:3001</a> for the development site!").into_response();
+        }
     }
 
-    let get = |path: String| UI_DIR.get_file(&path).map(|file| (path, file));
+    let get = |path: String| Frontend::get(&path).map(|file| (path, file));
 
     let plain = get(uri.path()[1..].to_string());
     let html = get(format!("{}.html", &uri.path()[1..]));
@@ -170,11 +170,7 @@ pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoRespon
                     )
                     .unwrap()
                 });
-            (
-                [(axum::http::header::CONTENT_TYPE, mime_type)],
-                file.contents(),
-            )
-                .into_response()
+            ([(axum::http::header::CONTENT_TYPE, mime_type)], file.data).into_response()
         }
         _ => axum::http::StatusCode::NOT_FOUND.into_response(),
     }

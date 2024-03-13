@@ -23,7 +23,6 @@ driver.workspace = true
 dunce.workspace = true
 futures-util = "0.3.30"
 hex = "0.4.3"
-include_dir = "0.7.3"
 indexmap.workspace = true
 itertools.workspace = true
 lz4_flex.workspace = true
@@ -33,6 +32,7 @@ once_cell.workspace = true
 open = "5.0.1"
 rand.workspace = true
 rusqlite.workspace = true
+rust-embed = { version = "8.3.0", features = ["axum", "compression"] }
 serde.workspace = true
 serde_json.workspace = true
 stdx.workspace = true
