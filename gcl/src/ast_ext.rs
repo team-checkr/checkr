@@ -1,11 +1,10 @@
 use std::{fmt::Debug, str::FromStr};
 
 use indexmap::IndexSet;
-use itertools::Either;
 
 use crate::{
     ast::{
-        AExpr, AOp, Array, BExpr, Command, Commands, Flow, Function, Guard, LogicOp, RelOp, Target,
+        AExpr, AOp, Array, BExpr, Command, Commands, Flow, Guard, LogicOp, RelOp, Target,
         TargetDef, TargetKind, Variable,
     },
     semantics::EmptySemanticsContext,
@@ -167,12 +166,6 @@ impl Command {
             Command::Skip => IndexSet::default(),
             Command::If(c) => guards_fv(c),
             Command::Loop(c) => guards_fv(c),
-            // TODO: Maybe the pred should also be looked at?
-            Command::EnrichedLoop(_, c) => guards_fv(c),
-            // TODO: Maybe the pred should also be looked at?
-            Command::Annotated(_, c, _) => c.fv(),
-            Command::Break => IndexSet::default(),
-            Command::Continue => IndexSet::default(),
         }
     }
 }
@@ -206,35 +199,6 @@ impl AExpr {
             AExpr::Reference(v) => v.fv(),
             AExpr::Binary(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             AExpr::Minus(x) => x.fv(),
-            AExpr::Function(f) => f.fv(),
-        }
-    }
-}
-impl Function {
-    pub fn exprs(&self) -> impl Iterator<Item = &AExpr> {
-        match self {
-            Function::Division(a, b) | Function::Min(a, b) | Function::Max(a, b) => {
-                Either::Left([a.as_ref(), b.as_ref()].into_iter())
-            }
-            Function::Count(_, x)
-            | Function::LogicalCount(_, x)
-            | Function::Fac(x)
-            | Function::Fib(x) => Either::Right(Either::Left([x.as_ref()].into_iter())),
-            Function::Length(_) | Function::LogicalLength(_) => {
-                Either::Right(Either::Right(std::iter::empty()))
-            }
-        }
-    }
-    pub fn fv(&self) -> IndexSet<Target> {
-        match self {
-            Function::Count(a, x) | Function::LogicalCount(a, x) => [Target::Array(a.clone(), ())]
-                .into_iter()
-                .chain(x.fv())
-                .collect(),
-            Function::Length(a) | Function::LogicalLength(a) => {
-                [Target::Array(a.clone(), ())].into_iter().collect()
-            }
-            _ => self.exprs().flat_map(|x| x.fv()).collect(),
         }
     }
 }
@@ -251,11 +215,6 @@ impl BExpr {
             BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             BExpr::Not(x) => x.fv(),
-            BExpr::Quantified(_, x, b) => {
-                let mut fv = b.fv();
-                fv.shift_remove(x);
-                fv
-            }
         }
     }
 }
@@ -267,13 +226,6 @@ impl BExpr {
             BExpr::Rel(l, op, r) => BExpr::Rel(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Logic(l, op, r) => BExpr::logic(l.subst_var(t, x), *op, r.subst_var(t, x)),
             BExpr::Not(e) => BExpr::Not(Box::new(e.subst_var(t, x))),
-            BExpr::Quantified(q, v, e) => {
-                if v.same_name(t) {
-                    self.clone()
-                } else {
-                    BExpr::Quantified(*q, v.clone(), Box::new(e.subst_var(t, x)))
-                }
-            }
         }
     }
 
@@ -311,7 +263,6 @@ impl BExpr {
                     x => BExpr::Not(Box::new(x)),
                 }
             }
-            BExpr::Quantified(_, _, _) => todo!(),
         }
     }
 }
@@ -324,7 +275,6 @@ impl AExpr {
             AExpr::Reference(v) => AExpr::Reference(v.clone()),
             AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
             AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
-            AExpr::Function(f) => AExpr::Function(f.subst_var(t, x)),
         }
     }
 
@@ -341,33 +291,6 @@ impl AExpr {
                 AExpr::Minus(inner) => inner.simplify(),
                 _ => AExpr::Minus(Box::new(e.simplify())),
             },
-            AExpr::Function(_) => self.clone(),
-        }
-    }
-}
-
-impl Function {
-    pub fn subst_var<T>(&self, t: &Target<T>, x: &AExpr) -> Function {
-        match self {
-            Function::Division(a, b) => {
-                Function::Division(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
-            }
-            Function::Min(a, b) => {
-                Function::Min(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
-            }
-            Function::Max(a, b) => {
-                Function::Max(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
-            }
-            Function::Count(arr, idx) => {
-                Function::Count(arr.clone(), Box::new(idx.subst_var(t, x)))
-            }
-            Function::LogicalCount(arr, idx) => {
-                Function::LogicalCount(arr.clone(), Box::new(idx.subst_var(t, x)))
-            }
-            Function::Length(arr) => Function::Length(arr.clone()),
-            Function::LogicalLength(arr) => Function::LogicalLength(arr.clone()),
-            Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
-            Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
         }
     }
 }

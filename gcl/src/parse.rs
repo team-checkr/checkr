@@ -2,7 +2,7 @@ use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;
 
-use crate::ast::{BExpr, Commands, Flow, Predicate, SecurityClass};
+use crate::ast::{BExpr, Commands, Flow, SecurityClass};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceSpan {
@@ -76,12 +76,6 @@ pub fn parse_bexpr(src: &str) -> Result<BExpr, ParseError> {
 
 pub fn parse_aexpr(src: &str) -> Result<crate::ast::AExpr, ParseError> {
     static PARSER: Lazy<crate::gcl::AExprParser> = Lazy::new(crate::gcl::AExprParser::new);
-
-    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
-}
-
-pub fn parse_predicate(src: &str) -> Result<Predicate, ParseError> {
-    static PARSER: Lazy<crate::gcl::PredicateParser> = Lazy::new(crate::gcl::PredicateParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }

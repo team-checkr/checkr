@@ -91,7 +91,7 @@ impl Security for Command {
             .map(|i| flow(i, t.clone().unit()))
             .collect(),
             Command::Skip => BTreeSet::default(),
-            Command::If(c) | Command::Loop(c) | Command::EnrichedLoop(_, c) => {
+            Command::If(c) | Command::Loop(c) => {
                 c.iter()
                     .fold(
                         (implicit.clone(), BTreeSet::default()),
@@ -106,9 +106,6 @@ impl Security for Command {
                     )
                     .1
             }
-            Command::Annotated(_, c, _) => c.sec(implicit),
-            Command::Break => BTreeSet::default(),
-            Command::Continue => BTreeSet::default(),
         }
     }
 }
