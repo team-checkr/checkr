@@ -1,6 +1,7 @@
 use ce_core::{define_env, gen::GclGenContext, rand, Env, Generate, ValidationResult};
-use gcl::{ast::AExpr, stringify::Stringify};
+use gcl::ast::AExpr;
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 define_env!(CalcEnv);
 

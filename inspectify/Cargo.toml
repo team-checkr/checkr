@@ -26,6 +26,7 @@ hex = "0.4.3"
 include_dir = "0.7.3"
 indexmap.workspace = true
 itertools.workspace = true
+lz4_flex.workspace = true
 md5.workspace = true
 mime_guess = "2.0.4"
 once_cell.workspace = true

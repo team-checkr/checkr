@@ -16,6 +16,7 @@ miette.workspace = true
 once_cell.workspace = true
 petgraph.workspace = true
 serde.workspace = true
+stdx.workspace = true
 tapi.workspace = true
 thiserror.workspace = true
 tracing.workspace = true

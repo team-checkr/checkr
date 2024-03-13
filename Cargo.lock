@@ -303,6 +303,7 @@ dependencies = [
  "itertools 0.12.1",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tracing",
 ]
@@ -319,6 +320,7 @@ dependencies = [
  "rand",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
 ]
 
@@ -347,6 +349,7 @@ dependencies = [
  "itertools 0.12.1",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tracing",
 ]
@@ -359,6 +362,7 @@ dependencies = [
  "gcl",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
 ]
 
@@ -371,6 +375,7 @@ dependencies = [
  "itertools 0.12.1",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tracing",
 ]
@@ -410,6 +415,7 @@ dependencies = [
  "itertools 0.12.1",
  "serde",
  "serde_json",
+ "stdx",
  "tapi",
  "tracing",
 ]
@@ -866,6 +872,7 @@ dependencies = [
  "once_cell",
  "petgraph",
  "serde",
+ "stdx",
  "tapi",
  "thiserror",
  "tracing",
@@ -1183,6 +1190,7 @@ dependencies = [
  "include_dir",
  "indexmap",
  "itertools 0.12.1",
+ "lz4_flex",
  "md5",
  "mime_guess",
  "once_cell",
@@ -2120,9 +2128,9 @@ version = "0.1.21"
 dependencies = [
  "lz4_flex",
  "once_cell",
- "rusqlite",
  "serde",
  "serde_json",
+ "tapi",
  "tokio",
  "tracing",
 ]

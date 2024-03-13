@@ -7,11 +7,10 @@ use ce_shell::Input;
 use color_eyre::eyre::Context;
 use driver::JobKind;
 use rusqlite::OptionalExtension;
-use stdx::compression::Compressed;
 
 use crate::endpoints::InspectifyJobMeta;
 
-use super::config::GroupConfig;
+use super::{compression::Compressed, config::GroupConfig};
 
 #[derive(Clone)]
 pub struct CheckoDb {

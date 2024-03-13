@@ -17,4 +17,5 @@ petgraph.workspace = true
 rand.workspace = true
 serde.workspace = true
 serde_json.workspace = true
+stdx.workspace = true
 tapi.workspace = true
