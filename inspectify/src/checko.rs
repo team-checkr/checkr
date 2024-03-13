@@ -1,7 +1,8 @@
+mod compression;
 pub mod config;
 mod db;
 mod git;
-pub mod public;
+pub mod scoreboard;
 
 use std::{
     future::Future,

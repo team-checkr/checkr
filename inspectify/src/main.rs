@@ -96,7 +96,7 @@ async fn run() -> color_eyre::Result<()> {
             async move {
                 loop {
                     *public_state.write().unwrap() =
-                        Some(checko::public::compute_public_state(&hub, &checko));
+                        Some(checko::scoreboard::compute_public_state(&hub, &checko));
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
             }

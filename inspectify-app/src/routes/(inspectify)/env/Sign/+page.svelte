@@ -10,7 +10,7 @@
   const io = useIo('Sign', {
     commands: 'skip',
     assignment: { variables: {}, arrays: {} },
-    determinism: 'Deterministic' ,
+    determinism: 'Deterministic',
   });
   const { input, meta } = io;
 

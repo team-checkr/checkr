@@ -7,11 +7,11 @@ use ce_core::{define_env, rand, Env, Generate, ValidationResult};
 use gcl::{
     ast::{Commands, Target, TargetDef, Variable},
     memory::Memory,
-    stringify::Stringify,
 };
 use itertools::Itertools;
 use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 define_env!(SecurityEnv);
 

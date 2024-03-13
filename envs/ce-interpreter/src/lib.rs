@@ -12,9 +12,9 @@ use gcl::{
     ast::{Commands, Int, TargetDef},
     interpreter::{Execution, InterpreterMemory, Step, TerminationState},
     pg::{Determinism, Node},
-    stringify::Stringify,
 };
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 define_env!(InterpreterEnv);
 

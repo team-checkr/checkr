@@ -1,6 +1,7 @@
 use ce_core::{define_env, rand, Env, Generate, ValidationResult};
-use gcl::{ast::Commands, interpreter::InterpreterMemory, stringify::Stringify};
+use gcl::{ast::Commands, interpreter::InterpreterMemory};
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 define_env!(ParserEnv);
 

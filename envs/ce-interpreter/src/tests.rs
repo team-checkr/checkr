@@ -1,5 +1,6 @@
 use ce_core::{Env, ValidationResult};
-use gcl::{ast::Variable, pg::Determinism, stringify::Stringify};
+use gcl::{ast::Variable, pg::Determinism};
+use stdx::stringify::Stringify;
 
 use crate::{Input, InterpreterEnv, InterpreterMemory};
 

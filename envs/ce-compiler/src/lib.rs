@@ -7,11 +7,11 @@ use gcl::{
     ast::Commands,
     interpreter::InterpreterMemory,
     pg::{Determinism, ProgramGraph},
-    stringify::Stringify,
 };
 use itertools::Itertools;
 use rand::{seq::SliceRandom, Rng};
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 define_env!(CompilerEnv);
 

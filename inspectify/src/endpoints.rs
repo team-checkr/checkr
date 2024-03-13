@@ -7,7 +7,7 @@ use driver::{HubEvent, JobId, JobKind, JobState};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
-use crate::checko::{self, config::GroupName, public::PublicState};
+use crate::checko::{self, config::GroupName, scoreboard::PublicState};
 
 #[derive(Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct InspectifyJobMeta {

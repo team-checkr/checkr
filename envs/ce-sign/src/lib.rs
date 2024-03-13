@@ -16,11 +16,11 @@ use gcl::{
         analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
     },
-    stringify::Stringify,
 };
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
 use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
 
 pub use semantics::{Bools, Sign, SignAnalysis, SignMemory, Signs};
 
