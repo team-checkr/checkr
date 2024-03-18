@@ -1,7 +1,7 @@
 #[macro_export]
 macro_rules! define_shell {
     ($($krate:path[$name:ident, $display:literal]),*$(,)?) => {
-        use std::{str::FromStr, sync::Arc};
+        use std::str::FromStr;
 
         use ce_core::{Env, EnvError, Generate, ValidationResult};
         use itertools::Itertools;
@@ -59,10 +59,7 @@ macro_rules! define_shell {
                 match self {
                     $(Analysis::$name => {
                         let input = <$krate as Env>::Input::gen(&mut (), rng);
-                        Input {
-                            analysis: self,
-                            json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
-                        }
+                        Input::new::<$krate>(&input)
                     }),*
                 }
             }
@@ -72,10 +69,7 @@ macro_rules! define_shell {
                     $(Analysis::$name => {
                         let input = serde_json::from_str::<<$krate as Env>::Input>(src)
                             .map_err($crate::io::Error::JsonError)?;
-                        Ok(Input {
-                            analysis: self,
-                            json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
-                        })
+                        Ok(Input::new::<$krate>(&input))
                     }),*
                 }
             }
@@ -85,10 +79,7 @@ macro_rules! define_shell {
                     $(Analysis::$name => {
                         let input = serde_json::from_slice::<<$krate as Env>::Input>(src)
                             .map_err($crate::io::Error::JsonError)?;
-                        Ok(Input {
-                            analysis: self,
-                            json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
-                        })
+                        Ok(Input::new::<$krate>(&input))
                     }),*
                 }
             }
@@ -99,10 +90,7 @@ macro_rules! define_shell {
                         let last_line = src.lines().last().unwrap_or_default();
                         let output = serde_json::from_str::<<$krate as Env>::Output>(last_line)
                             .map_err($crate::io::Error::JsonError)?;
-                        Ok(Output {
-                            analysis: self,
-                            json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
-                        })
+                        Ok(Output::new::<$krate>(&output))
                     }),*
                 }
             }
@@ -112,51 +100,38 @@ macro_rules! define_shell {
                     $(Analysis::$name => {
                         let output = serde_json::from_slice::<<$krate as Env>::Output>(src)
                             .map_err($crate::io::Error::JsonError)?;
-                        Ok(Output {
-                            analysis: self,
-                            json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
-                        })
+                        Ok(Output::new::<$krate>(&output))
                     }),*
                 }
             }
         }
 
         impl Input {
-            #[tracing::instrument(skip_all, fields(analysis = self.analysis.to_string()))]
+            #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
             pub fn meta(&self) -> Meta {
-                match self.analysis {
+                match self.analysis() {
                     $(Analysis::$name => {
-                        let meta = if let Ok(input) = serde_json::from_value::<<$krate as Env>::Input>((*self.json).clone()) {
+                        let meta = if let Ok(input) = self.data::<$krate>() {
                             <$krate>::meta(&input)
                         } else {
                             Default::default()
                         };
-                        Meta {
-                            analysis: self.analysis,
-                            json: serde_json::to_value(&meta)
-                                .expect("all output should be serializable")
-                                .into(),
-                        }
+                        Meta::new::<$krate>(&meta)
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.analysis.to_string()))]
+            #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
             pub fn reference_output(&self) -> Result<Output, EnvError> {
-                match self.analysis {
+                match self.analysis() {
                     $(Analysis::$name => {
-                        let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone())
-                            .map_err(EnvError::from_parse_input(&self.json))?;
+                        let input: <$krate as Env>::Input = self.data::<$krate>()
+                            .map_err(EnvError::from_parse_input(&self.json()))?;
                         let reference_output = <$krate>::run(&input)?;
-                        Ok(Output {
-                            analysis: self.analysis,
-                            json: serde_json::to_value(&reference_output)
-                                .expect("all output should be serializable")
-                                .into(),
-                        })
+                        Ok(Output::new::<$krate>(&reference_output))
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.analysis.to_string()))]
+            #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
             pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
                 assert_eq!(self.analysis(), output.analysis());
 
@@ -167,12 +142,12 @@ macro_rules! define_shell {
                     return result.clone();
                 }
 
-                let result = (|| match self.analysis {
+                let result = (|| match self.analysis() {
                     $(Analysis::$name => {
-                        let input: <$krate as Env>::Input = serde_json::from_value((*self.json).clone())
-                            .map_err(EnvError::from_parse_input(&self.json))?;
-                        let output: <$krate as Env>::Output = serde_json::from_value((*output.json).clone())
-                            .map_err(EnvError::from_parse_output(&output.json))?;
+                        let input: <$krate as Env>::Input = self.data::<$krate>()
+                            .map_err(EnvError::from_parse_input(&self.json()))?;
+                        let output: <$krate as Env>::Output = output.data::<$krate>()
+                            .map_err(EnvError::from_parse_output(&output.json()))?;
                         <$krate as Env>::validate(&input, &output)
                     }),*
                 })();
@@ -188,17 +163,11 @@ macro_rules! define_shell {
                 const ANALYSIS: Analysis = Analysis::$name;
 
                 fn generalize_input(input: &Self::Input) -> Input {
-                    Input {
-                        analysis: Self::ANALYSIS,
-                        json: Arc::new(serde_json::to_value(input).expect("input is always valid json")),
-                    }
+                    Input::new::<$krate>(input)
                 }
 
                 fn generalize_output(output: &Self::Output) -> Output {
-                    Output {
-                        analysis: Self::ANALYSIS,
-                        json: Arc::new(serde_json::to_value(output).expect("output is always valid json")),
-                    }
+                    Output::new::<$krate>(output)
                 }
             }
         )*

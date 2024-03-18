@@ -37,6 +37,15 @@ pub struct PublicState {
     groups: Vec<PublicGroup>,
 }
 
+// TODO: Perhaps we should split events up into more selective changes
+// #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
+// pub enum PublicEvent {
+//     LastFinished(Option<chrono::DateTime<chrono::FixedOffset>>),
+//     Analysis(Analysis, Vec<Option<Input>>),
+//     Group(GroupName, Vec<PublicAnalysisResults>),
+//     GroupOrder(Vec<GroupName>),
+// }
+
 fn compute_public_groups(
     hub: &driver::Hub<InspectifyJobMeta>,
     checko: &Checko,
