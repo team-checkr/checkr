@@ -1,32 +1,47 @@
 use std::sync::Arc;
 
-use crate::Analysis;
+use ce_core::Env;
+
+use crate::{Analysis, EnvExt};
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Input {
-    pub(crate) analysis: Analysis,
-    pub(crate) json: Arc<serde_json::Value>,
+    analysis: Analysis,
+    json: Arc<serde_json::Value>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
-    pub(crate) analysis: Analysis,
-    pub(crate) json: Arc<serde_json::Value>,
+    analysis: Analysis,
+    json: Arc<serde_json::Value>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Meta {
-    pub(crate) analysis: Analysis,
-    pub(crate) json: Arc<serde_json::Value>,
+    analysis: Analysis,
+    json: Arc<serde_json::Value>,
 }
 
 impl Input {
+    pub fn new<E: EnvExt>(data: &E::Input) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(data)
+                .expect("all output should be serializable")
+                .into(),
+        }
+    }
+
     pub fn analysis(&self) -> Analysis {
         self.analysis
     }
 
-    pub fn data(&self) -> Arc<serde_json::Value> {
+    pub fn json(&self) -> Arc<serde_json::Value> {
         self.json.clone()
+    }
+
+    pub fn data<E: Env>(&self) -> Result<E::Input, serde_json::Error> {
+        serde_json::from_value((*self.json).clone())
     }
 
     pub fn hash(&self) -> [u8; 16] {
@@ -35,12 +50,25 @@ impl Input {
 }
 
 impl Output {
+    pub fn new<E: EnvExt>(data: &E::Output) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(data)
+                .expect("all output should be serializable")
+                .into(),
+        }
+    }
+
     pub fn analysis(&self) -> Analysis {
         self.analysis
     }
 
-    pub fn data(&self) -> Arc<serde_json::Value> {
+    pub fn json(&self) -> Arc<serde_json::Value> {
         self.json.clone()
+    }
+
+    pub fn data<E: Env>(&self) -> Result<E::Output, serde_json::Error> {
+        serde_json::from_value((*self.json).clone())
     }
 
     pub fn hash(&self) -> [u8; 16] {
@@ -49,12 +77,25 @@ impl Output {
 }
 
 impl Meta {
+    pub fn new<E: EnvExt>(data: &E::Meta) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(data)
+                .expect("all output should be serializable")
+                .into(),
+        }
+    }
+
     pub fn analysis(&self) -> Analysis {
         self.analysis
     }
 
-    pub fn data(&self) -> Arc<serde_json::Value> {
+    pub fn json(&self) -> Arc<serde_json::Value> {
         self.json.clone()
+    }
+
+    pub fn data<E: Env>(&self) -> Result<E::Meta, serde_json::Error> {
+        serde_json::from_value((*self.json).clone())
     }
 }
 
