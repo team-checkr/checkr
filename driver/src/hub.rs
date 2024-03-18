@@ -254,4 +254,8 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         job
     }
+
+    pub fn clear(&self) {
+        self.jobs.write().unwrap().clear();
+    }
 }
