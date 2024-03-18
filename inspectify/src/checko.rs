@@ -7,7 +7,7 @@ pub mod scoreboard;
 use std::{
     future::Future,
     path::{Path, PathBuf},
-    sync::{Arc, Mutex},
+    sync::Arc,
     time::Duration,
 };
 
@@ -54,7 +54,6 @@ pub enum GroupDriver {
 pub struct GroupState {
     driver: GroupDriver,
     compile_job: Option<Job<InspectifyJobMeta>>,
-    active_jobs: Mutex<Vec<Job<InspectifyJobMeta>>>,
 }
 
 #[derive(Debug, Clone)]
@@ -175,7 +174,6 @@ impl Checko {
                 let state = Arc::new(GroupState {
                     driver: GroupDriver::Driver(driver),
                     compile_job,
-                    active_jobs: Mutex::new(Vec::new()),
                 });
                 Ok(state)
             }
@@ -186,7 +184,6 @@ impl Checko {
                         reason: format!("{:?}", err),
                     },
                     compile_job: None,
-                    active_jobs: Mutex::new(Vec::new()),
                 });
                 Ok(state)
             }
@@ -241,7 +238,7 @@ impl Checko {
                     group_path
                 };
 
-                let git_hash = git::hash(&path).await?;
+                let git_hash = git::hash(&path, None).await?;
 
                 Ok(GroupRepo {
                     path,
@@ -372,7 +369,6 @@ impl Checko {
                                 group_name: Some(run.group_config.name.clone()),
                             },
                         );
-                        group_state.active_jobs.lock().unwrap().push(job.clone());
                         events_tx
                             .send(CheckoEvent::JobAssigned {
                                 group: run.group_config.name.clone(),
@@ -383,11 +379,6 @@ impl Checko {
                         tracing::debug!(name=?run.group_config, "waiting for job");
                         job.wait().await;
                         tracing::debug!(name=?run.group_config, "job finished");
-                        group_state
-                            .active_jobs
-                            .lock()
-                            .unwrap()
-                            .retain(|j| j.id() != job.id());
 
                         if let Some(git_hash) = &group_repo.git_hash {
                             db.insert_cached_run(

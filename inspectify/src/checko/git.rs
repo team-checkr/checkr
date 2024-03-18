@@ -105,10 +105,14 @@ pub async fn pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
     Ok(())
 }
 
-pub async fn hash(path: impl AsRef<Path>) -> color_eyre::Result<String> {
+pub async fn is_up_to_date(path: impl AsRef<Path>) -> color_eyre::Result<bool> {
+    Ok(hash(&path, Some("HEAD")).await? == hash(&path, Some("origin/main")).await?)
+}
+
+pub async fn hash(path: impl AsRef<Path>, rev: Option<&str>) -> color_eyre::Result<String> {
     let output = Command::new("git")
         .arg("rev-parse")
-        .arg("HEAD")
+        .arg(rev.unwrap_or("HEAD"))
         .current_dir(path)
         .success_with_output()
         .await
