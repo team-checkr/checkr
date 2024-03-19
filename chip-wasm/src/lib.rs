@@ -34,6 +34,7 @@ pub struct Assertion {
 #[tsify(into_wasm_abi)]
 pub struct ParseResult {
     pub parse_error: bool,
+    pub prelude: String,
     pub assertions: Vec<Assertion>,
     pub markers: Vec<MarkerData>,
     pub is_fully_annotated: bool,
@@ -154,12 +155,15 @@ impl MonacoSpan {
     }
 }
 
+const PRELUDE: &str = include_str!("chip-theory.smt2");
+
 #[wasm_bindgen]
 pub fn parse(src: &str) -> ParseResult {
     let res = parse::parse_program(src);
     match res {
         Ok(ast) => ParseResult {
             parse_error: false,
+            prelude: PRELUDE.to_string(),
             assertions: ast
                 .assertions()
                 .into_iter()
@@ -185,6 +189,7 @@ pub fn parse(src: &str) -> ParseResult {
         },
         Err(err) => ParseResult {
             parse_error: true,
+            prelude: PRELUDE.to_string(),
             assertions: vec![],
             markers: err
                 .labels()

@@ -39,12 +39,6 @@ impl<Idx> Target<Idx> {
             _ => false,
         }
     }
-    pub fn is_logical(&self) -> bool {
-        match self {
-            Target::Variable(v) => v.is_logical(),
-            Target::Array(a, _) => a.is_logical(),
-        }
-    }
     pub fn def(&self) -> TargetDef {
         match self {
             Target::Variable(v) => TargetDef {
@@ -71,12 +65,6 @@ where
     }
 }
 
-impl Variable {
-    pub fn is_logical(&self) -> bool {
-        self.0.starts_with('_')
-    }
-}
-
 impl Debug for Variable {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0)
@@ -87,12 +75,6 @@ impl FromStr for Variable {
 
     fn from_str(s: &str) -> Result<Self, Self::Err> {
         Ok(Variable(s.to_string()))
-    }
-}
-
-impl Array {
-    pub fn is_logical(&self) -> bool {
-        self.0.starts_with('_')
     }
 }
 
@@ -177,26 +159,34 @@ impl AExpr {
     }
 }
 impl Function {
-    pub fn exprs(&self) -> impl Iterator<Item = &AExpr> {
+    pub(crate) fn name(&self) -> &'static str {
         match self {
-            Function::Division(a, b) | Function::Min(a, b) | Function::Max(a, b) => {
-                Either::Left([a.as_ref(), b.as_ref()].into_iter())
-            }
+            Function::Division(_, _) => "div",
+            Function::Min(_, _) => "min",
+            Function::Max(_, _) => "max",
+            Function::Fac(_) => "fac",
+            Function::Fib(_) => "fib",
+            Function::Exp(_, _) => "exp",
+        }
+    }
+
+    pub(crate) fn args(&self) -> impl Iterator<Item = &AExpr> {
+        match self {
+            Function::Division(a, b)
+            | Function::Min(a, b)
+            | Function::Max(a, b)
+            | Function::Exp(a, b) => Either::Left([a.as_ref(), b.as_ref()].into_iter()),
             Function::Fac(x) | Function::Fib(x) => Either::Right([x.as_ref()].into_iter()),
         }
     }
+
     pub fn fv(&self) -> IndexSet<Target> {
-        match self {
-            _ => self.exprs().flat_map(|x| x.fv()).collect(),
-        }
+        self.args().flat_map(|x| x.fv()).collect()
     }
 }
 impl BExpr {
     pub fn logic(lhs: Self, op: LogicOp, rhs: Self) -> Self {
         Self::Logic(Box::new(lhs), op, Box::new(rhs))
-    }
-    pub fn rel(lhs: AExpr, op: RelOp, rhs: AExpr) -> Self {
-        Self::Rel(lhs, op, rhs)
     }
     pub fn implies(self, rhs: Self) -> Self {
         Self::logic(self, LogicOp::Implies, rhs)
@@ -274,6 +264,9 @@ impl Function {
             }
             Function::Fac(n) => Function::Fac(Box::new(n.subst_var(t, x))),
             Function::Fib(n) => Function::Fib(Box::new(n.subst_var(t, x))),
+            Function::Exp(a, b) => {
+                Function::Exp(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
+            }
         }
     }
 }
