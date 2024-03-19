@@ -76,12 +76,22 @@ AExpr = {
     Var,
     "-" <AExpr>,
     "(" <AExpr> ")",
+    Function,
 
     AExpr "*" AExpr,
     AExpr "/" AExpr,
 
     AExpr "+" AExpr,
     AExpr "-" AExpr,
+};
+
+Function = {
+    "division" "(" AExpr "," AExpr ")",
+    "min" "(" AExpr "," AExpr ")",
+    "max" "(" AExpr "," AExpr ")",
+    "fac" "(" AExpr ")",
+    "fib" "(" AExpr ")",
+    "exp" "(" AExpr "," AExpr ")",
 };
 */
 
@@ -166,6 +176,18 @@ AExpr = {
         ['AExpr', '"/"', 'AExpr'],
         ['AExpr', '"+"', 'AExpr'],
         ['AExpr', '"-"', 'AExpr'],
+        ['Function'],
+      ],
+    },
+    {
+      left: 'Function',
+      right: [
+        ['"division"', '"("', 'AExpr', '","', 'AExpr', '")"'],
+        ['"min"', '"("', 'AExpr', '","', 'AExpr', '")"'],
+        ['"max"', '"("', 'AExpr', '","', 'AExpr', '")"'],
+        ['"fac"', '"("', 'AExpr', '")"'],
+        ['"fib"', '"("', 'AExpr', '")"'],
+        ['"exp"', '"("', 'AExpr', '","', 'AExpr', '")"'],
       ],
     },
   ];
