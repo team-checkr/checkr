@@ -2,8 +2,8 @@ use std::{sync::Arc, time::Duration};
 
 use axum::{extract::State, Json};
 use ce_core::ValidationResult;
-use ce_shell::{Analysis, Input};
-use driver::{HubEvent, JobId, JobKind, JobState};
+use ce_shell::{Analysis, Hash, Input};
+use driver::{HubEvent, JobId, JobState};
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
@@ -183,16 +183,11 @@ enum Event {
     ProgramsConfig {
         programs: Vec<Program>,
     },
-    GroupProgramJobAssigned {
-        group: GroupName,
-        program: Program,
-        job_id: JobId,
-    },
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct Program {
-    pub hash: [u8; 16],
+    pub hash: Hash,
     pub hash_str: String,
     pub input: Input,
 }
@@ -327,8 +322,7 @@ async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
                         ps.programs.iter().map(|p| {
                             let input = analysis.input_from_str(&p.input).unwrap();
                             let hash = input.hash();
-                            // hex encoding of the hash
-                            let hash_str = hex::encode(hash);
+                            let hash_str = hash.hex();
                             Program {
                                 hash,
                                 hash_str,
@@ -338,37 +332,7 @@ async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
                     })
                     .collect();
                 let event = Event::ProgramsConfig { programs };
-                if tx.send(Ok(event)).await.is_err() {
-                    return;
-                }
-
-                let mut events = checko.events();
-                while let Some(event) = events.recv().await {
-                    match event {
-                        checko::CheckoEvent::JobAssigned {
-                            group,
-                            kind,
-                            job_id,
-                        } => match kind {
-                            JobKind::Analysis(input) => {
-                                let program = Program {
-                                    hash: input.hash(),
-                                    hash_str: hex::encode(input.hash()),
-                                    input,
-                                };
-                                let event = Event::GroupProgramJobAssigned {
-                                    group,
-                                    program,
-                                    job_id,
-                                };
-                                if tx.send(Ok(event)).await.is_err() {
-                                    break;
-                                }
-                            }
-                            JobKind::Compilation => {}
-                        },
-                    }
-                }
+                let _ = tx.send(Ok(event)).await;
             }
         });
     }

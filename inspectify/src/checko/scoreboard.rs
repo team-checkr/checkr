@@ -1,11 +1,10 @@
-use ce_core::ValidationResult;
+use std::collections::HashMap;
+
 use ce_shell::{Analysis, Input};
-use driver::{JobKind, JobState};
-use itertools::Itertools;
+use driver::JobState;
+use itertools::{Either, Itertools};
 
-use crate::endpoints::InspectifyJobMeta;
-
-use super::{config::GroupName, Checko};
+use super::{config::GroupName, Checko, GroupStatus};
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PublicAnalysis {
@@ -22,6 +21,8 @@ pub struct PublicGroup {
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PublicAnalysisResults {
     analysis: Analysis,
+    status: GroupStatus,
+    last_hash: Option<String>,
     results: Vec<PublicProgramResult>,
 }
 
@@ -46,84 +47,49 @@ pub struct PublicState {
 //     GroupOrder(Vec<GroupName>),
 // }
 
-fn compute_public_groups(
-    hub: &driver::Hub<InspectifyJobMeta>,
-    checko: &Checko,
-) -> Vec<PublicGroup> {
-    let jobs = hub.jobs(None);
-    let groups = checko.groups_config().groups.iter().map(|group| {
-        let analysis_results = checko
-            .programs_config()
-            .envs
-            .iter()
-            .map(|(analysis, ps)| {
-                let results = ps
-                    .programs
-                    .iter()
-                    .map(|p| {
-                        let input = analysis.input_from_str(&p.input).unwrap();
-                        let job = jobs.iter().find(|j| {
-                            j.meta().group_name.as_deref() == Some(group.name.as_str())
-                                && j.kind() == JobKind::Analysis(input.clone())
-                        });
-                        let state = job
-                            .map(|j| {
-                                let output = input.analysis().output_from_str(&j.stdout());
-                                let validation = match (j.state(), &output) {
-                                    (JobState::Succeeded, Ok(output)) => {
-                                        Some(match input.validate_output(output) {
-                                            Ok(output) => output,
-                                            Err(e) => ValidationResult::Mismatch {
-                                                reason: format!("failed to validate output: {e:?}"),
-                                            },
-                                        })
-                                    }
-                                    (JobState::Succeeded, Err(e)) => {
-                                        Some(ValidationResult::Mismatch {
-                                            reason: format!("failed to parse output: {e:?}"),
-                                        })
-                                    }
-                                    _ => None,
-                                };
+async fn compute_public_groups(checko: &Checko) -> Vec<PublicGroup> {
+    let mut groups = HashMap::<GroupName, PublicGroup>::new();
 
-                                match (j.state(), validation) {
-                                    (
-                                        JobState::Succeeded,
-                                        Some(
-                                            ValidationResult::CorrectNonTerminated { .. }
-                                            | ValidationResult::CorrectTerminated,
-                                        ),
-                                    ) => JobState::Succeeded,
-                                    (
-                                        JobState::Succeeded,
-                                        Some(ValidationResult::Mismatch { .. }),
-                                    ) => JobState::Warning,
-                                    (JobState::Succeeded, Some(ValidationResult::TimeOut)) => {
-                                        JobState::Timeout
-                                    }
-                                    (state, _) => state,
-                                }
-                            })
-                            .unwrap_or(JobState::Queued);
-                        (PublicProgramResult { state }, input.hash())
-                    })
-                    .sorted_by_key(|(_, hash)| *hash)
-                    .map(|(res, _)| res);
-                PublicAnalysisResults {
-                    analysis: *analysis,
-                    results: results.collect(),
+    for ((group_name, analysis), gs) in checko.group_states.lock().await.iter() {
+        let pg = groups
+            .entry(group_name.clone())
+            .or_insert_with(|| PublicGroup {
+                name: group_name.clone(),
+                analysis_results: vec![],
+            });
+
+        let gs_results = gs.results().await;
+        let results = checko
+            .programs_config
+            .inputs()
+            .flat_map(|(a, inputs)| {
+                if a != *analysis {
+                    Either::Left(std::iter::empty())
+                } else {
+                    Either::Right(inputs.map(|input| {
+                        PublicProgramResult {
+                            state: gs_results
+                                .get(&input.hash())
+                                .cloned()
+                                .unwrap_or(JobState::Queued),
+                        }
+                    }))
                 }
             })
             .collect();
-        PublicGroup {
-            name: group.name.clone(),
-            analysis_results,
-        }
-    });
-    groups.collect()
+
+        pg.analysis_results.push(PublicAnalysisResults {
+            analysis: *analysis,
+            status: gs.status().await,
+            last_hash: gs.latest_hash().await,
+            results,
+        });
+    }
+
+    groups.into_values().collect()
 }
 
-pub fn compute_public_state(hub: &driver::Hub<InspectifyJobMeta>, checko: &Checko) -> PublicState {
+pub async fn compute_public_state(checko: &Checko) -> PublicState {
     let analysis = checko
         .programs_config()
         .envs
@@ -140,7 +106,8 @@ pub fn compute_public_state(hub: &driver::Hub<InspectifyJobMeta>, checko: &Check
                 .collect(),
         })
         .collect();
-    let groups = compute_public_groups(hub, checko)
+    let groups = compute_public_groups(checko)
+        .await
         .into_iter()
         .sorted_by_key(|g| {
             std::cmp::Reverse((
@@ -152,6 +119,7 @@ pub fn compute_public_state(hub: &driver::Hub<InspectifyJobMeta>, checko: &Check
                     .iter()
                     .flat_map(|a| a.results.iter().filter(|x| x.state == JobState::Warning))
                     .count(),
+                g.name.clone(),
             ))
         })
         .collect();

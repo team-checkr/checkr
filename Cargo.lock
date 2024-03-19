@@ -399,6 +399,7 @@ dependencies = [
  "ce-sign",
  "dashmap",
  "futures-util",
+ "hex",
  "itertools 0.12.1",
  "md5",
  "once_cell",

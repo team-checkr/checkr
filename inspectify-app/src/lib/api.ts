@@ -231,7 +231,11 @@ export namespace ce_shell {
   export namespace io {
     export type Input = {
       "analysis": ce_shell.Analysis,
-      "json": any
+      "json": any,
+      "hash": ce_shell.io.Hash
+    };
+    export type Hash = {
+      "bytes": number[]
     };
     export type Meta = {
       "analysis": ce_shell.Analysis,
@@ -239,7 +243,8 @@ export namespace ce_shell {
     };
     export type Output = {
       "analysis": ce_shell.Analysis,
-      "json": any
+      "json": any,
+      "hash": ce_shell.io.Hash
     };
   }
 }
@@ -284,6 +289,14 @@ export namespace driver {
 }
 export namespace inspectify {
   export namespace checko {
+    export type GroupStatus =
+      | "Initial"
+      | "CheckingForUpdate"
+      | "Compiling"
+      | "Testing"
+      | "CompilationError"
+      | "Finished";
+    export const GROUP_STATUS: GroupStatus[] = ["Initial", "CheckingForUpdate", "Compiling", "Testing", "CompilationError", "Finished"];
     export namespace config {
       export type GroupsConfig = {
         "ignored_authors": string[],
@@ -313,6 +326,8 @@ export namespace inspectify {
       };
       export type PublicAnalysisResults = {
         "analysis": ce_shell.Analysis,
+        "status": inspectify.checko.GroupStatus,
+        "last_hash": (string | null),
         "results": inspectify.checko.scoreboard.PublicProgramResult[]
       };
       export type PublicProgramResult = {
@@ -326,20 +341,19 @@ export namespace inspectify {
       "output": (ce_shell.io.Output | null),
       "error": (string | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
+    export type GenerateParams = {
+      "analysis": ce_shell.Analysis
+    };
     export type Event =
       | { "type": "Reset" }
       | { "type": "CompilationStatus", "value": { "status": (inspectify.endpoints.CompilationStatus | null) } }
       | { "type": "JobChanged", "value": { "job": inspectify.endpoints.Job } }
       | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
       | { "type": "GroupsConfig", "value": { "config": inspectify.checko.config.GroupsConfig } }
-      | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } }
-      | { "type": "GroupProgramJobAssigned", "value": { "group": inspectify.checko.config.GroupName, "program": inspectify.endpoints.Program, "job_id": driver.job.JobId } };
-    export type GenerateParams = {
-      "analysis": ce_shell.Analysis
-    };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
+      | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
@@ -349,11 +363,6 @@ export namespace inspectify {
       "spans": inspectify.endpoints.Span[],
       "analysis_data": (inspectify.endpoints.AnalysisData | null)
     };
-    export type Program = {
-      "hash": number[],
-      "hash_str": string,
-      "input": ce_shell.io.Input
-    };
     export type AnalysisExecution = {
       "id": driver.job.JobId
     };
@@ -361,6 +370,11 @@ export namespace inspectify {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
       "error_output": (inspectify.endpoints.Span[] | null)
+    };
+    export type Program = {
+      "hash": ce_shell.io.Hash,
+      "hash_str": string,
+      "input": ce_shell.io.Input
     };
     export type Span = {
       "text": string,

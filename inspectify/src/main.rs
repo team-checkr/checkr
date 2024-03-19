@@ -90,13 +90,12 @@ async fn run() -> color_eyre::Result<()> {
             }
         });
         tokio::spawn({
-            let hub = hub.clone();
             let checko = Arc::clone(&checko);
             let public_state = Arc::clone(&public_state);
             async move {
                 loop {
                     *public_state.write().unwrap() =
-                        Some(checko::scoreboard::compute_public_state(&hub, &checko));
+                        Some(checko::scoreboard::compute_public_state(&checko).await);
                     tokio::time::sleep(Duration::from_millis(200)).await;
                 }
             }
