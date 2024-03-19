@@ -1,3 +1,6 @@
+#[cfg(test)]
+mod tests;
+
 use std::{path::Path, process::Stdio};
 
 use color_eyre::eyre::{bail, Context};
@@ -29,6 +32,10 @@ impl CommandExt for Command {
             .output()
             .await
             .wrap_err("could not run command")?;
+        let stdout = String::from_utf8_lossy(&output.stdout);
+        let stderr = String::from_utf8_lossy(&output.stderr);
+        tracing::debug!(?stdout, ?stderr, "command output");
+
         if !output.status.success() {
             let err = String::from_utf8(output.stderr).wrap_err("stderr is not valid utf8")?;
             bail!("command failed: {err}");
@@ -105,10 +112,6 @@ pub async fn pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
     Ok(())
 }
 
-pub async fn is_up_to_date(path: impl AsRef<Path>) -> color_eyre::Result<bool> {
-    Ok(hash(&path, Some("HEAD")).await? == hash(&path, Some("origin/main")).await?)
-}
-
 pub async fn hash(path: impl AsRef<Path>, rev: Option<&str>) -> color_eyre::Result<String> {
     let output = Command::new("git")
         .arg("rev-parse")
@@ -121,21 +124,22 @@ pub async fn hash(path: impl AsRef<Path>, rev: Option<&str>) -> color_eyre::Resu
     Ok(hash.trim().to_string())
 }
 
-pub async fn checkout_latest_before(
-    git: &str,
+pub async fn latest_commit_before(
     path: impl AsRef<Path>,
     before: chrono::DateTime<chrono::FixedOffset>,
     ignored_authors: &[String],
-) -> color_eyre::Result<bool> {
+) -> color_eyre::Result<Option<String>> {
     let path = path.as_ref();
-    checkout_main(git, path).await?;
     tracing::debug!(?before, "checking out latest commit before");
     let before = before.format("%Y-%m-%d %H:%M:%S").to_string();
-    let commit_rev_bytes = Command::new("git")
-        .args(["rev-list", "-n", "1"])
-        .arg(format!("--before={before}"))
-        .arg("--perl-regexp")
-        .arg(format!("--author='^(?!{})'", ignored_authors.join("|")))
+    let mut cmd = Command::new("git");
+    cmd.args(["rev-list", "-n", "1"])
+        .arg(format!("--before='{before}'"));
+    if !ignored_authors.is_empty() {
+        cmd.arg("--perl-regexp")
+            .arg(format!("--author=^(?!{})", ignored_authors.join("|")));
+    }
+    let commit_rev_bytes = cmd
         .arg("HEAD")
         .current_dir(path)
         .success_with_output()
@@ -144,12 +148,28 @@ pub async fn checkout_latest_before(
     let commit_rev = std::str::from_utf8(&commit_rev_bytes).unwrap().trim();
     if commit_rev.is_empty() {
         tracing::debug!("no commit found before {before}");
-        return Ok(false);
+        return Ok(None);
     }
+    Ok(Some(commit_rev.to_string()))
+}
+
+pub async fn checkout_latest_before(
+    git: &str,
+    path: impl AsRef<Path>,
+    before: chrono::DateTime<chrono::FixedOffset>,
+    ignored_authors: &[String],
+) -> color_eyre::Result<bool> {
+    let path = path.as_ref();
+    checkout_main(git, path).await?;
+    let commit_rev = latest_commit_before(path, before, ignored_authors).await?;
+    let Some(commit_rev) = commit_rev else {
+        tracing::debug!("no commit found before {before}");
+        return Ok(false);
+    };
     tracing::debug!(?commit_rev, ?path, "latest commit before");
     Command::new("git")
         .arg("checkout")
-        .arg(commit_rev)
+        .arg(&commit_rev)
         .current_dir(path)
         .success_without_output()
         .await

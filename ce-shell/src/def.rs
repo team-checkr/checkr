@@ -20,7 +20,7 @@ macro_rules! define_shell {
             },)*
         }
 
-        #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, Hash, serde::Serialize, serde::Deserialize)]
+        #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash, serde::Serialize, serde::Deserialize)]
         pub enum Analysis {
             $($name,)*
         }
@@ -135,7 +135,7 @@ macro_rules! define_shell {
             pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
                 assert_eq!(self.analysis(), output.analysis());
 
-                static VALIDATION: once_cell::sync::Lazy<dashmap::DashMap<([u8; 16], [u8; 16]),  Result<ValidationResult, EnvError>>> = once_cell::sync::Lazy::new(Default::default);
+                static VALIDATION: once_cell::sync::Lazy<dashmap::DashMap<($crate::io::Hash, $crate::io::Hash),  Result<ValidationResult, EnvError>>> = once_cell::sync::Lazy::new(Default::default);
 
                 let key = (self.hash(), output.hash());
                 if let Some(result) = VALIDATION.get(&key) {

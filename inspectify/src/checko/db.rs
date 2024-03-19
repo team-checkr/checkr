@@ -1,11 +1,11 @@
 use std::{
+    borrow::Cow,
     path::Path,
     sync::{Arc, Mutex},
 };
 
 use ce_shell::Input;
 use color_eyre::eyre::Context;
-use driver::JobKind;
 use rusqlite::OptionalExtension;
 
 use crate::endpoints::InspectifyJobMeta;
@@ -24,27 +24,6 @@ pub struct Run {
 }
 
 pub type JobData = driver::JobData<InspectifyJobMeta>;
-
-impl Run {
-    pub fn new(group_config: Arc<GroupConfig>, input: Input) -> color_eyre::Result<Self> {
-        let data = JobData::new(
-            JobKind::Analysis(input),
-            InspectifyJobMeta {
-                group_name: Some(group_config.name.clone()),
-            },
-        );
-        Ok(Self { group_config, data })
-    }
-}
-
-impl Run {
-    pub fn input(&self) -> Option<Input> {
-        match &self.data.kind {
-            JobKind::Analysis(input) => Some(input.clone()),
-            _ => None,
-        }
-    }
-}
 
 impl CheckoDb {
     pub fn open(path: &Path) -> color_eyre::Result<Self> {
@@ -114,7 +93,14 @@ pub struct CacheKeyInput<'a> {
     pub input: &'a Input,
 }
 
-pub struct CacheKey<'a>(String, CacheKeyInput<'a>);
+#[derive(Clone)]
+struct CowCacheKeyInput<'a> {
+    group_name: Cow<'a, str>,
+    git_hash: Cow<'a, str>,
+    input: Cow<'a, Input>,
+}
+
+pub struct CacheKey<'a>(String, CowCacheKeyInput<'a>);
 
 impl<'a> CacheKeyInput<'a> {
     pub fn key(self) -> CacheKey<'a> {
@@ -125,7 +111,24 @@ impl<'a> CacheKeyInput<'a> {
                 self.git_hash,
                 self.input.hash()
             ),
-            self,
+            CowCacheKeyInput {
+                group_name: Cow::Borrowed(self.group_name),
+                git_hash: Cow::Borrowed(self.git_hash),
+                input: Cow::Borrowed(self.input),
+            },
+        )
+    }
+}
+
+impl<'a> CacheKey<'a> {
+    pub fn into_owned(self) -> CacheKey<'static> {
+        CacheKey(
+            self.0,
+            CowCacheKeyInput {
+                group_name: Cow::Owned(self.1.group_name.into_owned()),
+                git_hash: Cow::Owned(self.1.git_hash.into_owned()),
+                input: Cow::Owned(self.1.input.into_owned()),
+            },
         )
     }
 }

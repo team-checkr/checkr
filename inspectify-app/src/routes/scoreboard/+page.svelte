@@ -68,11 +68,11 @@
     {#each groupsStore as group, index (group.name)}
       <div
         animate:flip={{ duration: animationDuration }}
-        class="col-span-full grid transform-gpu transition will-change-transform hover:saturate-200"
+        class="group col-span-full grid transform-gpu transition will-change-transform hover:saturate-200"
         style="z-index: {groupsStore.length - index};
-               grid-template-columns: var(--name-width) 1fr;"
+               grid-template-columns: var(--name-width) repeat({numberOfPrograms}, 1fr);"
       >
-        <GroupRow {group} {numberOfPrograms} />
+        <GroupRow {analysisStore} {group} {numberOfPrograms} />
       </div>
     {/each}
   </div>

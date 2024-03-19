@@ -83,12 +83,17 @@ impl ProgramsConfig {
         Ok(CanonicalProgramsConfig { envs })
     }
 
-    pub(crate) fn inputs(&self) -> impl Iterator<Item = Input> + '_ {
-        self.envs.iter().flat_map(|(analysis, p)| {
-            p.programs.iter().map(move |p| {
-                let c = p.canonicalize(*analysis).unwrap();
-                analysis.input_from_str(&c.input).unwrap()
-            })
+    pub(crate) fn inputs(
+        &self,
+    ) -> impl Iterator<Item = (Analysis, impl Iterator<Item = Input> + '_)> + '_ {
+        self.envs.iter().map(|(&analysis, p)| {
+            (
+                analysis,
+                p.programs.iter().map(move |p| {
+                    let c = p.canonicalize(analysis).unwrap();
+                    analysis.input_from_str(&c.input).unwrap()
+                }),
+            )
         })
     }
 }
@@ -125,7 +130,9 @@ impl ProgramConfig {
     // }
 }
 
-#[derive(tapi::Tapi, Default, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
+#[derive(
+    tapi::Tapi, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
+)]
 #[serde(transparent)]
 pub struct GroupName(pub String);
 

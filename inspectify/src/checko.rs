@@ -5,15 +5,16 @@ mod git;
 pub mod scoreboard;
 
 use std::{
-    future::Future,
+    collections::BTreeMap,
     path::{Path, PathBuf},
     sync::Arc,
     time::Duration,
 };
 
-use ce_shell::Analysis;
+use ce_core::ValidationResult;
+use ce_shell::{Analysis, Input};
 use color_eyre::eyre::Context;
-use driver::{Driver, Hub, Job, JobId, JobKind};
+use driver::{Driver, Hub, Job, JobState};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -30,19 +31,7 @@ pub struct Checko {
     groups_config: config::GroupsConfig,
     programs_config: config::ProgramsConfig,
     last_finished: std::sync::Mutex<Option<chrono::DateTime<chrono::FixedOffset>>>,
-    group_repos: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), GroupRepo>>,
-    group_states: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), Arc<GroupState>>>,
-    events_tx: crate::history_broadcaster::Sender<CheckoEvent>,
-    events_rx: crate::history_broadcaster::Receiver<CheckoEvent>,
-}
-
-#[derive(Debug, Clone)]
-pub enum CheckoEvent {
-    JobAssigned {
-        group: GroupName,
-        kind: JobKind,
-        job_id: JobId,
-    },
+    group_states: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), GroupState2>>,
 }
 
 #[derive(Debug, Clone)]
@@ -60,6 +49,69 @@ pub struct GroupState {
 pub struct GroupRepo {
     pub path: PathBuf,
     pub git_hash: Option<String>,
+}
+
+#[derive(Default, Clone)]
+pub struct GroupState2 {
+    inner: Arc<tokio::sync::RwLock<GroupState2Inner>>,
+}
+#[derive(Default)]
+pub struct GroupState2Inner {
+    latest_hash: Option<String>,
+    status: GroupStatus,
+    results: BTreeMap<ce_shell::Hash, JobState>,
+}
+
+#[derive(
+    tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, serde::Serialize, serde::Deserialize,
+)]
+pub enum GroupStatus {
+    #[default]
+    Initial,
+    CheckingForUpdate,
+    Compiling,
+    Testing,
+    CompilationError,
+    Finished,
+}
+
+impl GroupState2 {
+    pub async fn status(&self) -> GroupStatus {
+        self.inner.read().await.status
+    }
+
+    pub async fn set_status(&self, status: GroupStatus) -> GroupStatus {
+        std::mem::replace(&mut self.inner.write().await.status, status)
+    }
+
+    pub async fn latest_hash(&self) -> Option<String> {
+        self.inner.read().await.latest_hash.clone()
+    }
+
+    pub async fn update_latest_hash(&self, hash: Option<&str>) -> bool {
+        let mut inner = self.inner.write().await;
+        if inner.latest_hash.as_deref() == hash {
+            return false;
+        }
+        inner.latest_hash = hash.map(|h| h.to_string());
+        true
+    }
+
+    pub async fn results(&self) -> BTreeMap<ce_shell::Hash, JobState> {
+        self.inner.read().await.results.clone()
+    }
+
+    pub async fn set_result(&self, hash: ce_shell::Hash, state: JobState) {
+        self.inner.write().await.results.insert(hash, state);
+    }
+}
+
+struct GroupToTest {
+    group: Arc<config::GroupConfig>,
+    analysis: Analysis,
+    repo: GroupRepo,
+    state: GroupState2,
+    driver: GroupDriver,
 }
 
 impl Checko {
@@ -81,24 +133,15 @@ impl Checko {
         let groups = config::read_groups(groups_path)?;
         let programs = config::read_programs(programs_path)?;
 
-        let (events_tx, events_rx) = crate::history_broadcaster::channel(1024);
-
         Ok(Self {
             hub,
             path,
             db,
             groups_config: groups,
             programs_config: programs,
-            group_repos: Default::default(),
-            group_states: Default::default(),
             last_finished: Default::default(),
-            events_tx,
-            events_rx,
+            group_states: Default::default(),
         })
-    }
-
-    pub fn events(&self) -> crate::history_broadcaster::Receiver<CheckoEvent> {
-        self.events_rx.resubscribe()
     }
 
     pub fn groups_config(&self) -> &config::GroupsConfig {
@@ -109,85 +152,10 @@ impl Checko {
         self.programs_config.canonicalize().unwrap()
     }
 
-    #[tracing::instrument(skip(self))]
-    pub async fn group_repo(
-        &self,
-        config: &GroupConfig,
-        analysis: Analysis,
-        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> color_eyre::Result<GroupRepo> {
-        let key = (config.name.clone(), analysis);
-
-        let gs = self.group_repos.lock().await.get(&key).cloned();
-        if let Some(repo) = gs {
-            Ok(repo)
-        } else {
-            let repo = self.update_group_repo(config, analysis, deadline).await?;
-            let mut group_repos = self.group_repos.lock().await;
-            group_repos.insert(key, repo.clone());
-            Ok(repo)
-        }
-    }
-
-    #[tracing::instrument(skip(self))]
-    pub async fn group_state(
-        &self,
-        config: &GroupConfig,
-        analysis: Analysis,
-        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> color_eyre::Result<impl Future<Output = Arc<GroupState>> + 'static> {
-        let key = (config.name.clone(), analysis);
-
-        let gs = self.group_states.lock().await.get(&key).cloned();
-        let state = if let Some(gs) = gs {
-            gs
-        } else {
-            let state = self.build_group_state(config, analysis, deadline).await?;
-            let mut group_states = self.group_states.lock().await;
-            group_states.insert(key, Arc::clone(&state));
-            state
-        };
-
-        Ok(async move {
-            if let Some(job) = &state.compile_job {
-                job.wait().await;
-            }
-            state
-        })
-    }
-
-    #[tracing::instrument(skip(self))]
-    async fn build_group_state(
-        &self,
-        config: &GroupConfig,
-        analysis: Analysis,
-        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> color_eyre::Result<Arc<GroupState>> {
-        tracing::debug!("building group state");
-        match self.build_group_driver(config, analysis, deadline).await {
-            Ok(driver) => {
-                tracing::debug!("ensuring compile job");
-                let compile_job = driver.ensure_compile(InspectifyJobMeta {
-                    group_name: Some(config.name.clone()),
-                });
-                tracing::debug!("group state built successfully");
-                let state = Arc::new(GroupState {
-                    driver: GroupDriver::Driver(driver),
-                    compile_job,
-                });
-                Ok(state)
-            }
-            Err(err) => {
-                tracing::error!(?err, "could not build group driver");
-                let state = Arc::new(GroupState {
-                    driver: GroupDriver::Missing {
-                        reason: format!("{:?}", err),
-                    },
-                    compile_job: None,
-                });
-                Ok(state)
-            }
-        }
+    fn group_path(&self, config: &GroupConfig, analysis: Analysis) -> PathBuf {
+        self.path
+            .join("groups")
+            .join(format!("{}-{analysis:?}", config.name))
     }
 
     #[tracing::instrument(skip(self))]
@@ -199,10 +167,7 @@ impl Checko {
     ) -> color_eyre::Result<GroupRepo> {
         match (&config.git, &config.path) {
             (Some(git), then_path) => {
-                let group_path = self
-                    .path
-                    .join("groups")
-                    .join(format!("{}-{analysis:?}", config.name));
+                let group_path = self.group_path(config, analysis);
 
                 std::fs::create_dir_all(&group_path).wrap_err_with(|| {
                     format!(
@@ -257,34 +222,14 @@ impl Checko {
         }
     }
 
-    #[tracing::instrument(skip(self))]
-    async fn build_group_driver(
-        &self,
-        config: &config::GroupConfig,
-        analysis: Analysis,
-        deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> color_eyre::Result<Driver<InspectifyJobMeta>> {
-        let group_git = self.group_repo(config, analysis, deadline).await?;
-        let driver = Driver::new_from_path(
-            self.hub.clone(),
-            &group_git.path,
-            group_git
-                .path
-                .join(config.run.as_deref().unwrap_or("run.toml")),
-        )?;
-        Ok(driver)
-    }
-
     pub fn last_finished(&self) -> Option<chrono::DateTime<chrono::FixedOffset>> {
         *self.last_finished.lock().unwrap()
     }
 
-    #[tracing::instrument(skip(self))]
-    pub async fn work(&self) -> color_eyre::Result<()> {
-        let inputs = self.programs_config.inputs().collect_vec();
-
-        let work_queue = Arc::new(tokio::sync::Mutex::new(Vec::new()));
-
+    async fn groups_to_test(
+        &self,
+        analysis_inputs: &BTreeMap<Analysis, Arc<Vec<Input>>>,
+    ) -> color_eyre::Result<Vec<GroupToTest>> {
         let mut groups = self
             .groups_config
             .groups
@@ -292,122 +237,247 @@ impl Checko {
             .map(|g| Arc::new(g.clone()))
             .collect_vec();
 
-        loop {
-            groups.shuffle(&mut rand::thread_rng());
+        groups.shuffle(&mut rand::thread_rng());
 
-            self.group_repos.lock().await.clear();
-            self.group_states.lock().await.clear();
+        // TODO: use async streams for this instead
+
+        let mut compile_join_set = tokio::task::JoinSet::new();
+
+        for (&a, inputs) in analysis_inputs {
+            let inputs = Arc::clone(inputs);
+            let deadline = self.programs_config.deadlines.get(&a).and_then(|d| d.time);
 
             for g in &groups {
-                for i in &inputs {
-                    tracing::debug!(name=?g.name, analysis=?i.analysis(), "creating run for");
-                    let run = db::Run::new(Arc::clone(g), i.clone())?;
-                    work_queue.lock().await.push(run);
-                }
-            }
-
-            work_queue.lock().await.shuffle(&mut rand::thread_rng());
-
-            loop {
-                let mut join_set = tokio::task::JoinSet::new();
-
-                for run in work_queue.lock().await.drain(..) {
-                    let Some(input) = run.input() else {
-                        tracing::error!(name=?run.group_config, "could not get input for run");
+                let g = Arc::clone(g);
+                let gs = self
+                    .group_states
+                    .lock()
+                    .await
+                    .entry((g.name.clone(), a))
+                    .or_default()
+                    .clone();
+                let repo = {
+                    let prev = gs.set_status(GroupStatus::CheckingForUpdate).await;
+                    let repo = self.update_group_repo(&g, a, deadline).await?;
+                    if !gs.update_latest_hash(repo.git_hash.as_deref()).await {
+                        gs.set_status(prev).await;
                         continue;
-                    };
+                    }
+                    repo
+                };
 
-                    let deadline = self
-                        .programs_config
-                        .deadlines
-                        .get(&input.analysis())
-                        .and_then(|d| d.time);
-                    let group_repo = self
-                        .group_repo(&run.group_config, input.analysis(), deadline)
-                        .await?;
+                let mut need_work = false;
 
-                    if let Some(git_hash) = &group_repo.git_hash {
-                        if let Some(data) = self.db.get_cached_run(
-                            &db::CacheKeyInput {
-                                group_name: &run.group_config.name,
-                                git_hash,
-                                input: &input,
-                            }
-                            .key(),
-                        )? {
-                            let job = self.hub.add_finished_job(data);
-                            self.events_tx
-                                .send(CheckoEvent::JobAssigned {
-                                    group: run.group_config.name.clone(),
-                                    kind: JobKind::Analysis(input),
-                                    job_id: job.id(),
-                                })
-                                .unwrap();
-                            continue;
+                if let Some(git_hash) = repo.git_hash.as_ref().as_ref() {
+                    for input in inputs.iter() {
+                        let key = db::CacheKeyInput {
+                            group_name: &g.name,
+                            git_hash,
+                            input,
+                        }
+                        .key();
+                        if let Some(job_data) = self.db.get_cached_run(&key)? {
+                            gs.set_result(input.hash(), job_data.state).await;
+                        } else {
+                            need_work = true;
                         }
                     }
+                } else {
+                    need_work = true;
+                }
 
-                    let group_state = self
-                        .group_state(&run.group_config, input.analysis(), deadline)
-                        .await?;
-                    let db = self.db.clone();
-                    let events_tx = self.events_tx.clone();
-                    join_set.spawn(
-                    async move {
-                        tracing::debug!(name=?run.group_config, "getting driver from group state");
-                        let group_state = group_state.await;
-                        let GroupDriver::Driver(driver) = &group_state.driver else {
-                            tracing::error!(name=?run.group_config, "group driver missing");
+                if !need_work {
+                    gs.set_status(GroupStatus::Finished).await;
+                    continue;
+                }
 
-                            return Ok::<_, color_eyre::Report>(());
-                        };
-                        tracing::debug!(name=?run.group_config, "starting run");
-                        // db.start_run(run.id)?;
-                        let job = driver.exec_job(
-                            &input,
-                            InspectifyJobMeta {
-                                group_name: Some(run.group_config.name.clone()),
+                tracing::info!(name=?g.name, ?a, "rerunning tests");
+
+                let driver = match Driver::new_from_path(
+                    self.hub.clone(),
+                    &repo.path,
+                    repo.path.join(g.run.as_deref().unwrap_or("run.toml")),
+                ) {
+                    Ok(driver) => {
+                        gs.set_status(GroupStatus::Compiling).await;
+                        tracing::debug!("ensuring compile job");
+                        let compile_job = driver.ensure_compile(InspectifyJobMeta {
+                            group_name: Some(g.name.clone()),
+                        });
+                        tracing::debug!("group state built successfully");
+                        Arc::new(GroupState {
+                            driver: GroupDriver::Driver(driver),
+                            compile_job,
+                        })
+                    }
+                    Err(err) => {
+                        gs.set_status(GroupStatus::CompilationError).await;
+                        tracing::error!(?err, "could not build group driver");
+                        Arc::new(GroupState {
+                            driver: GroupDriver::Missing {
+                                reason: format!("{:?}", err),
                             },
-                        );
-                        events_tx
-                            .send(CheckoEvent::JobAssigned {
-                                group: run.group_config.name.clone(),
-                                kind: JobKind::Analysis(input.clone()),
-                                job_id: job.id(),
-                            })
-                            .unwrap();
-                        tracing::debug!(name=?run.group_config, "waiting for job");
-                        job.wait().await;
-                        tracing::debug!(name=?run.group_config, "job finished");
+                            compile_job: None,
+                        })
+                    }
+                };
 
-                        if let Some(git_hash) = &group_repo.git_hash {
-                            db.insert_cached_run(
-                                &db::CacheKeyInput {
-                                    group_name: &run.group_config.name,
-                                    git_hash,
-                                    input: &input,
-                                }
-                                .key(),
-                                &job.data(),
-                            )?;
+                let inputs = Arc::clone(&inputs);
+                compile_join_set.spawn(
+                    async move {
+                        let res = if let Some(job) = &driver.compile_job {
+                            let state = job.wait().await;
+                            match state {
+                                JobState::Succeeded => Some(GroupToTest {
+                                    analysis: a,
+                                    group: g.clone(),
+                                    repo,
+                                    state: gs.clone(),
+                                    driver: driver.driver.clone(),
+                                }),
+                                _ => None,
+                            }
+                        } else {
+                            None
+                        };
+
+                        if res.is_some() {
+                            gs.set_status(GroupStatus::Testing).await;
+                        } else {
+                            gs.set_status(GroupStatus::CompilationError).await;
+                            for input in inputs.iter() {
+                                gs.set_result(input.hash(), JobState::Failed).await;
+                            }
                         }
-
-                        Ok::<_, color_eyre::Report>(())
+                        res
                     }
                     .in_current_span(),
                 );
-                }
+            }
+        }
 
-                if join_set.is_empty() {
-                    break;
-                }
+        let mut groups_to_test = Vec::new();
 
-                while let Some(res) = join_set.join_next().await {
-                    if let Err(err) = res? {
-                        tracing::error!(?err, "error in join set");
+        while let Some(res) = compile_join_set.join_next().await {
+            if let Some(gtt) = res? {
+                groups_to_test.push(gtt);
+            }
+        }
+
+        Ok(groups_to_test)
+    }
+
+    // #[tracing::instrument(skip(self))]
+    pub async fn work(&self) -> color_eyre::Result<()> {
+        let analysis_inputs: BTreeMap<_, _> = self
+            .programs_config
+            .inputs()
+            .map(|(analysis, inputs)| (analysis, Arc::new(inputs.collect_vec())))
+            .collect();
+
+        loop {
+            let groups_to_test = self.groups_to_test(&analysis_inputs).await?;
+
+            let mut testing_join_set = tokio::task::JoinSet::new();
+
+            for gtt in groups_to_test {
+                let driver = match gtt.driver {
+                    GroupDriver::Driver(driver) => driver,
+                    GroupDriver::Missing { reason } => {
+                        tracing::error!(name=?gtt.group.name, ?reason, "group driver missing");
+                        continue;
                     }
+                };
+                for i in analysis_inputs[&gtt.analysis].iter() {
+                    let key = gtt.repo.git_hash.as_ref().as_ref().map(|git_hash| {
+                        db::CacheKeyInput {
+                            group_name: &gtt.group.name,
+                            git_hash,
+                            input: i,
+                        }
+                        .key()
+                        .into_owned()
+                    });
+
+                    let db = self.db.clone();
+                    let input = i.clone();
+                    let g = Arc::clone(&gtt.group);
+                    let gs = gtt.state.clone();
+                    let job = driver.exec_job(
+                        &input,
+                        InspectifyJobMeta {
+                            group_name: Some(g.name.clone()),
+                        },
+                    );
+                    testing_join_set.spawn(
+                        async move {
+                            job.wait().await;
+
+                            let state = {
+                                let output = input.analysis().output_from_str(&job.stdout());
+                                let validation = match (job.state(), &output) {
+                                    (JobState::Succeeded, Ok(output)) => {
+                                        Some(match input.validate_output(output) {
+                                            Ok(output) => output,
+                                            Err(e) => ValidationResult::Mismatch {
+                                                reason: format!("failed to validate output: {e:?}"),
+                                            },
+                                        })
+                                    }
+                                    (JobState::Succeeded, Err(e)) => {
+                                        Some(ValidationResult::Mismatch {
+                                            reason: format!("failed to parse output: {e:?}"),
+                                        })
+                                    }
+                                    _ => None,
+                                };
+
+                                match (job.state(), validation) {
+                                    (
+                                        JobState::Succeeded,
+                                        Some(
+                                            ValidationResult::CorrectNonTerminated { .. }
+                                            | ValidationResult::CorrectTerminated,
+                                        ),
+                                    ) => JobState::Succeeded,
+                                    (
+                                        JobState::Succeeded,
+                                        Some(ValidationResult::Mismatch { .. }),
+                                    ) => JobState::Warning,
+                                    (JobState::Succeeded, Some(ValidationResult::TimeOut)) => {
+                                        JobState::Timeout
+                                    }
+                                    (state, _) => state,
+                                }
+                            };
+
+                            if let Some(key) = key {
+                                db.insert_cached_run(
+                                    &key,
+                                    &driver::JobData {
+                                        state,
+                                        ..job.data().clone()
+                                    },
+                                )?;
+                            }
+
+                            gs.set_status(GroupStatus::Finished).await;
+                            gs.set_result(input.hash(), state).await;
+
+                            Ok::<_, color_eyre::eyre::Error>(())
+                        }
+                        .in_current_span(),
+                    );
                 }
             }
+
+            while let Some(res) = testing_join_set.join_next().await {
+                if let Err(err) = res? {
+                    tracing::error!(?err, "error in join set");
+                }
+            }
+
+            self.hub.clear();
 
             *self.last_finished.lock().unwrap() = Some(chrono::Utc::now().fixed_offset());
             tracing::info!("waiting for next batch of runs");

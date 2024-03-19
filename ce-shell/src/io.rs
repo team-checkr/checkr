@@ -8,18 +8,48 @@ use crate::{Analysis, EnvExt};
 pub struct Input {
     analysis: Analysis,
     json: Arc<serde_json::Value>,
+    hash: Hash,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Output {
     analysis: Analysis,
     json: Arc<serde_json::Value>,
+    hash: Hash,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
 pub struct Meta {
     analysis: Analysis,
     json: Arc<serde_json::Value>,
+}
+
+#[derive(
+    tapi::Tapi,
+    Debug,
+    Clone,
+    Copy,
+    PartialEq,
+    Eq,
+    PartialOrd,
+    Ord,
+    Hash,
+    serde::Serialize,
+    serde::Deserialize,
+)]
+pub struct Hash {
+    bytes: [u8; 16],
+}
+
+impl Hash {
+    pub fn compute(data: &[u8]) -> Self {
+        Self {
+            bytes: md5::compute(data).0,
+        }
+    }
+    pub fn hex(&self) -> String {
+        hex::encode(self.bytes)
+    }
 }
 
 impl Input {
@@ -29,6 +59,10 @@ impl Input {
             json: serde_json::to_value(data)
                 .expect("all output should be serializable")
                 .into(),
+            hash: Hash::compute(
+                &serde_json::to_vec(&(E::ANALYSIS, data))
+                    .expect("all output should be serializable"),
+            ),
         }
     }
 
@@ -44,8 +78,8 @@ impl Input {
         serde_json::from_value((*self.json).clone())
     }
 
-    pub fn hash(&self) -> [u8; 16] {
-        md5::compute(format!("{:?}::{self}", self.analysis())).0
+    pub fn hash(&self) -> Hash {
+        self.hash
     }
 }
 
@@ -56,6 +90,10 @@ impl Output {
             json: serde_json::to_value(data)
                 .expect("all output should be serializable")
                 .into(),
+            hash: Hash::compute(
+                &serde_json::to_vec(&(E::ANALYSIS, data))
+                    .expect("all output should be serializable"),
+            ),
         }
     }
 
@@ -71,8 +109,8 @@ impl Output {
         serde_json::from_value((*self.json).clone())
     }
 
-    pub fn hash(&self) -> [u8; 16] {
-        md5::compute(format!("{:?}::{self}", self.analysis())).0
+    pub fn hash(&self) -> Hash {
+        self.hash
     }
 }
 
