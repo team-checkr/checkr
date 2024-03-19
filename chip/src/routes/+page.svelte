@@ -22,6 +22,7 @@ od
 
   let result = writable<ParseResult>({
     parse_error: false,
+    prelude: '',
     assertions: [],
     markers: [],
     is_fully_annotated: false,
@@ -54,7 +55,7 @@ od
       state.set('verifying');
       let errors = false;
       for (const t of $result.assertions) {
-        const res = await z3.run(t.smt);
+        const res = await z3.run(t.smt, { prelude: $result.prelude });
         const valid = res[res.length - 1].trim() === 'unsat';
 
         if (thisRun !== runId) {

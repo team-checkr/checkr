@@ -42,8 +42,9 @@ Function<X>: Function = {
     "division" "(" <X> "," <X> ")"  => Function::Division(<>),
     "min" "(" <X> "," <X> ")"       => Function::Min(<>),
     "max" "(" <X> "," <X> ")"       => Function::Max(<>),
-    "fac" "(" <X> ")"                   => Function::Fac(<>),
-    "fib" "(" <X> ")"                   => Function::Fib(<>),
+    "fac" "(" <X> ")"               => Function::Fac(<>),
+    "fib" "(" <X> ")"               => Function::Fib(<>),
+    "exp" "(" <X> "," <X> ")"       => Function::Exp(<>),
 };
 
 

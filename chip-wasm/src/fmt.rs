@@ -106,13 +106,7 @@ impl Display for AOp {
 }
 impl Display for Function {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        match self {
-            Function::Division(a, b) => write!(f, "division({a}, {b})"),
-            Function::Min(a, b) => write!(f, "min({a}, {b})"),
-            Function::Max(a, b) => write!(f, "max({a}, {b})"),
-            Function::Fac(x) => write!(f, "fac({x})"),
-            Function::Fib(x) => write!(f, "fib({x})"),
-        }
+        write!(f, "{}({})", self.name(), self.args().format(", "))
     }
 }
 impl Display for BExpr {

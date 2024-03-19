@@ -79,8 +79,8 @@ pub enum Function {
     Max(Box<AExpr>, Box<AExpr>),
     Fac(Box<AExpr>),
     Fib(Box<AExpr>),
+    Exp(Box<AExpr>, Box<AExpr>),
 }
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum BExpr {
     Bool(bool),
