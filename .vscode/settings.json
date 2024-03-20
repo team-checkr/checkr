@@ -1,7 +1,7 @@
 {
     "rust-analyzer.linkedProjects": [
         "Cargo.toml",
-        "chip-wasm/Cargo.toml"
+        "crates/chip-wasm/Cargo.toml"
     ],
     "FSharp.showExplorerOnStartup": false,
     "tailwindCSS.experimental.classRegex": [
@@ -10,5 +10,5 @@
     "tailwindCSS.includeLanguages": {
         "rust": "html"
     },
-    "tailwindCSS.experimental.configFile": "inspectify-app/tailwind.config.ts"
+    "tailwindCSS.experimental.configFile": "inspectify/app/tailwind.config.ts"
 }

@@ -6,7 +6,7 @@ inspectify ARGS="":
     RUST_LOG=debug cargo run -p inspectify -- {{ARGS}}
 
 inspectify-app:
-    cd inspectify-app && (npm install && npm run dev)
+    cd crates/inspectify/app && (npm install && npm run dev)
 
 # CI/Release
 
@@ -15,7 +15,7 @@ release-patch args="":
     cargo release patch {{args}}
 
 build-ui:
-    cd inspectify-app && (npm install && npm run build)
+    cd crates/inspectify/app && (npm install && npm run build)
 
 release-hook:
     git cliff -t $NEW_VERSION -o CHANGELOG.md
@@ -33,7 +33,7 @@ checko-debug:
 # Patch inspectify binaries
 
 patch-inspectify-binaries-macos:
-    cd inspectify-app && (npm install && npm run build)
+    cd crates/inspectify/app && (npm install && npm run build)
     cargo zigbuild --target aarch64-apple-darwin     -p inspectify --release
     cargo zigbuild --target x86_64-apple-darwin      -p inspectify --release
     cargo zigbuild --target x86_64-pc-windows-gnu    -p inspectify --release
@@ -53,7 +53,7 @@ CHECKO_REMOTE_HOST := "$CHECKO_REMOTE_HOST"
 CHECKO_REMOTE_PATH := "$CHECKO_REMOTE_PATH"
 
 patch-checko:
-    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cd inspectify-app && npm run build
+    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cd crates/inspectify/app && npm run build
     PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
     scp target/x86_64-unknown-linux-gnu/release/inspectify {{CHECKO_REMOTE_HOST}}:{{CHECKO_REMOTE_PATH}}
 
@@ -61,7 +61,7 @@ WIN_REMOTE_HOST := "$WIN_REMOTE_HOST"
 WIN_REMOTE_PATH := "$WIN_REMOTE_PATH"
 
 patch-windows-machine:
-    cd inspectify-app && npm run build
+    cd crates/inspectify/app && npm run build
     cargo zigbuild --target x86_64-pc-windows-gnu -p inspectify --release
     ssh {{WIN_REMOTE_HOST}} taskkill /IM "inspectify.exe" /F
     scp target/x86_64-pc-windows-gnu/release/inspectify.exe {{WIN_REMOTE_HOST}}:{{WIN_REMOTE_PATH}}
