@@ -13,7 +13,7 @@ use std::{
 
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Input};
-use color_eyre::eyre::Context;
+use color_eyre::{eyre::Context, Result};
 use driver::{Driver, Hub, Job, JobState};
 use futures_util::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
@@ -122,7 +122,7 @@ impl GroupToTest {
             .into_owned(),
         )
     }
-    async fn test_input(&self, db: &db::CheckoDb, input: &Input) -> color_eyre::Result<()> {
+    async fn test_input(&self, db: &db::CheckoDb, input: &Input) -> Result<()> {
         let job = self.driver.exec_job(
             input,
             InspectifyJobMeta {
@@ -150,7 +150,7 @@ impl GroupToTest {
 
 impl Checko {
     #[tracing::instrument(skip(hub))]
-    pub fn open(hub: Hub<InspectifyJobMeta>, path: &Path) -> color_eyre::Result<Self> {
+    pub fn open(hub: Hub<InspectifyJobMeta>, path: &Path) -> Result<Self> {
         let path = dunce::canonicalize(path)
             .wrap_err_with(|| format!("could not canonicalize path: '{}'", path.display()))?;
         tracing::debug!(?path, "opening checko");
@@ -216,7 +216,7 @@ impl Checko {
         config: &config::GroupConfig,
         analysis: Analysis,
         deadline: Option<chrono::DateTime<chrono::FixedOffset>>,
-    ) -> color_eyre::Result<GroupRepo> {
+    ) -> Result<GroupRepo> {
         match (&config.git, &config.path) {
             (Some(git), then_path) => {
                 let group_path = self.group_path(config, analysis);
@@ -250,7 +250,7 @@ impl Checko {
                 }
 
                 let path = if let Some(then_path) = then_path {
-                    group_path.join(then_path)
+                    group_path.join(then_path.as_str())
                 } else {
                     group_path
                 };
@@ -263,7 +263,7 @@ impl Checko {
                 })
             }
             (_, Some(path)) => {
-                let path = dunce::canonicalize(PathBuf::from(path))
+                let path = dunce::canonicalize(PathBuf::from(path.as_str()))
                     .wrap_err_with(|| format!("could not canonicalize group path: '{}'", path))?;
                 Ok(GroupRepo {
                     path,
@@ -279,128 +279,123 @@ impl Checko {
     }
 
     async fn groups_to_test(
-        &self,
+        self: &Arc<Self>,
         analysis_inputs: &BTreeMap<Analysis, Arc<Vec<Input>>>,
-    ) -> color_eyre::Result<Vec<GroupToTest>> {
-        let mut groups = self
-            .groups_config
-            .groups
-            .iter()
-            .map(|g| Arc::new(g.clone()))
-            .collect_vec();
+    ) -> Result<Vec<GroupToTest>> {
+        let mut groups = self.groups_config.groups.clone();
 
         groups.shuffle(&mut rand::thread_rng());
 
-        // TODO: use async streams for this instead
+        let mut compile_join_set = tokio::task::JoinSet::<Result<Option<_>>>::new();
 
-        let mut compile_join_set = tokio::task::JoinSet::new();
-
-        for (&a, inputs) in analysis_inputs {
+        for ((&a, inputs), g) in analysis_inputs
+            .iter()
+            .cartesian_product(groups.iter().cloned())
+        {
             let inputs = Arc::clone(inputs);
             let deadline = self.programs_config.deadlines.get(&a).and_then(|d| d.time);
+            let db = self.db.clone();
+            let hub = self.hub.clone();
+            let checko = self.clone();
 
-            for g in &groups {
-                let g = Arc::clone(g);
-                let gs = self.group_state(&g, a).await;
-                let repo = {
-                    let prev = gs.set_status(GroupStatus::CheckingForUpdate).await;
-                    let repo = self.update_group_repo(&g, a, deadline).await?;
+            // NOTE: We do the cloning sequentially, because we want to be nice
+            // to the remote server
+            let gs = checko.group_state(&g, a).await;
+            let repo = checko.update_group_repo(&g, a, deadline).await?;
+
+            compile_join_set.spawn(
+                async move {
+                    let prev_status = gs.set_status(GroupStatus::CheckingForUpdate).await;
                     if !gs.update_latest_hash(repo.git_hash.as_deref()).await {
-                        gs.set_status(prev).await;
-                        continue;
+                        gs.set_status(prev_status).await;
+                        return Ok(None);
                     }
-                    repo
-                };
 
-                let mut need_work = false;
+                    let mut need_work = false;
 
-                if let Some(git_hash) = repo.git_hash.as_ref() {
-                    for input in inputs.iter() {
-                        let key = db::CacheKeyInput {
-                            group_name: &g.name,
-                            git_hash,
-                            input,
-                        }
-                        .key();
-                        if let Some(job_data) = self.db.get_cached_run(&key)? {
-                            gs.set_result(input.hash(), job_data.state).await;
-                        } else {
-                            need_work = true;
-                        }
-                    }
-                } else {
-                    need_work = true;
-                }
-
-                if !need_work {
-                    gs.set_status(GroupStatus::Finished).await;
-                    continue;
-                }
-
-                tracing::info!(name=?g.name, ?a, "rerunning tests");
-
-                let driver = match Driver::new_from_path(
-                    self.hub.clone(),
-                    &repo.path,
-                    repo.path.join(g.run.as_deref().unwrap_or("run.toml")),
-                ) {
-                    Ok(driver) => {
-                        gs.set_status(GroupStatus::Compiling).await;
-                        tracing::debug!("ensuring compile job");
-                        let compile_job = driver.ensure_compile(InspectifyJobMeta {
-                            group_name: Some(g.name.clone()),
-                        });
-                        tracing::debug!("group state built successfully");
-                        Arc::new(GroupState {
-                            driver,
-                            compile_job,
-                        })
-                    }
-                    Err(err) => {
-                        gs.set_status(GroupStatus::CompilationError).await;
-                        tracing::error!(?err, "could not build group driver");
-                        continue;
-                    }
-                };
-
-                let inputs = Arc::clone(&inputs);
-                compile_join_set.spawn(
-                    async move {
-                        let res = if let Some(job) = &driver.compile_job {
-                            let state = job.wait().await;
-                            match state {
-                                JobState::Succeeded => Some(GroupToTest {
-                                    analysis: a,
-                                    group: g.clone(),
-                                    repo,
-                                    state: gs.clone(),
-                                    driver: driver.driver.clone(),
-                                }),
-                                _ => None,
+                    if let Some(git_hash) = repo.git_hash.as_ref() {
+                        for input in inputs.iter() {
+                            let key = db::CacheKeyInput {
+                                group_name: &g.name,
+                                git_hash,
+                                input,
                             }
-                        } else {
-                            None
-                        };
+                            .key();
+                            if let Some(job_data) = db.get_cached_run(&key)? {
+                                gs.set_result(input.hash(), job_data.state).await;
+                            } else {
+                                need_work = true;
+                            }
+                        }
+                    } else {
+                        need_work = true;
+                    }
 
-                        if res.is_some() {
-                            gs.set_status(GroupStatus::Testing).await;
-                        } else {
+                    if !need_work {
+                        gs.set_status(GroupStatus::Finished).await;
+                        return Ok(None);
+                    }
+
+                    tracing::info!(name=?g.name, ?a, "rerunning tests");
+
+                    let driver = match Driver::new_from_path(
+                        hub,
+                        &repo.path,
+                        repo.path.join(g.run.as_deref().unwrap_or("run.toml")),
+                    ) {
+                        Ok(driver) => {
+                            gs.set_status(GroupStatus::Compiling).await;
+                            tracing::debug!("ensuring compile job");
+                            let compile_job = driver.ensure_compile(InspectifyJobMeta {
+                                group_name: Some(g.name.clone()),
+                            });
+                            tracing::debug!("group state built successfully");
+                            Arc::new(GroupState {
+                                driver,
+                                compile_job,
+                            })
+                        }
+                        Err(err) => {
                             gs.set_status(GroupStatus::CompilationError).await;
-                            for input in inputs.iter() {
-                                gs.set_result(input.hash(), JobState::Failed).await;
-                            }
+                            tracing::error!(?err, "could not build group driver");
+                            return Ok(None);
                         }
-                        res
+                    };
+
+                    let res = if let Some(job) = &driver.compile_job {
+                        let state = job.wait().await;
+                        match state {
+                            JobState::Succeeded => Some(GroupToTest {
+                                analysis: a,
+                                group: g.clone(),
+                                repo,
+                                state: gs.clone(),
+                                driver: driver.driver.clone(),
+                            }),
+                            _ => None,
+                        }
+                    } else {
+                        None
+                    };
+
+                    if res.is_some() {
+                        gs.set_status(GroupStatus::Testing).await;
+                    } else {
+                        gs.set_status(GroupStatus::CompilationError).await;
+                        for input in inputs.iter() {
+                            gs.set_result(input.hash(), JobState::Failed).await;
+                        }
                     }
-                    .in_current_span(),
-                );
-            }
+                    Ok(res)
+                }
+                .in_current_span(),
+            );
         }
 
         let mut groups_to_test = Vec::new();
 
         while let Some(res) = compile_join_set.join_next().await {
-            if let Some(gtt) = res? {
+            if let Some(gtt) = res?? {
                 groups_to_test.push(gtt);
             }
         }
@@ -408,8 +403,8 @@ impl Checko {
         Ok(groups_to_test)
     }
 
-    // #[tracing::instrument(skip(self))]
-    pub async fn work(&self) -> color_eyre::Result<()> {
+    #[tracing::instrument(skip(self))]
+    pub async fn work(self: &Arc<Self>) -> Result<()> {
         let analysis_inputs: BTreeMap<_, _> = self
             .programs_config
             .inputs()

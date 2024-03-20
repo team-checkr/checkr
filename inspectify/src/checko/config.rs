@@ -1,18 +1,19 @@
 //! Config definitions for program inputs and groups of group.
 
-use std::{fs, path::Path};
+use std::{fs, path::Path, sync::Arc};
 
 use ce_shell::{Analysis, Input};
 use color_eyre::{eyre::Context, Result};
 use indexmap::IndexMap;
 use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
+use smol_str::SmolStr;
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
 pub struct GroupsConfig {
     #[serde(default)]
     pub ignored_authors: Vec<String>,
-    pub groups: Vec<GroupConfig>,
+    pub groups: Vec<Arc<GroupConfig>>,
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, Serialize, Deserialize)]
@@ -134,7 +135,7 @@ impl ProgramConfig {
     tapi::Tapi, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,
 )]
 #[serde(transparent)]
-pub struct GroupName(pub String);
+pub struct GroupName(SmolStr);
 
 impl std::fmt::Debug for GroupName {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -164,9 +165,9 @@ impl std::ops::Deref for GroupName {
 #[derive(tapi::Tapi, Debug, Default, Clone, Hash, Serialize, Deserialize)]
 pub struct GroupConfig {
     pub name: GroupName,
-    pub git: Option<String>,
-    pub path: Option<String>,
-    pub run: Option<String>,
+    pub git: Option<SmolStr>,
+    pub path: Option<SmolStr>,
+    pub run: Option<SmolStr>,
 }
 
 pub fn read_programs(programs: impl AsRef<Path>) -> Result<ProgramsConfig> {

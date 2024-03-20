@@ -35,6 +35,7 @@ rusqlite.workspace = true
 rust-embed = { version = "8.3.0", features = ["axum", "compression"] }
 serde.workspace = true
 serde_json.workspace = true
+smol_str = { version = "0.2.1", features = ["serde"] }
 stdx.workspace = true
 tapi.workspace = true
 tempfile = "3.10.1"
