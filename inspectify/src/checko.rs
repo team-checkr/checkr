@@ -15,6 +15,7 @@ use ce_core::ValidationResult;
 use ce_shell::{Analysis, Input};
 use color_eyre::eyre::Context;
 use driver::{Driver, Hub, Job, JobState};
+use futures_util::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;
 use itertools::Itertools;
 use rand::seq::SliceRandom;
@@ -34,14 +35,8 @@ pub struct Checko {
     group_states: tokio::sync::Mutex<IndexMap<(GroupName, Analysis), GroupState2>>,
 }
 
-#[derive(Debug, Clone)]
-pub enum GroupDriver {
-    Missing { reason: String },
-    Driver(Driver<InspectifyJobMeta>),
-}
-
 pub struct GroupState {
-    driver: GroupDriver,
+    driver: Driver<InspectifyJobMeta>,
     compile_job: Option<Job<InspectifyJobMeta>>,
 }
 
@@ -106,12 +101,51 @@ impl GroupState2 {
     }
 }
 
+#[derive(Clone)]
 struct GroupToTest {
     group: Arc<config::GroupConfig>,
     analysis: Analysis,
     repo: GroupRepo,
     state: GroupState2,
-    driver: GroupDriver,
+    driver: Driver<InspectifyJobMeta>,
+}
+
+impl GroupToTest {
+    fn cache_key(&self, input: &Input) -> Option<db::CacheKey<'static>> {
+        Some(
+            db::CacheKeyInput {
+                group_name: &self.group.name,
+                git_hash: self.repo.git_hash.as_ref()?,
+                input,
+            }
+            .key()
+            .into_owned(),
+        )
+    }
+    async fn test_input(&self, db: &db::CheckoDb, input: &Input) -> color_eyre::Result<()> {
+        let job = self.driver.exec_job(
+            input,
+            InspectifyJobMeta {
+                group_name: Some(self.group.name.clone()),
+            },
+        );
+        job.wait().await;
+
+        let state = compute_validated_job_state(&job);
+
+        if let Some(key) = self.cache_key(input) {
+            let data = driver::JobData {
+                state,
+                ..job.data().clone()
+            };
+            db.insert_cached_run(&key, &data)?;
+        }
+
+        self.state.set_status(GroupStatus::Finished).await;
+        self.state.set_result(input.hash(), state).await;
+
+        Ok(())
+    }
 }
 
 impl Checko {
@@ -156,6 +190,24 @@ impl Checko {
         self.path
             .join("groups")
             .join(format!("{}-{analysis:?}", config.name))
+    }
+
+    async fn group_state(&self, g: &GroupConfig, a: Analysis) -> GroupState2 {
+        self.group_states
+            .lock()
+            .await
+            .entry((g.name.clone(), a))
+            .or_default()
+            .clone()
+    }
+
+    async fn group_states(&self) -> Vec<(GroupName, Analysis, GroupState2)> {
+        self.group_states
+            .lock()
+            .await
+            .iter()
+            .map(|((g, a), gs)| (g.clone(), *a, gs.clone()))
+            .collect_vec()
     }
 
     #[tracing::instrument(skip(self))]
@@ -249,13 +301,7 @@ impl Checko {
 
             for g in &groups {
                 let g = Arc::clone(g);
-                let gs = self
-                    .group_states
-                    .lock()
-                    .await
-                    .entry((g.name.clone(), a))
-                    .or_default()
-                    .clone();
+                let gs = self.group_state(&g, a).await;
                 let repo = {
                     let prev = gs.set_status(GroupStatus::CheckingForUpdate).await;
                     let repo = self.update_group_repo(&g, a, deadline).await?;
@@ -268,7 +314,7 @@ impl Checko {
 
                 let mut need_work = false;
 
-                if let Some(git_hash) = repo.git_hash.as_ref().as_ref() {
+                if let Some(git_hash) = repo.git_hash.as_ref() {
                     for input in inputs.iter() {
                         let key = db::CacheKeyInput {
                             group_name: &g.name,
@@ -306,19 +352,14 @@ impl Checko {
                         });
                         tracing::debug!("group state built successfully");
                         Arc::new(GroupState {
-                            driver: GroupDriver::Driver(driver),
+                            driver,
                             compile_job,
                         })
                     }
                     Err(err) => {
                         gs.set_status(GroupStatus::CompilationError).await;
                         tracing::error!(?err, "could not build group driver");
-                        Arc::new(GroupState {
-                            driver: GroupDriver::Missing {
-                                reason: format!("{:?}", err),
-                            },
-                            compile_job: None,
-                        })
+                        continue;
                     }
                 };
 
@@ -377,105 +418,8 @@ impl Checko {
 
         loop {
             let groups_to_test = self.groups_to_test(&analysis_inputs).await?;
-
-            let mut testing_join_set = tokio::task::JoinSet::new();
-
-            for gtt in groups_to_test {
-                let driver = match gtt.driver {
-                    GroupDriver::Driver(driver) => driver,
-                    GroupDriver::Missing { reason } => {
-                        tracing::error!(name=?gtt.group.name, ?reason, "group driver missing");
-                        continue;
-                    }
-                };
-                for i in analysis_inputs[&gtt.analysis].iter() {
-                    let key = gtt.repo.git_hash.as_ref().as_ref().map(|git_hash| {
-                        db::CacheKeyInput {
-                            group_name: &gtt.group.name,
-                            git_hash,
-                            input: i,
-                        }
-                        .key()
-                        .into_owned()
-                    });
-
-                    let db = self.db.clone();
-                    let input = i.clone();
-                    let g = Arc::clone(&gtt.group);
-                    let gs = gtt.state.clone();
-                    let job = driver.exec_job(
-                        &input,
-                        InspectifyJobMeta {
-                            group_name: Some(g.name.clone()),
-                        },
-                    );
-                    testing_join_set.spawn(
-                        async move {
-                            job.wait().await;
-
-                            let state = {
-                                let output = input.analysis().output_from_str(&job.stdout());
-                                let validation = match (job.state(), &output) {
-                                    (JobState::Succeeded, Ok(output)) => {
-                                        Some(match input.validate_output(output) {
-                                            Ok(output) => output,
-                                            Err(e) => ValidationResult::Mismatch {
-                                                reason: format!("failed to validate output: {e:?}"),
-                                            },
-                                        })
-                                    }
-                                    (JobState::Succeeded, Err(e)) => {
-                                        Some(ValidationResult::Mismatch {
-                                            reason: format!("failed to parse output: {e:?}"),
-                                        })
-                                    }
-                                    _ => None,
-                                };
-
-                                match (job.state(), validation) {
-                                    (
-                                        JobState::Succeeded,
-                                        Some(
-                                            ValidationResult::CorrectNonTerminated { .. }
-                                            | ValidationResult::CorrectTerminated,
-                                        ),
-                                    ) => JobState::Succeeded,
-                                    (
-                                        JobState::Succeeded,
-                                        Some(ValidationResult::Mismatch { .. }),
-                                    ) => JobState::Warning,
-                                    (JobState::Succeeded, Some(ValidationResult::TimeOut)) => {
-                                        JobState::Timeout
-                                    }
-                                    (state, _) => state,
-                                }
-                            };
-
-                            if let Some(key) = key {
-                                db.insert_cached_run(
-                                    &key,
-                                    &driver::JobData {
-                                        state,
-                                        ..job.data().clone()
-                                    },
-                                )?;
-                            }
-
-                            gs.set_status(GroupStatus::Finished).await;
-                            gs.set_result(input.hash(), state).await;
-
-                            Ok::<_, color_eyre::eyre::Error>(())
-                        }
-                        .in_current_span(),
-                    );
-                }
-            }
-
-            while let Some(res) = testing_join_set.join_next().await {
-                if let Err(err) = res? {
-                    tracing::error!(?err, "error in join set");
-                }
-            }
+            self.run_group_tests(groups_to_test, &analysis_inputs)
+                .await?;
 
             self.hub.clear();
 
@@ -483,5 +427,59 @@ impl Checko {
             tracing::info!("waiting for next batch of runs");
             tokio::time::sleep(Duration::from_secs(60)).await;
         }
+    }
+
+    async fn run_group_tests(
+        &self,
+        groups_to_test: Vec<GroupToTest>,
+        analysis_inputs: &BTreeMap<Analysis, Arc<Vec<Input>>>,
+    ) -> Result<(), color_eyre::eyre::Error> {
+        let tests = groups_to_test.iter().flat_map(|gtt| {
+            analysis_inputs[&gtt.analysis]
+                .iter()
+                .cloned()
+                .map(move |input| {
+                    let gtt = gtt.clone();
+                    let db = self.db.clone();
+                    tokio::spawn(async move { gtt.test_input(&db, &input).await })
+                })
+        });
+        tokio_stream::iter(tests)
+            .then(|test| async { test.await? })
+            .try_collect()
+            .await
+    }
+}
+
+fn compute_validated_job_state(job: &Job<InspectifyJobMeta>) -> JobState {
+    let input = match job.kind() {
+        driver::JobKind::Compilation => return job.state(),
+        driver::JobKind::Analysis(input) => input,
+    };
+
+    let output = input.analysis().output_from_str(&job.stdout());
+    let validation = match (job.state(), &output) {
+        (JobState::Succeeded, Ok(output)) => Some(match input.validate_output(output) {
+            Ok(output) => output,
+            Err(e) => ValidationResult::Mismatch {
+                reason: format!("failed to validate output: {e:?}"),
+            },
+        }),
+        (JobState::Succeeded, Err(e)) => Some(ValidationResult::Mismatch {
+            reason: format!("failed to parse output: {e:?}"),
+        }),
+        _ => None,
+    };
+
+    match (job.state(), validation) {
+        (
+            JobState::Succeeded,
+            Some(
+                ValidationResult::CorrectNonTerminated { .. } | ValidationResult::CorrectTerminated,
+            ),
+        ) => JobState::Succeeded,
+        (JobState::Succeeded, Some(ValidationResult::Mismatch { .. })) => JobState::Warning,
+        (JobState::Succeeded, Some(ValidationResult::TimeOut)) => JobState::Timeout,
+        (state, _) => state,
     }
 }

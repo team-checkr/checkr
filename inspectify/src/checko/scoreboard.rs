@@ -50,7 +50,7 @@ pub struct PublicState {
 async fn compute_public_groups(checko: &Checko) -> Vec<PublicGroup> {
     let mut groups = HashMap::<GroupName, PublicGroup>::new();
 
-    for ((group_name, analysis), gs) in checko.group_states.lock().await.iter() {
+    for (group_name, analysis, gs) in checko.group_states().await {
         let pg = groups
             .entry(group_name.clone())
             .or_insert_with(|| PublicGroup {
@@ -63,7 +63,7 @@ async fn compute_public_groups(checko: &Checko) -> Vec<PublicGroup> {
             .programs_config
             .inputs()
             .flat_map(|(a, inputs)| {
-                if a != *analysis {
+                if a != analysis {
                     Either::Left(std::iter::empty())
                 } else {
                     Either::Right(inputs.map(|input| {
@@ -79,7 +79,7 @@ async fn compute_public_groups(checko: &Checko) -> Vec<PublicGroup> {
             .collect();
 
         pg.analysis_results.push(PublicAnalysisResults {
-            analysis: *analysis,
+            analysis,
             status: gs.status().await,
             last_hash: gs.latest_hash().await,
             results,
