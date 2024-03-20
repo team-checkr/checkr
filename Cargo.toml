@@ -56,6 +56,8 @@ stdx = { path = "./stdx" }
 # tapi = { path = "../tapi/crates/tapi", features = ["chrono", "toml"] }
 tapi = { git = "https://github.com/oeb25/tapi.git", features = [
     "chrono",
+    "endpoints",
+    "smol_str",
     "toml",
 ] }
 thiserror = "1.0.38"

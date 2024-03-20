@@ -84,6 +84,8 @@ pub async fn clone(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> 
 }
 
 pub async fn checkout_main(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
     tracing::debug!(?git, "checking out main branch");
     Command::new("git")
         .arg("checkout")
@@ -113,6 +115,8 @@ pub async fn pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
 }
 
 pub async fn hash(path: impl AsRef<Path>, rev: Option<&str>) -> color_eyre::Result<String> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
     let output = Command::new("git")
         .arg("rev-parse")
         .arg(rev.unwrap_or("HEAD"))
@@ -129,6 +133,8 @@ pub async fn latest_commit_before(
     before: chrono::DateTime<chrono::FixedOffset>,
     ignored_authors: &[String],
 ) -> color_eyre::Result<Option<String>> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
     let path = path.as_ref();
     tracing::debug!(?before, "checking out latest commit before");
     let before = before.format("%Y-%m-%d %H:%M:%S").to_string();
