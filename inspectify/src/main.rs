@@ -1,6 +1,5 @@
 mod checko;
 mod endpoints;
-mod history_broadcaster;
 
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
