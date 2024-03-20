@@ -35,7 +35,7 @@ od
   type State = (typeof STATES)[number];
   let state = writable<State>('idle');
 
-  $: {
+  $: if (browser) {
     const run = async () => {
       parseError.set(false);
       const { default: init, parse } = await import('chip-wasm');

@@ -1,1 +1,1 @@
-export * from '../inspectify-app/tailwind.config';
+export * from '../inspectify/tailwind.config';

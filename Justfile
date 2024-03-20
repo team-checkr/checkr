@@ -1,5 +1,12 @@
 set dotenv-load
 
+app app:
+    just build-wasm
+    cd apps/{{app}} && (npm install && npm run dev)
+
+build-wasm:
+    cd crates/chip-wasm && just build
+
 # Inspectify
 
 inspectify ARGS="":

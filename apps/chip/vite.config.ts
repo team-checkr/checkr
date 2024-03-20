@@ -10,12 +10,12 @@ export default defineConfig({
 		Icons({ compiler: 'svelte' }),
 		wasm(),
 		wasmPack({
-			crates: ['../chip-wasm/']
+			crates: ['../../crates/chip-wasm/']
 		})
 	],
 	server: {
 		fs: {
-			allow: ['../chip-wasm/pkg/']
+			allow: ['../../crates/chip-wasm/pkg/']
 		}
 	}
 });

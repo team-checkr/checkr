@@ -10,13 +10,10 @@ export default function wasmPack(config: WasmPackConfig): Plugin {
 
 	return {
 		name: 'wasm-pack',
-		watchChange(id, change) {
-			console.log('watch change:', id, change);
-		},
 		buildStart() {
 			for (const crate of config.crates) {
 				const lib = path.resolve(normalizePath(crate));
-				const job = childProcess.spawn('cargo', ['watch', '-s', 'wasm-pack build --target web'], {
+				const job = childProcess.spawn('cargo', ['watch', '--postpone', '-s', 'just build'], {
 					cwd: lib,
 					env: { ...process.env, RUST_LOG: 'none' },
 					stdio: 'inherit'
