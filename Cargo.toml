@@ -1,15 +1,15 @@
 [workspace]
 resolver = "2"
 members = [
-    "ce-core",
-    "ce-shell",
-    "checkr",
-    "driver",
-    "envs/*",
-    "gcl",
-    "inspectify",
-    "stdx",
-    "xtask",
+    "crates/ce-core",
+    "crates/ce-shell",
+    "crates/checkr",
+    "crates/driver",
+    "crates/envs/*",
+    "crates/gcl",
+    "crates/inspectify",
+    "crates/stdx",
+    "crates/xtask",
 ]
 
 [workspace.package]
@@ -25,22 +25,22 @@ license = "MIT OR Apache-2.0"
 axum = { version = "0.7.3", features = ["macros", "ws"] }
 axum-macros = "0.4.1"
 bitflags = "2.4.0"
-ce-calculator = { path = "./envs/ce-calculator" }
-ce-compiler = { path = "./envs/ce-compiler" }
-ce-core = { path = "./ce-core" }
-ce-interpreter = { path = "./envs/ce-interpreter" }
-ce-parser = { path = "./envs/ce-parser" }
-ce-security = { path = "./envs/ce-security" }
-ce-shell = { path = "./ce-shell" }
-ce-sign = { path = "./envs/ce-sign" }
-checkr = { path = "./checkr" }
+ce-calculator = { path = "./crates/envs/ce-calculator" }
+ce-compiler = { path = "./crates/envs/ce-compiler" }
+ce-core = { path = "./crates/ce-core" }
+ce-interpreter = { path = "./crates/envs/ce-interpreter" }
+ce-parser = { path = "./crates/envs/ce-parser" }
+ce-security = { path = "./crates/envs/ce-security" }
+ce-shell = { path = "./crates/ce-shell" }
+ce-sign = { path = "./crates/envs/ce-sign" }
+checkr = { path = "./crates/checkr" }
 clap = { version = "4.4.4", features = ["derive"] }
 color-eyre = "0.6.2"
 dashmap = "5.5.3"
-driver = { path = "./driver" }
+driver = { path = "./crates/driver" }
 dunce = "1.0.4"
 futures-util = "0.3.28"
-gcl = { path = "./gcl" }
+gcl = { path = "./crates/gcl" }
 indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = "0.12.1"
 lz4_flex = "0.11.2"
@@ -52,7 +52,7 @@ rand = { version = "0.8.5", features = ["small_rng"] }
 rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.152", features = ["derive", "rc"] }
 serde_json = "1.0.91"
-stdx = { path = "./stdx" }
+stdx = { path = "./crates/stdx" }
 # tapi = { path = "../tapi/crates/tapi", features = ["chrono", "toml"] }
 tapi = { git = "https://github.com/oeb25/tapi.git", features = [
     "chrono",

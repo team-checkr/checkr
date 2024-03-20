@@ -112,7 +112,7 @@ async fn run() -> Result<()> {
             sh.change_dir("inspectify-app/src/routes/env");
 
             let template_src = include_str!(
-                "../../inspectify-app/src/routes/(inspectify)/env/Template/+page.svelte"
+                "../../inspectify/app/src/routes/(inspectify)/env/Template/+page.svelte"
             )
             .replace("Parser", &short_name.to_pascal_case());
             sh.create_dir(short_name.to_pascal_case())?;
