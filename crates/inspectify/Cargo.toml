@@ -1,0 +1,49 @@
+[package]
+name = "inspectify"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+publish = false
+
+[package.metadata.dist]
+dist = true
+
+# See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
+
+[dependencies]
+axum.workspace = true
+ce-core.workspace = true
+ce-shell.workspace = true
+chrono = { version = "0.4.33", features = ["serde"] }
+clap.workspace = true
+color-eyre.workspace = true
+driver.workspace = true
+dunce.workspace = true
+futures-util = "0.3.30"
+hex = "0.4.3"
+indexmap.workspace = true
+itertools.workspace = true
+lz4_flex.workspace = true
+md5.workspace = true
+mime_guess = "2.0.4"
+once_cell.workspace = true
+open = "5.0.1"
+rand.workspace = true
+rusqlite.workspace = true
+rust-embed = { version = "8.3.0", features = ["axum", "compression"] }
+serde.workspace = true
+serde_json.workspace = true
+smol_str = { version = "0.2.1", features = ["serde"] }
+stdx.workspace = true
+tapi.workspace = true
+tempfile = "3.10.1"
+tokio.workspace = true
+tokio-retry = "0.3.0"
+tokio-stream = "0.1.14"
+toml.workspace = true
+tower-http = { version = "0.5.0", features = ["cors"] }
+tracing.workspace = true
+tracing-error.workspace = true
+tracing-subscriber.workspace = true

@@ -1,31 +1,12 @@
+set dotenv-load
+
 # Inspectify
 
-# Launch tmuxinator with the config for inspectify development
-inspectify:
-    tmuxinator
+inspectify ARGS="":
+    RUST_LOG=debug cargo run -p inspectify -- {{ARGS}}
 
-watch-web:
-    cd inspectify/ui; npm i && npm run dev
-
-watch-inspectify:
-    mkdir -p inspectify/ui/dist/
-    # RUST_LOG=debug cargo watch -i inspectify/ui/ -i starters/ -x 'run -p inspectify starters/fsharp-starter'
-    RUST_LOG=debug cargo watch -i inspectify/ui/ -i starters/ -x 'run -p inspectify'
-
-typeshare:
-    #!/bin/bash
-    set -e
-    if which typeshare > /dev/null ; then
-        typeshare . --lang=typescript --output-file=./inspectify/ui/src/lib/types.ts
-    else
-        echo "typeshare not run. to run install with 'cargo binstall typeshare-cli'"
-    fi
-
-build-ui: typeshare
-    cd inspectify/ui; npm i && npm run build
-
-build-inspectify: build-ui
-    cargo build -p inspectify --release
+inspectify-app:
+    cd apps/inspectify && (npm install && npm run dev)
 
 # CI/Release
 
@@ -33,9 +14,55 @@ release-patch args="":
     git checkout HEAD -- CHANGELOG.md
     cargo release patch {{args}}
 
-build-ci:
-    cargo build -p inspectify
-    cargo build -p checko
+build-ui:
+    cd apps/inspectify && (npm install && npm run build)
 
 release-hook:
     git cliff -t $NEW_VERSION -o CHANGELOG.md
+
+# Debugging
+
+checko-debug:
+    # rm -rf example/runs.db3
+    # rm -rf example/groups/
+    # rm -rf ../2024/checko-data/runs.db3
+    # rm -rf ../2024/checko-data/groups/
+    RUST_LOG=debug cargo run --release -p inspectify -- --checko ../2024/checko-data
+    # CARGO_PROFILE_RELEASE_DEBUG=true RUST_LOG=debug cargo flamegraph --root -p inspectify -- --checko ../2024/checko-data
+
+# Patch inspectify binaries
+
+patch-inspectify-binaries-macos:
+    cd apps/inspectify && (npm install && npm run build)
+    cargo zigbuild --target aarch64-apple-darwin     -p inspectify --release
+    cargo zigbuild --target x86_64-apple-darwin      -p inspectify --release
+    cargo zigbuild --target x86_64-pc-windows-gnu    -p inspectify --release
+    cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
+    rm -rf inspectify-binaries
+    git clone git@github.com:team-checkr/inspectify-binaries.git
+    cp target/aarch64-apple-darwin/release/inspectify       inspectify-binaries/inspectify-macos-arm64
+    cp target/x86_64-apple-darwin/release/inspectify        inspectify-binaries/inspectify-macos-x86_64
+    cp target/x86_64-pc-windows-gnu/release/inspectify.exe  inspectify-binaries/inspectify-win.exe
+    cp target/x86_64-unknown-linux-gnu/release/inspectify   inspectify-binaries/inspectify-linux
+    strip inspectify-binaries/inspectify-macos-arm64
+    strip inspectify-binaries/inspectify-macos-x86_64
+    strip inspectify-binaries/inspectify-linux
+    cd inspectify-binaries && git add . && git commit -m "Update binaries" && git push
+
+CHECKO_REMOTE_HOST := "$CHECKO_REMOTE_HOST"
+CHECKO_REMOTE_PATH := "$CHECKO_REMOTE_PATH"
+
+patch-checko:
+    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cd apps/inspectify && npm run build
+    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
+    scp target/x86_64-unknown-linux-gnu/release/inspectify {{CHECKO_REMOTE_HOST}}:{{CHECKO_REMOTE_PATH}}
+
+WIN_REMOTE_HOST := "$WIN_REMOTE_HOST"
+WIN_REMOTE_PATH := "$WIN_REMOTE_PATH"
+
+patch-windows-machine:
+    cd apps/inspectify && npm run build
+    cargo zigbuild --target x86_64-pc-windows-gnu -p inspectify --release
+    ssh {{WIN_REMOTE_HOST}} taskkill /IM "inspectify.exe" /F
+    scp target/x86_64-pc-windows-gnu/release/inspectify.exe {{WIN_REMOTE_HOST}}:{{WIN_REMOTE_PATH}}
+    ssh {{WIN_REMOTE_HOST}} 'cmd.exe /c "cd /Users/oembo/checkr-test/fsharp-starter && inspectify.exe"'

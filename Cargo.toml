@@ -1,6 +1,16 @@
 [workspace]
 resolver = "2"
-members = ["xtask", "checkr", "inspectify", "checko"]
+members = [
+    "crates/ce-core",
+    "crates/ce-shell",
+    "crates/checkr",
+    "crates/driver",
+    "crates/envs/*",
+    "crates/gcl",
+    "crates/inspectify",
+    "crates/stdx",
+    "crates/xtask",
+]
 
 [workspace.package]
 version = "0.1.21"
@@ -12,23 +22,50 @@ authors = [
 license = "MIT OR Apache-2.0"
 
 [workspace.dependencies]
-axum = { version = "0.6.2", features = ["macros", "ws"] }
-axum-macros = "0.3.1"
+axum = { version = "0.7.3", features = ["macros", "ws"] }
+axum-macros = "0.4.1"
+bitflags = "2.4.0"
+ce-calculator = { path = "./crates/envs/ce-calculator" }
+ce-compiler = { path = "./crates/envs/ce-compiler" }
+ce-core = { path = "./crates/ce-core" }
+ce-interpreter = { path = "./crates/envs/ce-interpreter" }
+ce-parser = { path = "./crates/envs/ce-parser" }
+ce-security = { path = "./crates/envs/ce-security" }
+ce-shell = { path = "./crates/ce-shell" }
+ce-sign = { path = "./crates/envs/ce-sign" }
+checkr = { path = "./crates/checkr" }
+clap = { version = "4.4.4", features = ["derive"] }
 color-eyre = "0.6.2"
-comfy-table = { version = "7.0.1", default-features = false }
-itertools = "0.11.0"
+dashmap = "5.5.3"
+driver = { path = "./crates/driver" }
+dunce = "1.0.4"
+futures-util = "0.3.28"
+gcl = { path = "./crates/gcl" }
+indexmap = { version = "2.0.0", features = ["serde"] }
+itertools = "0.12.1"
+lz4_flex = "0.11.2"
+md5 = "0.7.0"
+miette = { version = "5.10.0", features = ["fancy"] }
+once_cell = "1.19.0"
+petgraph = { version = "0.6.3" }
+rand = { version = "0.8.5", features = ["small_rng"] }
+rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.152", features = ["derive", "rc"] }
 serde_json = "1.0.91"
-rand = { version = "0.8.5", features = ["small_rng"] }
+stdx = { path = "./crates/stdx" }
+# tapi = { path = "../tapi/crates/tapi", features = ["chrono", "toml"] }
+tapi = { git = "https://github.com/oeb25/tapi.git", features = [
+    "chrono",
+    "endpoints",
+    "smol_str",
+    "toml",
+] }
 thiserror = "1.0.38"
 tokio = { version = "1.25.0", features = ["full"] }
+toml = { version = "0.8.0", features = ["indexmap"] }
 tracing = "0.1.37"
 tracing-error = "0.2.0"
 tracing-subscriber = { version = "0.3.16", features = ["env-filter"] }
-typeshare = "1.0.0"
-toml = { version = "0.8.0", features = ["indexmap"] }
-checkr = { path = "./checkr" }
-checko = { path = "./checko" }
 
 [profile.test]
 opt-level = 1
@@ -42,18 +79,23 @@ pre-release-hook = ["just", "release-hook"]
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.2.0"
-# CI backends to support (see 'cargo dist generate-ci')
+cargo-dist-version = "0.10.0"
+# CI backends to support
 ci = ["github"]
 # The installers to generate for each app
 installers = ["shell", "powershell"]
 # Target platforms to build apps for (Rust target-triple syntax)
 targets = [
-    "x86_64-unknown-linux-gnu",
-    "x86_64-apple-darwin",
-    "x86_64-pc-windows-msvc",
     "aarch64-apple-darwin",
+    "x86_64-apple-darwin",
+    "x86_64-unknown-linux-gnu",
+    "x86_64-pc-windows-msvc",
 ]
+# Publish jobs to run in CI
+pr-run-mode = "plan"
+
+[workspace.metadata.dist.dependencies]
+just = "*"
 
 # The profile that 'cargo dist' will build with
 [profile.dist]

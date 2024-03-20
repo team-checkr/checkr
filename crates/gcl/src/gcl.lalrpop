@@ -1,0 +1,124 @@
+use std::str::FromStr;
+use crate::{ast::*, pg::Action};
+
+grammar;
+
+extern {
+    type Error = crate::parse::CustomError;
+}
+
+match {
+    // Skip whitespace and comments
+    r"\s*" => { },
+    r"//[^\n\r]*[\n\r]*" => { }, // `// comment`
+    r"/\*([^\*]*\*+[^\*/])*([^\*]*\*+|[^\*])*\*/" => { }, // `/* comment */`
+    _
+}
+
+Sep<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T?> => match e {
+        None => v,
+        Some(e) => {
+            v.push(e);
+            v
+        }
+    }
+};
+SepNonEmpty<T, S>: Vec<T> = {
+    <mut v:(<T> S)*> <e:T> => {
+        v.push(e);
+        v
+    }
+};
+
+#[inline]
+Target: Target<Box<AExpr>> = {
+    Variable => Target::Variable(<>),
+    <arr:Array> "[" <idx:AExpr> "]" => Target::Array(arr, Box::new(idx)),
+}
+#[inline]
+Variable: Variable = Var => Variable(<>);
+#[inline]
+Array: Array = Var => Array(<>);
+
+pub BExpr: BExpr = {
+    #[precedence(level="0")]
+    <l:AExpr_> <op:RelOp> <r:AExpr_> => BExpr::Rel(l, op, r),
+    "true" => BExpr::Bool(true),
+    "false" => BExpr::Bool(false),
+    "!" <BExpr> => BExpr::Not(Box::new(<>)),
+    "(" <BExpr_> ")",
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <l:BExpr> "&" <r:BExpr> => BExpr::logic(l, LogicOp::Land, r),
+    <l:BExpr> "&&" <r:BExpr> => BExpr::logic(l, LogicOp::And, r),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:BExpr> "|" <r:BExpr> => BExpr::logic(l, LogicOp::Lor, r),
+    <l:BExpr> "||" <r:BExpr> => BExpr::logic(l, LogicOp::Or, r),
+};
+BExpr_: BExpr = BExpr;
+
+RelOp: RelOp = {
+    "<" => RelOp::Lt,
+    ">" => RelOp::Gt,
+    "<=" => RelOp::Le,
+    ">=" => RelOp::Ge,
+    "=" => RelOp::Eq,
+    "!=" => RelOp::Ne,
+};
+
+Var: String = r"[a-zA-Z][_a-zA-Z0-9]*" => <>.to_string();
+
+Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| lalrpop_util::ParseError::User {
+    error: crate::parse::CustomError::IntegerTooLarge { from, to },
+});
+
+// Graph
+
+pub Action: Action = {
+    <Target> ":=" <AExpr> => Action::Assignment(<>),
+    "skip" => Action::Skip,
+    BExpr => Action::Condition(<>),
+};
+
+// Security lattice
+
+pub SecurityLattice: Vec<Flow<SecurityClass>> = Sep<SecurityLatticeFlow, ",">;
+SecurityLatticeFlow: Flow<SecurityClass> = <from:SecurityClass> "<" <into:SecurityClass> => Flow { <> };
+SecurityClass: SecurityClass = Var => SecurityClass(<>);
+
+pub Commands: Commands = SepNonEmpty<Command, ";"> => Commands(<>);
+
+Command: Command = {
+    <Target> ":=" <AExpr>   => Command::Assignment(<>),
+    "if" <Guards> "fi"      => Command::If(<>),
+    "do" <Guards> "od"      => Command::Loop(<>),
+    "skip"                  => Command::Skip,
+};
+
+Guards: Vec<Guard> = Sep<Guard, "[]">;
+
+Guard: Guard = {
+    <BExpr> "->" <Commands> => Guard(<>),
+};
+
+AExpr_ = AExpr;
+pub AExpr: AExpr = {
+    #[precedence(level="1")]
+    Int => AExpr::Number(<>),
+    Target => AExpr::Reference(<>),
+    "-" <AExpr> => AExpr::Minus(Box::new(<>)),
+    "(" <AExpr_> ")",
+
+    #[precedence(level="2")] #[assoc(side="right")]
+    <l:AExpr> "^" <r:AExpr> => AExpr::binary(l, AOp::Pow, r),
+
+    #[precedence(level="3")] #[assoc(side="left")]
+    <l:AExpr> "*" <r:AExpr> => AExpr::binary(l, AOp::Times, r),
+    <l:AExpr> "/" <r:AExpr> => AExpr::binary(l, AOp::Divide, r),
+
+    #[precedence(level="4")] #[assoc(side="left")]
+    <l:AExpr> "+" <r:AExpr> => AExpr::binary(l, AOp::Plus, r),
+    <l:AExpr> "-" <r:AExpr> => AExpr::binary(l, AOp::Minus, r),
+};

@@ -1,3 +1,4 @@
 /target
-/gcmd
 .docker-cache/
+inspectify-binaries/
+.env

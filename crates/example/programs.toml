@@ -1,0 +1,170 @@
+[deadlines.Parser]
+time = 2024-03-01T01:00:00Z
+
+[deadlines.Compiler]
+time = 2024-03-12T01:00:00Z
+
+[deadlines.Interpreter]
+time = 2024-03-19T01:00:00Z
+
+[[envs.Parser]]
+seed = 125234
+shown = true
+
+[[envs.Parser]]
+seed = 1252341
+shown = true
+
+[[envs.Compiler]]
+seed = 125234
+shown = true
+
+[[envs.Compiler]]
+input = '''
+{"commands":"x := y ; y := -x","determinism":"NonDeterministic"}
+'''
+
+[[envs.Compiler]]
+seed = 1252341
+shown = true
+
+[[envs.Compiler]]
+seed = 1252342
+shown = true
+
+[[envs.Compiler]]
+seed = 1252343
+shown = true
+
+[[envs.Compiler]]
+seed = 1252344
+shown = true
+
+[[envs.Compiler]]
+seed = 1252345
+shown = true
+
+[[envs.Compiler]]
+seed = 1252346
+shown = true
+
+[[envs.Compiler]]
+seed = 1252347
+shown = true
+
+[[envs.Compiler]]
+seed = 12523481
+shown = true
+
+[[envs.Compiler]]
+seed = 12523482
+shown = true
+
+[[envs.Compiler]]
+seed = 12523483
+shown = true
+
+[[envs.Compiler]]
+seed = 12523484
+shown = true
+
+[[envs.Compiler]]
+seed = 12523485
+shown = true
+
+[[envs.Compiler]]
+seed = 12523486
+shown = true
+
+[[envs.Compiler]]
+seed = 12523487
+shown = true
+
+[[envs.Compiler]]
+seed = 12523488
+shown = true
+
+[[envs.Compiler]]
+seed = 12523489
+shown = true
+
+[[envs.Compiler]]
+seed = 125234810
+shown = true
+
+[[envs.Sign]]
+seed = 1252341
+shown = true
+
+[[envs.Sign]]
+seed = 1252342
+shown = true
+
+[[envs.Sign]]
+seed = 1252343
+shown = true
+
+[[envs.Sign]]
+seed = 1252344
+shown = true
+
+[[envs.Sign]]
+seed = 1252345
+shown = true
+
+[[envs.Sign]]
+seed = 1252346
+shown = true
+
+[[envs.Sign]]
+seed = 1252347
+shown = true
+
+[[envs.Sign]]
+seed = 12523481
+shown = true
+
+[[envs.Sign]]
+seed = 12523482
+shown = true
+
+[[envs.Sign]]
+seed = 12523483
+shown = true
+
+[[envs.Sign]]
+seed = 12523484
+shown = true
+
+[[envs.Sign]]
+seed = 12523485
+shown = true
+
+[[envs.Sign]]
+seed = 12523486
+shown = true
+
+[[envs.Sign]]
+seed = 12523487
+shown = true
+
+[[envs.Sign]]
+seed = 12523488
+shown = true
+
+[[envs.Sign]]
+seed = 12523489
+shown = true
+
+[[envs.Sign]]
+seed = 125234810
+shown = true
+
+# [[envs.Interpreter]]
+# seed = 12353
+# src = '''
+# x := y ; y := -x
+# '''
+# input = '''
+#     {"assignment":{"arrays":{},"variables":{"x":-1,"y":-8}},"determinism":{"Case":"Deterministic"},"trace_length":11}
+# '''
