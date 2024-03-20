@@ -141,7 +141,7 @@ async fn run() -> color_eyre::Result<()> {
 
 pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoResponse {
     #[derive(rust_embed::RustEmbed)]
-    #[folder = "./app/build/"]
+    #[folder = "../../apps/inspectify/build/"]
     struct Frontend;
 
     if uri.path() == "/" {
