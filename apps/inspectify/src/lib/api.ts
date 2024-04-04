@@ -224,28 +224,28 @@ export namespace ce_shell {
     | { "analysis": "Parser", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } }
     | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } }
     | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } }
-    | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } }
-    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": SecurityAnalysis.Meta } };
+    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": SecurityAnalysis.Meta } }
+    | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
   export type Analysis =
     | "Calculator"
     | "Parser"
     | "Compiler"
     | "Interpreter"
-    | "Sign"
-    | "Security";
-  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "Sign", "Security"];
+    | "Security"
+    | "Sign";
+  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "Security", "Sign"];
   export namespace io {
     export type Input = {
       "analysis": ce_shell.Analysis,
       "json": any,
       "hash": ce_shell.io.Hash
     };
+    export type Hash = {
+      "bytes": number[]
+    };
     export type Meta = {
       "analysis": ce_shell.Analysis,
       "json": any
-    };
-    export type Hash = {
-      "bytes": number[]
     };
     export type Output = {
       "analysis": ce_shell.Analysis,
@@ -336,14 +336,14 @@ export namespace inspectify {
     }
   }
   export namespace endpoints {
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type ReferenceExecution = {
       "meta": ce_shell.io.Meta,
       "output": (ce_shell.io.Output | null),
       "error": (string | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
     };

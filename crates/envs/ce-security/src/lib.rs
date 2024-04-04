@@ -133,8 +133,34 @@ impl Generate for Input {
     fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         let commands = Commands::gen(&mut Default::default(), rng);
 
+        let lattice_options = [
+            // public < private
+            vec![flow("public", "private")],
+            // unclassified < classified, classified < secret, secret < top_secret
+            vec![
+                flow("unclassified", "classified"),
+                flow("classified", "secret"),
+                flow("secret", "top_secret"),
+            ],
+            // trusted < dubious
+            vec![flow("trusted", "dubious")],
+            // known_facts < conjecture, conjecture < alternative_facts
+            vec![
+                flow("known_facts", "conjecture"),
+                flow("conjecture", "alternative_facts"),
+            ],
+            // low < high
+            vec![flow("low", "high")],
+            // clean < Facebook, clean < Google, clean < Microsoft
+            vec![
+                flow("clean", "Facebook"),
+                flow("clean", "Google"),
+                flow("clean", "Microsoft"),
+            ],
+        ];
+
         let lattice = SecurityLatticeInput {
-            rules: vec![flow("public".to_string(), "private".to_string())],
+            rules: lattice_options.choose(rng).unwrap().clone(),
         };
         let classes = lattice
             .rules

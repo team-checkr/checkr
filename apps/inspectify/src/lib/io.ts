@@ -50,7 +50,12 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         await new Promise((resolve) => setTimeout(resolve, 200));
         if (stop) return;
 
-        const analysisRequest = api.analysis({ analysis, json: $input });
+        const analysisRequest = api.analysis({
+          analysis,
+          json: $input,
+          // TODO: we should avoid this somehow
+          hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+        });
 
         cancel = () => {
           analysisRequest.abort();
@@ -159,7 +164,12 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
     ([$input], set) => {
       if (!browser) return;
 
-      const analysisRequest = api.reference({ analysis, json: $input });
+      const analysisRequest = api.reference({
+        analysis,
+        json: $input,
+        // TODO: we should avoid this somehow
+        hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
+      });
 
       analysisRequest.data.then(({ output, error, meta }) => {
         set({
