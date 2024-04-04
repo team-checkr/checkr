@@ -165,6 +165,8 @@ impl Command {
                     }
                 }
 
+                new.assertions.extend(acc.assertions);
+
                 acc = new;
             }
         }
