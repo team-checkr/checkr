@@ -1,17 +1,74 @@
 <script lang="ts">
+  import { browser } from '$app/environment';
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
   import { useIo } from '$lib/io';
+  import type { SecurityAnalysis } from '$lib/api';
 
   import ShieldExclamation from '~icons/heroicons/shield-exclamation';
   import LockClosed from '~icons/heroicons/lock-closed';
+  import InputOptions from '$lib/components/InputOptions.svelte';
+  import InputOption from '$lib/components/InputOption.svelte';
+  import ParsedInput from '../Interpreter/ParsedInput.svelte';
 
   const io = useIo('Security', { commands: 'skip', classification: {}, lattice: { rules: [] } });
+  const { input, meta } = io;
+  $: targets = $meta?.targets ?? [];
+  $: classes =
+    $meta?.lattice.allowed
+      .flatMap((a) => [a.from, a.into])
+      .filter((v, i, a) => a.indexOf(v) === i) ?? [];
+
+  const stringify = (l: SecurityAnalysis.SecurityLatticeInput): string =>
+    l.rules.map((a) => `${a.from} < ${a.into}`).join(', ');
+  const parse = (s: string): SecurityAnalysis.SecurityLatticeInput | undefined => {
+    const rules = s.split(',').map((r) => {
+      const [from, into] = r.split(' < ');
+      return { from: from?.trim(), into: into?.trim() };
+    });
+    if (rules.find((r) => !r.from || !r.into)) return void 0;
+    return { rules };
+  };
+
+  $: if (browser && classes.length > 0) {
+    for (const v of targets) {
+      if (!classes.includes($input.classification[v.name])) {
+        $input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
+      }
+    }
+  }
 </script>
 
 <Env {io}>
   <svelte:fragment slot="input">
-    <StandardInput analysis="Security" code="commands" {io} />
+    <StandardInput analysis="Security" code="commands" {io}>
+      <InputOptions title="Security Lattice">
+        <InputOption title="Lattice">
+          <div class="[&>input]:text-xs">
+            <ParsedInput type="who knows" bind:value={$input.lattice} {stringify} {parse} />
+          </div>
+        </InputOption>
+      </InputOptions>
+      <InputOptions title="Classification for Variables and Arrays">
+        <div class="col-span-full grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
+          {#each targets.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
+            <div class="px-4 py-0.5 font-mono text-sm">
+              {v.name}
+            </div>
+            <div class="w-full font-mono">
+              <select
+                class="w-full rounded border bg-transparent p-1"
+                bind:value={$input.classification[v.name]}
+              >
+                {#each classes as c, index}
+                  <option value={c} selected={index == 0}>{c}</option>
+                {/each}
+              </select>
+            </div>
+          {/each}
+        </div>
+      </InputOptions>
+    </StandardInput>
   </svelte:fragment>
   <svelte:fragment slot="output" let:output>
     <div>
