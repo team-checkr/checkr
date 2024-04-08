@@ -25,21 +25,18 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
                 continue;
             }
 
-            if let Some(end_idx) =
-                right[1..].find(|c: char| !(c.is_ascii_digit() || c == '[' || c == ';'))
-            {
-                for value in right[1..end_idx + 1].split(';') {
-                    spans.push(Span {
-                        text: "".to_string(),
-                        code: Some(Code::from_str(value)),
-                        fg: None,
-                        bg: None,
-                    });
-                }
-                s = &right[end_idx + 2..];
-            } else {
-                todo!()
+            let end_idx = right[1..]
+                .find(|c: char| !(c.is_ascii_digit() || c == '[' || c == ';'))
+                .unwrap_or(right[1..].len());
+            for value in right[1..end_idx + 1].split(';') {
+                spans.push(Span {
+                    text: "".to_string(),
+                    code: Some(Code::from_str(value)),
+                    fg: None,
+                    bg: None,
+                });
             }
+            s = &right[(end_idx + 2).min(right.len())..];
         } else {
             spans.push(Span {
                 text: s.to_string(),
@@ -73,7 +70,7 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
                 (Code::SetColor(ty), _) => {
                     state = State::SawSet(ty, false);
                 }
-                (Code::Unknown(5), State::SawSet(ty, false)) => {
+                (Code::Unknown(Some(5)), State::SawSet(ty, false)) => {
                     state = State::SawSet(ty, true);
                 }
                 (_, State::SawSet(ty, true)) => {
@@ -97,7 +94,10 @@ pub fn parse_ansi(mut s: &str) -> Vec<Span> {
                         BrightCyan,
                         BrightWhite,
                     ];
-                    let Some(color) = colors.get(code.value() as usize + 1) else {
+                    let Some(color) = code
+                        .value()
+                        .and_then(|value| colors.get(value as usize + 1))
+                    else {
                         continue;
                     };
 
@@ -139,7 +139,7 @@ pub enum Code {
     SetColor(ColorType),
     NoColor(ColorType),
     Color(Color, ColorType),
-    Unknown(u8),
+    Unknown(Option<u8>),
 }
 
 #[derive(tapi::Tapi, Debug, Clone, Copy, PartialEq, serde::Serialize)]
@@ -172,15 +172,15 @@ macro_rules! impl_codes {
 
                 match s {
                     $(stringify!($l) => $($expr)*,)*
-                    value => return Code::Unknown(value.parse().unwrap()),
+                    value => return Code::Unknown(value.parse().ok()),
                 }
             }
-            pub fn value(self) -> u8 {
+            pub fn value(self) -> Option<u8> {
                 use Color::*;
                 use ColorType::*;
 
                 match self {
-                    $($($expr)* => $l,)*
+                    $($($expr)* => Some($l),)*
                     Code::Unknown(value) => value,
                 }
             }
