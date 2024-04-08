@@ -32,9 +32,18 @@
 
   $: if (browser && classes.length > 0) {
     for (const v of targets) {
-      if (!classes.includes($input.classification[v.name])) {
+      if (!(v.name in $input.classification) || !classes.includes($input.classification[v.name])) {
         $input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
       }
+    }
+    const toDelete: string[] = [];
+    for (const v of Object.keys($input.classification)) {
+      if (!targets.find((t) => t.name === v)) {
+        toDelete.push(v);
+      }
+    }
+    for (const v of toDelete) {
+      delete $input.classification[v];
     }
   }
 </script>
