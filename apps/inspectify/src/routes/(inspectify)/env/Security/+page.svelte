@@ -70,7 +70,7 @@
                 bind:value={$input.classification[v.name]}
               >
                 {#each classes as c, index}
-                  <option value={c} selected={index == 0}>{c}</option>
+                  <option value={c} selected={index == 0} class="bg-slate-700">{c}</option>
                 {/each}
               </select>
             </div>
