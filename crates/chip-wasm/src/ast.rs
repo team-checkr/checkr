@@ -1,3 +1,4 @@
+use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 
 use crate::parse::SourceSpan;
@@ -27,30 +28,33 @@ pub struct Variable(pub String);
 #[serde(transparent)]
 pub struct Array(pub String);
 
-#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Commands(pub Vec<Command>);
+pub type AGCLCommands = Commands<PredicateChain, PredicateBlock>;
+pub type AGCLCommand = Command<PredicateChain, PredicateBlock>;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Command {
-    pub kind: CommandKind,
+pub struct Commands<Pred, Inv>(pub Vec<Command<Pred, Inv>>);
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Command<Pred, Inv> {
+    pub kind: CommandKind<Pred, Inv>,
     pub span: SourceSpan,
-    pub pre_predicates: Vec<PredicateBlock>,
-    pub post_predicates: Vec<PredicateBlock>,
+    pub pre: Pred,
+    pub post: Pred,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum CommandKind {
+pub enum CommandKind<Pred, Inv> {
     Assignment(Target<Box<AExpr>>, AExpr),
     Skip,
-    If(Vec<Guard>),
-    Loop(PredicateBlock, Vec<Guard>),
+    If(Vec<Guard<Pred, Inv>>),
+    Loop(Inv, Vec<Guard<Pred, Inv>>),
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub struct Guard {
+pub struct Guard<Pred, Inv> {
     pub guard_span: SourceSpan,
     pub guard: BExpr,
-    pub cmds: Commands,
+    pub cmds: Commands<Pred, Inv>,
 }
 
 pub type Int = i32;
@@ -93,6 +97,11 @@ pub enum BExpr {
 pub type Predicate = BExpr;
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct PredicateChain {
+    pub predicates: Vec<PredicateBlock>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct PredicateBlock {
     pub predicate: Predicate,
     pub span: SourceSpan,
@@ -122,4 +131,24 @@ pub enum LogicOp {
     Lor,
     /// **Enriched**
     Implies,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum LTLFormula {
+    Bool(bool),
+    Rel(AExpr, RelOp, AExpr),
+    Not(Box<LTLFormula>),
+    And(Box<LTLFormula>, Box<LTLFormula>),
+    Or(Box<LTLFormula>, Box<LTLFormula>),
+    Implies(Box<LTLFormula>, Box<LTLFormula>),
+    Until(Box<LTLFormula>, Box<LTLFormula>),
+    Next(Box<LTLFormula>),
+    Globally(Box<LTLFormula>),
+    Finally(Box<LTLFormula>),
+}
+
+pub struct LTLProgram {
+    pub initial: IndexMap<Variable, i32>,
+    pub commands: Vec<Commands<(), ()>>,
+    pub ltl: LTLFormula,
 }

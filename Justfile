@@ -4,6 +4,10 @@ app app:
     just build-wasm
     cd apps/{{app}} && (npm install && npm run dev)
 
+app-build app:
+    just build-wasm
+    cd apps/{{app}} && (npm install && npm run build)
+
 build-wasm:
     cd crates/chip-wasm && just build
 

@@ -2,7 +2,7 @@ use miette::Diagnostic;
 use once_cell::sync::Lazy;
 use thiserror::Error;
 
-use crate::ast::Commands;
+use crate::ast::{AGCLCommands, LTLProgram};
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct SourceSpan {
@@ -62,8 +62,15 @@ impl From<(usize, usize)> for SourceSpan {
     }
 }
 
-pub fn parse_program(src: &str) -> Result<Commands, ParseError> {
-    static PARSER: Lazy<crate::agcl::CommandsParser> = Lazy::new(crate::agcl::CommandsParser::new);
+pub fn parse_agcl_program(src: &str) -> Result<AGCLCommands, ParseError> {
+    static PARSER: Lazy<crate::agcl::AGCLCommandsParser> =
+        Lazy::new(crate::agcl::AGCLCommandsParser::new);
+
+    PARSER.parse(src).map_err(|e| ParseError::new(src, e))
+}
+pub fn parse_ltl_program(src: &str) -> Result<LTLProgram, ParseError> {
+    static PARSER: Lazy<crate::agcl::LTLProgramParser> =
+        Lazy::new(crate::agcl::LTLProgramParser::new);
 
     PARSER.parse(src).map_err(|e| ParseError::new(src, e))
 }

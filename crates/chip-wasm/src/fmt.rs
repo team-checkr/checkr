@@ -4,7 +4,7 @@ use itertools::Itertools;
 
 use crate::ast::{
     AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, LogicOp,
-    PredicateBlock, Quantifier, RelOp, Target, Variable,
+    PredicateBlock, PredicateChain, Quantifier, RelOp, Target, Variable,
 };
 
 impl Display for Variable {
@@ -35,15 +35,15 @@ impl std::fmt::Display for Target<()> {
     }
 }
 
-impl Display for Command {
+impl<Prev: Display, Inv: Display> Display for Command<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        let pres = self.pre_predicates.iter().format("\n");
-        let posts = self.post_predicates.iter().format("\n");
+        let pres = &self.pre;
+        let posts = &self.post;
         write!(f, "{pres}\n{}\n{posts}", self.kind)
     }
 }
 
-impl Display for CommandKind {
+impl<Prev: Display, Inv: Display> Display for CommandKind<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             CommandKind::Assignment(target, expr) => write!(f, "{target} := {expr}"),
@@ -56,13 +56,13 @@ impl Display for CommandKind {
     }
 }
 
-impl Display for Commands {
+impl<Prev: Display, Inv: Display> Display for Commands<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.iter().format(" ;\n"))
     }
 }
 
-impl Display for Guard {
+impl<Prev: Display, Inv: Display> Display for Guard<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(
             f,
@@ -74,6 +74,12 @@ impl Display for Guard {
                 .map(|l| format!("   {l}"))
                 .format("\n")
         )
+    }
+}
+
+impl Display for PredicateChain {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        write!(f, "{}", self.predicates.iter().format("\n"))
     }
 }
 

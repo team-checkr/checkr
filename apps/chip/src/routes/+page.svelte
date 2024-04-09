@@ -3,22 +3,13 @@
   import { browser } from '$app/environment';
   import Editor from '$lib/components/Editor.svelte';
   import type { MarkerData, MarkerSeverity, ParseResult } from 'chip-wasm';
+  import Nav from '$lib/components/Nav.svelte';
 
-  let program = `// {a=A}
-// if a > 0 -> a := a + 1
-// [] a = 0 -> a := 1
-// [] a < 0 -> a := a {a>A}
-// fi
-// {a>A} ;
-
-{n >= 0}
-i := 0 ; sum := 0 ;
-do[i <= n & sum = i * (i-1)/2]
-  i < n ->
-    sum := sum + i ;
-    i := i + 1
-od
-{sum = n * (n-1)/2}`;
+  let program = `{ true }
+if
+  false -> skip
+fi
+{ true }`;
 
   let result = writable<ParseResult>({
     parse_error: false,
@@ -102,6 +93,8 @@ od
   <title>Chip</title>
   <meta name="description" content="Chip" />
 </svelte:head>
+
+<Nav title="Chip" />
 
 <div class="relative grid grid-rows-[2fr_auto_auto] overflow-hidden bg-slate-800">
   <Editor bind:value={program} markers={[...$result.markers, ...$verifications]} />

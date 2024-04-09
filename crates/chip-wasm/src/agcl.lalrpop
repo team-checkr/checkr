@@ -1,4 +1,5 @@
 use std::str::FromStr;
+use indexmap::IndexMap;
 use crate::ast::*;
 
 grammar;
@@ -81,29 +82,50 @@ Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| 
 
 // Predicates
 
-pub Commands: Commands = SepNonEmpty<Command, ";"> => Commands(<>);
-
-Command: Command = {
-    <pre_predicates:PredicateBlock*> <kind:CommandKind> <post_predicates:PredicateBlock*> =>
+pub AGCLCommands: Commands<PredicateChain, PredicateBlock> = SepNonEmpty<AGCLCommand, ";"> => Commands(<>);
+AGCLCommand: Command<PredicateChain, PredicateBlock> = {
+    <pre:PredicateChain> <kind:AGCLCommandKind> <post:PredicateChain> =>
         Command {
-            pre_predicates,
+            pre,
             kind,
-            post_predicates,
+            post,
             span: (0, 0).into(),
         }
 };
-
-CommandKind: CommandKind = {
+AGCLCommandKind: CommandKind<PredicateChain, PredicateBlock> = {
     <Target> ":=" <AExpr>                       => CommandKind::Assignment(<>),
     "skip"                                      => CommandKind::Skip,
-    "if" <Guards> "fi"                          => CommandKind::If(<>),
-    "do" <PredicateInv> <Guards> "od" => CommandKind::Loop(<>),
+    "if" <AGCLGuards> "fi"                          => CommandKind::If(<>),
+    "do" <PredicateInv> <AGCLGuards> "od" => CommandKind::Loop(<>),
+};
+AGCLGuards: Vec<Guard<PredicateChain, PredicateBlock>> = SepNonEmpty<AGCLGuard, "[]">;
+AGCLGuard: Guard<PredicateChain, PredicateBlock> = {
+    <l:@L> <guard:BExpr> <r:@R> "->" <cmds:AGCLCommands> => Guard { guard, cmds, guard_span: (l, r - l).into() },
 };
 
-Guards: Vec<Guard> = SepNonEmpty<Guard, "[]">;
+LTLCommands: Commands<(), ()> = SepNonEmpty<LTLCommand, ";"> => Commands(<>);
+LTLCommand: Command<(), ()> = {
+    <kind:LTLCommandKind> =>
+        Command {
+            pre: (),
+            kind,
+            post: (),
+            span: (0, 0).into(),
+        }
+};
+LTLCommandKind: CommandKind<(), ()> = {
+    <Target> ":=" <AExpr>                       => CommandKind::Assignment(<>),
+    "skip"                                      => CommandKind::Skip,
+    "if" <LTLGuards> "fi"                          => CommandKind::If(<>),
+    "do" <LTLGuards> "od" => CommandKind::Loop((), <>),
+};
+LTLGuards: Vec<Guard<(), ()>> = SepNonEmpty<LTLGuard, "[]">;
+LTLGuard: Guard<(), ()> = {
+    <l:@L> <guard:BExpr> <r:@R> "->" <cmds:LTLCommands> => Guard { guard, cmds, guard_span: (l, r - l).into() },
+};
 
-Guard: Guard = {
-    <l:@L> <guard:BExpr> <r:@R> "->" <cmds:Commands> => Guard { guard, cmds, guard_span: (l, r - l).into() },
+PredicateChain: PredicateChain = {
+    <predicates:PredicateBlock*> => PredicateChain { <> }
 };
 
 PredicateBlock: PredicateBlock = {
@@ -165,3 +187,55 @@ pub AExpr: AExpr = {
     <l:AExpr> "-" <r:AExpr> => AExpr::binary(l, AOp::Minus, r),
 };
 AExprBox: Box<AExpr> = AExpr => Box::new(<>);
+
+// Formats
+
+pub LTLProgram: LTLProgram = {
+    <initial:LTLInitialAssign>
+    <commands:LTLCommands>
+    "{" <ltl:LTLFormula> "}" => LTLProgram {
+        initial,
+        commands: vec![commands],
+        ltl,
+    },
+
+    <initial:LTLInitialAssign>
+    "par"
+    <commands:SepNonEmpty<LTLCommands, "[]">>
+    "rap"
+    "{" <ltl:LTLFormula> "}" => LTLProgram { <> },
+};
+
+LTLInitialAssign: IndexMap<Variable, Int> = {
+    "{" <vars:Sep<LTLVariableAssignment, ",">> "}" => vars.into_iter().collect()
+};
+
+LTLVariableAssignment: (Variable, Int) = {
+    <var:Var> ":=" <val:Int> => (Variable(var), val),
+};
+
+// LTL Formula with precedence
+LTLFormula_ = LTLFormula;
+LTLFormula: LTLFormula = {
+    #[precedence(level="0")]
+    <l:AExpr_> <op:RelOp> <r:AExpr_> => LTLFormula::Rel(l, op, r),
+    "true" => LTLFormula::Bool(true),
+    "false" => LTLFormula::Bool(false),
+    "!" <LTLFormula> => LTLFormula::Not(Box::new(<>)),
+    "(" <LTLFormula_> ")",
+
+    #[precedence(level="1")] #[assoc(side="left")]
+    <l:LTLFormula> "&" <r:LTLFormula> => LTLFormula::And(Box::new(l), Box::new(r)),
+
+    #[precedence(level="2")] #[assoc(side="left")]
+    <l:LTLFormula> "|" <r:LTLFormula> => LTLFormula::Or(Box::new(l), Box::new(r)),
+
+    #[precedence(level="3")] #[assoc(side="right")]
+    <l:LTLFormula> "==>" <r:LTLFormula> => LTLFormula::Implies(Box::new(l), Box::new(r)),
+
+    #[precedence(level="6")] #[assoc(side="right")]
+    <l:LTLFormula> "U" <r:LTLFormula> => LTLFormula::Until(Box::new(l), Box::new(r)),
+    "X" <LTLFormula> => LTLFormula::Next(Box::new(<>)),
+    "G" <LTLFormula> => LTLFormula::Globally(Box::new(<>)),
+    "F" <LTLFormula> => LTLFormula::Finally(Box::new(<>)),
+};
