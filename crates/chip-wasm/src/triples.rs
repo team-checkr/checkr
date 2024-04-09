@@ -3,7 +3,8 @@ use std::collections::BTreeSet;
 use itertools::Itertools;
 
 use crate::{
-    ast::{Command, CommandKind, Commands, Predicate},
+    ast::{AGCLCommand, AGCLCommands, CommandKind, Predicate},
+    ast_ext::FreeVariables,
     parse::SourceSpan,
 };
 
@@ -26,7 +27,7 @@ pub struct Accumulator {
     predicate_spans: BTreeSet<(Predicate, Source)>,
 }
 
-impl Commands {
+impl AGCLCommands {
     pub fn assertions(&self) -> BTreeSet<Assertion> {
         self.tri(Accumulator::default()).assertions
     }
@@ -39,21 +40,21 @@ impl Commands {
     }
 
     pub fn is_fully_annotated(&self) -> bool {
-        let before = self.0.first().is_some_and(|x| !x.pre_predicates.is_empty());
-        let after = self.0.last().is_some_and(|x| !x.post_predicates.is_empty());
+        let before = self.0.first().is_some_and(|x| !x.pre.predicates.is_empty());
+        let after = self.0.last().is_some_and(|x| !x.post.predicates.is_empty());
         let in_between = self
             .0
             .iter()
             .tuple_windows()
-            .all(|(a, b)| !a.post_predicates.is_empty() || !b.pre_predicates.is_empty());
+            .all(|(a, b)| !a.post.predicates.is_empty() || !b.pre.predicates.is_empty());
         let inside = self.0.iter().all(|c| c.is_fully_annotated());
         before && after && in_between && inside
     }
 }
 
-impl Command {
+impl AGCLCommand {
     fn tri(&self, mut acc: Accumulator) -> Accumulator {
-        for p in self.post_predicates.iter().rev() {
+        for p in self.post.predicates.iter().rev() {
             for (old_p, old_src) in acc.predicate_spans {
                 acc.assertions.insert(Assertion {
                     predicate: p.predicate.clone().implies(old_p),
@@ -171,7 +172,7 @@ impl Command {
             }
         }
 
-        for p in self.pre_predicates.iter().rev() {
+        for p in self.pre.predicates.iter().rev() {
             for (old_p, old_src) in acc.predicate_spans {
                 acc.assertions.insert(Assertion {
                     predicate: p.predicate.clone().implies(old_p),

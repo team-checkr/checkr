@@ -4,8 +4,8 @@ use indexmap::IndexSet;
 use itertools::Either;
 
 use crate::ast::{
-    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, LogicOp, RelOp,
-    Target, TargetDef, TargetKind, Variable,
+    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, LTLFormula, LogicOp,
+    PredicateBlock, PredicateChain, Target, TargetDef, TargetKind, Variable,
 };
 
 impl Target<()> {
@@ -102,38 +102,61 @@ impl From<Array> for Target<()> {
     }
 }
 
-impl Commands {
-    pub fn fv(&self) -> IndexSet<Target> {
+pub trait FreeVariables {
+    fn fv(&self) -> IndexSet<Target>;
+}
+
+impl FreeVariables for () {
+    fn fv(&self) -> IndexSet<Target> {
+        Default::default()
+    }
+}
+
+impl<T: FreeVariables> FreeVariables for &[T] {
+    fn fv(&self) -> IndexSet<Target> {
+        self.iter().flat_map(|x| x.fv()).collect()
+    }
+}
+
+impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for Commands<Pred, Inv> {
+    fn fv(&self) -> IndexSet<Target> {
         self.0.iter().flat_map(|c| c.fv()).collect()
     }
 }
-impl Command {
+impl<Pred: FreeVariables, Inv: FreeVariables> Command<Pred, Inv> {
     pub fn fv(&self) -> IndexSet<Target> {
-        let a = self.pre_predicates.iter().flat_map(|p| p.predicate.fv());
-        let b = self.post_predicates.iter().flat_map(|p| p.predicate.fv());
-        a.chain(self.kind.fv()).chain(b).collect()
+        let a = self.pre.fv();
+        let b = self.post.fv();
+        itertools::chain!(a, self.kind.fv(), b).collect()
     }
 }
-impl CommandKind {
+impl<Pred: FreeVariables, Inv: FreeVariables> CommandKind<Pred, Inv> {
     pub fn fv(&self) -> IndexSet<Target> {
         match self {
             CommandKind::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
             CommandKind::Skip => IndexSet::default(),
-            CommandKind::If(c) => guards_fv(c),
-            CommandKind::Loop(inv, c) => inv.predicate.fv().union(&guards_fv(c)).cloned().collect(),
+            CommandKind::If(c) => c.as_slice().fv(),
+            CommandKind::Loop(inv, c) => inv.fv().union(&c.as_slice().fv()).cloned().collect(),
         }
     }
 }
-fn guards_fv(guards: &[Guard]) -> IndexSet<Target> {
-    guards.iter().flat_map(|g| g.fv()).collect()
-}
-impl Guard {
-    pub fn fv(&self) -> IndexSet<Target> {
+impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for Guard<Pred, Inv> {
+    fn fv(&self) -> IndexSet<Target> {
         self.guard.fv().union(&self.cmds.fv()).cloned().collect()
     }
 }
-impl Target<Box<AExpr>> {
-    pub fn fv(&self) -> IndexSet<Target> {
+impl FreeVariables for PredicateChain {
+    fn fv(&self) -> IndexSet<Target> {
+        self.predicates.as_slice().fv()
+    }
+}
+impl FreeVariables for PredicateBlock {
+    fn fv(&self) -> IndexSet<Target> {
+        self.predicate.fv()
+    }
+}
+impl FreeVariables for Target<Box<AExpr>> {
+    fn fv(&self) -> IndexSet<Target> {
         match self {
             Target::Variable(v) => [Target::Variable(v.clone())].into_iter().collect(),
             Target::Array(Array(a), idx) => {
@@ -144,11 +167,8 @@ impl Target<Box<AExpr>> {
         }
     }
 }
-impl AExpr {
-    pub fn binary(lhs: Self, op: AOp, rhs: Self) -> Self {
-        Self::Binary(Box::new(lhs), op, Box::new(rhs))
-    }
-    pub fn fv(&self) -> IndexSet<Target> {
+impl FreeVariables for AExpr {
+    fn fv(&self) -> IndexSet<Target> {
         match self {
             AExpr::Number(_) => Default::default(),
             AExpr::Reference(v) => v.fv(),
@@ -156,6 +176,26 @@ impl AExpr {
             AExpr::Minus(x) => x.fv(),
             AExpr::Function(f) => f.fv(),
         }
+    }
+}
+impl FreeVariables for BExpr {
+    fn fv(&self) -> IndexSet<Target> {
+        match self {
+            BExpr::Bool(_) => Default::default(),
+            BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
+            BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
+            BExpr::Not(x) => x.fv(),
+            BExpr::Quantified(_, x, b) => {
+                let mut fv = b.fv();
+                fv.shift_remove(x);
+                fv
+            }
+        }
+    }
+}
+impl AExpr {
+    pub fn binary(lhs: Self, op: AOp, rhs: Self) -> Self {
+        Self::Binary(Box::new(lhs), op, Box::new(rhs))
     }
 }
 impl Function {
@@ -196,19 +236,6 @@ impl BExpr {
     }
     pub fn or(self, rhs: Self) -> Self {
         Self::logic(self, LogicOp::Or, rhs)
-    }
-    pub fn fv(&self) -> IndexSet<Target> {
-        match self {
-            BExpr::Bool(_) => Default::default(),
-            BExpr::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
-            BExpr::Logic(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
-            BExpr::Not(x) => x.fv(),
-            BExpr::Quantified(_, x, b) => {
-                let mut fv = b.fv();
-                fv.shift_remove(x);
-                fv
-            }
-        }
     }
 }
 impl std::ops::Not for BExpr {
@@ -267,6 +294,22 @@ impl Function {
             Function::Exp(a, b) => {
                 Function::Exp(Box::new(a.subst_var(t, x)), Box::new(b.subst_var(t, x)))
             }
+        }
+    }
+}
+
+impl FreeVariables for LTLFormula {
+    fn fv(&self) -> IndexSet<Target> {
+        match self {
+            // Bool(bool), Rel(AExpr, RelOp, AExpr), Not(Box<LTLFormula>), And(Box<LTLFormula>, Box<LTLFormula>), Or(Box<LTLFormula>, Box<LTLFormula>), Implies(Box<LTLFormula>, Box<LTLFormula>), Until(Box<LTLFormula>, Box<LTLFormula>), Next(Box<LTLFormula>), Globally(Box<LTLFormula>), Finally(Box<LTLFormula>),
+            LTLFormula::Bool(_) => Default::default(),
+            LTLFormula::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
+            LTLFormula::Not(x) => x.fv(),
+            LTLFormula::And(l, r) | LTLFormula::Or(l, r) | LTLFormula::Implies(l, r) => {
+                l.fv().union(&r.fv()).cloned().collect()
+            }
+            LTLFormula::Until(l, r) => l.fv().union(&r.fv()).cloned().collect(),
+            LTLFormula::Next(x) | LTLFormula::Globally(x) | LTLFormula::Finally(x) => x.fv(),
         }
     }
 }
