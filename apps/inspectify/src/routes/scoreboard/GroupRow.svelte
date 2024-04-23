@@ -35,7 +35,7 @@
 
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
-        const cellWidth = Math.round(canvas.width / numberOfPrograms);
+        const cellWidth = Math.floor(canvas.width / numberOfPrograms);
         const cellHeight = canvas.height;
 
         const borderColor = config.theme.colors['slate'][800] + '10';
@@ -43,6 +43,7 @@
         const t = Date.now() / 5000;
         let redrawing = false;
         let index = 0;
+        let currentWidthDrawn = 0;
         for (const analysis of group.analysis_results) {
           for (const res of analysis.results) {
             const isWorking =
@@ -58,10 +59,13 @@
               )}`.slice(0, 2);
               ctx.fillStyle += suffix;
             }
-            ctx.fillRect(idx * cellWidth, 0, cellWidth, cellHeight);
+            const expectedWithDrawn = (canvas.width / numberOfPrograms) * idx;
+            const thisCellWidth = currentWidthDrawn < expectedWithDrawn ? cellWidth + 1 : cellWidth;
+            ctx.fillRect(currentWidthDrawn, 0, thisCellWidth, cellHeight);
             // Draw right and top borders
             ctx.fillStyle = borderColor;
-            ctx.fillRect(idx * cellWidth + cellWidth - 1, 0, 1, cellHeight);
+            ctx.fillRect(currentWidthDrawn + thisCellWidth - 1, 0, 1, cellHeight);
+            currentWidthDrawn += thisCellWidth;
           }
         }
         ctx.fillStyle = borderColor;
