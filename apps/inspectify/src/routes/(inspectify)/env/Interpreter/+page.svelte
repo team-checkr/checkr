@@ -9,6 +9,7 @@
   import ParsedInput from './ParsedInput.svelte';
   import InputOptions from '$lib/components/InputOptions.svelte';
   import InputOption from '$lib/components/InputOption.svelte';
+  import DeterminismInput from '$lib/components/DeterminismInput.svelte';
 
   const io = useIo('Interpreter', {
     commands: 'skip',
@@ -59,30 +60,7 @@
             <ParsedInput type="int" bind:value={$input.trace_length} />
           </div>
         </InputOption>
-        <InputOption title="Determinism">
-          <div class="grid w-full grid-cols-2 gap-x-2 font-mono">
-            {#each GCL.DETERMINISM as determinism}
-              <div
-                class="flex items-center justify-center rounded text-sm transition {$input.determinism ==
-                determinism
-                  ? 'bg-slate-500'
-                  : 'bg-slate-800'}"
-              >
-                <label for="determinism-{determinism}" class="cursor-pointer px-2 py-1">
-                  {determinism}
-                </label>
-                <input
-                  class="hidden"
-                  type="radio"
-                  id="determinism-{determinism}"
-                  name="determinism"
-                  value={determinism}
-                  bind:group={$input.determinism}
-                />
-              </div>
-            {/each}
-          </div>
-        </InputOption>
+        <DeterminismInput {input} />
       </InputOptions>
     </StandardInput>
   </svelte:fragment>

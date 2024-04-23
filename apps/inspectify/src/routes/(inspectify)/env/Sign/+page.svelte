@@ -6,6 +6,9 @@
   import StandardInput from '$lib/components/StandardInput.svelte';
   import { useIo } from '$lib/io';
   import { sortNodes, toSubscript } from '$lib/fmt';
+  import InputOptions from '$lib/components/InputOptions.svelte';
+  import DeterminismInput from '$lib/components/DeterminismInput.svelte';
+  import InclusionCheckbox from '$lib/components/InclusionCheckbox.svelte';
 
   const io = useIo('Sign', {
     commands: 'skip',
@@ -42,34 +45,44 @@
 <Env {io}>
   <svelte:fragment slot="input">
     <StandardInput analysis="Sign" code="commands" {io}>
-      <h1 class="border-y p-2 pb-1 text-lg font-bold">Initial sign assignment</h1>
-      <div class="grid grid-cols-[auto_repeat(3,1fr)] place-items-center">
-        {#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
-          <div class="px-4 py-0.5 font-mono text-sm">
-            {v.name}
-          </div>
-          {#each SignAnalysis.SIGN as sign}
-            {#if v.kind == 'Variable'}
-              <div>
-                <label for="{v.name}-{sign}">{fmtSignOrSigns(sign)}</label>
-                <input
-                  type="radio"
-                  name={v.name}
-                  id="{v.name}-{sign}"
-                  value={sign}
-                  bind:group={$input.assignment.variables[v.name]}
-                />
-              </div>
-            {:else if v.kind == 'Array'}
-              <div>
-                {fmtSignOrSigns(sign)}
-              </div>
-            {:else}
-              <div>...</div>
-            {/if}
+      <InputOptions title="Initial sign assignment">
+        <div class="col-span-full grid w-full grid-cols-[auto_repeat(3,1fr)] place-items-center">
+          {#each vars.slice().sort((a, b) => (a.name > b.name ? 1 : -1)) as v}
+            <div class="px-4 py-0.5 font-mono text-sm">
+              {v.name}
+            </div>
+            {#each SignAnalysis.SIGN as sign}
+              {#if v.kind == 'Variable'}
+                <div>
+                  <label for="{v.name}-{sign}">{fmtSignOrSigns(sign)}</label>
+                  <input
+                    type="radio"
+                    name={v.name}
+                    id="{v.name}-{sign}"
+                    value={sign}
+                    bind:group={$input.assignment.variables[v.name]}
+                  />
+                </div>
+              {:else if v.kind == 'Array'}
+                <div>
+                  <label for="{v.name}-{sign}">{fmtSignOrSigns(sign)}</label>
+                  <InclusionCheckbox
+                    name={v.name}
+                    id="{v.name}-{sign}"
+                    value={sign}
+                    bind:array={$input.assignment.arrays[v.name]}
+                  />
+                </div>
+              {:else}
+                <div>...</div>
+              {/if}
+            {/each}
           {/each}
-        {/each}
-      </div>
+        </div>
+      </InputOptions>
+      <InputOptions>
+        <DeterminismInput {input} />
+      </InputOptions>
     </StandardInput>
   </svelte:fragment>
 
