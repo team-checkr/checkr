@@ -4,6 +4,7 @@ members = [
     "crates/ce-core",
     "crates/ce-shell",
     "crates/checkr",
+    "crates/chip",
     "crates/driver",
     "crates/envs/*",
     "crates/gcl",
@@ -44,9 +45,11 @@ futures-util = "0.3.28"
 gcl = { path = "./crates/gcl" }
 indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = "0.12.1"
+lalrpop = "0.20.2"
+lalrpop-util = { version = "0.20.2", features = ["lexer"] }
 lz4_flex = "0.11.2"
 md5 = "0.7.0"
-miette = { version = "5.10.0", features = ["fancy"] }
+miette = { version = "7.2.0", features = ["fancy-no-syscall"] }
 mcltl = { path = "./crates/mcltl-rs" }
 once_cell = "1.19.0"
 petgraph = { version = "0.6.3" }

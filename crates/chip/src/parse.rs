@@ -129,7 +129,7 @@ pub enum ParseError {
     },
 }
 
-pub(crate) enum CustomError {
+pub enum CustomError {
     IntegerTooLarge { from: usize, to: usize },
 }
 
