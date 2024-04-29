@@ -11,10 +11,15 @@ mod triples;
 
 use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
 
-use ast::BExpr;
+use ast::{BExpr, Locator};
 use itertools::Itertools;
-use mcltl::state::State as _;
+use mcltl::{
+    buchi::{Alphabet, AtomicProperty, ProductBuchi},
+    ltl::expression::Literal,
+    state::State as _,
+};
 use miette::Diagnostic;
+use parse::SourceSpan;
 use serde::Serialize;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
@@ -152,6 +157,9 @@ struct RelatedInformation {
 }
 
 impl MonacoSpan {
+    fn from_source_span(src: &str, span: SourceSpan) -> MonacoSpan {
+        Self::from_offset_len(src, span.offset(), span.len())
+    }
     fn from_offset_len(src: &str, offset: usize, length: usize) -> MonacoSpan {
         let start = Position::from_byte_offset(src, offset);
         let end = Position::from_byte_offset(src, offset + length);
@@ -220,7 +228,6 @@ pub fn parse(src: &str) -> ParseResult {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum State {
     Initial,
-    Fresh(usize),
     Real(interpreter::State),
 }
 
@@ -229,14 +236,9 @@ impl mcltl::state::State for State {
         State::Initial
     }
 
-    fn new_name() -> Self {
-        State::Fresh(<usize as mcltl::state::State>::new_name())
-    }
-
     fn name(&self) -> String {
         match self {
             State::Initial => "INIT".to_string(),
-            State::Fresh(n) => format!("n{}", n),
             State::Real(s) => s.raw_id(),
         }
     }
@@ -250,42 +252,115 @@ impl std::fmt::Display for State {
 
 #[derive(Debug, Clone, Serialize, Tsify)]
 #[tsify(into_wasm_abi)]
-struct LtLResult {
+pub struct LtLResult {
     parse_error: bool,
-    markers: Vec<MarkerData>,
+    markers: Vec<(MarkerData, Vec<String>)>,
+    ts_dot: String,
+    ts_map: HashMap<String, Vec<MonacoSpan>>,
     kripke_str: String,
     buchi_dot: String,
+    negated_nnf_ltl_property_str: String,
     gbuchi_property_dot: String,
     buchi_property_dot: String,
     product_ba_dot: String,
 }
 
+#[derive(Debug, Default)]
+struct Timing {}
+
+struct TimingGuard {
+    name: String,
+}
+
+const PRINT_TIMINGS: bool = false;
+
+impl Timing {
+    fn start(&self, name: impl std::fmt::Display) -> TimingGuard {
+        if PRINT_TIMINGS {
+            web_sys::console::time_with_label(&name.to_string());
+        }
+        TimingGuard {
+            name: name.to_string(),
+        }
+    }
+    fn time<T>(&self, name: impl std::fmt::Display, f: impl FnOnce() -> T) -> T {
+        let guard = self.start(name);
+        let res = f();
+        drop(guard);
+        res
+    }
+}
+
+impl Drop for TimingGuard {
+    fn drop(&mut self) {
+        if PRINT_TIMINGS {
+            web_sys::console::time_end_with_label(&self.name);
+        }
+    }
+}
+
 #[wasm_bindgen]
 pub fn parse_ltl(src: &str) -> LtLResult {
-    let res = parse::parse_ltl_program(src);
+    let timing = Timing::default();
+
+    let res = timing.time("parse", || parse::parse_ltl_program(src));
 
     match res {
         Ok(ast) => {
-            let p = interpreter::Program::compile(
-                &ast.commands,
-                ast.ltl.fv().into_iter().filter_map(|t| match t {
-                    Target::Variable(v) => Some(v),
-                    _ => None,
-                }),
-            );
+            let p = timing.time("compile", || {
+                interpreter::Program::compile(
+                    &ast.commands,
+                    ast.properties
+                        .iter()
+                        .flat_map(|(_, property)| property.fv())
+                        .filter_map(|t| match t {
+                            Target::Variable(v) => Some(v),
+                            _ => None,
+                        })
+                        .chain(ast.initial.keys().cloned()),
+                )
+            });
             let state = p.initial_state(|var| ast.initial.get(var).copied().unwrap_or_default());
+
+            let mut fuel: u32 = 5000;
 
             // Explore the state space using a breath-first search
             let mut states = Vec::new();
             let mut visited = HashMap::new();
-            let mut relations = HashMap::new();
+            let mut relations: HashMap<usize, HashSet<_>> = HashMap::new();
             let mut queue = VecDeque::new();
             states.push(state.clone());
             visited.insert(state.clone(), 0);
             queue.push_back(0);
 
             while let Some(state_id) = queue.pop_front() {
-                for next_state in states[state_id].step(&p).into_iter().flatten() {
+                for next_state in states[state_id].step(&p) {
+                    if let Some(new_fuel) = fuel.checked_sub(1) {
+                        fuel = new_fuel;
+                    } else {
+                        return LtLResult {
+                            parse_error: false,
+                            markers: vec![(
+                                MarkerData {
+                                    related_information: None,
+                                    tags: None,
+                                    severity: MarkerSeverity::Error,
+                                    message: "Exploration of the state space".to_string(),
+                                    span: MonacoSpan::from_offset_len(src, 0, 0),
+                                },
+                                Vec::new(),
+                            )],
+                            ts_dot: "".to_string(),
+                            ts_map: Default::default(),
+                            kripke_str: "".to_string(),
+                            buchi_dot: "".to_string(),
+                            negated_nnf_ltl_property_str: "".to_string(),
+                            gbuchi_property_dot: "".to_string(),
+                            buchi_property_dot: "".to_string(),
+                            product_ba_dot: "".to_string(),
+                        };
+                    }
+
                     let id = match visited.entry(next_state.clone()) {
                         Entry::Occupied(id) => *id.get(),
                         Entry::Vacant(v) => {
@@ -296,154 +371,282 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                             id
                         }
                     };
-                    relations
-                        .entry(state_id)
-                        .or_insert_with(HashSet::new)
-                        .insert(id);
+                    relations.entry(state_id).or_default().insert(id);
+                    relations.entry(id).or_default();
                 }
             }
 
-            // Build the LTL property
-
-            let mut relational_properties = Vec::new();
-            let ltl_property = ast.ltl.to_mcltl(&mut relational_properties);
-            let nnf_ltl_property = ltl_property.rewrite().nnf();
-
-            tracing::debug!("{nnf_ltl_property:?}");
-
-            // Build the Kripke structure
-
-            let inits = vec![State::Real(states.first().unwrap().clone())];
-            // let inits = states.iter().map(|s| s.id(&p)).collect_vec();
-            let worlds: Vec<_> = states
-                .iter()
-                .map(|state| mcltl::verifier::kripke::World {
-                    id: State::Real(state.clone()),
-                    assignement: relational_properties
-                        .iter()
-                        .enumerate()
-                        .map(|(idx, (l, op, r))| {
-                            let holds = BExpr::Rel(l.clone(), *op, r.clone())
-                                .evaluate(&p, state)
-                                .is_ok_and(|x| x);
-                            (format!("p{idx}"), holds)
-                        })
-                        .collect(),
-                })
-                .collect();
-            let relations: Vec<_> = relations
-                .into_iter()
-                .flat_map(|(src, dsts)| {
-                    let worlds = &worlds;
-                    dsts.into_iter()
-                        .map(move |dst| (worlds[src].clone(), worlds[dst].clone()))
-                })
-                .collect();
-
-            let debug_str = format!(
-                r#"
-init = {{{}}}
-
-{}
-"#,
-                inits.iter().map(|s| s.name()).format(", "),
-                worlds
+            let ts_dot = format!(
+                "digraph G {{\n{}\n{}\n{}\n}}",
+                states
                     .iter()
-                    .map(|w| format!(
-                        r#"
-{} = {{ {} }}
-{}
-"#,
-                        w.id,
-                        w.assignement
-                            .iter()
-                            .map(|(k, v)| if *v {
-                                k.to_string()
-                            } else {
-                                format!("¬{}", k)
-                            })
-                            .format(", "),
-                        relations
-                            .iter()
-                            .filter(|(src, _)| src.id == w.id)
-                            .map(|(src, dst)| format!("{} => {}", src.id, dst.id))
-                            .format(", "),
-                    ))
-                    .format(""),
+                    .enumerate()
+                    .map(|(idx, s)| format!("{}[label={:?}];", idx, s.format(&p).to_string()))
+                    .format("\n"),
+                r#"init -> 0 ; init[label="",opacity=0]"#,
+                relations
+                    .iter()
+                    .flat_map(|(from, tos)| tos.iter().map(move |to| format!("{from} -> {to};")))
+                    .format("\n"),
             );
+            let ts_map = states
+                .iter()
+                .enumerate()
+                .map(|(idx, s)| {
+                    (
+                        idx.to_string(),
+                        s.spans(&p)
+                            .map(|span| MonacoSpan::from_source_span(src, span.cursor_at_start()))
+                            .collect_vec(),
+                    )
+                })
+                .collect();
 
-            tracing::debug!(%debug_str);
+            let mut kripke_str = "".to_string();
+            let mut buchi_dot = "".to_string();
+            let mut negated_nnf_ltl_property_str = "".to_string();
+            let mut gbuchi_property_dot = "".to_string();
+            let mut buchi_property_dot = "".to_string();
+            let mut product_ba_dot = "".to_string();
 
-            tracing::debug!(?inits, ?worlds, ?relations);
+            let mut markers: Vec<(_, _)> = Vec::new();
 
-            let mut kripke = mcltl::verifier::kripke::KripkeStructure::new(inits);
-            for w in worlds {
-                kripke.add_world(w);
-            }
-            for (src, dst) in relations {
-                kripke.add_relation(src, dst);
-            }
+            for (property_span, property) in &ast.properties {
+                // Build NNF LTL properties
 
-            // Build the Buchi automaton
+                let mut relational_properties = Vec::new();
 
-            tracing::debug!("building Buchi automaton");
-            let buchi: mcltl::buchi::Buchi<_> = kripke.clone().into();
+                let ltl_property = !property.to_mcltl(&mut relational_properties);
+                let nnf_ltl_property = ltl_property.nnf();
 
-            tracing::debug!("constructing the graph of the LTL property");
-            let nodes = mcltl::ltl::automata::create_graph::<State>(nnf_ltl_property.clone());
+                let mut alphabet: Alphabet<Literal> = [
+                    Locator::Init.to_lit(),
+                    Locator::Stuck.to_lit(),
+                    Locator::Terminated.to_lit(),
+                ]
+                .into_iter()
+                .collect();
 
-            tracing::debug!("extracting Buchi automaton from LTL property");
-            let gbuchi_property = mcltl::buchi::extract_buchi(nodes, nnf_ltl_property);
+                // tracing::debug!("{nnf_ltl_property:?}");
 
-            tracing::debug!("converting generalized Buchi automaton into classic Buchi automaton");
-            let buchi_property = gbuchi_property.to_buchi();
+                // Build the Kripke structure
 
-            tracing::debug!("product automaton");
-            let product_ba = mcltl::buchi::product_automata(buchi.clone(), buchi_property.clone());
+                let kripke = timing.time("kripke", || {
+                    let mut kripke: mcltl::verifier::kripke::KripkeStructure<State, Literal> =
+                        mcltl::verifier::kripke::KripkeStructure::new(
+                            [State::Real(states.first().unwrap().clone())].to_vec(),
+                        );
+                    let worlds: Vec<_> = states
+                        .iter()
+                        .map(|state| {
+                            let mut assignment = relational_properties
+                                .iter()
+                                .enumerate()
+                                .filter_map(|(idx, (l, op, r))| {
+                                    let holds = BExpr::Rel(l.clone(), *op, r.clone())
+                                        .evaluate(&p, state)
+                                        .is_ok_and(|x| x);
+                                    holds.then(|| Literal::from(format!("p{idx}")))
+                                })
+                                .collect::<<Literal as AtomicProperty>::Set>();
 
-            let buchi_dot = buchi.dot();
-            tracing::info!(buchi=%buchi_dot);
-            let gbuchi_property_dot = gbuchi_property.dot();
-            tracing::info!(gbuchi_property=%gbuchi_property_dot);
-            let buchi_property_dot = buchi_property.dot();
-            tracing::info!(buchi_property=%buchi_property_dot);
-            let product_ba_dot = product_ba.dot();
-            tracing::info!(product_ba=%product_ba_dot);
+                            if state.is_terminated(&p) {
+                                assignment.insert(Locator::Terminated.to_lit());
+                            } else if state.is_stuck(&p) {
+                                assignment.insert(Locator::Stuck.to_lit());
+                            } else if states.first().unwrap() == state {
+                                assignment.insert(Locator::Init.to_lit());
+                            }
 
-            tracing::debug!("emptiness check");
-            let res = mcltl::verifier::model_checker::emptiness(product_ba);
+                            kripke.add_node(State::Real(state.clone()), assignment)
+                        })
+                        .collect();
 
-            match res {
-                Ok(()) => {
-                    tracing::info!("LTL property holds");
+                    for (src, dsts) in relations.iter() {
+                        let worlds = &worlds;
+                        for dst in dsts.iter() {
+                            kripke.add_relation(worlds[*src], worlds[*dst]);
+                        }
+                    }
+                    kripke
+                });
+
+                // Build the Buchi automaton
+
+                // tracing::debug!("building Buchi automaton");
+                let buchi: mcltl::buchi::Buchi<State, Literal> = timing.time("buchi", || {
+                    let mut buchi = kripke.to_buchi(Some(&alphabet));
+                    timing.time("add_necessary_self_loops", || {
+                        buchi.add_necessary_self_loops()
+                    });
+                    buchi
+                });
+
+                // tracing::debug!("extracting Buchi automaton from LTL property");
+                let gbuchi_property =
+                    timing.time("gbuchi_property", || nnf_ltl_property.gba(Some(&alphabet)));
+
+                // tracing::debug!("converting generalized Buchi automaton into classic Buchi automaton");
+                let buchi_property = timing.time("buchi_property", || gbuchi_property.to_buchi());
+
+                // tracing::debug!("product automaton");
+                let product_ba = timing.time("product", || {
+                    // buchi.product(&buchi_property).pruned()
+                    ProductBuchi::new(&buchi, &buchi_property)
+                });
+
+                if kripke_str.is_empty() {
+                    kripke_str = kripke.to_string();
+
+                    // NOTE: This is currently disabled since it's not rendered
+                    // and takes a substantial time to create
+                    timing.time("dot", || {
+                        buchi_dot = buchi.dot();
+                        negated_nnf_ltl_property_str = nnf_ltl_property.to_string();
+                        gbuchi_property_dot = gbuchi_property.dot();
+                        buchi_property_dot = buchi_property.dot();
+                        product_ba_dot = product_ba.dot();
+                    });
                 }
-                Err((mut s1, mut s2)) => {
-                    s1.reverse();
-                    s2.reverse();
 
-                    while let Some(top) = s1.pop() {
-                        let id = top.id.0;
+                // tracing::debug!("emptiness check");
+                let res = timing.time("find_accepting_cycle", || product_ba.find_accepting_cycle());
 
-                        if let Some(l) = top.labels.first() {
-                            tracing::error!(?id, ?l, "counterexample")
-                        } else {
-                            tracing::error!(?id, "counterexample")
+                if let Some(cycle) = res {
+                    let mut trace = Vec::new();
+
+                    for (top, _) in cycle.iter() {
+                        let id = buchi.id(top);
+
+                        if let State::Real(s) = id {
+                            trace.push(s.clone());
                         }
                     }
 
-                    while let Some(top) = s2.pop() {
-                        let label = top.labels.first().unwrap();
-                        let id = top.id.0;
-                        tracing::error!(?id, ?label, "counterexample")
+                    let mut table = comfy_table::Table::new();
+                    table.set_header(
+                        std::iter::once("Step".to_string())
+                            .chain(p.variables().map(|v| v.to_string())),
+                    );
+                    for (idx, s) in trace.iter().enumerate() {
+                        table.add_row(
+                            std::iter::once((idx + 1).to_string())
+                                .chain(s.variables(&p).map(|(_, v)| v.to_string())),
+                        );
                     }
-                }
+
+                    enum Alignment {
+                        Left,
+                        Center,
+                        Right,
+                    }
+                    enum CellType {
+                        Plain,
+                        Code,
+                    }
+                    struct HtmlTable {
+                        header: Vec<(String, Alignment, CellType)>,
+                        rows: Vec<Vec<(String, Alignment, CellType)>>,
+                    }
+                    impl CellType {
+                        fn wrap(&self, s: impl std::fmt::Display) -> String {
+                            match self {
+                                CellType::Plain => s.to_string(),
+                                CellType::Code => format!("<code>{}</code>", s),
+                            }
+                        }
+                    }
+                    impl std::fmt::Display for Alignment {
+                        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                            match self {
+                                Alignment::Left => "left",
+                                Alignment::Center => "center",
+                                Alignment::Right => "right",
+                            }
+                            .fmt(f)
+                        }
+                    }
+                    impl std::fmt::Display for HtmlTable {
+                        fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+                            write!(f, "<table><thead><tr>")?;
+                            for (v, a, t) in &self.header {
+                                write!(f, "<th align=\"{}\">{}</th>", a, t.wrap(v))?;
+                            }
+                            write!(f, "</tr></thead><tbody>")?;
+                            for row in &self.rows {
+                                write!(f, "<tr>")?;
+                                for (v, a, t) in row {
+                                    write!(f, "<td align=\"{}\">{}</td>", a, t.wrap(v))?;
+                                }
+                                write!(f, "</tr>")?;
+                            }
+                            write!(f, "</tbody></table>")
+                        }
+                    }
+
+                    let html_table = HtmlTable {
+                        header: std::iter::once((
+                            "Step".to_string(),
+                            Alignment::Right,
+                            CellType::Plain,
+                        ))
+                        .chain(
+                            p.variables()
+                                .map(|v| (v.to_string(), Alignment::Right, CellType::Code)),
+                        )
+                        .collect(),
+                        rows: trace
+                            .iter()
+                            .enumerate()
+                            .map(|(idx, s)| {
+                                std::iter::once((
+                                    (idx + 1).to_string(),
+                                    Alignment::Right,
+                                    CellType::Plain,
+                                ))
+                                .chain(s.variables(&p).map(|(_, value)| {
+                                    (value.to_string(), Alignment::Right, CellType::Code)
+                                }))
+                                .collect()
+                            })
+                            .collect(),
+                    };
+
+                    markers.push((
+                        MarkerData {
+                            related_information: None,
+                            tags: None,
+                            severity: MarkerSeverity::Error,
+                            message: format!("LTL property does not hold\n\n{}", html_table),
+                            span: MonacoSpan::from_offset_len(
+                                src,
+                                property_span.offset(),
+                                property_span.len(),
+                            ),
+                        },
+                        cycle
+                            .iter()
+                            .filter_map(|(state, _)| {
+                                Some(
+                                    states
+                                        .iter()
+                                        .position(|s| State::Real(s.clone()) == *buchi.id(state))?
+                                        .to_string(),
+                                )
+                            })
+                            .collect(),
+                    ))
+                };
             }
 
             LtLResult {
                 parse_error: false,
-                markers: vec![],
-                kripke_str: debug_str,
+                markers,
+                ts_dot,
+                ts_map,
+                kripke_str,
                 buchi_dot,
+                negated_nnf_ltl_property_str,
                 gbuchi_property_dot,
                 buchi_property_dot,
                 product_ba_dot,
@@ -455,16 +658,24 @@ init = {{{}}}
                 .labels()
                 .into_iter()
                 .flatten()
-                .map(|l| MarkerData {
-                    related_information: None,
-                    tags: None,
-                    severity: MarkerSeverity::Error,
-                    message: l.label().unwrap_or_default().to_string(),
-                    span: MonacoSpan::from_offset_len(src, l.offset(), l.len()),
+                .map(|l| {
+                    (
+                        MarkerData {
+                            related_information: None,
+                            tags: None,
+                            severity: MarkerSeverity::Error,
+                            message: l.label().unwrap_or_default().to_string(),
+                            span: MonacoSpan::from_offset_len(src, l.offset(), l.len()),
+                        },
+                        Vec::new(),
+                    )
                 })
                 .collect(),
+            ts_dot: "".to_string(),
+            ts_map: Default::default(),
             kripke_str: "".to_string(),
             buchi_dot: "".to_string(),
+            negated_nnf_ltl_property_str: "".to_string(),
             gbuchi_property_dot: "".to_string(),
             buchi_property_dot: "".to_string(),
             product_ba_dot: "".to_string(),

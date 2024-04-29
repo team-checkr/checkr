@@ -49,6 +49,20 @@ impl SourceSpan {
         span.into_iter()
             .fold(init, |a, b| b.map(|b| a.join(b)).unwrap_or(a))
     }
+
+    pub fn cursor_at_start(&self) -> Self {
+        SourceSpan {
+            offset: self.offset(),
+            length: 1,
+        }
+    }
+
+    pub fn cursor_at_end(&self) -> Self {
+        SourceSpan {
+            offset: self.end(),
+            length: 1,
+        }
+    }
 }
 
 impl From<SourceSpan> for miette::SourceSpan {

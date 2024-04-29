@@ -302,7 +302,7 @@ impl FreeVariables for LTLFormula {
     fn fv(&self) -> IndexSet<Target> {
         match self {
             // Bool(bool), Rel(AExpr, RelOp, AExpr), Not(Box<LTLFormula>), And(Box<LTLFormula>, Box<LTLFormula>), Or(Box<LTLFormula>, Box<LTLFormula>), Implies(Box<LTLFormula>, Box<LTLFormula>), Until(Box<LTLFormula>, Box<LTLFormula>), Next(Box<LTLFormula>), Globally(Box<LTLFormula>), Finally(Box<LTLFormula>),
-            LTLFormula::Bool(_) => Default::default(),
+            LTLFormula::Bool(_) | LTLFormula::Locator(_) => Default::default(),
             LTLFormula::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             LTLFormula::Not(x) => x.fv(),
             LTLFormula::And(l, r) | LTLFormula::Or(l, r) | LTLFormula::Implies(l, r) => {

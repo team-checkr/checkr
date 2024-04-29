@@ -134,8 +134,16 @@ pub enum LogicOp {
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub enum Locator {
+    Init,
+    Stuck,
+    Terminated,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum LTLFormula {
     Bool(bool),
+    Locator(Locator),
     Rel(AExpr, RelOp, AExpr),
     Not(Box<LTLFormula>),
     And(Box<LTLFormula>, Box<LTLFormula>),
@@ -147,8 +155,10 @@ pub enum LTLFormula {
     Finally(Box<LTLFormula>),
 }
 
+pub type LTLProperty = (SourceSpan, LTLFormula);
+
 pub struct LTLProgram {
     pub initial: IndexMap<Variable, i32>,
     pub commands: Vec<Commands<(), ()>>,
-    pub ltl: LTLFormula,
+    pub properties: Vec<LTLProperty>,
 }

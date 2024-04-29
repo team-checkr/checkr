@@ -1,6 +1,6 @@
 use std::str::FromStr;
 use indexmap::IndexMap;
-use crate::ast::*;
+use crate::{ast::*, parse::SourceSpan};
 
 grammar;
 
@@ -84,12 +84,12 @@ Int: Int = <from:@L> <int:r"[0-9]+"> <to:@R> =>? Int::from_str(int).map_err(|_| 
 
 pub AGCLCommands: Commands<PredicateChain, PredicateBlock> = SepNonEmpty<AGCLCommand, ";"> => Commands(<>);
 AGCLCommand: Command<PredicateChain, PredicateBlock> = {
-    <pre:PredicateChain> <kind:AGCLCommandKind> <post:PredicateChain> =>
+    <pre:PredicateChain> <l:@L> <kind:AGCLCommandKind> <r:@R> <post:PredicateChain> =>
         Command {
             pre,
             kind,
             post,
-            span: (0, 0).into(),
+            span: (l, r - l).into(),
         }
 };
 AGCLCommandKind: CommandKind<PredicateChain, PredicateBlock> = {
@@ -105,12 +105,12 @@ AGCLGuard: Guard<PredicateChain, PredicateBlock> = {
 
 LTLCommands: Commands<(), ()> = SepNonEmpty<LTLCommand, ";"> => Commands(<>);
 LTLCommand: Command<(), ()> = {
-    <kind:LTLCommandKind> =>
+    <l:@L> <kind:LTLCommandKind> <r:@R> =>
         Command {
             pre: (),
             kind,
             post: (),
-            span: (0, 0).into(),
+            span: (l, r - l).into(),
         }
 };
 LTLCommandKind: CommandKind<(), ()> = {
@@ -193,26 +193,37 @@ AExprBox: Box<AExpr> = AExpr => Box::new(<>);
 pub LTLProgram: LTLProgram = {
     <initial:LTLInitialAssign>
     <commands:LTLCommands>
-    "{" <ltl:LTLFormula> "}" => LTLProgram {
+    <properties:LTLProperty*> => LTLProgram {
         initial,
         commands: vec![commands],
-        ltl,
+        properties,
     },
 
     <initial:LTLInitialAssign>
     "par"
     <commands:SepNonEmpty<LTLCommands, "[]">>
     "rap"
-    "{" <ltl:LTLFormula> "}" => LTLProgram { <> },
+    <properties:LTLProperty*> => LTLProgram {
+        initial,
+        commands,
+        properties,
+    },
 };
 
 LTLInitialAssign: IndexMap<Variable, Int> = {
-    "{" <vars:Sep<LTLVariableAssignment, ",">> "}" => vars.into_iter().collect()
+    ">" <vars:SepNonEmpty<LTLVariableAssignment, ",">> => vars.into_iter().collect()
 };
 
 LTLVariableAssignment: (Variable, Int) = {
-    <var:Var> ":=" <val:Int> => (Variable(var), val),
+    <var:Var> "=" <val:Int> => (Variable(var), val),
+    <var:Var> "=" "-" <val:Int> => (Variable(var), -val),
 };
+
+LTLProperty: (SourceSpan, LTLFormula) = {
+    "check" <l:@L> <ltl:LTLFormula> <r:@R> =>
+        ((l, r - l).into(), ltl),
+}
+
 
 // LTL Formula with precedence
 LTLFormula_ = LTLFormula;
@@ -221,7 +232,13 @@ LTLFormula: LTLFormula = {
     <l:AExpr_> <op:RelOp> <r:AExpr_> => LTLFormula::Rel(l, op, r),
     "true" => LTLFormula::Bool(true),
     "false" => LTLFormula::Bool(false),
+    "init" => LTLFormula::Locator(Locator::Init),
+    "stuck" => LTLFormula::Locator(Locator::Stuck),
+    "terminated" => LTLFormula::Locator(Locator::Terminated),
     "!" <LTLFormula> => LTLFormula::Not(Box::new(<>)),
+    "X" <LTLFormula> => LTLFormula::Next(Box::new(<>)),
+    "G" <LTLFormula> => LTLFormula::Globally(Box::new(<>)),
+    "F" <LTLFormula> => LTLFormula::Finally(Box::new(<>)),
     "(" <LTLFormula_> ")",
 
     #[precedence(level="1")] #[assoc(side="left")]
@@ -235,7 +252,4 @@ LTLFormula: LTLFormula = {
 
     #[precedence(level="6")] #[assoc(side="right")]
     <l:LTLFormula> "U" <r:LTLFormula> => LTLFormula::Until(Box::new(l), Box::new(r)),
-    "X" <LTLFormula> => LTLFormula::Next(Box::new(<>)),
-    "G" <LTLFormula> => LTLFormula::Globally(Box::new(<>)),
-    "F" <LTLFormula> => LTLFormula::Finally(Box::new(<>)),
 };

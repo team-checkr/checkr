@@ -1,11 +1,15 @@
-use itertools::Itertools;
+use std::fmt;
+
+use itertools::{Either, Itertools};
+use mcltl::ltl::expression::Literal;
 
 use crate::{
     ast::{
-        AExpr, AOp, BExpr, Command, CommandKind, Commands, Function, LTLFormula, LogicOp, RelOp,
-        Target, Variable,
+        AExpr, AOp, BExpr, Command, CommandKind, Commands, Function, LTLFormula, Locator, LogicOp,
+        RelOp, Target, Variable,
     },
     ast_ext::FreeVariables,
+    parse::SourceSpan,
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
@@ -33,6 +37,7 @@ pub struct Program {
     variables: Vec<Variable>,
     instrs: Vec<Instr>,
     entry_points: Vec<InstrPtr>,
+    source_map: Vec<Option<SourceSpan>>,
 }
 
 impl std::ops::Index<InstrPtr> for Program {
@@ -63,13 +68,17 @@ impl Program {
                 .collect(),
             instrs: Vec::new(),
             entry_points: Vec::new(),
+            source_map: Vec::new(),
         };
 
         for cmds in cmdss {
             let entry = p.current();
             p.entry_points.push(entry);
             p.compile_commands(cmds);
-            p.push(Instr::Halt);
+            p.push(
+                Instr::Halt,
+                cmds.0.last().map(|cmd| cmd.span.cursor_at_end()),
+            );
         }
 
         p
@@ -80,6 +89,10 @@ impl Program {
             ptrs: self.entry_points.clone(),
             memory: self.variables.iter().map(memory).collect(),
         }
+    }
+
+    pub fn variables(&self) -> impl Iterator<Item = &'_ Variable> {
+        self.variables.iter()
     }
 
     fn variable_index(&self, name: &str) -> Option<u32> {
@@ -93,9 +106,10 @@ impl Program {
         InstrPtr(self.instrs.len() as _)
     }
 
-    fn push(&mut self, instr: Instr) -> InstrPtr {
+    fn push(&mut self, instr: Instr, src: Option<SourceSpan>) -> InstrPtr {
         let ptr = self.current();
         self.instrs.push(instr);
+        self.source_map.push(src);
         ptr
     }
 
@@ -113,20 +127,20 @@ impl Program {
         match &cmd.kind {
             CommandKind::Assignment(t, e) => {
                 let index = self.variable_index(t.name()).unwrap();
-                self.push(Instr::Assign(index, e.clone()));
+                self.push(Instr::Assign(index, e.clone()), Some(cmd.span));
             }
             CommandKind::Skip => {
-                self.push(Instr::Nop);
+                self.push(Instr::Nop, Some(cmd.span));
             }
             CommandKind::If(guards) => {
-                let head = self.push(Instr::Nop);
+                let head = self.push(Instr::Nop, Some(cmd.span));
                 let mut choices = Vec::new();
                 let mut exits = Vec::new();
                 for guard in guards {
                     choices.push((guard.guard.clone(), self.current()));
                     self.compile_commands(&guard.cmds);
                     exits.push(self.current());
-                    self.push(Instr::Nop);
+                    self.push(Instr::Nop, Some(cmd.span));
                 }
                 self.set(
                     head,
@@ -140,12 +154,12 @@ impl Program {
                 }
             }
             CommandKind::Loop(_, guards) => {
-                let head = self.push(Instr::Nop);
+                let head = self.push(Instr::Nop, Some(cmd.span));
                 let mut choices = Vec::new();
                 for guard in guards {
                     choices.push((guard.guard.clone(), self.current()));
                     self.compile_commands(&guard.cmds);
-                    self.push(Instr::Goto(head));
+                    self.push(Instr::Goto(head), Some(cmd.span));
                 }
                 self.set(
                     head,
@@ -178,41 +192,104 @@ pub enum StepError {
 }
 
 impl State {
-    pub fn step(&self, p: &Program) -> Vec<Result<State, StepError>> {
+    pub fn step(&self, p: &Program) -> Vec<State> {
         self.ptrs
             .iter()
             .enumerate()
-            .map(|(i, _)| self.step_exe(p, i))
+            .flat_map(|(i, _)| self.step_exe(p, i))
+            .flatten()
+            .map(|s| s.follow_gotos(p))
             .collect()
     }
-    fn step_exe(&self, p: &Program, execution: usize) -> Result<State, StepError> {
-        let (mem, ptr) = self.step_at(p, self.ptrs[execution])?;
-        let mut ptrs = self.ptrs.clone();
-        ptrs[execution] = ptr;
-        Ok(State { ptrs, memory: mem })
+    fn follow_gotos(mut self, p: &Program) -> State {
+        for ptr in self.ptrs.iter_mut() {
+            loop {
+                match &p[*ptr] {
+                    Instr::Goto(q) => *ptr = *q,
+                    Instr::Nop => *ptr = ptr.bump(),
+                    _ => break,
+                }
+            }
+        }
+        self
     }
-    fn step_at(&self, p: &Program, ptr: InstrPtr) -> Result<(Memory, InstrPtr), StepError> {
+    pub fn spans<'a>(&'a self, p: &'a Program) -> impl Iterator<Item = SourceSpan> + 'a {
+        self.ptrs
+            .iter()
+            .filter_map(|ptr| p.source_map[ptr.0 as usize])
+    }
+    pub fn variables<'a>(&'a self, p: &'a Program) -> impl Iterator<Item = (&'a Variable, i32)> {
+        p.variables().zip(self.memory.iter().copied())
+    }
+    fn step_exe(
+        &self,
+        p: &Program,
+        execution: usize,
+    ) -> Result<impl Iterator<Item = State> + '_, StepError> {
+        Ok(self
+            .step_at(p, self.ptrs[execution])?
+            .map(move |(mem, ptr)| {
+                let mut ptrs = self.ptrs.clone();
+                ptrs[execution] = ptr;
+                State { ptrs, memory: mem }
+            }))
+    }
+    pub fn is_terminated(&self, p: &Program) -> bool {
+        self.ptrs.iter().all(|&ptr| matches!(p[ptr], Instr::Halt))
+    }
+    pub fn is_stuck(&self, p: &Program) -> bool {
+        let mut any_stuck = false;
+
+        for &ptr in self.ptrs.iter() {
+            match &p[ptr] {
+                Instr::Halt => {}
+                Instr::Branch { choices, otherwise } => {
+                    if !any_stuck {
+                        any_stuck = otherwise.is_none()
+                            && choices
+                                .iter()
+                                .all(|(b, _)| b.evaluate(p, self).is_ok_and(|is_true| !is_true));
+                    }
+                }
+                _ => return false,
+            }
+        }
+
+        any_stuck
+    }
+    fn step_at(
+        &self,
+        p: &Program,
+        ptr: InstrPtr,
+    ) -> Result<impl Iterator<Item = (Memory, InstrPtr)>, StepError> {
         match &p[ptr] {
-            Instr::Nop => Ok((self.memory.clone(), ptr.bump())),
+            Instr::Nop => Ok(Either::Left(
+                [(self.memory.clone(), ptr.bump())].into_iter(),
+            )),
             Instr::Assign(v, e) => {
                 let value = e.evaluate(p, self)?;
                 let mut memory = self.memory.clone();
                 memory[*v as usize] = value;
-                Ok((memory, ptr.bump()))
+                Ok(Either::Left([(memory, ptr.bump())].into_iter()))
             }
             Instr::Branch { choices, otherwise } => {
+                let mut valid = Vec::new();
                 for (b, target) in choices {
                     if b.evaluate(p, self)? {
-                        return Ok((self.memory.clone(), *target));
+                        valid.push((self.memory.clone(), *target));
                     }
                 }
-                if let Some(target) = otherwise {
-                    Ok((self.memory.clone(), *target))
+                if valid.is_empty() {
+                    if let Some(target) = otherwise {
+                        Ok(Either::Left([(self.memory.clone(), *target)].into_iter()))
+                    } else {
+                        Err(StepError::Stuck)
+                    }
                 } else {
-                    Err(StepError::Stuck)
+                    Ok(Either::Right(valid.into_iter()))
                 }
             }
-            Instr::Goto(target) => Ok((self.memory.clone(), *target)),
+            Instr::Goto(target) => Ok(Either::Left([(self.memory.clone(), *target)].into_iter())),
             Instr::Halt => Err(StepError::Halt),
         }
     }
@@ -221,14 +298,31 @@ impl State {
         let vars = self.memory.iter().format(" ");
         format!("{}@{}", vars, self.ptrs.iter().map(|p| p.0).format("X"))
     }
-    pub fn id(&self, p: &Program) -> String {
-        let vars = self
-            .memory
-            .iter()
-            .zip(&p.variables)
-            .map(|(value, name)| format!("{name}{value}"))
-            .format("");
-        format!("{}X{}", vars, self.ptrs.iter().map(|p| p.0).format("X"))
+    pub fn format<'a>(&'a self, p: &'a Program) -> StateFormat<'a> {
+        StateFormat {
+            state: self,
+            program: p,
+        }
+    }
+}
+
+pub struct StateFormat<'a> {
+    state: &'a State,
+    program: &'a Program,
+}
+
+impl<'a> fmt::Display for StateFormat<'a> {
+    fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
+        write!(
+            f,
+            "{}",
+            self.state
+                .memory
+                .iter()
+                .zip(&self.program.variables)
+                .map(|(value, var)| format!("{var} = {value}"))
+                .format(", ")
+        )
     }
 }
 
@@ -345,14 +439,9 @@ impl LTLFormula {
         use mcltl::ltl::expression::LTLExpression;
 
         match self {
-            // Bool(_), Rel(_, _, _), Not(_), And(_, _), Or(_, _), Implies(_, _), Until(_, _), Next(_), Globally(_), Finally(_),
-            LTLFormula::Bool(b) => {
-                if *b {
-                    LTLExpression::True
-                } else {
-                    LTLExpression::False
-                }
-            }
+            LTLFormula::Bool(true) => LTLExpression::True,
+            LTLFormula::Bool(false) => LTLExpression::False,
+            LTLFormula::Locator(l) => LTLExpression::lit(l.to_lit()),
             LTLFormula::Rel(lhs, op, rhs) => {
                 let idx = if let Some(idx) = rels
                     .iter()
@@ -363,28 +452,22 @@ impl LTLFormula {
                     rels.push((lhs.clone(), *op, rhs.clone()));
                     rels.len() - 1
                 };
-                LTLExpression::Literal(format!("p{idx}"))
+                LTLExpression::Literal(format!("p{idx}").into())
             }
-            LTLFormula::Not(e) => LTLExpression::Not(Box::new(e.to_mcltl(rels))),
-            LTLFormula::And(p, q) => {
-                LTLExpression::And(Box::new(p.to_mcltl(rels)), Box::new(q.to_mcltl(rels)))
-            }
-            LTLFormula::Or(p, q) => {
-                LTLExpression::Or(Box::new(p.to_mcltl(rels)), Box::new(q.to_mcltl(rels)))
-            }
-            LTLFormula::Implies(p, q) => {
-                todo!();
-                // LTLExpression::Implies(Box::new(p.to_mcltl(rels)), Box::new(q.to_mcltl(rels)))
-            }
-            LTLFormula::Until(p, q) => {
-                LTLExpression::U(Box::new(p.to_mcltl(rels)), Box::new(q.to_mcltl(rels)))
-            }
-            LTLFormula::Next(p) => {
-                todo!();
-                // LTLExpression::Next(Box::new(p.to_mcltl(rels)))
-            }
+            LTLFormula::Not(e) => !e.to_mcltl(rels),
+            LTLFormula::And(p, q) => p.to_mcltl(rels) & q.to_mcltl(rels),
+            LTLFormula::Or(p, q) => p.to_mcltl(rels) | q.to_mcltl(rels),
+            LTLFormula::Implies(p, q) => !p.to_mcltl(rels) | q.to_mcltl(rels),
+            LTLFormula::Until(p, q) => p.to_mcltl(rels).U(q.to_mcltl(rels)),
+            LTLFormula::Next(p) => LTLExpression::X(Box::new(p.to_mcltl(rels))),
             LTLFormula::Globally(p) => LTLExpression::G(Box::new(p.to_mcltl(rels))),
             LTLFormula::Finally(p) => LTLExpression::F(Box::new(p.to_mcltl(rels))),
         }
+    }
+}
+
+impl Locator {
+    pub fn to_lit(&self) -> Literal {
+        format!("@{self}").into()
     }
 }
