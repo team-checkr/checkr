@@ -208,13 +208,10 @@ source = "registry+https://github.com/rust-lang/crates.io-index"
 checksum = "baf1de4339761588bc0619e3cbc0120ee582ebb74b53b4efbf79117bd2da40fd"
 
 [[package]]
-name = "chip-wasm"
-version = "0.1.0"
+name = "chip"
+version = "0.1.21"
 dependencies = [
- "chrono",
- "comfy-table",
- "console_error_panic_hook",
- "getrandom",
+ "clap",
  "indexmap",
  "itertools 0.12.1",
  "lalrpop",
@@ -223,10 +220,28 @@ dependencies = [
  "miette 7.2.0",
  "once_cell",
  "serde",
- "serde_json",
- "smol_str",
  "smtlib",
  "smtlib-lowlevel",
+ "thiserror",
+]
+
+[[package]]
+name = "chip-wasm"
+version = "0.1.0"
+dependencies = [
+ "chip",
+ "chrono",
+ "comfy-table",
+ "console_error_panic_hook",
+ "getrandom",
+ "indexmap",
+ "itertools 0.12.1",
+ "mcltl",
+ "miette 7.2.0",
+ "once_cell",
+ "serde",
+ "serde_json",
+ "smol_str",
  "thiserror",
  "tracing",
  "tracing-wasm",

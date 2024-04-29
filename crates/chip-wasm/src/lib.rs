@@ -1,17 +1,12 @@
 #![allow(non_snake_case)]
 
-mod agcl;
-mod ast;
-mod ast_ext;
-mod ast_smt;
-mod fmt;
-mod interpreter;
-mod parse;
-mod triples;
-
 use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
 
-use ast::{BExpr, Locator};
+use chip::{
+    ast::{BExpr, Locator, Target},
+    ast_ext::FreeVariables,
+    parse::SourceSpan,
+};
 use itertools::Itertools;
 use mcltl::{
     buchi::{Alphabet, AtomicProperty, ProductBuchi},
@@ -19,12 +14,9 @@ use mcltl::{
     state::State as _,
 };
 use miette::Diagnostic;
-use parse::SourceSpan;
 use serde::Serialize;
 use tsify::Tsify;
 use wasm_bindgen::prelude::*;
-
-use crate::{ast::Target, ast_ext::FreeVariables};
 
 #[wasm_bindgen(start)]
 pub fn start() -> Result<(), JsValue> {
@@ -172,15 +164,13 @@ impl MonacoSpan {
     }
 }
 
-const PRELUDE: &str = include_str!("chip-theory.smt2");
-
 #[wasm_bindgen]
 pub fn parse(src: &str) -> ParseResult {
-    let res = parse::parse_agcl_program(src);
+    let res = chip::parse::parse_agcl_program(src);
     match res {
         Ok(ast) => ParseResult {
             parse_error: false,
-            prelude: PRELUDE.to_string(),
+            prelude: chip::SMT_PRELUDE.to_string(),
             assertions: ast
                 .assertions()
                 .into_iter()
@@ -206,7 +196,7 @@ pub fn parse(src: &str) -> ParseResult {
         },
         Err(err) => ParseResult {
             parse_error: true,
-            prelude: PRELUDE.to_string(),
+            prelude: chip::SMT_PRELUDE.to_string(),
             assertions: vec![],
             markers: err
                 .labels()
@@ -228,7 +218,7 @@ pub fn parse(src: &str) -> ParseResult {
 #[derive(Debug, Clone, PartialEq, Eq, Hash)]
 enum State {
     Initial,
-    Real(interpreter::State),
+    Real(chip::interpreter::State),
 }
 
 impl mcltl::state::State for State {
@@ -303,12 +293,12 @@ impl Drop for TimingGuard {
 pub fn parse_ltl(src: &str) -> LtLResult {
     let timing = Timing::default();
 
-    let res = timing.time("parse", || parse::parse_ltl_program(src));
+    let res = timing.time("parse", || chip::parse::parse_ltl_program(src));
 
     match res {
         Ok(ast) => {
             let p = timing.time("compile", || {
-                interpreter::Program::compile(
+                chip::interpreter::Program::compile(
                     &ast.commands,
                     ast.properties
                         .iter()

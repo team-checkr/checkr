@@ -1,0 +1,23 @@
+[package]
+name = "chip"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+clap.workspace = true
+indexmap.workspace = true
+itertools.workspace = true
+lalrpop-util.workspace = true
+mcltl.workspace = true
+miette.workspace = true
+once_cell.workspace = true
+serde.workspace = true
+smtlib = "0.1.8"
+smtlib-lowlevel = "0.1.8"
+thiserror.workspace = true
+
+[build-dependencies]
+lalrpop.workspace = true
