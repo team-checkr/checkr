@@ -3,7 +3,7 @@ use std::fmt::Display;
 use itertools::Itertools;
 
 use crate::ast::{
-    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, LogicOp,
+    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, Locator, LogicOp,
     PredicateBlock, PredicateChain, Quantifier, RelOp, Target, Variable,
 };
 
@@ -154,6 +154,15 @@ impl Display for LogicOp {
             LogicOp::Or => write!(f, "||"),
             LogicOp::Lor => write!(f, "|"),
             LogicOp::Implies => write!(f, "==>"),
+        }
+    }
+}
+impl Display for Locator {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Locator::Init => write!(f, "init"),
+            Locator::Stuck => write!(f, "stuck"),
+            Locator::Terminated => write!(f, "terminated"),
         }
     }
 }

@@ -5,15 +5,28 @@
   import type { LtLResult, MarkerData } from 'chip-wasm';
   import Nav from '$lib/components/Nav.svelte';
   import Network from '$lib/components/Network.svelte';
+  import { mirage } from 'ayu';
 
-  let program = `{ x := 2 }
-x := x + 1
-{ x = 2 }`;
+  let program = `> x = 30
+do
+x >= 0 -> x := x-1
+od
+check F x = -1              // should hold
+check F x = -2              // should not hold
+check G x = -1              // should not hold
+check ! F ! (x = -1)        // should not hold
+check ! (true U ! (x = -1)) // should not hold
+check G x >= -1             // should hold
+check ! F ! (x >= -1)       // should hold
+`;
 
   let result = writable<LtLResult>({
     parse_error: false,
     markers: [],
+    ts_dot: '',
+    ts_map: new Map(),
     buchi_dot: '',
+    negated_nnf_ltl_property_str: '',
     buchi_property_dot: '',
     gbuchi_property_dot: '',
     kripke_str: '',
@@ -23,26 +36,66 @@ x := x + 1
 
   let parseError = writable(false);
 
-  const STATES = ['idle', 'verifying', 'verified', 'error'];
+  const STATES = ['idle', 'checking', 'checked', 'error'];
   type State = (typeof STATES)[number];
   let state = writable<State>('idle');
 
   $: graphs = [
     { title: 'Kripke structure', dot: $result.kripke_str },
     { title: 'Buchi automaton', dot: $result.buchi_dot },
-    { title: 'Generalized Buchi property', dot: $result.gbuchi_property_dot },
-    { title: 'Buchi property', dot: $result.buchi_property_dot },
+    {
+      title: `Generalized Buchi property: ${$result.negated_nnf_ltl_property_str}`,
+      dot: $result.gbuchi_property_dot,
+    },
+    {
+      title: `Buchi property: ${$result.negated_nnf_ltl_property_str}`,
+      dot: $result.buchi_property_dot,
+    },
     { title: 'Product automaton', dot: $result.product_ba_dot },
   ];
 
+  let hoveredNode: string | null = null;
+  let hoveredMarker: number | null = null;
+
+  let hoverMakers: MarkerData[] = [];
+
+  $: if (typeof hoveredNode == 'number' || typeof hoveredNode == 'string') {
+    const spans = $result.ts_map.get(hoveredNode.toString());
+    if (spans) {
+      hoverMakers = spans.map(
+        (span): MarkerData => ({
+          relatedInformation: [],
+          tags: [],
+          severity: 'Info',
+          message: 'here',
+          span,
+        }),
+      );
+    } else {
+      hoverMakers = [];
+    }
+  } else {
+    hoverMakers = [];
+  }
+  $: highlightedNodes =
+    (typeof hoveredMarker == 'number' && $result.markers[hoveredMarker]?.[1]) || [];
+
   $: if (browser) {
     const run = async () => {
+      state.set('checked');
       parseError.set(false);
       const { default: init, parse_ltl } = await import('chip-wasm');
       await init();
+      console.time('run wasm');
       const res = parse_ltl(program);
+      console.timeEnd('run wasm');
       if (res.parse_error) parseError.set(true);
       result.set(res);
+      if (res.markers.length > 0) {
+        state.set('error');
+      } else {
+        state.set('checked');
+      }
     };
     run().catch(console.error);
   }
@@ -51,8 +104,8 @@ x := x + 1
     dot
       .trim()
       .replaceAll('\n\n\n', '\n\n')
-      .replaceAll(/"\]\[shape="doublecircle"/g, ' ⭐"')
-      .replaceAll(/\[label=[^\]]+\]\[shape="point"]/g, '[label="."]')
+      .replaceAll(/"\]\[shape="doublecircle"/g, `",color="${mirage.syntax.tag.hex()}"`)
+      .replaceAll(/\[label=[^\]]+\]\[shape="point"]/g, '[label="",opacity=0]')
       .replaceAll(/\]\[shape/g, ',shape');
 </script>
 
@@ -64,29 +117,44 @@ x := x + 1
 <Nav title="Moka" />
 
 <div class="relative grid grid-cols-2 grid-rows-[2fr_auto] bg-slate-800">
-  <Editor bind:value={program} markers={[...$result.markers, ...$verifications]} />
+  <Editor
+    bind:value={program}
+    bind:hoveredMarker
+    markers={[...$result.markers.map((m) => m[0]), ...$verifications, ...hoverMakers]}
+  />
   <div class="flex flex-col text-white">
-    {#each graphs as { title, dot }}
-      {#if dot}
-        <div class="flex flex-1 flex-col p-2">
-          <h2 class="text-xl font-bold">{title}</h2>
-          <div class="grid flex-1 grid-cols-2 overflow-auto rounded bg-slate-700">
-            <pre class="p-4">{prepareDot(dot)}</pre>
-            <div class="m-1 rounded bg-slate-900">
-              <Network dot={prepareDot(dot)} />
+    {#if false}
+      {#each graphs as { title, dot }}
+        {#if dot}
+          <div class="flex flex-1 flex-col p-2">
+            <h2 class="text-xl font-bold">{title}</h2>
+            <div class="grid flex-1 grid-cols-1 overflow-auto rounded bg-slate-700">
+              {#if dot.includes('digraph')}
+                <div class="m-1 rounded bg-slate-900">
+                  <Network dot={prepareDot(dot)} highlight={['n20']} />
+                </div>
+              {:else}
+                <div class="relative">
+                  <pre class="absolute inset-0 overflow-auto p-4">{prepareDot(dot)}</pre>
+                </div>
+              {/if}
             </div>
           </div>
-        </div>
-      {/if}
-    {/each}
+        {/if}
+      {/each}
+    {:else}
+      <div class="flex-1">
+        <Network bind:hoveredNode dot={$result.ts_dot} highlight={highlightedNodes} />
+      </div>
+    {/if}
   </div>
   <div
-    class="flex items-center p-2 text-2xl text-white transition duration-500 {$parseError
+    class="col-span-2 flex items-center p-2 text-2xl text-white transition duration-500 {$parseError
       ? 'bg-purple-600'
       : {
           idle: 'bg-gray-500',
-          verifying: 'bg-yellow-500',
-          verified: 'bg-green-500',
+          checking: 'bg-yellow-500',
+          checked: 'bg-green-500',
           error: 'bg-red-500',
         }[$state]}"
   >
@@ -95,14 +163,14 @@ x := x + 1
         ? 'Parse error'
         : {
             idle: 'Idle',
-            verifying: 'Verifying...',
-            verified: 'Verified',
-            error: 'Verification error',
+            checking: 'Checking...',
+            checked: 'Checked',
+            error: 'Error',
           }[$state]}
     </span>
     <div class="flex-1" />
     <span class="text-xl">
-      <!-- {#if !$parseError && $state == 'verified'}
+      <!-- {#if !$parseError && $state == 'checked'}
           {#if $result.is_fully_annotated}
             The program is <b>fully annotated</b>
           {:else}
@@ -111,9 +179,4 @@ x := x + 1
         {/if} -->
     </span>
   </div>
-  <!-- <div>
-          {#each result.assertions as triple}
-              <pre class="p-4">{triple.smt}</pre>
-          {/each}
-      </div> -->
 </div>
