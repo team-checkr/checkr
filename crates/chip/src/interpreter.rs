@@ -192,14 +192,21 @@ pub enum StepError {
 }
 
 impl State {
-    pub fn step(&self, p: &Program) -> Vec<State> {
+    pub fn step<'a>(&'a self, p: &'a Program) -> impl Iterator<Item = State> + 'a {
+        self.step_inner(p).flatten()
+    }
+    fn step_inner<'a>(
+        &'a self,
+        p: &'a Program,
+    ) -> impl Iterator<Item = Result<State, StepError>> + 'a {
         self.ptrs
             .iter()
             .enumerate()
-            .flat_map(|(i, _)| self.step_exe(p, i))
-            .flatten()
-            .map(|s| s.follow_gotos(p))
-            .collect()
+            .flat_map(|(i, _)| match self.step_exe(p, i) {
+                Ok(inner) => Either::Left(inner.map(Ok)),
+                Err(err) => Either::Right([Err(err)].into_iter()),
+            })
+            .map(|s| Ok(s?.follow_gotos(p)))
     }
     fn follow_gotos(mut self, p: &Program) -> State {
         for ptr in self.ptrs.iter_mut() {
@@ -235,27 +242,18 @@ impl State {
             }))
     }
     pub fn is_terminated(&self, p: &Program) -> bool {
-        self.ptrs.iter().all(|&ptr| matches!(p[ptr], Instr::Halt))
+        self.step_inner(p)
+            .all(|t| matches!(t, Err(StepError::Halt)))
     }
     pub fn is_stuck(&self, p: &Program) -> bool {
-        let mut any_stuck = false;
+        let all_stuck_or_halted = self
+            .step_inner(p)
+            .all(|t| matches!(t, Err(StepError::Stuck | StepError::Halt)));
+        let any_stuck = self
+            .step_inner(p)
+            .any(|t| matches!(t, Err(StepError::Stuck)));
 
-        for &ptr in self.ptrs.iter() {
-            match &p[ptr] {
-                Instr::Halt => {}
-                Instr::Branch { choices, otherwise } => {
-                    if !any_stuck {
-                        any_stuck = otherwise.is_none()
-                            && choices
-                                .iter()
-                                .all(|(b, _)| b.evaluate(p, self).is_ok_and(|is_true| !is_true));
-                    }
-                }
-                _ => return false,
-            }
-        }
-
-        any_stuck
+        all_stuck_or_halted && any_stuck
     }
     fn step_at(
         &self,

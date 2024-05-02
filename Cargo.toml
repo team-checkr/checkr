@@ -5,9 +5,11 @@ members = [
     "crates/ce-shell",
     "crates/checkr",
     "crates/chip",
+    "crates/chip-cli",
     "crates/driver",
     "crates/envs/*",
     "crates/gcl",
+    "crates/gitty",
     "crates/inspectify",
     "crates/mcltl-rs",
     "crates/stdx",
@@ -36,6 +38,8 @@ ce-security = { path = "./crates/envs/ce-security" }
 ce-shell = { path = "./crates/ce-shell" }
 ce-sign = { path = "./crates/envs/ce-sign" }
 checkr = { path = "./crates/checkr" }
+chip = { path = "./crates/chip" }
+chrono = { version = "0.4.33", features = ["serde"] }
 clap = { version = "4.4.4", features = ["derive"] }
 color-eyre = "0.6.2"
 dashmap = "5.5.3"
@@ -43,6 +47,7 @@ driver = { path = "./crates/driver" }
 dunce = "1.0.4"
 futures-util = "0.3.28"
 gcl = { path = "./crates/gcl" }
+gitty = { path = "./crates/gitty" }
 indexmap = { version = "2.0.0", features = ["serde"] }
 itertools = "0.12.1"
 lalrpop = "0.20.2"
@@ -57,6 +62,7 @@ rand = { version = "0.8.5", features = ["small_rng"] }
 rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.152", features = ["derive", "rc"] }
 serde_json = "1.0.91"
+smtlib = { version = "0.2.0", features = ["tokio"] }
 stdx = { path = "./crates/stdx" }
 # tapi = { path = "../tapi/crates/tapi", features = ["chrono", "toml"] }
 tapi = { git = "https://github.com/oeb25/tapi.git", features = [
@@ -66,7 +72,7 @@ tapi = { git = "https://github.com/oeb25/tapi.git", features = [
     "toml",
 ] }
 thiserror = "1.0.38"
-tokio = { version = "1.25.0", features = ["full"] }
+tokio = { version = "1.37.0", features = ["full"] }
 toml = { version = "0.8.0", features = ["indexmap"] }
 tracing = "0.1.37"
 tracing-error = "0.2.0"

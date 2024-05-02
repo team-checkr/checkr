@@ -1,0 +1,17 @@
+[package]
+name = "gitty"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+chrono.workspace = true
+color-eyre = "0.6.3"
+dunce.workspace = true
+once_cell.workspace = true
+stdx.workspace = true
+tempfile = "3.10.1"
+tokio.workspace = true
+tracing.workspace = true

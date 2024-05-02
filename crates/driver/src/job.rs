@@ -193,7 +193,7 @@ impl std::fmt::Debug for JobKind {
     }
 }
 
-#[derive(tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, Serialize, Deserialize)]
+#[derive(tapi::Tapi, Debug, Default, Clone, Copy, PartialEq, Eq, Hash, Serialize, Deserialize)]
 pub enum JobState {
     Queued,
     #[default]
@@ -227,5 +227,20 @@ impl Display for JobState {
             JobState::Timeout => write!(f, "Timeout"),
             JobState::OutputLimitExceeded => write!(f, "Output limit exceeded"),
         }
+    }
+}
+
+impl JobState {
+    pub fn all() -> &'static [JobState] {
+        &[
+            JobState::Queued,
+            JobState::Running,
+            JobState::Succeeded,
+            JobState::Canceled,
+            JobState::Failed,
+            JobState::Warning,
+            JobState::Timeout,
+            JobState::OutputLimitExceeded,
+        ]
     }
 }

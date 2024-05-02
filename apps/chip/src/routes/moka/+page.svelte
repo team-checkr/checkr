@@ -107,6 +107,8 @@ check ! F ! (x >= -1)       // should hold
       .replaceAll(/"\]\[shape="doublecircle"/g, `",color="${mirage.syntax.tag.hex()}"`)
       .replaceAll(/\[label=[^\]]+\]\[shape="point"]/g, '[label="",opacity=0]')
       .replaceAll(/\]\[shape/g, ',shape');
+
+  let pauseGraphRendering = false;
 </script>
 
 <svelte:head>
@@ -143,8 +145,30 @@ check ! F ! (x >= -1)       // should hold
         {/if}
       {/each}
     {:else}
-      <div class="flex-1">
-        <Network bind:hoveredNode dot={$result.ts_dot} highlight={highlightedNodes} />
+      <div class="relative flex-1">
+        {#if pauseGraphRendering}
+          <button
+            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded border px-3 py-2 text-lg font-bold transition hover:bg-slate-500/10"
+            on:click={() => (pauseGraphRendering = false)}
+          >
+            Graph rendering pause. Click to enable
+          </button>
+        {:else}
+          <Network bind:hoveredNode dot={$result.ts_dot} highlight={highlightedNodes} />
+        {/if}
+        <div
+          class="absolute right-1 top-1 flex items-center space-x-1 text-sm opacity-20 transition hover:opacity-100"
+        >
+          <label for="pause-graph-rendering" class="cursor-pointer select-none"
+            >Pause graph rendering</label
+          >
+          <input
+            type="checkbox"
+            name="pause-graph-rendering"
+            id="pause-graph-rendering"
+            bind:checked={pauseGraphRendering}
+          />
+        </div>
       </div>
     {/if}
   </div>

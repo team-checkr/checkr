@@ -16,12 +16,13 @@ dist = true
 axum.workspace = true
 ce-core.workspace = true
 ce-shell.workspace = true
-chrono = { version = "0.4.33", features = ["serde"] }
+chrono.workspace = true
 clap.workspace = true
 color-eyre.workspace = true
 driver.workspace = true
 dunce.workspace = true
 futures-util = "0.3.30"
+gitty.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
 itertools.workspace = true

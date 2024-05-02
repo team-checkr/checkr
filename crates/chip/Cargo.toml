@@ -15,9 +15,9 @@ mcltl.workspace = true
 miette.workspace = true
 once_cell.workspace = true
 serde.workspace = true
-smtlib = "0.1.8"
-smtlib-lowlevel = "0.1.8"
+smtlib.workspace = true
 thiserror.workspace = true
+tracing.workspace = true
 
 [build-dependencies]
 lalrpop.workspace = true

@@ -336,14 +336,6 @@ export namespace inspectify {
     }
   }
   export namespace endpoints {
-    export type ReferenceExecution = {
-      "meta": ce_shell.io.Meta,
-      "output": (ce_shell.io.Output | null),
-      "error": (string | null)
-    };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type GenerateParams = {
       "analysis": ce_shell.Analysis
     };
@@ -354,8 +346,13 @@ export namespace inspectify {
       | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
       | { "type": "GroupsConfig", "value": { "config": inspectify.checko.config.GroupsConfig } }
       | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } };
-    export type AnalysisExecution = {
-      "id": driver.job.JobId
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
+    export type ReferenceExecution = {
+      "meta": ce_shell.io.Meta,
+      "output": (ce_shell.io.Output | null),
+      "error": (string | null)
     };
     export type Job = {
       "id": driver.job.JobId,
@@ -365,6 +362,9 @@ export namespace inspectify {
       "stdout": string,
       "spans": inspectify.endpoints.Span[],
       "analysis_data": (inspectify.endpoints.AnalysisData | null)
+    };
+    export type AnalysisExecution = {
+      "id": driver.job.JobId
     };
     export type CompilationStatus = {
       "id": driver.job.JobId,
@@ -392,6 +392,7 @@ export namespace inspectify {
 export const api = {
     generate: request<inspectify.endpoints.GenerateParams, ce_shell.io.Input>("json", "POST", "/generate", "json"),
     events: sse<[], inspectify.endpoints.Event>(() => `/events`, "json"),
+    checkoCsv: request<Record<string, never>, string>("none", "GET", "/checko-csv", "text"),
     checkoPublic: sse<[], inspectify.endpoints.PublicEvent>(() => `/checko-public`, "json"),
     jobsCancel: request<driver.job.JobId, void>("json", "POST", "/jobs/cancel", "none"),
     analysis: request<ce_shell.io.Input, (inspectify.endpoints.AnalysisExecution | null)>("json", "POST", "/analysis", "json"),

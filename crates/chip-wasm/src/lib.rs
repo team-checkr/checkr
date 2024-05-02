@@ -324,7 +324,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
             queue.push_back(0);
 
             while let Some(state_id) = queue.pop_front() {
-                for next_state in states[state_id].step(&p) {
+                for next_state in states[state_id].step(&p).collect_vec() {
                     if let Some(new_fuel) = fuel.checked_sub(1) {
                         fuel = new_fuel;
                     } else {

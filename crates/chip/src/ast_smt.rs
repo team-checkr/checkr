@@ -58,13 +58,13 @@ impl AExpr {
             }
             AExpr::Minus(e) => -e.smt(),
             AExpr::Function(f) => {
-                let f_ident = smtlib_lowlevel::ast::QualIdentifier::Identifier(
-                    smtlib_lowlevel::ast::Identifier::Simple(smtlib_lowlevel::lexicon::Symbol(
+                let f_ident = smtlib::lowlevel::ast::QualIdentifier::Identifier(
+                    smtlib::lowlevel::ast::Identifier::Simple(smtlib::lowlevel::lexicon::Symbol(
                         f.name().to_string(),
                     )),
                 );
                 let args = f.args().map(|a| a.smt().into()).collect::<Vec<_>>();
-                smtlib_lowlevel::ast::Term::Application(f_ident, args).into()
+                smtlib::lowlevel::ast::Term::Application(f_ident, args).into()
             }
         }
     }

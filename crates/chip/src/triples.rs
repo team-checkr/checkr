@@ -203,21 +203,21 @@ impl AGCLCommand {
 }
 
 impl Assertion {
-    pub fn smt(&self) -> impl Iterator<Item = smtlib_lowlevel::ast::Command> {
+    pub fn smt(&self) -> impl Iterator<Item = smtlib::lowlevel::ast::Command> {
         let fv = self.predicate.fv();
 
         fv.into_iter()
             .map(|v| {
-                smtlib_lowlevel::ast::Command::DeclareConst(
-                    smtlib_lowlevel::lexicon::Symbol(v.name().to_string()),
-                    smtlib_lowlevel::ast::Sort::Sort(smtlib_lowlevel::ast::Identifier::Simple(
-                        smtlib_lowlevel::lexicon::Symbol("Int".to_string()),
+                smtlib::lowlevel::ast::Command::DeclareConst(
+                    smtlib::lowlevel::lexicon::Symbol(v.name().to_string()),
+                    smtlib::lowlevel::ast::Sort::Sort(smtlib::lowlevel::ast::Identifier::Simple(
+                        smtlib::lowlevel::lexicon::Symbol("Int".to_string()),
                     )),
                 )
             })
             .chain([
-                smtlib_lowlevel::ast::Command::Assert((!self.predicate.smt()).into()),
-                smtlib_lowlevel::ast::Command::CheckSat,
+                smtlib::lowlevel::ast::Command::Assert((!self.predicate.smt()).into()),
+                smtlib::lowlevel::ast::Command::CheckSat,
             ])
     }
 }

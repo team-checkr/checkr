@@ -1,7 +1,6 @@
 mod compression;
 pub mod config;
 mod db;
-mod git;
 pub mod scoreboard;
 
 use std::{
@@ -230,14 +229,14 @@ impl Checko {
 
                 let git_pull_result = tokio_retry::Retry::spawn(
                     tokio_retry::strategy::FixedInterval::new(Duration::from_secs(5)).take(15),
-                    || git::clone_or_pull(git, &group_path),
+                    || gitty::clone_or_pull(git, &group_path),
                 )
                 .await;
 
                 git_pull_result?;
 
                 if let Some(deadline) = deadline {
-                    let _found_any = git::checkout_latest_before(
+                    let _found_any = gitty::checkout_latest_before(
                         git,
                         &group_path,
                         deadline,
@@ -255,7 +254,7 @@ impl Checko {
                     group_path
                 };
 
-                let git_hash = git::hash(&path, None).await?;
+                let git_hash = gitty::hash(&path, None).await?;
 
                 Ok(GroupRepo {
                     path,
