@@ -1,0 +1,22 @@
+[package]
+name = "chip-cli"
+edition = "2021"
+version.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+camino = "1.1.6"
+chip.workspace = true
+clap.workspace = true
+color-eyre = "0.6.3"
+gitty.workspace = true
+itertools.workspace = true
+serde.workspace = true
+smtlib = { workspace = true, features = ["tokio"] }
+tokio.workspace = true
+toml.workspace = true
+tracing.workspace = true
+tracing-error = "0.2.0"
+tracing-subscriber = { version = "0.3.18", features = ["env-filter"] }

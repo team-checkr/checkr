@@ -2,6 +2,7 @@ use std::collections::HashMap;
 
 use ce_shell::{Analysis, Input};
 use driver::JobState;
+use indexmap::IndexMap;
 use itertools::{Either, Itertools};
 
 use super::{config::GroupName, Checko, GroupStatus};
@@ -36,6 +37,41 @@ pub struct PublicState {
     last_finished: Option<chrono::DateTime<chrono::FixedOffset>>,
     analysis: Vec<PublicAnalysis>,
     groups: Vec<PublicGroup>,
+}
+impl PublicState {
+    pub(crate) fn to_csv(&self) -> String {
+        use std::fmt::Write;
+
+        let mut csv = String::new();
+
+        writeln!(csv, "Analysis,Group,{}", JobState::all().iter().format(",")).unwrap();
+
+        for group in &self.groups {
+            for analysis_result in &group.analysis_results {
+                let analysis = analysis_result.analysis;
+                let group = &group.name;
+
+                let mut counts: IndexMap<JobState, u32> = IndexMap::new();
+
+                for result in &analysis_result.results {
+                    *counts.entry(result.state).or_insert(0) += 1;
+                }
+
+                writeln!(
+                    csv,
+                    "{},{},{}",
+                    analysis,
+                    group,
+                    JobState::all()
+                        .iter()
+                        .map(|state| counts.get(state).copied().unwrap_or(0))
+                        .format(","),
+                )
+                .unwrap();
+            }
+        }
+        csv
+    }
 }
 
 // TODO: Perhaps we should split events up into more selective changes

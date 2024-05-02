@@ -5,6 +5,8 @@
   import GroupRow from './GroupRow.svelte';
 
   import CommandLineIcon from '~icons/heroicons/chart-bar-square';
+  import ArrowDownTray from '~icons/heroicons/arrow-down-tray';
+  import { api } from '$lib/api';
 
   let analysisStore = $publicDataAnalysisStore;
   let groupsStore = $publicDataGroupsStore;
@@ -21,6 +23,12 @@
     }, animationDuration * 2);
     return () => clearInterval(interval);
   });
+
+  const downloadCsv = async () => {
+    const data = await api.checkoCsv({}).data;
+    const { saveAs } = await import('file-saver');
+    saveAs(new Blob([data], { type: 'text/csv' }), 'checko.csv');
+  };
 </script>
 
 <nav class="flex items-center bg-slate-900 px-2 text-sm text-slate-200">
@@ -35,19 +43,24 @@
   </a>
 
   <div class="flex-1" />
-  <div class="flex space-x-1 py-1">
-    <span class="italic text-slate-400">Last update:</span>
-    <span class="font-mono"
-      >{$lastFinishedStore &&
-        new Intl.DateTimeFormat('en-GB', {
-          hour: 'numeric',
-          minute: 'numeric',
-          second: 'numeric',
-          day: 'numeric',
-          month: 'numeric',
-          year: 'numeric',
-        }).format($lastFinishedStore)}</span
-    >
+  <div class="flex space-x-2 py-1">
+    <div class="flex space-x-1">
+      <span class="italic text-slate-400">Last update:</span>
+      <span class="font-mono"
+        >{$lastFinishedStore &&
+          new Intl.DateTimeFormat('en-GB', {
+            hour: 'numeric',
+            minute: 'numeric',
+            second: 'numeric',
+            day: 'numeric',
+            month: 'numeric',
+            year: 'numeric',
+          }).format($lastFinishedStore)}</span
+      >
+    </div>
+    <button class="-m-1 rounded p-1 transition hover:bg-slate-600" on:click={downloadCsv}>
+      <ArrowDownTray />
+    </button>
   </div>
 </nav>
 

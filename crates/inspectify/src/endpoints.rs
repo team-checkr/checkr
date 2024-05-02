@@ -27,6 +27,7 @@ pub fn endpoints() -> tapi::endpoints::Endpoints<'static, AppState> {
     tapi::endpoints::Endpoints::new([
         &generate::endpoint as E,
         &events::endpoint as E,
+        &checko_csv::endpoint as E,
         &checko_public::endpoint as E,
         &jobs_cancel::endpoint as E,
         &exec_analysis::endpoint as E,
@@ -437,4 +438,14 @@ async fn checko_public(State(state): State<AppState>) -> tapi::endpoints::Sse<Pu
     }
 
     tapi::endpoints::Sse::new(tokio_stream::wrappers::ReceiverStream::new(rx))
+}
+
+#[tapi::tapi(path = "/checko-csv", method = Get)]
+async fn checko_csv(State(state): State<AppState>) -> String {
+    let public_state = state.public_state.read().unwrap();
+    if let Some(public_state) = &*public_state {
+        public_state.to_csv()
+    } else {
+        String::new()
+    }
 }

@@ -211,7 +211,8 @@ pub LTLProgram: LTLProgram = {
 };
 
 LTLInitialAssign: IndexMap<Variable, Int> = {
-    ">" <vars:SepNonEmpty<LTLVariableAssignment, ",">> => vars.into_iter().collect()
+    <assignments:(">" <SepNonEmpty<LTLVariableAssignment, ",">>)*> =>
+        assignments.into_iter().flatten().collect(),
 };
 
 LTLVariableAssignment: (Variable, Int) = {

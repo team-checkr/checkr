@@ -49,7 +49,7 @@ monaco.languages.setMonarchTokensProvider(GCL_LANGUAGE_ID, {
     { token: 'delimiter.angle', open: '<', close: '>' },
   ],
 
-  keywords: ['if', 'fi', 'do', 'od', "par", "rap", "check"],
+  keywords: ['if', 'fi', 'do', 'od', "par", "rap", "skip", "check"],
   constants: ['true', 'false', 'init', 'stuck', 'terminated'],
   operators: [
     '-',
