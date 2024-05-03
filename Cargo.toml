@@ -91,7 +91,7 @@ pre-release-hook = ["just", "release-hook"]
 # Config for 'cargo dist'
 [workspace.metadata.dist]
 # The preferred cargo-dist version to use in CI (Cargo.toml SemVer syntax)
-cargo-dist-version = "0.10.0"
+cargo-dist-version = "0.13.3"
 # CI backends to support
 ci = ["github"]
 # The installers to generate for each app
@@ -105,6 +105,8 @@ targets = [
 ]
 # Publish jobs to run in CI
 pr-run-mode = "plan"
+# Whether to install an updater program
+install-updater = false
 
 [workspace.metadata.dist.dependencies]
 just = "*"
