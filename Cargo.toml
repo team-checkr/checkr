@@ -29,6 +29,7 @@ license = "MIT OR Apache-2.0"
 axum = { version = "0.7.3", features = ["macros", "ws"] }
 axum-macros = "0.4.1"
 bitflags = "2.4.0"
+camino = "1.1.6"
 ce-calculator = { path = "./crates/envs/ce-calculator" }
 ce-compiler = { path = "./crates/envs/ce-compiler" }
 ce-core = { path = "./crates/ce-core" }
