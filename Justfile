@@ -23,7 +23,11 @@ inspectify-app:
 
 release-patch args="":
     git checkout HEAD -- CHANGELOG.md
-    cargo release patch {{args}}
+    cargo release --exclude mcltl patch {{args}}
+
+release-minor args="":
+    git checkout HEAD -- CHANGELOG.md
+    cargo release --exclude mcltl minor {{args}}
 
 build-ui:
     cd apps/inspectify && (npm install && npm run build)
