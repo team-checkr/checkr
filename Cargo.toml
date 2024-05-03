@@ -108,7 +108,13 @@ pr-run-mode = "plan"
 # Whether to install an updater program
 install-updater = false
 
-[workspace.metadata.dist.dependencies]
+[workspace.metadata.dist.dependencies.homebrew]
+just = "*"
+
+[workspace.metadata.dist.dependencies.apt]
+just = "*"
+
+[workspace.metadata.dist.dependencies.chocolatey]
 just = "*"
 
 # The profile that 'cargo dist' will build with
