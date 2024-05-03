@@ -1334,7 +1334,6 @@ dependencies = [
  "smol_str",
  "stdx",
  "tapi",
- "tempfile",
  "tokio",
  "tokio-retry",
  "tokio-stream",

@@ -21,7 +21,7 @@ clap.workspace = true
 color-eyre.workspace = true
 driver.workspace = true
 dunce.workspace = true
-futures-util = "0.3.30"
+futures-util.workspace = true
 gitty.workspace = true
 hex = "0.4.3"
 indexmap.workspace = true
@@ -39,7 +39,6 @@ serde_json.workspace = true
 smol_str = { version = "0.2.1", features = ["serde"] }
 stdx.workspace = true
 tapi.workspace = true
-tempfile = "3.10.1"
 tokio.workspace = true
 tokio-retry = "0.3.0"
 tokio-stream = "0.1.14"
