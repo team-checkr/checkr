@@ -82,7 +82,7 @@ impl AGCLCommand {
                 }
                 acc.predicate_spans = new;
             }
-            CommandKind::Skip => {}
+            CommandKind::Skip | CommandKind::Placeholder => {}
             CommandKind::If(gcs) => {
                 acc = gcs
                     .iter()
@@ -194,7 +194,7 @@ impl AGCLCommand {
     }
     pub fn is_fully_annotated(&self) -> bool {
         match &self.kind {
-            CommandKind::Assignment(_, _) | CommandKind::Skip => true,
+            CommandKind::Assignment(_, _) | CommandKind::Skip | CommandKind::Placeholder => true,
             CommandKind::If(gcs) | CommandKind::Loop(_, gcs) => {
                 gcs.iter().all(|gc| gc.cmds.is_fully_annotated())
             }

@@ -1,18 +1,12 @@
 #![allow(non_snake_case)]
 
-use std::collections::{hash_map::Entry, HashMap, HashSet, VecDeque};
+use std::collections::HashMap;
 
 use chip::{
-    ast::{BExpr, Locator, Target},
-    ast_ext::FreeVariables,
+    model_check::{ReachableStates, State},
     parse::SourceSpan,
 };
 use itertools::Itertools;
-use mcltl::{
-    buchi::{Alphabet, AtomicProperty, ProductBuchi},
-    ltl::expression::Literal,
-    state::State as _,
-};
 use miette::Diagnostic;
 use serde::Serialize;
 use tsify::Tsify;
@@ -215,31 +209,6 @@ pub fn parse(src: &str) -> ParseResult {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, Eq, Hash)]
-enum State {
-    Initial,
-    Real(chip::interpreter::State),
-}
-
-impl mcltl::state::State for State {
-    fn initial() -> Self {
-        State::Initial
-    }
-
-    fn name(&self) -> String {
-        match self {
-            State::Initial => "INIT".to_string(),
-            State::Real(s) => s.raw_id(),
-        }
-    }
-}
-
-impl std::fmt::Display for State {
-    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
-        self.name().fmt(f)
-    }
-}
-
 #[derive(Debug, Clone, Serialize, Tsify)]
 #[tsify(into_wasm_abi)]
 pub struct LtLResult {
@@ -289,103 +258,64 @@ impl Drop for TimingGuard {
     }
 }
 
-#[wasm_bindgen]
+// #[wasm_bindgen]
 pub fn parse_ltl(src: &str) -> LtLResult {
     let timing = Timing::default();
 
     let res = timing.time("parse", || chip::parse::parse_ltl_program(src));
+    const FUEL: u32 = 5000;
 
     match res {
         Ok(ast) => {
-            let p = timing.time("compile", || {
-                chip::interpreter::Program::compile(
-                    &ast.commands,
-                    ast.properties
-                        .iter()
-                        .flat_map(|(_, property)| property.fv())
-                        .filter_map(|t| match t {
-                            Target::Variable(v) => Some(v),
-                            _ => None,
-                        })
-                        .chain(ast.initial.keys().cloned()),
-                )
-            });
-            let state = p.initial_state(|var| ast.initial.get(var).copied().unwrap_or_default());
-
-            let mut fuel: u32 = 5000;
-
-            // Explore the state space using a breath-first search
-            let mut states = Vec::new();
-            let mut visited = HashMap::new();
-            let mut relations: HashMap<usize, HashSet<_>> = HashMap::new();
-            let mut queue = VecDeque::new();
-            states.push(state.clone());
-            visited.insert(state.clone(), 0);
-            queue.push_back(0);
-
-            while let Some(state_id) = queue.pop_front() {
-                for next_state in states[state_id].step(&p).collect_vec() {
-                    if let Some(new_fuel) = fuel.checked_sub(1) {
-                        fuel = new_fuel;
-                    } else {
-                        return LtLResult {
-                            parse_error: false,
-                            markers: vec![(
-                                MarkerData {
-                                    related_information: None,
-                                    tags: None,
-                                    severity: MarkerSeverity::Error,
-                                    message: "Exploration of the state space".to_string(),
-                                    span: MonacoSpan::from_offset_len(src, 0, 0),
-                                },
-                                Vec::new(),
-                            )],
-                            ts_dot: "".to_string(),
-                            ts_map: Default::default(),
-                            kripke_str: "".to_string(),
-                            buchi_dot: "".to_string(),
-                            negated_nnf_ltl_property_str: "".to_string(),
-                            gbuchi_property_dot: "".to_string(),
-                            buchi_property_dot: "".to_string(),
-                            product_ba_dot: "".to_string(),
-                        };
-                    }
-
-                    let id = match visited.entry(next_state.clone()) {
-                        Entry::Occupied(id) => *id.get(),
-                        Entry::Vacant(v) => {
-                            let id = states.len();
-                            v.insert(id);
-                            states.push(next_state.clone());
-                            queue.push_back(id);
-                            id
-                        }
-                    };
-                    relations.entry(state_id).or_default().insert(id);
-                    relations.entry(id).or_default();
-                }
-            }
+            let Ok(rs) = ReachableStates::generate(&ast, FUEL) else {
+                return LtLResult {
+                    parse_error: false,
+                    markers: vec![(
+                        MarkerData {
+                            related_information: None,
+                            tags: None,
+                            severity: MarkerSeverity::Error,
+                            message: "Exploration of the state space".to_string(),
+                            span: MonacoSpan::from_offset_len(src, 0, 0),
+                        },
+                        Vec::new(),
+                    )],
+                    ts_dot: "".to_string(),
+                    ts_map: Default::default(),
+                    kripke_str: "".to_string(),
+                    buchi_dot: "".to_string(),
+                    negated_nnf_ltl_property_str: "".to_string(),
+                    gbuchi_property_dot: "".to_string(),
+                    buchi_property_dot: "".to_string(),
+                    product_ba_dot: "".to_string(),
+                };
+            };
 
             let ts_dot = format!(
                 "digraph G {{\n{}\n{}\n{}\n}}",
-                states
+                rs.states
                     .iter()
                     .enumerate()
-                    .map(|(idx, s)| format!("{}[label={:?}];", idx, s.format(&p).to_string()))
+                    .map(|(idx, s)| format!(
+                        "{}[label={:?}];",
+                        idx,
+                        s.format(&rs.program).to_string()
+                    ))
                     .format("\n"),
                 r#"init -> 0 ; init[label="",opacity=0]"#,
-                relations
+                rs.relations
                     .iter()
                     .flat_map(|(from, tos)| tos.iter().map(move |to| format!("{from} -> {to};")))
                     .format("\n"),
             );
-            let ts_map = states
+            let ts_map: HashMap<String, Vec<MonacoSpan>> = rs
+                .states
                 .iter()
                 .enumerate()
                 .map(|(idx, s)| {
                     (
                         idx.to_string(),
-                        s.spans(&p)
+                        s.spans(&rs.program)
                             .map(|span| MonacoSpan::from_source_span(src, span.cursor_at_start()))
                             .collect_vec(),
                     )
@@ -404,97 +334,20 @@ pub fn parse_ltl(src: &str) -> LtLResult {
             for (property_span, property) in &ast.properties {
                 // Build NNF LTL properties
 
-                let mut relational_properties = Vec::new();
+                let pl = rs.pipeline(property);
 
-                let ltl_property = !property.to_mcltl(&mut relational_properties);
-                let nnf_ltl_property = ltl_property.nnf();
-
-                let mut alphabet: Alphabet<Literal> = [
-                    Locator::Init.to_lit(),
-                    Locator::Stuck.to_lit(),
-                    Locator::Terminated.to_lit(),
-                ]
-                .into_iter()
-                .collect();
-
-                // tracing::debug!("{nnf_ltl_property:?}");
-
-                // Build the Kripke structure
-
-                let kripke = timing.time("kripke", || {
-                    let mut kripke: mcltl::verifier::kripke::KripkeStructure<State, Literal> =
-                        mcltl::verifier::kripke::KripkeStructure::new(
-                            [State::Real(states.first().unwrap().clone())].to_vec(),
-                        );
-                    let worlds: Vec<_> = states
-                        .iter()
-                        .map(|state| {
-                            let mut assignment = relational_properties
-                                .iter()
-                                .enumerate()
-                                .filter_map(|(idx, (l, op, r))| {
-                                    let holds = BExpr::Rel(l.clone(), *op, r.clone())
-                                        .evaluate(&p, state)
-                                        .is_ok_and(|x| x);
-                                    holds.then(|| Literal::from(format!("p{idx}")))
-                                })
-                                .collect::<<Literal as AtomicProperty>::Set>();
-
-                            if state.is_terminated(&p) {
-                                assignment.insert(Locator::Terminated.to_lit());
-                            } else if state.is_stuck(&p) {
-                                assignment.insert(Locator::Stuck.to_lit());
-                            } else if states.first().unwrap() == state {
-                                assignment.insert(Locator::Init.to_lit());
-                            }
-
-                            kripke.add_node(State::Real(state.clone()), assignment)
-                        })
-                        .collect();
-
-                    for (src, dsts) in relations.iter() {
-                        let worlds = &worlds;
-                        for dst in dsts.iter() {
-                            kripke.add_relation(worlds[*src], worlds[*dst]);
-                        }
-                    }
-                    kripke
-                });
-
-                // Build the Buchi automaton
-
-                // tracing::debug!("building Buchi automaton");
-                let buchi: mcltl::buchi::Buchi<State, Literal> = timing.time("buchi", || {
-                    let mut buchi = kripke.to_buchi(Some(&alphabet));
-                    timing.time("add_necessary_self_loops", || {
-                        buchi.add_necessary_self_loops()
-                    });
-                    buchi
-                });
-
-                // tracing::debug!("extracting Buchi automaton from LTL property");
-                let gbuchi_property =
-                    timing.time("gbuchi_property", || nnf_ltl_property.gba(Some(&alphabet)));
-
-                // tracing::debug!("converting generalized Buchi automaton into classic Buchi automaton");
-                let buchi_property = timing.time("buchi_property", || gbuchi_property.to_buchi());
-
-                // tracing::debug!("product automaton");
-                let product_ba = timing.time("product", || {
-                    // buchi.product(&buchi_property).pruned()
-                    ProductBuchi::new(&buchi, &buchi_property)
-                });
+                let product_ba = pl.product_ba();
 
                 if kripke_str.is_empty() {
-                    kripke_str = kripke.to_string();
+                    kripke_str = pl.kripke.to_string();
 
                     // NOTE: This is currently disabled since it's not rendered
                     // and takes a substantial time to create
                     timing.time("dot", || {
-                        buchi_dot = buchi.dot();
-                        negated_nnf_ltl_property_str = nnf_ltl_property.to_string();
-                        gbuchi_property_dot = gbuchi_property.dot();
-                        buchi_property_dot = buchi_property.dot();
+                        buchi_dot = pl.buchi.dot();
+                        negated_nnf_ltl_property_str = pl.nnf_ltl_property.to_string();
+                        gbuchi_property_dot = pl.gbuchi_property.dot();
+                        buchi_property_dot = pl.buchi_property.dot();
                         product_ba_dot = product_ba.dot();
                     });
                 }
@@ -506,7 +359,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                     let mut trace = Vec::new();
 
                     for (top, _) in cycle.iter() {
-                        let id = buchi.id(top);
+                        let id = pl.buchi.id(top);
 
                         if let State::Real(s) = id {
                             trace.push(s.clone());
@@ -516,12 +369,12 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                     let mut table = comfy_table::Table::new();
                     table.set_header(
                         std::iter::once("Step".to_string())
-                            .chain(p.variables().map(|v| v.to_string())),
+                            .chain(rs.program.variables().map(|v| v.to_string())),
                     );
                     for (idx, s) in trace.iter().enumerate() {
                         table.add_row(
                             std::iter::once((idx + 1).to_string())
-                                .chain(s.variables(&p).map(|(_, v)| v.to_string())),
+                                .chain(s.variables(&rs.program).map(|(_, v)| v.to_string())),
                         );
                     }
 
@@ -581,7 +434,8 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                             CellType::Plain,
                         ))
                         .chain(
-                            p.variables()
+                            rs.program
+                                .variables()
                                 .map(|v| (v.to_string(), Alignment::Right, CellType::Code)),
                         )
                         .collect(),
@@ -594,7 +448,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                                     Alignment::Right,
                                     CellType::Plain,
                                 ))
-                                .chain(s.variables(&p).map(|(_, value)| {
+                                .chain(s.variables(&rs.program).map(|(_, value)| {
                                     (value.to_string(), Alignment::Right, CellType::Code)
                                 }))
                                 .collect()
@@ -618,9 +472,11 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                             .iter()
                             .filter_map(|(state, _)| {
                                 Some(
-                                    states
+                                    rs.states
                                         .iter()
-                                        .position(|s| State::Real(s.clone()) == *buchi.id(state))?
+                                        .position(|s| {
+                                            State::Real(s.clone()) == *pl.buchi.id(state)
+                                        })?
                                         .to_string(),
                                 )
                             })

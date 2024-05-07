@@ -102,8 +102,19 @@ impl From<Array> for Target<()> {
     }
 }
 
-impl<Pred, Inv> Commands<Pred, Inv> {
-    pub fn is_syntactically_equiv(&self, p: &Commands<Pred, Inv>) -> bool {
+pub trait SyntacticallyEquiv {
+    #[allow(clippy::wrong_self_convention)]
+    fn is_syntactically_equiv(self, other: Self) -> bool;
+}
+
+impl<T: SyntacticallyEquiv, I: Iterator<Item = T> + ExactSizeIterator> SyntacticallyEquiv for I {
+    fn is_syntactically_equiv(self, other: Self) -> bool {
+        self.len() == other.len() && self.zip(other).all(|(a, b)| a.is_syntactically_equiv(b))
+    }
+}
+
+impl<Pred, Inv> SyntacticallyEquiv for &'_ Commands<Pred, Inv> {
+    fn is_syntactically_equiv(self, p: Self) -> bool {
         self.0.len() == p.0.len()
             && self
                 .0
@@ -113,9 +124,10 @@ impl<Pred, Inv> Commands<Pred, Inv> {
     }
 }
 
-impl<Pred, Inv> Command<Pred, Inv> {
-    pub fn is_syntactically_equiv(&self, p: &Command<Pred, Inv>) -> bool {
+impl<Pred, Inv> SyntacticallyEquiv for &'_ Command<Pred, Inv> {
+    fn is_syntactically_equiv(self, p: Self) -> bool {
         match (&self.kind, &p.kind) {
+            (CommandKind::Placeholder, _) | (_, CommandKind::Placeholder) => true,
             (CommandKind::Assignment(x1, a1), CommandKind::Assignment(x2, a2)) => {
                 x1 == x2 && a1 == a2
             }
@@ -126,15 +138,15 @@ impl<Pred, Inv> Command<Pred, Inv> {
                     && c1
                         .iter()
                         .zip(c2.iter())
-                        .all(|(g1, g2)| g1.is_synctactically_equiv(g2))
+                        .all(|(g1, g2)| g1.is_syntactically_equiv(g2))
             }
             _ => false,
         }
     }
 }
 
-impl<Pred, Inv> Guard<Pred, Inv> {
-    pub fn is_synctactically_equiv(&self, p: &Guard<Pred, Inv>) -> bool {
+impl<Pred, Inv> SyntacticallyEquiv for &'_ Guard<Pred, Inv> {
+    fn is_syntactically_equiv(self, p: Self) -> bool {
         self.guard == p.guard && self.cmds.is_syntactically_equiv(&p.cmds)
     }
 }
@@ -171,7 +183,7 @@ impl<Pred: FreeVariables, Inv: FreeVariables> CommandKind<Pred, Inv> {
     pub fn fv(&self) -> IndexSet<Target> {
         match self {
             CommandKind::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
-            CommandKind::Skip => IndexSet::default(),
+            CommandKind::Skip | CommandKind::Placeholder => IndexSet::default(),
             CommandKind::If(c) => c.as_slice().fv(),
             CommandKind::Loop(inv, c) => inv.fv().union(&c.as_slice().fv()).cloned().collect(),
         }

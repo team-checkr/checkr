@@ -116,6 +116,7 @@ LTLCommand: Command<(), ()> = {
 LTLCommandKind: CommandKind<(), ()> = {
     <Target> ":=" <AExpr>                       => CommandKind::Assignment(<>),
     "skip"                                      => CommandKind::Skip,
+    "placeholder"                               => CommandKind::Placeholder,
     "if" <LTLGuards> "fi"                          => CommandKind::If(<>),
     "do" <LTLGuards> "od" => CommandKind::Loop((), <>),
 };

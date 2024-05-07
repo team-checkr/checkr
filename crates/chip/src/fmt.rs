@@ -48,6 +48,7 @@ impl<Prev: Display, Inv: Display> Display for CommandKind<Prev, Inv> {
         match self {
             CommandKind::Assignment(target, expr) => write!(f, "{target} := {expr}"),
             CommandKind::Skip => write!(f, "skip"),
+            CommandKind::Placeholder => write!(f, "placeholder"),
             CommandKind::If(guards) => write!(f, "if {}\nfi", guards.iter().format("\n[] ")),
             CommandKind::Loop(inv, guards) => {
                 write!(f, "do[{inv}] {}\nod", guards.iter().format("\n[] "))

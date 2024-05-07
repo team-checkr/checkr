@@ -132,6 +132,9 @@ impl Program {
             CommandKind::Skip => {
                 self.push(Instr::Nop, Some(cmd.span));
             }
+            CommandKind::Placeholder => {
+                self.push(Instr::Nop, Some(cmd.span));
+            }
             CommandKind::If(guards) => {
                 let head = self.push(Instr::Nop, Some(cmd.span));
                 let mut choices = Vec::new();

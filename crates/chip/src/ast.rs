@@ -46,6 +46,7 @@ pub struct Command<Pred, Inv> {
 pub enum CommandKind<Pred, Inv> {
     Assignment(Target<Box<AExpr>>, AExpr),
     Skip,
+    Placeholder,
     If(Vec<Guard<Pred, Inv>>),
     Loop(Inv, Vec<Guard<Pred, Inv>>),
 }
