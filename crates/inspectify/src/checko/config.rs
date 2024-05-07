@@ -1,6 +1,6 @@
 //! Config definitions for program inputs and groups of group.
 
-use std::{fs, path::Path, sync::Arc};
+use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
 
 use ce_shell::{Analysis, Input};
 use color_eyre::{eyre::Context, Result};
@@ -168,6 +168,8 @@ pub struct GroupConfig {
     pub git: Option<SmolStr>,
     pub path: Option<SmolStr>,
     pub run: Option<SmolStr>,
+    #[serde(default)]
+    pub commit: BTreeMap<Analysis, SmolStr>,
 }
 
 pub fn read_programs(programs: impl AsRef<Path>) -> Result<ProgramsConfig> {

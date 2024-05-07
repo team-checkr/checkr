@@ -63,7 +63,7 @@ rand = { version = "0.8.5", features = ["small_rng"] }
 rusqlite = { version = "0.31.0", features = ["bundled", "chrono"] }
 serde = { version = "1.0.152", features = ["derive", "rc"] }
 serde_json = "1.0.91"
-smtlib = { version = "0.2.0", features = ["tokio"] }
+smtlib = { version = "0.2.0" }
 stdx = { path = "./crates/stdx" }
 # tapi = { path = "../tapi/crates/tapi", features = ["chrono", "toml"] }
 tapi = { git = "https://github.com/oeb25/tapi.git", features = [

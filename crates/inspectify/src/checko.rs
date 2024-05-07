@@ -235,7 +235,9 @@ impl Checko {
 
                 git_pull_result?;
 
-                if let Some(deadline) = deadline {
+                if let Some(commit) = config.commit.get(&analysis) {
+                    gitty::checkout_commit(&group_path, commit).await?;
+                } else if let Some(deadline) = deadline {
                     let _found_any = gitty::checkout_latest_before(
                         git,
                         &group_path,

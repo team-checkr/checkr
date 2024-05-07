@@ -182,3 +182,18 @@ pub async fn checkout_latest_before(
         .wrap_err_with(|| format!("could not checkout latest commit: {commit_rev}"))?;
     Ok(true)
 }
+
+pub async fn checkout_commit(group_path: impl AsRef<Path>, commit: &str) -> color_eyre::Result<()> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
+    tracing::debug!(?commit, "checking out commit");
+    Command::new("git")
+        .arg("checkout")
+        .arg(commit)
+        .env("GIT_SSH_COMMAND", GIT_SSH_COMMAND.as_str())
+        .current_dir(group_path)
+        .success_without_output()
+        .await
+        .wrap_err_with(|| format!("could not checkout commit: {commit}"))?;
+    Ok(())
+}

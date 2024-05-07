@@ -89,7 +89,8 @@ export type GroupConfig = {
   "name": inspectify.checko.config.GroupName,
   "git": (string | null),
   "path": (string | null),
-  "run": (string | null)
+  "run": (string | null),
+  "commit": Record<ce_shell.Analysis, string>
 };
 export namespace Calculator {
   export type Input = {
@@ -336,9 +337,6 @@ export namespace inspectify {
     }
   }
   export namespace endpoints {
-    export type GenerateParams = {
-      "analysis": ce_shell.Analysis
-    };
     export type Event =
       | { "type": "Reset" }
       | { "type": "CompilationStatus", "value": { "status": (inspectify.endpoints.CompilationStatus | null) } }
@@ -346,14 +344,17 @@ export namespace inspectify {
       | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
       | { "type": "GroupsConfig", "value": { "config": inspectify.checko.config.GroupsConfig } }
       | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type ReferenceExecution = {
       "meta": ce_shell.io.Meta,
       "output": (ce_shell.io.Output | null),
       "error": (string | null)
     };
+    export type GenerateParams = {
+      "analysis": ce_shell.Analysis
+    };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type Job = {
       "id": driver.job.JobId,
       "state": driver.job.JobState,
