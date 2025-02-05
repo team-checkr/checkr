@@ -86,28 +86,28 @@ const sse =
   };
 
 export type GroupConfig = {
-  "name": inspectify.checko.config.GroupName,
-  "git": (string | null),
-  "path": (string | null),
-  "run": (string | null),
-  "commit": Record<ce_shell.Analysis, string>
+  name: inspectify.checko.config.GroupName,
+  git: (string | null),
+  path: (string | null),
+  run: (string | null),
+  commit: Record<ce_shell.Analysis, string>
 };
 export namespace Calculator {
   export type Input = {
-    "expression": string
+    expression: string
   };
   export type Output = {
-    "result": string,
-    "error": string
+    result: string,
+    error: string
   };
 }
 export namespace Compiler {
   export type Input = {
-    "commands": string,
-    "determinism": GCL.Determinism
+    commands: string,
+    determinism: GCL.Determinism
   };
   export type Output = {
-    "dot": string
+    dot: string
   };
 }
 export namespace GCL {
@@ -116,8 +116,8 @@ export namespace GCL {
     | "NonDeterministic";
   export const DETERMINISM: Determinism[] = ["Deterministic", "NonDeterministic"];
   export type TargetDef = {
-    "name": string,
-    "kind": GCL.TargetKind
+    name: string,
+    kind: GCL.TargetKind
   };
   export type TargetKind =
     | "Variable"
@@ -128,21 +128,21 @@ export namespace GCL {
 }
 export namespace Interpreter {
   export type Input = {
-    "commands": string,
-    "determinism": GCL.Determinism,
-    "assignment": Interpreter.InterpreterMemory,
-    "trace_length": number
+    commands: string,
+    determinism: GCL.Determinism,
+    assignment: Interpreter.InterpreterMemory,
+    trace_length: number
   };
   export type Output = {
-    "initial_node": string,
-    "final_node": string,
-    "dot": string,
-    "trace": Interpreter.Step[],
-    "termination": Interpreter.TerminationState
+    initial_node: string,
+    final_node: string,
+    dot: string,
+    trace: Interpreter.Step[],
+    termination: Interpreter.TerminationState
   };
   export type InterpreterMemory = {
-    "variables": Record<GCL.Variable, number>,
-    "arrays": Record<GCL.Array, number[]>
+    variables: Record<GCL.Variable, number>,
+    arrays: Record<GCL.Array, number[]>
   };
   export type TerminationState =
     | "Running"
@@ -150,61 +150,61 @@ export namespace Interpreter {
     | "Terminated";
   export const TERMINATION_STATE: TerminationState[] = ["Running", "Stuck", "Terminated"];
   export type Step = {
-    "action": string,
-    "node": string,
-    "memory": Interpreter.InterpreterMemory
+    action: string,
+    node: string,
+    memory: Interpreter.InterpreterMemory
   };
 }
 export namespace Parser {
   export type Input = {
-    "commands": string
+    commands: string
   };
   export type Output = {
-    "pretty": string
+    pretty: string
   };
 }
 export namespace SecurityAnalysis {
   export type Input = {
-    "commands": string,
-    "classification": Record<string, string>,
-    "lattice": SecurityAnalysis.SecurityLatticeInput
+    commands: string,
+    classification: Record<string, string>,
+    lattice: SecurityAnalysis.SecurityLatticeInput
   };
   export type Output = {
-    "actual": SecurityAnalysis.Flow[],
-    "allowed": SecurityAnalysis.Flow[],
-    "violations": SecurityAnalysis.Flow[],
-    "is_secure": boolean
+    actual: SecurityAnalysis.Flow[],
+    allowed: SecurityAnalysis.Flow[],
+    violations: SecurityAnalysis.Flow[],
+    is_secure: boolean
   };
   export type Meta = {
-    "lattice": SecurityAnalysis.SecurityLattice,
-    "targets": GCL.TargetDef[]
+    lattice: SecurityAnalysis.SecurityLattice,
+    targets: GCL.TargetDef[]
   };
   export type SecurityLatticeInput = {
-    "rules": SecurityAnalysis.Flow[]
+    rules: SecurityAnalysis.Flow[]
   };
   export type SecurityLattice = {
-    "allowed": SecurityAnalysis.Flow[]
+    allowed: SecurityAnalysis.Flow[]
   };
   export type Flow = {
-    "from": string,
-    "into": string
+    from: string,
+    into: string
   };
 }
 export namespace SignAnalysis {
   export type Input = {
-    "commands": string,
-    "determinism": GCL.Determinism,
-    "assignment": SignAnalysis.SignMemory
+    commands: string,
+    determinism: GCL.Determinism,
+    assignment: SignAnalysis.SignMemory
   };
   export type Output = {
-    "initial_node": string,
-    "final_node": string,
-    "nodes": Record<string, SignAnalysis.SignMemory[]>,
-    "dot": string
+    initial_node: string,
+    final_node: string,
+    nodes: Record<string, SignAnalysis.SignMemory[]>,
+    dot: string
   };
   export type SignMemory = {
-    "variables": Record<GCL.Variable, SignAnalysis.Sign>,
-    "arrays": Record<GCL.Array, SignAnalysis.Sign[]>
+    variables: Record<GCL.Variable, SignAnalysis.Sign>,
+    arrays: Record<GCL.Array, SignAnalysis.Sign[]>
   };
   export type Sign =
     | "Positive"
@@ -215,18 +215,18 @@ export namespace SignAnalysis {
 export namespace ce_core {
   export type ValidationResult =
     | { "type": "CorrectTerminated" }
-    | { "type": "CorrectNonTerminated", "iterations": number }
-    | { "type": "Mismatch", "reason": string }
+    | { "type": "CorrectNonTerminated", iterations: number }
+    | { "type": "Mismatch", reason: string }
     | { "type": "TimeOut" };
 }
 export namespace ce_shell {
   export type Envs =
-    | { "analysis": "Calculator", "io": { "input": Calculator.Input, "output": Calculator.Output, "meta": void } }
-    | { "analysis": "Parser", "io": { "input": Parser.Input, "output": Parser.Output, "meta": void } }
-    | { "analysis": "Compiler", "io": { "input": Compiler.Input, "output": Compiler.Output, "meta": void } }
-    | { "analysis": "Interpreter", "io": { "input": Interpreter.Input, "output": Interpreter.Output, "meta": GCL.TargetDef[] } }
-    | { "analysis": "Security", "io": { "input": SecurityAnalysis.Input, "output": SecurityAnalysis.Output, "meta": SecurityAnalysis.Meta } }
-    | { "analysis": "Sign", "io": { "input": SignAnalysis.Input, "output": SignAnalysis.Output, "meta": GCL.TargetDef[] } };
+    | { "analysis": "Calculator", "io": { input: Calculator.Input, output: Calculator.Output, meta: void } }
+    | { "analysis": "Parser", "io": { input: Parser.Input, output: Parser.Output, meta: void } }
+    | { "analysis": "Compiler", "io": { input: Compiler.Input, output: Compiler.Output, meta: void } }
+    | { "analysis": "Interpreter", "io": { input: Interpreter.Input, output: Interpreter.Output, meta: GCL.TargetDef[] } }
+    | { "analysis": "Security", "io": { input: SecurityAnalysis.Input, output: SecurityAnalysis.Output, meta: SecurityAnalysis.Meta } }
+    | { "analysis": "Sign", "io": { input: SignAnalysis.Input, output: SignAnalysis.Output, meta: GCL.TargetDef[] } };
   export type Analysis =
     | "Calculator"
     | "Parser"
@@ -237,21 +237,21 @@ export namespace ce_shell {
   export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "Security", "Sign"];
   export namespace io {
     export type Input = {
-      "analysis": ce_shell.Analysis,
-      "json": any,
-      "hash": ce_shell.io.Hash
-    };
-    export type Hash = {
-      "bytes": number[]
+      analysis: ce_shell.Analysis,
+      json: any,
+      hash: ce_shell.io.Hash
     };
     export type Meta = {
-      "analysis": ce_shell.Analysis,
-      "json": any
+      analysis: ce_shell.Analysis,
+      json: any
+    };
+    export type Hash = {
+      bytes: number[]
     };
     export type Output = {
-      "analysis": ce_shell.Analysis,
-      "json": any,
-      "hash": ce_shell.io.Hash
+      analysis: ce_shell.Analysis,
+      json: any,
+      hash: ce_shell.io.Hash
     };
   }
 }
@@ -306,87 +306,87 @@ export namespace inspectify {
     export const GROUP_STATUS: GroupStatus[] = ["Initial", "CheckingForUpdate", "Compiling", "Testing", "CompilationError", "Finished"];
     export namespace config {
       export type GroupsConfig = {
-        "ignored_authors": string[],
-        "groups": GroupConfig[]
+        ignored_authors: string[],
+        groups: GroupConfig[]
       };
       export type GroupName = string;
     }
     export namespace scoreboard {
       export type PublicState = {
-        "last_finished": (string | null),
-        "analysis": inspectify.checko.scoreboard.PublicAnalysis[],
-        "groups": inspectify.checko.scoreboard.PublicGroup[]
+        last_finished: (string | null),
+        analysis: inspectify.checko.scoreboard.PublicAnalysis[],
+        groups: inspectify.checko.scoreboard.PublicGroup[]
       };
       export type PublicAnalysis = {
-        "analysis": ce_shell.Analysis,
-        "programs": (ce_shell.io.Input | null)[]
+        analysis: ce_shell.Analysis,
+        programs: (ce_shell.io.Input | null)[]
       };
       export type PublicGroup = {
-        "name": inspectify.checko.config.GroupName,
-        "analysis_results": inspectify.checko.scoreboard.PublicAnalysisResults[]
+        name: inspectify.checko.config.GroupName,
+        analysis_results: inspectify.checko.scoreboard.PublicAnalysisResults[]
       };
       export type PublicAnalysisResults = {
-        "analysis": ce_shell.Analysis,
-        "status": inspectify.checko.GroupStatus,
-        "last_hash": (string | null),
-        "results": inspectify.checko.scoreboard.PublicProgramResult[]
+        analysis: ce_shell.Analysis,
+        status: inspectify.checko.GroupStatus,
+        last_hash: (string | null),
+        results: inspectify.checko.scoreboard.PublicProgramResult[]
       };
       export type PublicProgramResult = {
-        "state": driver.job.JobState
+        state: driver.job.JobState
       };
     }
   }
   export namespace endpoints {
-    export type Event =
-      | { "type": "Reset" }
-      | { "type": "CompilationStatus", "value": { "status": (inspectify.endpoints.CompilationStatus | null) } }
-      | { "type": "JobChanged", "value": { "job": inspectify.endpoints.Job } }
-      | { "type": "JobsChanged", "value": { "jobs": driver.job.JobId[] } }
-      | { "type": "GroupsConfig", "value": { "config": inspectify.checko.config.GroupsConfig } }
-      | { "type": "ProgramsConfig", "value": { "programs": inspectify.endpoints.Program[] } };
     export type ReferenceExecution = {
-      "meta": ce_shell.io.Meta,
-      "output": (ce_shell.io.Output | null),
-      "error": (string | null)
-    };
-    export type GenerateParams = {
-      "analysis": ce_shell.Analysis
+      meta: ce_shell.io.Meta,
+      output: (ce_shell.io.Output | null),
+      error: (string | null)
     };
     export type PublicEvent =
       | { "type": "Reset" }
       | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
-    export type Job = {
-      "id": driver.job.JobId,
-      "state": driver.job.JobState,
-      "kind": driver.job.JobKind,
-      "group_name": (inspectify.checko.config.GroupName | null),
-      "stdout": string,
-      "spans": inspectify.endpoints.Span[],
-      "analysis_data": (inspectify.endpoints.AnalysisData | null)
+    export type GenerateParams = {
+      analysis: ce_shell.Analysis
     };
+    export type Event =
+      | { "type": "Reset" }
+      | { "type": "CompilationStatus", "value": { status: inspectify.endpoints.CompilationStatus } }
+      | { "type": "JobChanged", "value": { job: inspectify.endpoints.Job } }
+      | { "type": "JobsChanged", "value": { jobs: driver.job.JobId[] } }
+      | { "type": "GroupsConfig", "value": { config: inspectify.checko.config.GroupsConfig } }
+      | { "type": "ProgramsConfig", "value": { programs: inspectify.endpoints.Program[] } };
     export type AnalysisExecution = {
-      "id": driver.job.JobId
+      id: driver.job.JobId
     };
     export type CompilationStatus = {
-      "id": driver.job.JobId,
-      "state": driver.job.JobState,
-      "error_output": (inspectify.endpoints.Span[] | null)
+      id: (driver.job.JobId | null),
+      state: driver.job.JobState,
+      error_output: (inspectify.endpoints.Span[] | null)
+    };
+    export type Job = {
+      id: driver.job.JobId,
+      state: driver.job.JobState,
+      kind: driver.job.JobKind,
+      group_name: (inspectify.checko.config.GroupName | null),
+      stdout: string,
+      spans: inspectify.endpoints.Span[],
+      analysis_data: (inspectify.endpoints.AnalysisData | null)
     };
     export type Program = {
-      "hash": ce_shell.io.Hash,
-      "hash_str": string,
-      "input": ce_shell.io.Input
+      hash: ce_shell.io.Hash,
+      hash_str: string,
+      input: ce_shell.io.Input
     };
     export type Span = {
-      "text": string,
-      "fg": (driver.ansi.Color | null),
-      "bg": (driver.ansi.Color | null)
+      text: string,
+      fg: (driver.ansi.Color | null),
+      bg: (driver.ansi.Color | null)
     };
     export type AnalysisData = {
-      "meta": ce_shell.io.Meta,
-      "output": (ce_shell.io.Output | null),
-      "reference_output": (ce_shell.io.Output | null),
-      "validation": (ce_core.ValidationResult | null)
+      meta: ce_shell.io.Meta,
+      output: (ce_shell.io.Output | null),
+      reference_output: (ce_shell.io.Output | null),
+      validation: (ce_core.ValidationResult | null)
     };
   }
 }

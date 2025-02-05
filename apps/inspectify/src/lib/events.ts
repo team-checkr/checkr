@@ -92,16 +92,6 @@ if (browser) {
           programsStore.set(msg.data.value.programs);
           break;
         }
-        case 'GroupProgramJobAssigned': {
-          const { group, program, job_id } = msg.data.value;
-          groupProgramJobAssignedStore.update(
-            produce((x) => {
-              if (!x[group]) x[group] = {};
-              x[group][program.hash_str] = job_id;
-            }),
-          );
-          break;
-        }
       }
     });
   }, 100);

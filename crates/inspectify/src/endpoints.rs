@@ -170,7 +170,7 @@ fn periodic_stream<T: Clone + Send + PartialEq + 'static, S: Send + 'static>(
 enum Event {
     Reset,
     CompilationStatus {
-        status: Option<CompilationStatus>,
+        status: CompilationStatus,
     },
     JobChanged {
         job: Job,
@@ -283,24 +283,32 @@ async fn events(State(state): State<AppState>) -> tapi::endpoints::Sse<Event> {
                     .map(|job| (job.clone(), job.state()))
             },
             |cached| Event::CompilationStatus {
-                status: cached.clone().map(|(job, state)| CompilationStatus {
-                    id: job.id(),
-                    state,
-                    error_output: if job.state() == JobState::Failed {
-                        let combined = job.stdout_and_stderr();
-                        let spans = driver::ansi::parse_ansi(&combined)
-                            .into_iter()
-                            .map(|s| Span {
-                                text: s.text,
-                                fg: s.fg,
-                                bg: s.bg,
-                            })
-                            .collect();
-                        Some(spans)
-                    } else {
-                        None
-                    },
-                }),
+                status: if let Some((job, state)) = cached.clone() {
+                    CompilationStatus {
+                        id: Some(job.id()),
+                        state,
+                        error_output: if job.state() == JobState::Failed {
+                            let combined = job.stdout_and_stderr();
+                            let spans = driver::ansi::parse_ansi(&combined)
+                                .into_iter()
+                                .map(|s| Span {
+                                    text: s.text,
+                                    fg: s.fg,
+                                    bg: s.bg,
+                                })
+                                .collect();
+                            Some(spans)
+                        } else {
+                            None
+                        },
+                    }
+                } else {
+                    CompilationStatus {
+                        id: None,
+                        state: JobState::Succeeded,
+                        error_output: None,
+                    }
+                },
             },
             tx.clone(),
         );
@@ -352,6 +360,7 @@ async fn exec_analysis(
     Json(input): Json<ce_shell::Input>,
 ) -> Json<Option<AnalysisExecution>> {
     let Some(driver) = state.driver.as_ref() else {
+        tracing::warn!("driver is not available");
         return Json(None);
     };
     let output = driver.exec_job(&input, InspectifyJobMeta::default());
@@ -401,7 +410,7 @@ enum JobOutput {
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 struct CompilationStatus {
-    id: JobId,
+    id: Option<JobId>,
     state: JobState,
     error_output: Option<Vec<Span>>,
 }

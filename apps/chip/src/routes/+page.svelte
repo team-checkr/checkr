@@ -22,7 +22,7 @@ fi
 
   let parseError = writable(false);
 
-  const STATES = ['idle', 'verifying', 'verified', 'error'];
+  const STATES = ['idle', 'verifying', 'verified', 'error'] as const;
   type State = (typeof STATES)[number];
   let state = writable<State>('idle');
 

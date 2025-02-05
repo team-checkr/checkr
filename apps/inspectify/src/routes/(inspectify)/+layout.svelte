@@ -30,8 +30,10 @@
     {#each ANALYSIS as o}
       <a
         href="/env/{o}"
-        class="flex items-center px-2 transition hover:bg-slate-800"
-        class:active={$page.url.pathname == `/env/${o}`}>{o}</a
+        class="flex items-center px-2 transition hover:bg-slate-800 {$page.url.pathname ==
+        `/env/${o}`
+          ? 'bg-slate-700'
+          : ''}">{o}</a
       >
     {/each}
   </div>

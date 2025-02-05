@@ -25,6 +25,7 @@ impl RunRunOption {
 #[derive(Debug, Clone, PartialEq, Serialize, Deserialize)]
 pub struct RunOption {
     pub run: RunRunOption,
+    #[serde(default)]
     pub compile: Option<String>,
     #[serde(default)]
     pub watch: Vec<String>,

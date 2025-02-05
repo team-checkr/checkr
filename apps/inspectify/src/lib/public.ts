@@ -2,10 +2,10 @@ import { browser } from '$app/environment';
 import { readonly, writable } from 'svelte/store';
 import { api, type inspectify } from './api';
 
-const publicDataAnalysis = writable<inspectify.endpoints.PublicAnalysis[]>([]);
+const publicDataAnalysis = writable<inspectify.checko.scoreboard.PublicAnalysis[]>([]);
 export const publicDataAnalysisStore = readonly(publicDataAnalysis);
 
-const publicDataGroups = writable<inspectify.endpoints.PublicGroup[]>([]);
+const publicDataGroups = writable<inspectify.checko.scoreboard.PublicGroup[]>([]);
 export const publicDataGroupsStore = readonly(publicDataGroups);
 
 const lastFinished = writable<Date | null>(null);
