@@ -8,11 +8,13 @@
   import ArrowDownTray from '~icons/heroicons/arrow-down-tray';
   import { api } from '$lib/api';
 
-  let analysisStore = $publicDataAnalysisStore;
-  let groupsStore = $publicDataGroupsStore;
-  $: numberOfPrograms = $publicDataAnalysisStore.reduce((acc, analysis) => {
-    return acc + analysis.programs.length;
-  }, 0);
+  let analysisStore = $state($publicDataAnalysisStore);
+  let groupsStore = $state($publicDataGroupsStore);
+  let numberOfPrograms = $derived(
+    $publicDataAnalysisStore.reduce((acc, analysis) => {
+      return acc + analysis.programs.length;
+    }, 0),
+  );
 
   const animationDuration = 500;
 
@@ -42,7 +44,7 @@
     <span>Checko</span>
   </a>
 
-  <div class="flex-1" />
+  <div class="flex-1"></div>
   <div class="flex space-x-2 py-1">
     <div class="flex space-x-1">
       <span class="italic text-slate-400">Last update:</span>
@@ -58,7 +60,7 @@
           }).format($lastFinishedStore)}</span
       >
     </div>
-    <button class="-m-1 rounded p-1 transition hover:bg-slate-600" on:click={downloadCsv}>
+    <button class="-m-1 rounded p-1 transition hover:bg-slate-600" onclick={downloadCsv}>
       <ArrowDownTray />
     </button>
   </div>
@@ -69,7 +71,7 @@
     class="grid self-start border-l"
     style="grid-template-columns: var(--name-width) repeat({numberOfPrograms}, 1fr);"
   >
-    <div />
+    <div></div>
     {#each analysisStore as analysis (analysis)}
       <div
         class="border px-3 py-2 text-center text-xl font-bold italic"

@@ -8,16 +8,21 @@
 
   import ArrowPath from '~icons/heroicons/arrow-path';
   import Fire from '~icons/heroicons/fire';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
 
-  $: compilationJob =
-    typeof $compilationStatusStore?.id == 'number' ? $jobsStore[$compilationStatusStore.id] : null;
-  $: compilationError = $compilationStatusStore?.state == 'Failed';
+  let { children }: Props = $props();
+
+  let compilationJob =
+    $derived(typeof $compilationStatusStore?.id == 'number' ? $jobsStore[$compilationStatusStore.id] : null);
+  let compilationError = $derived($compilationStatusStore?.state == 'Failed');
 </script>
 
 <div class="relative grid grid-rows-[1fr_auto]">
   <main class="relative grid h-full">
     <div class="absolute inset-0 grid">
-      <slot />
+      {@render children?.()}
     </div>
   </main>
 

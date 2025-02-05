@@ -1,9 +1,13 @@
 <script lang="ts">
   import JsonViewInner from './JSONViewInner.svelte';
 
-  export let json: any;
+  interface Props {
+    json: any;
+  }
 
-  let raw = false;
+  let { json }: Props = $props();
+
+  let raw = $state(false);
 </script>
 
 <div class="relative w-full p-1">

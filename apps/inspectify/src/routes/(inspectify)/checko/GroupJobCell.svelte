@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type inspectify, type driver } from '$lib/api';
+  import { type inspectify, type GroupConfig, type driver } from '$lib/api';
   import { groupProgramJobAssignedStore, jobsStore } from '$lib/events';
   import { selectedJobId, showStatus } from '$lib/jobs';
 
@@ -12,13 +12,17 @@
   import Clock from '~icons/heroicons/clock';
   import Trash from '~icons/heroicons/Trash';
 
-  export let group: inspectify.checko.config.GroupConfig;
-  export let program: inspectify.endpoints.Program;
+  interface Props {
+    group: GroupConfig;
+    program: inspectify.endpoints.Program;
+  }
 
-  $: jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
-  $: job = $jobsStore[jobId];
-  $: validation = $job?.analysis_data?.validation?.type;
-  $: state = validation == 'Mismatch' ? 'Warning' : $job?.state ?? 'Queued';
+  let { group, program }: Props = $props();
+
+  let jobId = $derived($groupProgramJobAssignedStore?.[group.name]?.[program.hash_str]);
+  let job = $derived($jobsStore[jobId]);
+  let validation = $derived($job?.analysis_data?.validation?.type);
+  let state = $derived(validation == 'Mismatch' ? 'Warning' : ($job?.state ?? 'Queued'));
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse', ''],
@@ -31,17 +35,19 @@
     OutputLimitExceeded: [Trash, '', 'bg-orange-400'],
   };
 
-  $: icon = icons[state][0];
-  $: iconClass = icons[state][1];
-  $: containerClass = icons[state][2];
+  let icon = $derived(icons[state][0]);
+  let iconClass = $derived(icons[state][1]);
+  let containerClass = $derived(icons[state][2]);
+
+  const SvelteComponent = $derived(icon);
 </script>
 
 <button
   class="grid h-full place-items-center p-2 transition {containerClass}"
-  on:click={() => {
+  onclick={() => {
     $selectedJobId = jobId;
     $showStatus = true;
   }}
 >
-  <svelte:component this={icon} class="h-6 w-6 text-white transition {iconClass}" />
+  <SvelteComponent class="h-6 w-6 text-white transition {iconClass}" />
 </button>

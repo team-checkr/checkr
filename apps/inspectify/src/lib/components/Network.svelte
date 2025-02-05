@@ -1,14 +1,20 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { mirage } from 'ayu';
   import { onMount } from 'svelte';
   import type { Network } from 'vis-network/esnext';
 
-  export let dot: string;
+  interface Props {
+    dot: string;
+  }
 
-  let container: HTMLDivElement;
-  let network: Network | void;
+  let { dot }: Props = $props();
 
-  $: redraw = async () => {
+  let container: HTMLDivElement | undefined = $state();
+  let network: Network | undefined = $state();
+
+  let redraw = $derived(async () => {
     let preDot = dot;
     const vis = await import('vis-network/esnext');
     if (preDot != dot) return;
@@ -17,6 +23,8 @@
     if (network) {
       network.setData(data);
     } else {
+      if (!container) return;
+
       network = new vis.Network(container, data, {
         // interaction: { zoomView: false },
         nodes: {
@@ -47,9 +55,10 @@
         autoResize: true,
       });
     }
-  };
+  });
 
   onMount(() => {
+    if (!container) return;
     const observer = new ResizeObserver(() => {
       requestAnimationFrame(() => {
         if (network) {
@@ -66,9 +75,9 @@
     redraw();
   });
 
-  $: {
+  run(() => {
     dot && network && redraw();
-  }
+  });
 </script>
 
 <div class="relative h-full w-full">

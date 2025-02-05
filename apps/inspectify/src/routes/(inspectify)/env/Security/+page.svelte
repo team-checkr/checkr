@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { browser } from '$app/environment';
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
@@ -13,11 +15,12 @@
 
   const io = useIo('Security', { commands: 'skip', classification: {}, lattice: { rules: [] } });
   const { input, meta } = io;
-  $: targets = $meta?.targets ?? [];
-  $: classes =
+  let targets = $derived($meta?.targets ?? []);
+  let classes = $derived(
     $meta?.lattice.allowed
       .flatMap((a) => [a.from, a.into])
-      .filter((v, i, a) => a.indexOf(v) === i) ?? [];
+      .filter((v, i, a) => a.indexOf(v) === i) ?? [],
+  );
 
   const stringify = (l: SecurityAnalysis.SecurityLatticeInput): string =>
     l.rules.map((a) => `${a.from} < ${a.into}`).join(', ');
@@ -30,26 +33,31 @@
     return { rules };
   };
 
-  $: if (browser && classes.length > 0) {
-    for (const v of targets) {
-      if (!(v.name in $input.classification) || !classes.includes($input.classification[v.name])) {
-        $input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
+  run(() => {
+    if (browser && classes.length > 0) {
+      for (const v of targets) {
+        if (
+          !(v.name in $input.classification) ||
+          !classes.includes($input.classification[v.name])
+        ) {
+          $input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
+        }
+      }
+      const toDelete: string[] = [];
+      for (const v of Object.keys($input.classification)) {
+        if (!targets.find((t) => t.name === v)) {
+          toDelete.push(v);
+        }
+      }
+      for (const v of toDelete) {
+        delete $input.classification[v];
       }
     }
-    const toDelete: string[] = [];
-    for (const v of Object.keys($input.classification)) {
-      if (!targets.find((t) => t.name === v)) {
-        toDelete.push(v);
-      }
-    }
-    for (const v of toDelete) {
-      delete $input.classification[v];
-    }
-  }
+  });
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
+  {#snippet inputView()}
     <StandardInput analysis="Security" code="commands" {io}>
       <InputOptions title="Security Lattice">
         <InputOption title="Lattice">
@@ -78,8 +86,8 @@
         </div>
       </InputOptions>
     </StandardInput>
-  </svelte:fragment>
-  <svelte:fragment slot="output" let:output>
+  {/snippet}
+  {#snippet outputView({ output })}
     <div>
       <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Computed flows</h1>
       <div class="grid min-h-0 grid-cols-[auto_1fr] gap-y-5 p-2">
@@ -96,7 +104,7 @@
             {/each}
           </div>
         {/each}
-        <div />
+        <div></div>
         <div class="flex">
           <div
             class="flex items-center space-x-1 rounded px-2 py-1 text-white transition {output.is_secure
@@ -114,5 +122,5 @@
         </div>
       </div>
     </div>
-  </svelte:fragment>
+  {/snippet}
 </Env>

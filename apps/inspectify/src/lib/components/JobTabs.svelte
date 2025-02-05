@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { type Tab, currentTab, tabs } from '$lib/jobs';
   import Ansi from '$lib/components/Ansi.svelte';
   import JsonView from './JSONView.svelte';
@@ -6,15 +8,22 @@
   import type { ce_core } from '$lib/api';
   import type { Job } from '$lib/events';
 
-  export let selectedJob: Job;
-  export let canHide = false;
-  export let hidden = canHide;
-
-  $: if (selectedJob?.kind.kind == 'Compilation') {
-    $currentTab = 'Output';
+  interface Props {
+    selectedJob: Job;
+    canHide?: boolean;
+    hidden?: any;
   }
-  $: isDisabled = (tab: Tab) =>
-    selectedJob ? tab != 'Output' && selectedJob.kind.kind == 'Compilation' : true;
+
+  let { selectedJob, canHide = false, hidden = $bindable(canHide) }: Props = $props();
+
+  run(() => {
+    if (selectedJob?.kind.kind == 'Compilation') {
+      $currentTab = 'Output';
+    }
+  });
+  let isDisabled = $derived((tab: Tab) =>
+    selectedJob ? tab != 'Output' && selectedJob.kind.kind == 'Compilation' : true,
+  );
 
   const validationTypeSymbols: Record<ce_core.ValidationResult['type'], string> = {
     CorrectTerminated: '✅',
@@ -33,7 +42,7 @@
         isDisabled(tab)
           ? 'bg-slate-700'
           : 'hover:bg-slate-800'}"
-        on:click={() => {
+        onclick={() => {
           if (canHide && $currentTab == tab) {
             hidden = !hidden;
           } else {
@@ -63,7 +72,7 @@
           </TrackingScroll>
         {:else if $currentTab == 'Input JSON' && selectedJob.kind.kind == 'Analysis'}
           <JsonView json={selectedJob.kind.data.json} />
-          <div class="[overflow-anchor:auto]" />
+          <div class="[overflow-anchor:auto]"></div>
         {:else if $currentTab == 'Output JSON'}
           {#if selectedJob.analysis_data?.output}
             <JsonView json={selectedJob.analysis_data.output.json} />
@@ -79,13 +88,13 @@
               {/if}
             </div>
           {/if}
-          <div class="[overflow-anchor:auto]" />
+          <div class="[overflow-anchor:auto]"></div>
         {:else if $currentTab == 'Reference Output'}
           <JsonView json={selectedJob.analysis_data?.reference_output?.json} />
-          <div class="[overflow-anchor:auto]" />
+          <div class="[overflow-anchor:auto]"></div>
         {:else if $currentTab == 'Validation'}
           <JsonView json={selectedJob.analysis_data?.validation} />
-          <div class="[overflow-anchor:auto]" />
+          <div class="[overflow-anchor:auto]"></div>
         {/if}
       </div>
     </div>

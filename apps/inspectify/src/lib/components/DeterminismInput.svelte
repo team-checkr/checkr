@@ -4,7 +4,11 @@
   import { GCL } from '$lib/api';
   import InputOption from './InputOption.svelte';
 
-  export let input: Writable<{ determinism: GCL.Determinism }>;
+  interface Props {
+    input: Writable<{ determinism: GCL.Determinism }>;
+  }
+
+  let { input }: Props = $props();
 </script>
 
 <InputOption title="Determinism">

@@ -1,3 +1,7 @@
+<!-- @migration-task Error while migrating Svelte code: can't migrate `$: includedAnalysis = ce_shell.ANALYSIS.filter((a) =>
+    $programsStore.find((p) => p.input.analysis == a),
+  );` to `$derived` because there's a variable named derived.
+     Rename the variable and try again or migrate by hand. -->
 <script lang="ts">
   import { ce_shell, driver, type inspectify } from '$lib/api';
   import JobPane from '$lib/components/JobPane.svelte';
@@ -64,7 +68,7 @@
       style="grid-template-columns: auto repeat({$programsStore.length}, 1fr);"
     >
       {#if $groupsConfigStore && $programsStore}
-        <div />
+        <div></div>
         {#each includedAnalysis as analysis (analysis)}
           <div
             class="border px-3 py-2 text-center text-xl font-bold italic"

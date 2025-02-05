@@ -3,11 +3,15 @@
   import { type Io } from '$lib/io';
   import { currentTab, selectedJobId, showStatus } from '$lib/jobs';
 
-  export let io: Io<ce_shell.Analysis>;
+  interface Props {
+    io: Io<ce_shell.Analysis>;
+  }
+
+  let { io }: Props = $props();
   const { results } = io;
-  $: outputState = $results.outputState;
-  $: validation = $results.validation;
-  $: job = $results.job;
+  let outputState = $derived($results.outputState);
+  let validation = $derived($results.validation);
+  let job = $derived($results.job);
 </script>
 
 <div
@@ -32,7 +36,7 @@
   <!-- TODO: This should display output in the output not the job pane -->
   <button
     class="h-full shrink-0 px-1.5 font-bold transition hover:bg-white/10"
-    on:click={() => {
+    onclick={() => {
       $selectedJobId = $job ? $job.id : null;
       $currentTab = 'Output';
       $showStatus = true;

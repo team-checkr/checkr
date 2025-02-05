@@ -1,25 +1,35 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import type { driver, inspectify } from '$lib/api';
   import { onMount } from 'svelte';
 
-  export let numberOfPrograms: number;
-  export let group: inspectify.checko.scoreboard.PublicGroup;
-  export let analysisStore: inspectify.checko.scoreboard.PublicAnalysis[];
+  interface Props {
+    numberOfPrograms: number;
+    group: inspectify.checko.scoreboard.PublicGroup;
+    analysisStore: inspectify.checko.scoreboard.PublicAnalysis[];
+  }
 
-  $: accLength = analysisStore.reduce(
-    (acc, analysis) => {
-      return [...acc, acc[acc.length - 1] + analysis.programs.length];
-    },
-    [2],
+  let { numberOfPrograms, group, analysisStore }: Props = $props();
+
+  let accLength = $derived(
+    analysisStore.reduce(
+      (acc, analysis) => {
+        return [...acc, acc[acc.length - 1] + analysis.programs.length];
+      },
+      [2],
+    ),
   );
 
-  let canvas: HTMLCanvasElement;
+  let canvas: HTMLCanvasElement | undefined = $state();
 
-  $: {
+  run(() => {
     if (canvas) {
       const ctx = canvas.getContext('2d')!;
 
       const draw = async () => {
+        if (!canvas) return;
+
         const { default: config } = await import('tailwind.config.ts');
 
         const colors: Record<driver.job.JobState, string> = {
@@ -76,10 +86,12 @@
 
       draw();
     }
-  }
+  });
 
   onMount(() => {
+    if (!canvas) return;
     const observer = new ResizeObserver(() => {
+      if (!canvas) return;
       canvas.width = canvas.clientWidth;
       canvas.height = canvas.clientHeight;
     });
@@ -97,7 +109,7 @@
   class="row-start-1 h-6 w-full"
   style="grid-column: 2 / span {numberOfPrograms};"
   bind:this={canvas}
-/>
+></canvas>
 {#each group.analysis_results as analysis, index}
   <div
     class="row-start-1 mt-px flex items-center font-mono text-xs {analysis.status == 'Finished'

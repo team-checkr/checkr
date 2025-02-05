@@ -1,22 +1,33 @@
 <script lang="ts" generics="T">
-  export let value: T;
-  export let type: T extends number ? 'int' : T extends Array<infer S> ? 'array' : 'who knows';
-  let input: string = '';
+  import { run } from 'svelte/legacy';
 
-  export let stringify = (x: T) => JSON.stringify(x);
-  export let parse = (x: string) => {
-    try {
-      const val = JSON.parse(x);
-      switch (type) {
-        case 'int':
-          if (typeof val === 'number') return Math.floor(val) as T;
-          break;
-        case 'array':
-          if (Array.isArray(val)) return val as T;
-          break;
-      }
-    } catch (err) {}
-  };
+  let input: string = $state('');
+
+  interface Props {
+    value: T;
+    type: T extends number ? 'int' : T extends Array<infer S> ? 'array' : 'who knows';
+    stringify?: any;
+    parse?: any;
+  }
+
+  let {
+    value = $bindable(),
+    type,
+    stringify = (x: T) => JSON.stringify(x),
+    parse = (x: string) => {
+      try {
+        const val = JSON.parse(x);
+        switch (type) {
+          case 'int':
+            if (typeof val === 'number') return Math.floor(val) as T;
+            break;
+          case 'array':
+            if (Array.isArray(val)) return val as T;
+            break;
+        }
+      } catch (err) {}
+    },
+  }: Props = $props();
 
   const g = (x: T) => {
     const res = stringify(x);
@@ -26,8 +37,12 @@
     const res = parse(x);
     if (typeof res != 'undefined') value = res;
   };
-  $: g(value);
-  $: gInv(input);
+  run(() => {
+    g(value);
+  });
+  run(() => {
+    gInv(input);
+  });
 </script>
 
 <input

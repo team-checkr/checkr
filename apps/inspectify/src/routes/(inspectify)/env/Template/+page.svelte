@@ -3,12 +3,12 @@
   import StandardInput from '$lib/components/StandardInput.svelte';
   import { useIo } from '$lib/io';
 
-  const io = useIo('Parse', { commands: 'skip' });
+  const io = useIo('Parser', { commands: 'skip' });
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
-    <StandardInput analysis="Parse" {io} />
-  </svelte:fragment>
-  <svelte:fragment slot="output" let:output let:referenceOutput></svelte:fragment>
+  {#snippet inputView()}
+    <StandardInput analysis="Parser" {io} />
+  {/snippet}
+  {#snippet outputView({ output, referenceOutput })}{/snippet}
 </Env>

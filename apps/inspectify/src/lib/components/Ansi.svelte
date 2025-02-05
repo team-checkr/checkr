@@ -1,6 +1,10 @@
 <script lang="ts">
   import type { inspectify } from '$lib/api';
-  export let spans: inspectify.endpoints.Span[];
+  interface Props {
+    spans: inspectify.endpoints.Span[];
+  }
+
+  let { spans }: Props = $props();
 </script>
 
 {#each spans as span}<span class="fg-{span.fg} bg-{span.bg}">{span.text}</span>{/each}

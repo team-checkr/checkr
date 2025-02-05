@@ -7,11 +7,11 @@
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
+  {#snippet inputView()}
     <StandardInput analysis="Parser" code="commands" {io} />
-  </svelte:fragment>
+  {/snippet}
 
-  <svelte:fragment slot="output" let:output let:referenceOutput>
+  {#snippet outputView({ output, referenceOutput })}
     <div class="relative">
       <div class="absolute inset-0 grid">
         <pre class="p-2"><code
@@ -19,5 +19,5 @@
           ></pre>
       </div>
     </div>
-  </svelte:fragment>
+  {/snippet}
 </Env>

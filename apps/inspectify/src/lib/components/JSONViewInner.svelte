@@ -1,5 +1,10 @@
 <script lang="ts">
-  export let json: any;
+  import JSONViewInner from './JSONViewInner.svelte';
+  interface Props {
+    json: any;
+  }
+
+  let { json }: Props = $props();
 </script>
 
 {#if typeof json == 'string'}
@@ -12,7 +17,7 @@
   <div>
     {#each json as value}
       <div class="border px-2 py-1">
-        <svelte:self json={value} />
+        <JSONViewInner json={value} />
       </div>
     {/each}
   </div>
@@ -25,14 +30,14 @@
         <div class="flex items-baseline">
           <div class="px-2 py-0.5 text-sm font-bold">{key}:</div>
           <div class="ml-2 px-2 py-1">
-            <svelte:self json={value} />
+            <JSONViewInner json={value} />
           </div>
         </div>
       {:else}
         <div>
           <div class="px-2 py-0.5 text-sm font-bold">{key}:</div>
           <div class="ml-2 border px-2 py-1">
-            <svelte:self json={value} />
+            <JSONViewInner json={value} />
           </div>
         </div>
       {/if}

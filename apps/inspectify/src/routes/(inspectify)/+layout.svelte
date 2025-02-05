@@ -4,6 +4,11 @@
 
   import CommandLineIcon from '~icons/heroicons/command-line';
   import { showReference } from '$lib/jobs';
+  interface Props {
+    children?: import('svelte').Snippet;
+  }
+
+  let { children }: Props = $props();
 
   const { ANALYSIS } = ce_shell;
 </script>
@@ -55,4 +60,4 @@
   </div>
 </nav>
 
-<slot />
+{@render children?.()}

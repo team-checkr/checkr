@@ -11,7 +11,11 @@
   import Clock from '~icons/heroicons/clock';
   import Trash from '~icons/heroicons/Trash';
 
-  export let state: driver.job.JobState;
+  interface Props {
+    state: driver.job.JobState;
+  }
+
+  let { state }: Props = $props();
 
   const dispatch = createEventDispatcher<{ click: void }>();
 
@@ -27,14 +31,16 @@
     OutputLimitExceeded: [Trash, '', 'bg-orange-400'],
   };
 
-  $: icon = icons[state][0];
-  $: iconClass = icons[state][1];
-  $: containerClass = icons[state][2];
+  let icon = $derived(icons[state][0]);
+  let iconClass = $derived(icons[state][1]);
+  let containerClass = $derived(icons[state][2]);
+
+  const SvelteComponent = $derived(icon);
 </script>
 
 <button
   class="grid h-full place-items-center p-2 transition-colors {containerClass}"
-  on:click={() => dispatch('click')}
+  onclick={() => dispatch('click')}
 >
-  <svelte:component this={icon} class="h-6 w-6 text-white transition-colors {iconClass}" />
+  <SvelteComponent class="h-6 w-6 text-white transition-colors {iconClass}" />
 </button>

@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { browser } from '$app/environment';
   import { SignAnalysis } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
@@ -17,22 +19,24 @@
   });
   const { input, meta } = io;
 
-  $: vars = $meta ?? [];
+  let vars = $derived($meta ?? []);
 
   // NOTE: we need to supply the initial signs to new variables
-  $: if (browser) {
-    for (const v of vars) {
-      if (v.kind == 'Variable') {
-        if (!$input.assignment.variables[v.name]) {
-          $input.assignment.variables[v.name] = SignAnalysis.SIGN[0];
-        }
-      } else if (v.kind == 'Array') {
-        if (!$input.assignment.arrays[v.name]) {
-          $input.assignment.arrays[v.name] = [SignAnalysis.SIGN[0]];
+  run(() => {
+    if (browser) {
+      for (const v of vars) {
+        if (v.kind == 'Variable') {
+          if (!$input.assignment.variables[v.name]) {
+            $input.assignment.variables[v.name] = SignAnalysis.SIGN[0];
+          }
+        } else if (v.kind == 'Array') {
+          if (!$input.assignment.arrays[v.name]) {
+            $input.assignment.arrays[v.name] = [SignAnalysis.SIGN[0]];
+          }
         }
       }
     }
-  }
+  });
 
   const fmtSignOrSigns = (sign: SignAnalysis.Sign | SignAnalysis.Sign[] | void): string =>
     !sign
@@ -43,7 +47,7 @@
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
+  {#snippet inputView()}
     <StandardInput analysis="Sign" code="commands" {io}>
       <InputOptions title="Initial sign assignment">
         <div class="col-span-full grid w-full grid-cols-[auto_repeat(3,1fr)] place-items-center">
@@ -84,9 +88,9 @@
         <DeterminismInput {input} />
       </InputOptions>
     </StandardInput>
-  </svelte:fragment>
+  {/snippet}
 
-  <svelte:fragment slot="output" let:output let:meta>
+  {#snippet outputView({ output, meta })}
     <div class="grid grid-cols-[auto_1fr]">
       <div class="border-r border-t bg-slate-900">
         <div
@@ -124,5 +128,5 @@
         </div>
       </div>
     </div>
-  </svelte:fragment>
+  {/snippet}
 </Env>

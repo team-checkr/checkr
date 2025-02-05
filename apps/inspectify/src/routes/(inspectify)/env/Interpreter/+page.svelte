@@ -1,4 +1,6 @@
 <script lang="ts">
+  import { run } from 'svelte/legacy';
+
   import { browser } from '$app/environment';
   import { GCL } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
@@ -18,25 +20,27 @@
     trace_length: 10,
   });
   const { input, meta } = io;
-  $: vars = $meta ?? [];
+  let vars = $derived($meta ?? []);
 
-  $: if (browser) {
-    for (const v of vars) {
-      if (v.kind == 'Variable') {
-        if (typeof $input.assignment.variables[v.name] != 'number') {
-          $input.assignment.variables[v.name] = 0;
-        }
-      } else if (v.kind == 'Array') {
-        if (!Array.isArray($input.assignment.arrays[v.name])) {
-          $input.assignment.arrays[v.name] = [0];
+  run(() => {
+    if (browser) {
+      for (const v of vars) {
+        if (v.kind == 'Variable') {
+          if (typeof $input.assignment.variables[v.name] != 'number') {
+            $input.assignment.variables[v.name] = 0;
+          }
+        } else if (v.kind == 'Array') {
+          if (!Array.isArray($input.assignment.arrays[v.name])) {
+            $input.assignment.arrays[v.name] = [0];
+          }
         }
       }
     }
-  }
+  });
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
+  {#snippet inputView()}
     <StandardInput analysis="Interpreter" code="commands" {io}>
       <InputOptions title="Initialization of variables and arrays">
         <div class="col-span-full grid grid-cols-[max-content_1fr] items-center gap-y-2 px-1 py-1">
@@ -63,8 +67,8 @@
         <DeterminismInput {input} />
       </InputOptions>
     </StandardInput>
-  </svelte:fragment>
-  <svelte:fragment slot="output" let:input={cachedInput} let:output let:meta>
+  {/snippet}
+  {#snippet outputView({ input: cachedInput, output, meta })}
     <div class="grid min-h-0 grid-cols-[auto_1fr]">
       <div class="overflow-auto border-r border-t bg-slate-900">
         <div
@@ -74,8 +78,8 @@
             1,
           )}, max-content);"
         >
-          <div />
-          <div />
+          <div></div>
+          <div></div>
           <div
             class="border-b text-left font-mono font-bold"
             style="grid-column: span {meta.length}"
@@ -89,7 +93,7 @@
           {/each}
 
           {#if meta.length == 0}
-            <div />
+            <div></div>
           {/if}
           {#each meta as v}
             <div class="text-center font-mono font-bold">
@@ -103,7 +107,7 @@
             </div>
             <div class="text-center">{toSubscript(step.node)}</div>
             {#if meta.length == 0}
-              <div />
+              <div></div>
             {/if}
             {#each meta as v}
               <div class="px-1 text-right font-mono text-slate-300">
@@ -133,5 +137,5 @@
         </div>
       </div>
     </div>
-  </svelte:fragment>
+  {/snippet}
 </Env>

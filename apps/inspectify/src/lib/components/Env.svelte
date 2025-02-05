@@ -4,20 +4,35 @@
   import { crossfade } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
-  import type { Io } from '$lib/io';
+  import type { Input, Io, Meta, Output } from '$lib/io';
   import Ansi from './Ansi.svelte';
   import JobTabs from './JobTabs.svelte';
   import TrackingScroll from './TrackingScroll.svelte';
   import ValidationIndicator from './ValidationIndicator.svelte';
 
-  export let io: Io<A>;
+  interface Props {
+    io: Io<A>;
+    inputView?: import('svelte').Snippet;
+    outputView?: import('svelte').Snippet<
+      [
+        {
+          input: Input<A>;
+          meta: Meta<A>;
+          output: Output<A>;
+          referenceOutput: Output<A>;
+        },
+      ]
+    >;
+  }
+
+  let { io, inputView: input, outputView: output }: Props = $props();
   const { meta, results: trueResults, reference: referenceResults } = io;
   const notNull = <T,>(x: T | null): T => x!;
 
-  $: results = $showReference ? referenceResults : trueResults;
+  let results = $derived($showReference ? referenceResults : trueResults);
 
-  $: latestJob = $results.job;
-  let hideTabs = true;
+  let latestJob = $derived($results.job);
+  let hideTabs = $state(true);
 
   const [send, receive] = crossfade({
     delay: 200,
@@ -30,7 +45,7 @@
 <div class="grid h-full w-full grid-cols-[min-content_1fr] grid-rows-[1fr_auto]">
   <div class="relative row-span-2 h-full w-[45ch] min-w-[20ch] max-w-[80vw] resize-x overflow-auto">
     <div class="absolute inset-0 grid">
-      <slot name="input" />
+      {@render input?.()}
     </div>
   </div>
   <div class="relative h-full">
@@ -44,13 +59,12 @@
           <div class="grid grid-rows-[1fr_auto]">
             <div class="relative">
               <div class="absolute inset-0 grid overflow-auto">
-                <slot
-                  name="output"
-                  input={$results.input}
-                  meta={notNull($meta)}
-                  output={notNull($results.output)}
-                  referenceOutput={notNull($results.referenceOutput)}
-                />
+                {@render output?.({
+                  input: $results.input,
+                  meta: notNull($meta),
+                  output: notNull($results.output),
+                  referenceOutput: notNull($results.referenceOutput),
+                })}
               </div>
             </div>
             {#if $latestJob}

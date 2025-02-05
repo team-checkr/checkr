@@ -1,10 +1,14 @@
 <script lang="ts" generics="T">
-  export let name: string;
-  export let id: string;
-  export let value: T;
-  export let array: T[];
+  interface Props {
+    name: string;
+    id: string;
+    value: T;
+    array: T[];
+  }
 
-  let input: HTMLInputElement;
+  let { name, id, value, array = $bindable() }: Props = $props();
+
+  let input: HTMLInputElement | undefined = $state();
 </script>
 
 <input
@@ -13,5 +17,5 @@
   {name}
   {id}
   checked={array.includes(value)}
-  on:change={() => (array = input.checked ? [...array, value] : array.filter((x) => x != value))}
+  onchange={() => (array = input?.checked ? [...array, value] : array.filter((x) => x != value))}
 />

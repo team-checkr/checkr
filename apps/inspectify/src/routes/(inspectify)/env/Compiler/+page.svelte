@@ -14,18 +14,18 @@
 </script>
 
 <Env {io}>
-  <svelte:fragment slot="input">
+  {#snippet inputView()}
     <StandardInput analysis="Compiler" code="commands" {io}>
       <InputOptions>
         <DeterminismInput {input} />
       </InputOptions>
     </StandardInput>
-  </svelte:fragment>
-  <svelte:fragment slot="output" let:output>
+  {/snippet}
+  {#snippet outputView({ output })}
     <div class="relative">
       <div class="absolute inset-0 grid overflow-auto">
         <Network dot={output.dot || ''} />
       </div>
     </div>
-  </svelte:fragment>
+  {/snippet}
 </Env>
