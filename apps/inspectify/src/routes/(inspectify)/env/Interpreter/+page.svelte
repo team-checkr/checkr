@@ -119,13 +119,15 @@
           {/each}
           <div class="flex">
             {#if output.termination == 'Running'}
-              <div class="my-1 rounded bg-blue-500 px-2 py-1 font-bold text-white">
+              <div class="my-1 rounded-sm bg-blue-500 px-2 py-1 font-bold text-white">
                 Stopped after {output.trace.length} steps
               </div>
             {:else if output.termination == 'Terminated'}
-              <div class="my-1 rounded bg-green-500 px-2 py-1 font-bold text-white">Terminated</div>
+              <div class="my-1 rounded-sm bg-green-500 px-2 py-1 font-bold text-white">
+                Terminated
+              </div>
             {:else if output.termination == 'Stuck'}
-              <div class="my-1 rounded bg-red-500 px-2 py-1 font-bold text-white">Stuck</div>
+              <div class="my-1 rounded-sm bg-red-500 px-2 py-1 font-bold text-white">Stuck</div>
             {/if}
           </div>
         </div>

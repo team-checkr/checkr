@@ -60,7 +60,7 @@
           }).format($lastFinishedStore)}</span
       >
     </div>
-    <button class="-m-1 rounded p-1 transition hover:bg-slate-600" onclick={downloadCsv}>
+    <button class="-m-1 rounded-sm p-1 transition hover:bg-slate-600" onclick={downloadCsv}>
       <ArrowDownTray />
     </button>
   </div>

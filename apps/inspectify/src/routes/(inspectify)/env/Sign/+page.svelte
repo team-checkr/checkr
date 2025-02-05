@@ -94,7 +94,7 @@
     <div class="grid grid-cols-[auto_1fr]">
       <div class="border-r border-t bg-slate-900">
         <div
-          class="grid w-full grid-flow-dense [&_*]:border-t"
+          class="**:border-t grid w-full grid-flow-dense"
           style="grid-template-columns: min-content repeat({meta.length}, max-content);"
         >
           <div class="border-none"></div>

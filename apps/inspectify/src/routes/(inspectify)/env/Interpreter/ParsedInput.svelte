@@ -47,6 +47,6 @@
 
 <input
   type="text"
-  class="w-full border-x-0 border-b border-t-0 bg-transparent outline-none"
+  class="outline-hidden w-full border-x-0 border-b border-t-0 bg-transparent"
   bind:value={input}
 />

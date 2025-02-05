@@ -74,7 +74,7 @@
             </div>
             <div class="w-full font-mono">
               <select
-                class="w-full rounded border bg-transparent p-1"
+                class="w-full rounded-sm border bg-transparent p-1"
                 bind:value={$input.classification[v.name]}
               >
                 {#each classes as c, index}
@@ -98,7 +98,7 @@
               <span class="shrink-0 text-sm italic opacity-75">None</span>
             {/if}
             {#each rules as rule (rule)}
-              <span class="shrink-0 rounded bg-white/5 px-1.5 py-0.5"
+              <span class="shrink-0 rounded-sm bg-white/5 px-1.5 py-0.5"
                 >{rule.from} → {rule.into}</span
               >
             {/each}

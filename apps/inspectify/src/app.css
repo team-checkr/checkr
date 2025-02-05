@@ -1,18 +1,37 @@
-/* Write your global styles here, in PostCSS syntax */
-@tailwind base;
-@tailwind components;
-@tailwind utilities;
+@import 'tailwindcss';
+@plugin '@tailwindcss/typography';
+@plugin '@tailwindcss/forms';
 
-.prose :not(pre) > code {
-  /* TODO: There are some cases where this is nice, but in PV for example the
+/*
+  The default border color has changed to `currentColor` in Tailwind CSS v4,
+  so we've added these compatibility styles to make sure everything still
+  looks the same as it did with Tailwind CSS v3.
+
+  If we ever want to remove these styles, we need to add an explicit border
+  color utility to any element that depends on these defaults.
+*/
+@layer base {
+  *,
+  ::after,
+  ::before,
+  ::backdrop,
+  ::file-selector-button {
+    border-color: var(--color-gray-200, currentColor);
+  }
+}
+
+@layer utilities {
+  .prose :not(pre) > code {
+    /* TODO: There are some cases where this is nice, but in PV for example the
             predicates get way too long and they need to be broken up */
-  /* @apply whitespace-nowrap; */
-}
-.prose code::before {
-  content: '';
-}
-.prose code::after {
-  content: '';
+    /* @apply whitespace-nowrap; */
+  }
+  .prose code::before {
+    content: '';
+  }
+  .prose code::after {
+    content: '';
+  }
 }
 
 @layer base {

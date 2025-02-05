@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import type { driver, inspectify } from '$lib/api';
   import { onMount } from 'svelte';
 
@@ -21,34 +19,35 @@
     ),
   );
 
+  const getColor = (name: string) =>
+    getComputedStyle(document.documentElement).getPropertyValue(name);
+
+  const colors: Record<driver.job.JobState, string> = {
+    Queued: '',
+    Running: getColor('--color-slate-400'),
+    Succeeded: getColor('--color-green-500'),
+    Canceled: getColor('--color-slate-400'),
+    Failed: getColor('--color-red-500'),
+    Warning: getColor('--color-yellow-400'),
+    Timeout: getColor('--color-blue-400'),
+    OutputLimitExceeded: getColor('--color-orange-400'),
+  };
+
   let canvas: HTMLCanvasElement | undefined = $state();
 
-  run(() => {
+  $effect.pre(() => {
     if (canvas) {
       const ctx = canvas.getContext('2d')!;
 
       const draw = async () => {
         if (!canvas) return;
 
-        const { default: config } = await import('tailwind.config.ts');
-
-        const colors: Record<driver.job.JobState, string> = {
-          Queued: '',
-          Running: config.theme.colors['slate'][400],
-          Succeeded: config.theme.colors['green'][500],
-          Canceled: config.theme.colors['slate'][400],
-          Failed: config.theme.colors['red'][500],
-          Warning: config.theme.colors['yellow'][400],
-          Timeout: config.theme.colors['blue'][400],
-          OutputLimitExceeded: config.theme.colors['orange'][400],
-        };
-
         ctx.clearRect(0, 0, canvas.width, canvas.height);
 
         const cellWidth = Math.floor(canvas.width / numberOfPrograms);
         const cellHeight = canvas.height;
 
-        const borderColor = config.theme.colors['slate'][800] + '10';
+        const borderColor = getColor('--color-slate-800');
 
         const t = Date.now() / 5000;
         let redrawing = false;
@@ -62,7 +61,7 @@
               redrawing = true;
             }
             const idx = index++;
-            ctx.fillStyle = colors[res.state] || config.theme.colors['slate'][700];
+            ctx.fillStyle = colors[res.state] || getColor('--color-slate-700');
             if (isWorking) {
               const suffix = `${(Math.pow(Math.sin(index / 50 + t) / Math.PI, 2) * 10000).toString(
                 16,
@@ -73,18 +72,22 @@
             const thisCellWidth = currentWidthDrawn < expectedWithDrawn ? cellWidth + 1 : cellWidth;
             ctx.fillRect(currentWidthDrawn, 0, thisCellWidth, cellHeight);
             // Draw right and top borders
+            ctx.globalAlpha = 0.1;
             ctx.fillStyle = borderColor;
             ctx.fillRect(currentWidthDrawn + thisCellWidth - 1, 0, 1, cellHeight);
+            ctx.globalAlpha = 1.0;
             currentWidthDrawn += thisCellWidth;
           }
         }
+        ctx.globalAlpha = 0.1;
         ctx.fillStyle = borderColor;
         ctx.fillRect(0, cellHeight - 1, canvas.width, 1);
+        ctx.globalAlpha = 1.0;
 
         if (redrawing) requestAnimationFrame(draw);
       };
 
-      draw();
+      setTimeout(draw, 100);
     }
   });
 
