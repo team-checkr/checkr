@@ -1,5 +1,5 @@
 <script lang="ts">
-  import '../app.pcss';
+  import '../app.css';
   interface Props {
     children?: import('svelte').Snippet;
   }
