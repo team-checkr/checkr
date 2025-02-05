@@ -5,7 +5,7 @@ use std::collections::BTreeSet;
 
 use ce_core::{
     define_env,
-    rand::{self, seq::SliceRandom},
+    rand::{self, seq::IndexedRandom},
     Env, Generate, ValidationResult,
 };
 use gcl::{
@@ -156,10 +156,10 @@ impl Generate for Input {
         let initial_memory = gcl::memory::Memory::from_targets_with(
             commands.fv(),
             &mut rng,
-            |rng, _| rng.gen_range(-10..=10),
+            |rng, _| rng.random_range(-10..=10),
             |rng, _| {
-                let len = rng.gen_range(5..=10);
-                (0..len).map(|_| rng.gen_range(-10..=10)).collect()
+                let len = rng.random_range(5..=10);
+                (0..len).map(|_| rng.random_range(-10..=10)).collect()
             },
         );
         let assignment = InterpreterMemory {
@@ -175,7 +175,7 @@ impl Generate for Input {
             commands: Stringify::new(commands),
             determinism,
             assignment,
-            trace_length: rng.gen_range(10..=15),
+            trace_length: rng.random_range(10..=15),
         }
     }
 }

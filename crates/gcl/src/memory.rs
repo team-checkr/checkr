@@ -92,7 +92,7 @@ impl<T, A> Memory<T, A> {
     }
 }
 
-impl<'a, T, A> MemoryRef<'a, T, A> {
+impl<T, A> MemoryRef<'_, T, A> {
     pub fn target(&self) -> Target {
         match self {
             MemoryRef::Variable(t, _) => Target::Variable((*t).clone()),
@@ -101,7 +101,7 @@ impl<'a, T, A> MemoryRef<'a, T, A> {
     }
 }
 
-impl<'a, T> MemoryRef<'a, T, T> {
+impl<T> MemoryRef<'_, T, T> {
     pub fn value(&self) -> &T {
         match self {
             MemoryRef::Variable(_, v) | MemoryRef::Array(_, v) => v,
@@ -109,7 +109,7 @@ impl<'a, T> MemoryRef<'a, T, T> {
     }
 }
 
-impl<'a, T, A> std::fmt::Display for MemoryRef<'a, T, A>
+impl<T, A> std::fmt::Display for MemoryRef<'_, T, A>
 where
     T: std::fmt::Display,
     A: std::fmt::Display,

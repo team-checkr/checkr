@@ -120,7 +120,7 @@ impl<'a> CacheKeyInput<'a> {
     }
 }
 
-impl<'a> CacheKey<'a> {
+impl CacheKey<'_> {
     pub fn into_owned(self) -> CacheKey<'static> {
         CacheKey(
             self.0,

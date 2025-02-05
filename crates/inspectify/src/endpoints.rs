@@ -44,7 +44,7 @@ struct GenerateParams {
 async fn generate(Json(params): Json<GenerateParams>) -> Json<ce_shell::Input> {
     let input = params
         .analysis
-        .gen_input(&mut rand::rngs::SmallRng::from_entropy());
+        .gen_input(&mut rand::rngs::SmallRng::from_os_rng());
     Json(input)
 }
 

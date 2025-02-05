@@ -1,4 +1,4 @@
-use rand::{seq::SliceRandom, Rng};
+use rand::{seq::IndexedRandom, Rng};
 
 use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
@@ -101,7 +101,7 @@ impl Context {
         rng: &mut R,
     ) -> Vec<G> {
         let max = max.min(self.fuel as _).max(min);
-        let n = rng.gen_range(min..=max);
+        let n = rng.random_range(min..=max);
         if self.fuel < n as _ {
             self.fuel = 0;
         } else {
@@ -212,7 +212,7 @@ impl Generate for AExpr {
             vec![
                 (
                     0.4,
-                    Box::new(|_, rng| AExpr::Number(rng.gen_range(-100..=100))),
+                    Box::new(|_, rng| AExpr::Number(rng.random_range(-100..=100))),
                 ),
                 (
                     if cx.names.is_empty() { 0.0 } else { 0.8 },
@@ -261,7 +261,7 @@ impl Generate for BExpr {
         cx.sample(
             rng,
             vec![
-                (0.2, Box::new(|_cx, rng| BExpr::Bool(rng.gen()))),
+                (0.2, Box::new(|_cx, rng| BExpr::Bool(rng.random()))),
                 (
                     if cx.recursion_limit == 0 { 0.0 } else { 0.7 },
                     Box::new(|cx, rng| {

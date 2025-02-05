@@ -6,7 +6,7 @@ use std::collections::BTreeSet;
 
 use ce_core::{
     define_env,
-    rand::{self, seq::SliceRandom},
+    rand::{self, seq::IndexedRandom},
     Env, EnvError, Generate, ValidationResult,
 };
 use gcl::{

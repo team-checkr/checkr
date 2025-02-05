@@ -285,7 +285,7 @@ impl Checko {
     ) -> Result<Vec<GroupToTest>> {
         let mut groups = self.groups_config.groups.clone();
 
-        groups.shuffle(&mut rand::thread_rng());
+        groups.shuffle(&mut rand::rng());
 
         let mut compile_join_set = tokio::task::JoinSet::<Result<Option<_>>>::new();
 

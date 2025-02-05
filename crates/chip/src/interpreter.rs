@@ -312,7 +312,7 @@ pub struct StateFormat<'a> {
     program: &'a Program,
 }
 
-impl<'a> fmt::Display for StateFormat<'a> {
+impl fmt::Display for StateFormat<'_> {
     fn fmt(&self, f: &mut fmt::Formatter) -> fmt::Result {
         write!(
             f,

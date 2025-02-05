@@ -3,13 +3,16 @@ mod analysis;
 use std::collections::{BTreeMap, BTreeSet};
 
 use analysis::{Security, SecurityLattice};
-use ce_core::{define_env, rand, Env, Generate, ValidationResult};
+use ce_core::{
+    define_env,
+    rand::{self, seq::IndexedRandom},
+    Env, Generate, ValidationResult,
+};
 use gcl::{
     ast::{Commands, Target, TargetDef, Variable},
     memory::Memory,
 };
 use itertools::Itertools;
-use rand::seq::SliceRandom;
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
 

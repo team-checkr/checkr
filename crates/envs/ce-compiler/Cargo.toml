@@ -11,7 +11,7 @@ license.workspace = true
 [dependencies]
 ce-core.workspace = true
 gcl.workspace = true
-graphviz-rust = "0.7.2"
+graphviz-rust = "0.9.3"
 itertools.workspace = true
 petgraph.workspace = true
 rand.workspace = true

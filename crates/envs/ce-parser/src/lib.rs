@@ -111,10 +111,10 @@ fn generate_input_assignment(
     let initial_memory = gcl::memory::Memory::from_targets_with(
         commands.fv(),
         &mut rng,
-        |rng, _| rng.gen_range(-10..=10),
+        |rng, _| rng.random_range(-10..=10),
         |rng, _| {
-            let len = rng.gen_range(5..=10);
-            (0..len).map(|_| rng.gen_range(-10..=10)).collect()
+            let len = rng.random_range(5..=10);
+            (0..len).map(|_| rng.random_range(-10..=10)).collect()
         },
     );
     InterpreterMemory {

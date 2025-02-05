@@ -305,15 +305,15 @@ impl MonotoneFramework for SignAnalysis {
     }
 }
 
-fn cartesian_flat_map<'a, L: 'a, R: 'a, T: Clone, Q>(
+fn cartesian_flat_map<'a, L, R, T: Clone, Q>(
     l: L,
     r: R,
     f: impl Fn(T, Option<T>) -> Q + 'a,
 ) -> impl Iterator<Item = Q> + 'a
 where
-    L: IntoIterator<Item = T> + Clone,
+    L: 'a + IntoIterator<Item = T> + Clone,
     L::IntoIter: Clone,
-    R: IntoIterator<Item = T> + Clone,
+    R: 'a + IntoIterator<Item = T> + Clone,
     R::IntoIter: Clone,
 {
     if r.clone().into_iter().next().is_none() {

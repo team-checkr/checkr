@@ -6,7 +6,7 @@ use clap::Parser;
 use color_eyre::Result;
 use heck::{ToKebabCase, ToPascalCase, ToSnakeCase};
 use itertools::Itertools;
-use toml_edit::Document;
+use toml_edit::DocumentMut;
 use xshell::cmd;
 
 #[derive(Debug, Parser)]
@@ -57,7 +57,7 @@ async fn run() -> Result<()> {
             // NOTE: Add crate to project Cargo.toml
             sh.change_dir(project_root());
             let toml = sh.read_file("Cargo.toml")?;
-            let mut doc = toml.parse::<Document>()?;
+            let mut doc = toml.parse::<DocumentMut>()?;
             let table = [("path".to_string(), format!("./envs/{crate_name}"))]
                 .into_iter()
                 .collect::<toml_edit::InlineTable>();
