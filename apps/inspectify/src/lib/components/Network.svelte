@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import { mirage } from 'ayu';
   import { onMount } from 'svelte';
   import type { Network } from 'vis-network/esnext';
@@ -75,7 +73,7 @@
     redraw();
   });
 
-  run(() => {
+  $effect(() => {
     dot && network && redraw();
   });
 </script>

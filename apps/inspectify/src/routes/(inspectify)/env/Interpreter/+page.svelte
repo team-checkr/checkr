@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import { browser } from '$app/environment';
   import { GCL } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
@@ -22,7 +20,7 @@
   const { input, meta } = io;
   let vars = $derived($meta ?? []);
 
-  run(() => {
+  $effect.pre(() => {
     if (browser) {
       for (const v of vars) {
         if (v.kind == 'Variable') {

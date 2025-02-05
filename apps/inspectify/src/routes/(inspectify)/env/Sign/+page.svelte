@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import { browser } from '$app/environment';
   import { SignAnalysis } from '$lib/api';
   import Env from '$lib/components/Env.svelte';
@@ -22,7 +20,7 @@
   let vars = $derived($meta ?? []);
 
   // NOTE: we need to supply the initial signs to new variables
-  run(() => {
+  $effect.pre(() => {
     if (browser) {
       for (const v of vars) {
         if (v.kind == 'Variable') {

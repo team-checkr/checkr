@@ -1,12 +1,10 @@
 <script lang="ts" generics="T">
-  import { run } from 'svelte/legacy';
-
-  let input: string = $state('');
+  import type { ChangeEventHandler } from 'svelte/elements';
 
   interface Props {
     value: T;
     type: T extends number ? 'int' : T extends Array<infer S> ? 'array' : 'who knows';
-    stringify?: any;
+    stringify?: (x: T) => string;
     parse?: any;
   }
 
@@ -29,19 +27,23 @@
     },
   }: Props = $props();
 
-  const g = (x: T) => {
-    const res = stringify(x);
-    if (typeof res != 'undefined') input = res;
-  };
-  const gInv = (x: string) => {
-    const res = parse(x);
-    if (typeof res != 'undefined') value = res;
-  };
-  run(() => {
-    g(value);
+  let setValue = $state(value);
+
+  let input: string = $state(stringify(value));
+
+  const onChange: ChangeEventHandler<HTMLInputElement> = $derived(() => {
+    const res = parse(input);
+    if (typeof res == 'undefined') return;
+    if (stringify(res) != stringify(value)) {
+      value = res;
+      setValue = res;
+    }
   });
-  run(() => {
-    gInv(input);
+  $effect(() => {
+    if (stringify(value) != stringify(setValue)) {
+      input = stringify(value);
+      setValue = value;
+    }
   });
 </script>
 
@@ -49,4 +51,5 @@
   type="text"
   class="outline-hidden w-full border-x-0 border-b border-t-0 bg-transparent"
   bind:value={input}
+  oninput={onChange}
 />

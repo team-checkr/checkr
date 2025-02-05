@@ -1,7 +1,5 @@
 <script lang="ts">
-  import { run as run_1 } from 'svelte/legacy';
-
-  import { createEventDispatcher, onDestroy, onMount } from 'svelte';
+  import { onDestroy, onMount } from 'svelte';
   import type * as Monaco from 'monaco-editor/esm/vs/editor/editor.api';
 
   interface Props {
@@ -35,8 +33,8 @@
       });
       model = monaco.editor.createModel(value, GCL_LANGUAGE_ID);
       editor.setModel(model);
-      model.onDidChangeContent(() => {
-        if (model) value = model.getValue();
+      model.onDidChangeContent((e) => {
+        if (!e.isFlush && model) value = model.getValue();
       });
 
       observer = new ResizeObserver(() => editor.layout());
@@ -51,8 +49,13 @@
     editor?.dispose();
   });
 
-  run_1(() => {
-    if (model && typeof value == 'string' && model.getValue() != value) {
+  $effect(() => {
+    if (
+      model &&
+      typeof value == 'string' &&
+      model.getValue() != value &&
+      !editor?.hasWidgetFocus()
+    ) {
       model.setValue(value);
     }
   });
@@ -61,10 +64,3 @@
 <div class="relative h-full w-full">
   <div class="absolute inset-0 overflow-hidden" bind:this={editorContainer}></div>
 </div>
-
-<style>
-  .container {
-    width: 100%;
-    height: 600px;
-  }
-</style>

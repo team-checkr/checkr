@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import { browser } from '$app/environment';
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
@@ -33,7 +31,7 @@
     return { rules };
   };
 
-  run(() => {
+  $effect.pre(() => {
     if (browser && classes.length > 0) {
       for (const v of targets) {
         if (

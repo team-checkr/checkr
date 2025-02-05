@@ -342,6 +342,12 @@ export namespace inspectify {
       output: (ce_shell.io.Output | null),
       error: (string | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
+    export type GenerateParams = {
+      analysis: ce_shell.Analysis
+    };
     export type Event =
       | { "type": "Reset" }
       | { "type": "CompilationStatus", "value": { status: inspectify.endpoints.CompilationStatus } }
@@ -349,12 +355,6 @@ export namespace inspectify {
       | { "type": "JobsChanged", "value": { jobs: driver.job.JobId[] } }
       | { "type": "GroupsConfig", "value": { config: inspectify.checko.config.GroupsConfig } }
       | { "type": "ProgramsConfig", "value": { programs: inspectify.endpoints.Program[] } };
-    export type GenerateParams = {
-      analysis: ce_shell.Analysis
-    };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type AnalysisExecution = {
       id: driver.job.JobId
     };

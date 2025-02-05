@@ -1,6 +1,4 @@
 <script lang="ts">
-  import { run } from 'svelte/legacy';
-
   import { type Tab, currentTab, tabs } from '$lib/jobs';
   import Ansi from '$lib/components/Ansi.svelte';
   import JsonView from './JSONView.svelte';
@@ -16,7 +14,7 @@
 
   let { selectedJob, canHide = false, hidden = $bindable(canHide) }: Props = $props();
 
-  run(() => {
+  $effect(() => {
     if (selectedJob?.kind.kind == 'Compilation') {
       $currentTab = 'Output';
     }
