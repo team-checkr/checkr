@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.1] - 2025-02-06
+
+### Checko
+
+- Add specific commit checkout groups
+
 ## [0.2.0] - 2024-05-03
 
 ### Bug Fixes
@@ -36,6 +42,7 @@ All notable changes to this project will be documented in this file.
 - Update a doc link
 - Update ci
 - Update `mcltl-rs` submodule
+- Release
 
 ### Refactor
 
@@ -56,6 +63,9 @@ All notable changes to this project will be documented in this file.
 - Use nextest in ci
 - Update `cargo-dist`
 - Add `just release-minor`
+- Install just in `cargo dist` CI
+- Update `cargo-dist` config
+- Update `cargo-dist` config
 
 ### Misc
 
