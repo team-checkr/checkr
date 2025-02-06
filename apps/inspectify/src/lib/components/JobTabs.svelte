@@ -4,7 +4,7 @@
   import JsonView from './JSONView.svelte';
   import TrackingScroll from './TrackingScroll.svelte';
   import type { ce_core } from '$lib/api';
-  import type { Job } from '$lib/events';
+  import type { Job } from '$lib/events.svelte';
 
   interface Props {
     selectedJob: Job;

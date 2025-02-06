@@ -1,6 +1,6 @@
 <script lang="ts">
   import { ce_shell } from '$lib/api';
-  import { type Io } from '$lib/io';
+  import { type Io } from '$lib/io.svelte';
   import { currentTab, selectedJobId, showStatus } from '$lib/jobs';
 
   interface Props {

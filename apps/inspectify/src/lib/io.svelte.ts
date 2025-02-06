@@ -1,6 +1,6 @@
 import { derived, writable, type Readable, type Writable } from 'svelte/store';
-import { ce_shell, api, driver, type ce_core } from './api';
-import { jobsStore, type Job, compilationStatusStore } from './events';
+import { ce_shell, api, type ce_core } from './api';
+import { jobsStore, type Job, compilationStatus } from './events.svelte';
 import { selectedJobId, showReference } from './jobs';
 import { browser } from '$app/environment';
 
@@ -35,13 +35,13 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
   const input = writable<Input<A>>(defaultInput);
 
   const jobIdAndInputDerived = derived(
-    [input, compilationStatusStore, showReference],
-    ([$input, $compilationStatus, $showReference], set) => {
+    [input, showReference],
+    ([$input, $showReference], set) => {
       if (!browser) return;
 
       if ($showReference) return;
 
-      if ($compilationStatus?.state != 'Succeeded') return;
+      if (compilationStatus.status?.state != 'Succeeded') return;
 
       let cancel = () => {};
       let stop = false;

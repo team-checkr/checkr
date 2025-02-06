@@ -1,6 +1,6 @@
 <script lang="ts">
   import { type inspectify, type GroupConfig, type driver } from '$lib/api';
-  import { groupProgramJobAssignedStore, jobsStore } from '$lib/events';
+  import { groupProgramJobAssignedStore, jobsStore } from '$lib/events.svelte';
   import { selectedJobId, showStatus } from '$lib/jobs';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
@@ -19,7 +19,7 @@
 
   let { group, program }: Props = $props();
 
-  let jobId = $derived($groupProgramJobAssignedStore?.[group.name]?.[program.hash_str]);
+  let jobId = $derived(groupProgramJobAssignedStore.groups?.[group.name]?.[program.hash_str]);
   let job = $derived($jobsStore[jobId]);
   let validation = $derived($job?.analysis_data?.validation?.type);
   let state = $derived(validation == 'Mismatch' ? 'Warning' : ($job?.state ?? 'Queued'));

@@ -4,7 +4,7 @@
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io';
+  import { useIo } from '$lib/io.svelte';
   import { toSubscript } from '$lib/fmt';
   import ParsedInput from './ParsedInput.svelte';
   import InputOptions from '$lib/components/InputOptions.svelte';

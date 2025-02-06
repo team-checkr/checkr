@@ -4,7 +4,7 @@
   import { crossfade } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
-  import type { Input, Io, Meta, Output } from '$lib/io';
+  import type { Input, Io, Meta, Output } from '$lib/io.svelte';
   import Ansi from './Ansi.svelte';
   import JobTabs from './JobTabs.svelte';
   import TrackingScroll from './TrackingScroll.svelte';

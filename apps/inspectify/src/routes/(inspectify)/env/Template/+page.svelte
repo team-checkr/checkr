@@ -1,7 +1,7 @@
 <script lang="ts">
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io';
+  import { useIo } from '$lib/io.svelte';
 
   const io = useIo('Parser', { commands: 'skip' });
 </script>

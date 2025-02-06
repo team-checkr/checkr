@@ -1,27 +1,17 @@
-<!-- @migration-task Error while migrating Svelte code: can't migrate `$: includedAnalysis = ce_shell.ANALYSIS.filter((a) =>
-    $programsStore.find((p) => p.input.analysis == a),
-  );` to `$derived` because there's a variable named derived.
-     Rename the variable and try again or migrate by hand. -->
 <script lang="ts">
-  import { ce_shell, driver, type inspectify } from '$lib/api';
+  import { ce_shell } from '$lib/api';
   import JobPane from '$lib/components/JobPane.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
-  import {
-    groupProgramJobAssignedStore,
-    groupsConfigStore,
-    jobsStore,
-    programsStore,
-  } from '$lib/events';
+  import { groupsConfigStore, programsStore } from '$lib/events.svelte';
   import { showStatus } from '$lib/jobs';
-  import { derived, readonly, writable } from 'svelte/store';
   import GroupJobCell from './GroupJobCell.svelte';
 
-  $: includedAnalysis = ce_shell.ANALYSIS.filter((a) =>
-    $programsStore.find((p) => p.input.analysis == a),
+  const includedAnalysis = $derived(
+    ce_shell.ANALYSIS.filter((a) => programsStore.programs.find((p) => p.input.analysis == a)),
   );
 
   // $: computeGroupState = (group: inspectify.checko.config.GroupConfig) => {
-  //   const states = $programsStore.map((program) => {
+  //   const states = programsStore.programs.map((program) => {
   //     const jobId = $groupProgramJobAssignedStore?.[group.name]?.[program.hash_str];
   //     const job = $jobsStore[jobId];
   //     if (!job) return writable('Queued' as const);
@@ -55,7 +45,7 @@
   //     return $scores[bIndex] - $scores[aIndex];
   //   }) || [];
 
-  $: sortedGroups = $groupsConfigStore?.groups || [];
+  const sortedGroups = $derived(groupsConfigStore.config?.groups || []);
 </script>
 
 <div class="grid {showStatus ? 'grid-cols-[auto_1fr]' : ''}">
@@ -65,15 +55,16 @@
   <div class="w-full overflow-auto">
     <div
       class="grid self-start border-l"
-      style="grid-template-columns: auto repeat({$programsStore.length}, 1fr);"
+      style="grid-template-columns: auto repeat({programsStore.programs.length}, 1fr);"
     >
-      {#if $groupsConfigStore && $programsStore}
+      {#if groupsConfigStore.config}
         <div></div>
         {#each includedAnalysis as analysis (analysis)}
           <div
             class="border px-3 py-2 text-center text-xl font-bold italic"
-            style="grid-column: span {$programsStore.filter((p) => p.input.analysis == analysis)
-              .length}"
+            style="grid-column: span {programsStore.programs.filter(
+              (p) => p.input.analysis == analysis,
+            ).length}"
           >
             {analysis}
           </div>
@@ -82,7 +73,7 @@
           <div class="flex items-center border bg-slate-800 px-1 font-bold">
             {group.name}
           </div>
-          {#each $programsStore as program (program.hash_str)}
+          {#each programsStore.programs as program (program.hash_str)}
             <GroupJobCell {group} {program} />
           {/each}
         {/each}

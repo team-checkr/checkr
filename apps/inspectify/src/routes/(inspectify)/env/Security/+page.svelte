@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io';
+  import { useIo } from '$lib/io.svelte';
   import type { SecurityAnalysis } from '$lib/api';
 
   import ShieldExclamation from '~icons/heroicons/shield-exclamation';

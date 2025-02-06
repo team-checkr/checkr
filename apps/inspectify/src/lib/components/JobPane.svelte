@@ -6,7 +6,7 @@
 <script lang="ts">
   import { derived } from 'svelte/store';
   import { driver } from '$lib/api';
-  import { jobsListStore, jobsStore } from '$lib/events';
+  import { jobsListStore, jobsStore } from '$lib/events.svelte';
   import { selectedJobId } from '$lib/jobs';
   import JobTabs from './JobTabs.svelte';
 
@@ -103,6 +103,6 @@
   {#if $selectedJob}
     <JobTabs selectedJob={$selectedJob} />
   {:else}
-    <div class="bg-slate-900" />
+    <div class="bg-slate-900"></div>
   {/if}
 </div>

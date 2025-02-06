@@ -11,42 +11,44 @@ const jobsListWritableStore = writable<driver.job.JobId[]>([]);
 export const jobsListStore = readonly(jobsListWritableStore);
 export const jobsStore: Writable<Record<driver.job.JobId, Writable<Job>>> = writable({});
 
-export const compilationStatusStore: Writable<inspectify.endpoints.CompilationStatus | null> =
-  writable(null);
+export const compilationStatus: { status: inspectify.endpoints.CompilationStatus | null } = $state({
+  status: null,
+});
 
-export const groupsConfigStore: Writable<inspectify.checko.config.GroupsConfig | null> =
-  writable(null);
-export const programsStore: Writable<inspectify.endpoints.Program[]> = writable([]);
+export const groupsConfigStore: { config: inspectify.checko.config.GroupsConfig | null } = $state({
+  config: null,
+});
+export const programsStore: { programs: inspectify.endpoints.Program[] } = $state({ programs: [] });
 
-export const groupProgramJobAssignedStore: Writable<
-  Record<string, Record<string, driver.job.JobId>>
-> = writable({});
+export const groupProgramJobAssignedStore: {
+  groups: Record<string, Record<string, driver.job.JobId>>;
+} = $state({ groups: {} });
 
 type Connection = 'connected' | 'disconnected';
 
-export const connectionStore: Writable<Connection> = writable('disconnected');
+export const connectionStore: { state: Connection } = $state({ state: 'disconnected' });
 
 if (browser) {
   setTimeout(() => {
     api.events([]).listen((msg) => {
       if (msg.type == 'error') {
-        connectionStore.set('disconnected');
+        connectionStore.state = 'disconnected';
         return;
       }
-      connectionStore.set('connected');
+      connectionStore.state = 'connected';
 
       switch (msg.data.type) {
         case 'Reset': {
           jobsListWritableStore.set([]);
           jobsStore.set({});
-          compilationStatusStore.set(null);
-          groupsConfigStore.set(null);
-          programsStore.set([]);
-          groupProgramJobAssignedStore.set({});
+          compilationStatus.status = null;
+          groupsConfigStore.config = null;
+          programsStore.programs = [];
+          groupProgramJobAssignedStore.groups = {};
           break;
         }
         case 'CompilationStatus': {
-          compilationStatusStore.set(msg.data.value.status);
+          compilationStatus.status = msg.data.value.status;
           break;
         }
         case 'JobChanged': {
@@ -85,11 +87,11 @@ if (browser) {
           break;
         }
         case 'GroupsConfig': {
-          groupsConfigStore.set(msg.data.value.config);
+          groupsConfigStore.config = msg.data.value.config;
           break;
         }
         case 'ProgramsConfig': {
-          programsStore.set(msg.data.value.programs);
+          programsStore.programs = msg.data.value.programs;
           break;
         }
       }

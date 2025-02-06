@@ -1,7 +1,7 @@
 <script lang="ts" generics="A extends ce_shell.Analysis">
   import { ce_shell } from '$lib/api';
   import Editor from '$lib/components/Editor.svelte';
-  import type { Io, Input } from '$lib/io';
+  import type { Io, Input } from '$lib/io.svelte';
 
   import ClipboardDocumentList from '~icons/heroicons/clipboard-document-list';
 
