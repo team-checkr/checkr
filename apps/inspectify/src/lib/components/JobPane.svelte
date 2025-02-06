@@ -1,36 +1,14 @@
 <script lang="ts">
-  import { driver } from '$lib/api';
   import { jobsListStore, jobsStore } from '$lib/events.svelte';
   import { selectedJobId } from '$lib/jobs.svelte';
   import JobTabs from './JobTabs.svelte';
-
-  import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
-  import ArrowPath from '~icons/heroicons/arrow-path';
-  import Check from '~icons/heroicons/check';
-  import NoSymbol from '~icons/heroicons/no-symbol';
-  import Fire from '~icons/heroicons/fire';
-  import ExclamationTriangle from '~icons/heroicons/exclamation-triangle';
-  import Clock from '~icons/heroicons/clock';
-  import Trash from '~icons/heroicons/trash';
+  import JobPaneIcon from './JobPaneIcon.svelte';
 
   interface Props {
     showGroup?: boolean;
   }
 
   let { showGroup = false }: Props = $props();
-
-  const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string]> = {
-    Queued: [EllipsisHorizontal, 'animate-pulse'],
-    Running: [ArrowPath, 'animate-spin text-slate-400'],
-    Succeeded: [Check, 'text-green-300'],
-    Canceled: [NoSymbol, 'text-slate-400'],
-    Failed: [Fire, 'text-red-300'],
-    Warning: [ExclamationTriangle, 'text-yellow-300'],
-    Timeout: [Clock, 'text-blue-300'],
-    OutputLimitExceeded: [Trash, 'text-orange-300'],
-  };
-
-  const Icon = (state: driver.job.JobState) => icons[state][0];
 
   const jobs = $derived(jobsListStore.jobs.map((id) => jobsStore.jobs[id]));
   const filteredJobs = $derived(jobs.filter((j) => j.state != 'Canceled'));
@@ -71,11 +49,7 @@
                 : 'group-hover:bg-slate-800'}"
               title={job.state}
             >
-              <!-- TODO: We need to construct this icon dynamically somehow -->
-              <!-- <svelte:component
-                this={Icon(job.state)}
-                class="w-4 transition {icons[job.state][1]}"
-              /> -->
+              <JobPaneIcon jobState={job.state} />
             </div>
             {#if showGroup}
               <div
