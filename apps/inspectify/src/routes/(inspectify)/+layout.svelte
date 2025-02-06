@@ -3,7 +3,7 @@
   import { page } from '$app/stores';
 
   import CommandLineIcon from '~icons/heroicons/command-line';
-  import { showReference } from '$lib/jobs';
+  import { showReference } from '$lib/jobs.svelte';
   interface Props {
     children?: import('svelte').Snippet;
   }
@@ -23,13 +23,6 @@
     </div>
     <span>Inspectify</span>
   </a>
-  <!-- {
-	  process.env.INSPECTIFY_VERSION && (
-		<span class="text-xs place-self-end mb-2 text-slate-400 italic font-light">
-		  {import.meta.env.INSPECTIFY_VERSION}
-		</span>
-	  )
-	} -->
 
   <div class="ml-6 flex h-full text-base font-thin">
     {#each ANALYSIS as o}
@@ -55,7 +48,7 @@
       type="checkbox"
       name="show-reference"
       id="show-reference"
-      bind:checked={$showReference}
+      bind:checked={showReference.show}
     />
   </div>
 </nav>

@@ -48,7 +48,7 @@
     "file-saver": "^2.0.5",
     "immer": "^10.0.3",
     "monaco-editor": "^0.45.0",
-    "unplugin-icons": "^0.18.1",
+    "unplugin-icons": "22.0.0",
     "vis-network": "^9.1.9"
   }
 }

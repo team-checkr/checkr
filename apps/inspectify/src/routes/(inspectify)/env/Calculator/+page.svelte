@@ -1,16 +1,16 @@
 <script lang="ts">
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io.svelte';
+  import { Io } from '$lib/io.svelte';
 
-  const io = useIo('Calculator', { expression: '1 + 2' });
+  const io = new Io('Calculator', { expression: '1 + 2' });
 </script>
 
 <Env {io}>
   {#snippet inputView()}
     <StandardInput analysis="Calculator" code="expression" {io} />
   {/snippet}
-  {#snippet outputView({ output, referenceOutput })}
+  {#snippet outputView({ output })}
     <div class="grid grid-cols-1">
       <div class="relative">
         <div class="absolute inset-0 flex flex-col border-r">

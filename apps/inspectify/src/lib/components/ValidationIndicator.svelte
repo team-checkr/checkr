@@ -1,17 +1,15 @@
 <script lang="ts">
   import { ce_shell } from '$lib/api';
   import { type Io } from '$lib/io.svelte';
-  import { currentTab, selectedJobId, showStatus } from '$lib/jobs';
+  import { currentTab, selectedJobId, showStatus } from '$lib/jobs.svelte';
 
   interface Props {
     io: Io<ce_shell.Analysis>;
   }
 
   let { io }: Props = $props();
-  const { results } = io;
-  let outputState = $derived($results.outputState);
-  let validation = $derived($results.validation);
-  let job = $derived($results.job);
+  let outputState = $derived(io.results.outputState);
+  let validation = $derived(io.results.validation);
 </script>
 
 <div
@@ -37,9 +35,9 @@
   <button
     class="h-full shrink-0 px-1.5 font-bold transition hover:bg-white/10"
     onclick={() => {
-      $selectedJobId = $job ? $job.id : null;
-      $currentTab = 'Output';
-      $showStatus = true;
+      selectedJobId.jobId = io.results.job ? io.results.job.id : null;
+      currentTab.current = 'Output';
+      showStatus.show = true;
     }}>See output</button
   >
 </div>

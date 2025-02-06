@@ -1,13 +1,7 @@
-<!-- @migration-task Error while migrating Svelte code: can't migrate `$: jobs = derived(
-    $jobsListStore.map((id) => $jobsStore[id]),
-    (jobs) => jobs,
-  );` to `$derived` because there's a variable named derived.
-     Rename the variable and try again or migrate by hand. -->
 <script lang="ts">
-  import { derived } from 'svelte/store';
   import { driver } from '$lib/api';
   import { jobsListStore, jobsStore } from '$lib/events.svelte';
-  import { selectedJobId } from '$lib/jobs';
+  import { selectedJobId } from '$lib/jobs.svelte';
   import JobTabs from './JobTabs.svelte';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
@@ -19,7 +13,11 @@
   import Clock from '~icons/heroicons/clock';
   import Trash from '~icons/heroicons/trash';
 
-  export let showGroup = false;
+  interface Props {
+    showGroup?: boolean;
+  }
+
+  let { showGroup = false }: Props = $props();
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse'],
@@ -34,13 +32,11 @@
 
   const Icon = (state: driver.job.JobState) => icons[state][0];
 
-  $: jobs = derived(
-    $jobsListStore.map((id) => $jobsStore[id]),
-    (jobs) => jobs,
+  const jobs = $derived(jobsListStore.jobs.map((id) => jobsStore.jobs[id]));
+  const filteredJobs = $derived(jobs.filter((j) => j.state != 'Canceled'));
+  const selectedJob = $derived(
+    typeof selectedJobId.jobId == 'number' ? jobsStore.jobs[selectedJobId.jobId] : null,
   );
-  $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
-  // $: filteredJobs = $jobs.filter((j) => j.state != 'Canceled');
-  $: selectedJob = typeof $selectedJobId == 'number' ? $jobsStore[$selectedJobId] : null;
 </script>
 
 <div
@@ -56,9 +52,9 @@
           <div class="sticky top-0 bg-slate-950 px-2 py-1 text-center font-bold">{title}</div>
         {/each}
         {#each filteredJobs.slice().reverse() as job (job.id)}
-          <button class="group contents text-left" on:click={() => ($selectedJobId = job.id)}>
+          <button class="group contents text-left" onclick={() => (selectedJobId.jobId = job.id)}>
             <div
-              class="py-0.5 pl-2 pr-1 transition {job.id == $selectedJobId
+              class="py-0.5 pl-2 pr-1 transition {job.id == selectedJobId.jobId
                 ? 'bg-slate-700'
                 : 'group-hover:bg-slate-800'}"
             >
@@ -70,19 +66,20 @@
             </div>
             <div
               class="flex items-center justify-center px-1 py-0.5 transition {job.id ==
-              $selectedJobId
+              selectedJobId.jobId
                 ? 'bg-slate-700'
                 : 'group-hover:bg-slate-800'}"
               title={job.state}
             >
-              <svelte:component
+              <!-- TODO: We need to construct this icon dynamically somehow -->
+              <!-- <svelte:component
                 this={Icon(job.state)}
                 class="w-4 transition {icons[job.state][1]}"
-              />
+              /> -->
             </div>
             {#if showGroup}
               <div
-                class="py-0.5 pl-2 pr-1 text-center transition {job.id == $selectedJobId
+                class="py-0.5 pl-2 pr-1 text-center transition {job.id == selectedJobId.jobId
                   ? 'bg-slate-700'
                   : 'group-hover:bg-slate-800'}"
               >
@@ -100,8 +97,8 @@
   </div>
 
   <!-- Job view -->
-  {#if $selectedJob}
-    <JobTabs selectedJob={$selectedJob} />
+  {#if selectedJob}
+    <JobTabs {selectedJob} />
   {:else}
     <div class="bg-slate-900"></div>
   {/if}

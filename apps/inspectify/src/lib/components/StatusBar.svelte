@@ -1,24 +1,15 @@
-<!-- @migration-task Error while migrating Svelte code: can't migrate `$: jobs = derived(
-    $jobsListStore.map((id) => $jobsStore[id]),
-    (jobs) => jobs,
-  );` to `$derived` because there's a variable named derived.
-     Rename the variable and try again or migrate by hand. -->
 <script lang="ts">
-  import { derived } from 'svelte/store';
   import { driver } from '$lib/api';
   import { jobsStore, jobsListStore, connectionStore } from '$lib/events.svelte';
 
   import ChevronDoubleUp from '~icons/heroicons/chevron-double-up';
   import Link from '~icons/heroicons/link';
-  import { showStatus } from '$lib/jobs';
+  import { showStatus } from '$lib/jobs.svelte';
   import { PUBLIC_INSPECTIFY_VERSION } from '$env/static/public';
 
   const version = PUBLIC_INSPECTIFY_VERSION;
 
-  $: jobs = derived(
-    $jobsListStore.map((id) => $jobsStore[id]),
-    (jobs) => jobs,
-  );
+  const jobs = $derived(jobsListStore.jobs.map((id) => jobsStore.jobs[id]));
 
   const emptyJobStates = () =>
     Object.fromEntries(driver.job.JOB_STATE.map((s) => [s, 0])) as Record<
@@ -26,24 +17,23 @@
       number
     >;
 
-  let jobStates = emptyJobStates();
-
-  $: {
-    jobStates = emptyJobStates();
-    for (let job of $jobs) {
+  const jobStates = $derived.by(() => {
+    const jobStates = emptyJobStates();
+    for (let job of jobs) {
       if (job.state in jobStates) {
         jobStates[job.state]++;
       }
     }
-  }
+    return jobStates;
+  });
 </script>
 
 <div class="flex items-center space-x-1 border-t bg-slate-900 text-sm">
   <button
     class="flex h-full items-center space-x-0.5 bg-slate-900 px-2 text-xs transition hover:bg-slate-400/10 active:bg-slate-400/5"
-    on:click={() => ($showStatus = !$showStatus)}
+    onclick={() => (showStatus.show = !showStatus.show)}
   >
-    <ChevronDoubleUp class="transition {$showStatus ? 'rotate-0' : 'rotate-180'}" />
+    <ChevronDoubleUp class="transition {showStatus.show ? 'rotate-0' : 'rotate-180'}" />
   </button>
 
   {#if jobStates['Queued'] === 0 && jobStates['Running'] === 0 && jobStates['Succeeded'] > 0 && jobStates['Failed'] === 0 && jobStates['Warning'] === 0}

@@ -3,7 +3,7 @@
   import JobPane from '$lib/components/JobPane.svelte';
   import StatusBar from '$lib/components/StatusBar.svelte';
   import { groupsConfigStore, programsStore } from '$lib/events.svelte';
-  import { showStatus } from '$lib/jobs';
+  import { showStatus } from '$lib/jobs.svelte';
   import GroupJobCell from './GroupJobCell.svelte';
 
   const includedAnalysis = $derived(

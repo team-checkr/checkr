@@ -4,32 +4,31 @@
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io.svelte';
+  import { Io } from '$lib/io.svelte';
   import { toSubscript } from '$lib/fmt';
   import ParsedInput from './ParsedInput.svelte';
   import InputOptions from '$lib/components/InputOptions.svelte';
   import InputOption from '$lib/components/InputOption.svelte';
   import DeterminismInput from '$lib/components/DeterminismInput.svelte';
 
-  const io = useIo('Interpreter', {
+  const io = new Io('Interpreter', {
     commands: 'skip',
     determinism: GCL.DETERMINISM[0],
     assignment: { variables: {}, arrays: {} },
     trace_length: 10,
   });
-  const { input, meta } = io;
-  let vars = $derived($meta ?? []);
+  let vars = $derived(io.meta ?? []);
 
   $effect.pre(() => {
     if (browser) {
       for (const v of vars) {
         if (v.kind == 'Variable') {
-          if (typeof $input.assignment.variables[v.name] != 'number') {
-            $input.assignment.variables[v.name] = 0;
+          if (typeof io.input.assignment.variables[v.name] != 'number') {
+            io.input.assignment.variables[v.name] = 0;
           }
         } else if (v.kind == 'Array') {
-          if (!Array.isArray($input.assignment.arrays[v.name])) {
-            $input.assignment.arrays[v.name] = [0];
+          if (!Array.isArray(io.input.assignment.arrays[v.name])) {
+            io.input.assignment.arrays[v.name] = [0];
           }
         }
       }
@@ -48,9 +47,9 @@
             </div>
             <div class="w-full font-mono">
               {#if v.kind == 'Array'}
-                <ParsedInput type="array" bind:value={$input.assignment.arrays[v.name]} />
+                <ParsedInput type="array" bind:value={io.input.assignment.arrays[v.name]} />
               {:else}
-                <ParsedInput type="int" bind:value={$input.assignment.variables[v.name]} />
+                <ParsedInput type="int" bind:value={io.input.assignment.variables[v.name]} />
               {/if}
             </div>
           {/each}
@@ -59,10 +58,10 @@
       <InputOptions>
         <InputOption title="Number of steps">
           <div class="w-full font-mono">
-            <ParsedInput type="int" bind:value={$input.trace_length} />
+            <ParsedInput type="int" bind:value={io.input.trace_length} />
           </div>
         </InputOption>
-        <DeterminismInput {input} />
+        <DeterminismInput input={io.input} />
       </InputOptions>
     </StandardInput>
   {/snippet}

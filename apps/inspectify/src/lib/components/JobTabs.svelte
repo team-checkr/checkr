@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { type Tab, currentTab, tabs } from '$lib/jobs';
+  import { type Tab, currentTab, tabs } from '$lib/jobs.svelte';
   import Ansi from '$lib/components/Ansi.svelte';
   import JsonView from './JSONView.svelte';
   import TrackingScroll from './TrackingScroll.svelte';
@@ -16,7 +16,7 @@
 
   $effect(() => {
     if (selectedJob?.kind.kind == 'Compilation') {
-      $currentTab = 'Output';
+      currentTab.current = 'Output';
     }
   });
   let isDisabled = $derived((tab: Tab) =>
@@ -36,16 +36,16 @@
     {#each tabs as tab}
       <button
         class="flex flex-1 items-center justify-center px-2 py-1 transition disabled:opacity-50 {(!hidden &&
-          tab == $currentTab) ||
+          tab == currentTab.current) ||
         isDisabled(tab)
           ? 'bg-slate-700'
           : 'hover:bg-slate-800'}"
         onclick={() => {
-          if (canHide && $currentTab == tab) {
+          if (canHide && currentTab.current == tab) {
             hidden = !hidden;
           } else {
             hidden = false;
-            $currentTab = tab;
+            currentTab.current = tab;
           }
         }}
         disabled={isDisabled(tab)}
@@ -64,14 +64,14 @@
   {#if !hidden}
     <div class="relative self-stretch bg-slate-900 text-xs">
       <div class="absolute inset-0 flex overflow-auto">
-        {#if $currentTab == 'Output'}
+        {#if currentTab.current == 'Output'}
           <TrackingScroll>
             <Ansi spans={selectedJob.spans} />
           </TrackingScroll>
-        {:else if $currentTab == 'Input JSON' && selectedJob.kind.kind == 'Analysis'}
+        {:else if currentTab.current == 'Input JSON' && selectedJob.kind.kind == 'Analysis'}
           <JsonView json={selectedJob.kind.data.json} />
           <div class="[overflow-anchor:auto]"></div>
-        {:else if $currentTab == 'Output JSON'}
+        {:else if currentTab.current == 'Output JSON'}
           {#if selectedJob.analysis_data?.output}
             <JsonView json={selectedJob.analysis_data.output.json} />
           {:else}
@@ -87,10 +87,10 @@
             </div>
           {/if}
           <div class="[overflow-anchor:auto]"></div>
-        {:else if $currentTab == 'Reference Output'}
+        {:else if currentTab.current == 'Reference Output'}
           <JsonView json={selectedJob.analysis_data?.reference_output?.json} />
           <div class="[overflow-anchor:auto]"></div>
-        {:else if $currentTab == 'Validation'}
+        {:else if currentTab.current == 'Validation'}
           <JsonView json={selectedJob.analysis_data?.validation} />
           <div class="[overflow-anchor:auto]"></div>
         {/if}

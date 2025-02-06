@@ -1,7 +1,6 @@
-import { derived, writable, type Readable, type Writable } from 'svelte/store';
 import { ce_shell, api, type ce_core } from './api';
 import { jobsStore, type Job, compilationStatus } from './events.svelte';
-import { selectedJobId, showReference } from './jobs';
+import { selectedJobId, showReference } from './jobs.svelte';
 import { browser } from '$app/environment';
 
 type Mapping = { [A in ce_shell.Analysis]: (ce_shell.Envs & { analysis: A })['io'] };
@@ -18,30 +17,68 @@ export type Results<A extends ce_shell.Analysis> = {
   output: Output<A> | null;
   referenceOutput: Output<A> | null;
   validation: ce_core.ValidationResult | { type: 'Failure'; message: string } | null;
-  job: Readable<Job> | null;
+  job: Job | null;
 };
 
-export type Io<A extends ce_shell.Analysis> = {
-  input: Writable<Input<A>>;
-  meta: Readable<Meta<A> | null>;
-  results: Readable<Results<A>>;
-  reference: Readable<Results<A>>;
-  generate: () => Promise<Input<A>>;
-};
+const defaultResults = <A extends ce_shell.Analysis>(): Results<A> => ({
+  input: null as any,
+  outputState: 'None',
+  output: null,
+  referenceOutput: null,
+  validation: null,
+  job: null,
+});
 
-const ios: Partial<Record<ce_shell.Analysis, Io<ce_shell.Analysis>>> = {};
+export class Io<A extends ce_shell.Analysis> {
+  analysis: A;
+  input: Input<A> = $state(null as any);
+  meta: Meta<A> | null = $state(null);
+  reference: Results<A> = $state(defaultResults());
 
-const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
-  const input = writable<Input<A>>(defaultInput);
+  currentJob: { jobId: number; input: Input<A> } | null = $state(null);
 
-  const jobIdAndInputDerived = derived(
-    [input, showReference],
-    ([$input, $showReference], set) => {
-      if (!browser) return;
+  results: Results<A> = $derived.by<Results<A>>(() => {
+    if (!this.currentJob || !(this.currentJob.jobId in jobsStore.jobs))
+      return {
+        input: this.input,
+        outputState: 'None',
+        job: null,
+        output: null,
+        referenceOutput: null,
+        validation: null,
+      } satisfies Results<A>;
+    const job = jobsStore.jobs[this.currentJob.jobId];
+    return {
+      input: this.currentJob.input,
+      outputState: job.analysis_data?.output?.json ? 'Current' : 'Stale',
+      output: job.analysis_data?.output?.json as any,
+      referenceOutput: job.analysis_data?.reference_output?.json as any,
+      validation: job.analysis_data?.validation as any,
+      job: job,
+    } satisfies Results<A>;
+  });
 
-      if ($showReference) return;
+  constructor(analysis: A, defaultInput: Input<A>) {
+    this.analysis = analysis;
+    this.input = defaultInput;
 
-      if (compilationStatus.status?.state != 'Succeeded') return;
+    if (!browser) return;
+
+    // Kick off analysis
+    $effect(() => {
+      if (!browser) {
+        return;
+      }
+
+      if (showReference.show) {
+        return;
+      }
+
+      if (compilationStatus.status?.state != 'Succeeded') {
+        return;
+      }
+
+      const inputSnapshot = $state.snapshot(this.input);
 
       let cancel = () => {};
       let stop = false;
@@ -52,7 +89,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
 
         const analysisRequest = api.analysis({
           analysis,
-          json: $input,
+          json: inputSnapshot,
           // TODO: we should avoid this somehow
           hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
         });
@@ -66,7 +103,7 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
           api.jobsCancel(res.id).data.catch(() => {});
         };
 
-        set({ jobId: res.id, input: $input });
+        this.currentJob = { jobId: res.id, input: inputSnapshot };
       };
 
       run();
@@ -75,145 +112,45 @@ const initializeIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: In
         stop = true;
         cancel();
       };
-    },
-    null as { jobId: number; input: Input<A> } | null,
-  );
+    });
 
-  const jobIdDerived = derived(
-    jobIdAndInputDerived,
-    ($jobIdAndMeta) => $jobIdAndMeta?.jobId ?? null,
-  );
-  const cachedInput = derived(jobIdAndInputDerived, ($jobIdAndMeta) => $jobIdAndMeta?.input);
+    $effect(() => {
+      if (this.currentJob) selectedJobId.jobId = this.currentJob.jobId;
+    });
 
-  jobIdDerived.subscribe(($jobId) => {
-    selectedJobId.set($jobId);
-  });
-
-  const defaultResults: Results<A> = {
-    input: defaultInput,
-    outputState: 'None',
-    output: null,
-    referenceOutput: null,
-    validation: null,
-    job: null,
-  };
-
-  const results = derived(
-    [jobIdDerived, cachedInput, jobsStore],
-    ([$jobId, $cachedInput, $jobs], set) => {
-      if (typeof $jobId != 'number' || !$cachedInput) return;
-
-      let cancel = () => {};
-      let stop = false;
-
-      const run = async () => {
-        set({
-          outputState: 'None',
-          output: null,
-          referenceOutput: null,
-          validation: null,
-          job: null,
-        } as Results<A>);
-
-        let job = $jobs[$jobId] as Writable<Job> | undefined;
-        while (!stop && !job) {
-          job = $jobs[$jobId];
-          if (!job) await new Promise((resolve) => setTimeout(resolve, 200));
-        }
-
-        if (!job) return;
-
-        cancel = job.subscribe(($job) => {
-          switch ($job.state) {
-            case 'Succeeded':
-              set({
-                input: $cachedInput,
-                outputState: 'Current',
-                // TODO: Add a toggle for showing the reference output in place of the output
-                output: $job.analysis_data?.output?.json as any,
-                referenceOutput: $job.analysis_data?.reference_output?.json as any,
-                validation: $job.analysis_data?.validation as any,
-                job,
-              } as Results<A>);
-              break;
-            case 'Failed':
-              set({
-                input: $cachedInput,
-                outputState: 'Current',
-                output: null,
-                referenceOutput: null,
-                validation: { type: 'Failure', message: $job.stdout },
-                job,
-              } as Results<A>);
-          }
-        });
-      };
-
-      run();
-
-      return () => {
-        stop = true;
-        cancel();
-      };
-    },
-    defaultResults,
-  );
-
-  const referenceAndMeta = derived(
-    [input],
-    ([$input], set) => {
+    $effect(() => {
       if (!browser) return;
 
       const analysisRequest = api.reference({
         analysis,
-        json: $input,
+        json: this.input,
         // TODO: we should avoid this somehow
         hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
       });
 
       analysisRequest.data.then(({ output, error, meta }) => {
-        set({
-          results: {
-            input: $input,
-            outputState: 'Current',
-            output: output?.json as any,
-            referenceOutput: output?.json as any,
-            validation: { type: 'CorrectTerminated' },
-            job: null,
-          },
-          meta: meta.json,
-        });
+        this.meta = meta.json;
+        this.reference = {
+          input: this.input,
+          outputState: 'Current',
+          output: output?.json as any,
+          referenceOutput: output?.json as any,
+          validation: { type: 'CorrectTerminated' },
+          job: null,
+        };
       });
 
       return () => {
         analysisRequest.abort();
       };
-    },
-    { results: defaultResults, meta: null as Meta<A> | null },
-  );
-  const reference = derived(referenceAndMeta, ($referenceAndMeta) => $referenceAndMeta.results);
-  const meta = derived(referenceAndMeta, ($referenceAndMeta) => $referenceAndMeta.meta);
-
-  const generate = () =>
-    api.generate({ analysis }).data.then((result) => {
-      input.set(result.json as any);
-      return result.json as any;
     });
 
-  if (browser) generate();
-
-  return {
-    input,
-    meta,
-    results,
-    reference,
-    generate,
-  };
-};
-
-export const useIo = <A extends ce_shell.Analysis>(analysis: A, defaultInput: Input<A>): Io<A> => {
-  if (!ios[analysis]) {
-    ios[analysis] = initializeIo(analysis, defaultInput);
+    this.generate();
   }
-  return ios[analysis] as Io<A>;
-};
+
+  async generate(): Promise<Input<A>> {
+    const result = await api.generate({ analysis: this.analysis }).data;
+    this.input = result.json as any;
+    return result.json as any;
+  }
+}

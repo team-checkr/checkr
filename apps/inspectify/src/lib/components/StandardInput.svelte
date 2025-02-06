@@ -15,15 +15,13 @@
     children?: import('svelte').Snippet;
   }
 
-  let { analysis, io, code = void 0, children }: Props = $props();
-
-  const input = io.input;
+  let { io, code = void 0, children }: Props = $props();
 
   const regenerate = async () => {
-    $input = await io.generate();
+    io.input = await io.generate();
   };
   const copyInput = () => {
-    navigator.clipboard.writeText(JSON.stringify($input));
+    navigator.clipboard.writeText(JSON.stringify(io.input));
   };
 </script>
 
@@ -38,7 +36,7 @@
   <div class="relative row-span-2 border-r">
     <div class="absolute inset-0 grid overflow-auto">
       {#if code}
-        <Editor bind:value={$input[code] as string | undefined} />
+        <Editor bind:value={io.input[code] as string | undefined} />
       {/if}
     </div>
   </div>

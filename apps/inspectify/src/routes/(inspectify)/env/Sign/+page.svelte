@@ -4,32 +4,31 @@
   import Env from '$lib/components/Env.svelte';
   import Network from '$lib/components/Network.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io.svelte';
+  import { Io } from '$lib/io.svelte';
   import { sortNodes, toSubscript } from '$lib/fmt';
   import InputOptions from '$lib/components/InputOptions.svelte';
   import DeterminismInput from '$lib/components/DeterminismInput.svelte';
   import InclusionCheckbox from '$lib/components/InclusionCheckbox.svelte';
 
-  const io = useIo('Sign', {
+  const io = new Io('Sign', {
     commands: 'skip',
     assignment: { variables: {}, arrays: {} },
     determinism: 'Deterministic',
   });
-  const { input, meta } = io;
 
-  let vars = $derived($meta ?? []);
+  let vars = $derived(io.meta ?? []);
 
   // NOTE: we need to supply the initial signs to new variables
   $effect.pre(() => {
     if (browser) {
       for (const v of vars) {
         if (v.kind == 'Variable') {
-          if (!$input.assignment.variables[v.name]) {
-            $input.assignment.variables[v.name] = SignAnalysis.SIGN[0];
+          if (!io.input.assignment.variables[v.name]) {
+            io.input.assignment.variables[v.name] = SignAnalysis.SIGN[0];
           }
         } else if (v.kind == 'Array') {
-          if (!$input.assignment.arrays[v.name]) {
-            $input.assignment.arrays[v.name] = [SignAnalysis.SIGN[0]];
+          if (!io.input.assignment.arrays[v.name]) {
+            io.input.assignment.arrays[v.name] = [SignAnalysis.SIGN[0]];
           }
         }
       }
@@ -62,7 +61,7 @@
                     name={v.name}
                     id="{v.name}-{sign}"
                     value={sign}
-                    bind:group={$input.assignment.variables[v.name]}
+                    bind:group={io.input.assignment.variables[v.name]}
                   />
                 </div>
               {:else if v.kind == 'Array'}
@@ -72,7 +71,7 @@
                     name={v.name}
                     id="{v.name}-{sign}"
                     value={sign}
-                    bind:array={$input.assignment.arrays[v.name]}
+                    bind:array={io.input.assignment.arrays[v.name]}
                   />
                 </div>
               {:else}
@@ -83,7 +82,7 @@
         </div>
       </InputOptions>
       <InputOptions>
-        <DeterminismInput {input} />
+        <DeterminismInput input={io.input} />
       </InputOptions>
     </StandardInput>
   {/snippet}

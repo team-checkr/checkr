@@ -1,9 +1,9 @@
 <script lang="ts">
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io.svelte';
+  import { Io } from '$lib/io.svelte';
 
-  const io = useIo('Parser', { commands: 'skip' });
+  const io = new Io('Parser', { commands: 'skip' });
 </script>
 
 <Env {io}>

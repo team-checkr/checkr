@@ -1,7 +1,7 @@
 <script lang="ts">
   import { type inspectify, type GroupConfig, type driver } from '$lib/api';
   import { groupProgramJobAssignedStore, jobsStore } from '$lib/events.svelte';
-  import { selectedJobId, showStatus } from '$lib/jobs';
+  import { selectedJobId, showStatus } from '$lib/jobs.svelte';
 
   import EllipsisHorizontal from '~icons/heroicons/ellipsis-horizontal';
   import ArrowPath from '~icons/heroicons/arrow-path';
@@ -20,9 +20,9 @@
   let { group, program }: Props = $props();
 
   let jobId = $derived(groupProgramJobAssignedStore.groups?.[group.name]?.[program.hash_str]);
-  let job = $derived($jobsStore[jobId]);
-  let validation = $derived($job?.analysis_data?.validation?.type);
-  let state = $derived(validation == 'Mismatch' ? 'Warning' : ($job?.state ?? 'Queued'));
+  let job = $derived(jobsStore.jobs[jobId]);
+  let validation = $derived(job?.analysis_data?.validation?.type);
+  let state = $derived(validation == 'Mismatch' ? 'Warning' : (job?.state ?? 'Queued'));
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse', ''],
@@ -35,19 +35,17 @@
     OutputLimitExceeded: [Trash, '', 'bg-orange-400'],
   };
 
-  let icon = $derived(icons[state][0]);
+  let Icon = $derived(icons[state][0]);
   let iconClass = $derived(icons[state][1]);
   let containerClass = $derived(icons[state][2]);
-
-  const SvelteComponent = $derived(icon);
 </script>
 
 <button
   class="grid h-full place-items-center p-2 transition {containerClass}"
   onclick={() => {
-    $selectedJobId = jobId;
-    $showStatus = true;
+    selectedJobId.jobId = jobId;
+    showStatus.show = true;
   }}
 >
-  <SvelteComponent class="h-6 w-6 text-white transition {iconClass}" />
+  <Icon class="h-6 w-6 text-white transition {iconClass}" />
 </button>

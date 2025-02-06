@@ -1,5 +1,5 @@
 <script lang="ts">
-  import { publicDataAnalysisStore, publicDataGroupsStore, lastFinishedStore } from '$lib/public';
+  import { publicData } from '$lib/public.svelte';
   import { onMount } from 'svelte';
   import { flip } from 'svelte/animate';
   import GroupRow from './GroupRow.svelte';
@@ -8,10 +8,10 @@
   import ArrowDownTray from '~icons/heroicons/arrow-down-tray';
   import { api } from '$lib/api';
 
-  let analysisStore = $state($publicDataAnalysisStore);
-  let groupsStore = $state($publicDataGroupsStore);
+  let analysisStore = $state($state.snapshot(publicData.analysis));
+  let groupsStore = $state($state.snapshot(publicData.groups));
   let numberOfPrograms = $derived(
-    $publicDataAnalysisStore.reduce((acc, analysis) => {
+    publicData.analysis.reduce((acc, analysis) => {
       return acc + analysis.programs.length;
     }, 0),
   );
@@ -20,8 +20,8 @@
 
   onMount(() => {
     const interval = setInterval(() => {
-      analysisStore = $publicDataAnalysisStore;
-      groupsStore = $publicDataGroupsStore;
+      analysisStore = $state.snapshot(publicData.analysis);
+      groupsStore = $state.snapshot(publicData.groups);
     }, animationDuration * 2);
     return () => clearInterval(interval);
   });
@@ -49,7 +49,7 @@
     <div class="flex space-x-1">
       <span class="italic text-slate-400">Last update:</span>
       <span class="font-mono"
-        >{$lastFinishedStore &&
+        >{publicData.lastFinished &&
           new Intl.DateTimeFormat('en-GB', {
             hour: 'numeric',
             minute: 'numeric',
@@ -57,7 +57,7 @@
             day: 'numeric',
             month: 'numeric',
             year: 'numeric',
-          }).format($lastFinishedStore)}</span
+          }).format(publicData.lastFinished)}</span
       >
     </div>
     <button class="-m-1 rounded-sm p-1 transition hover:bg-slate-600" onclick={downloadCsv}>

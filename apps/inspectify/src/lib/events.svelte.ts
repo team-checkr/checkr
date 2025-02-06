@@ -1,15 +1,12 @@
 import { browser } from '$app/environment';
-import { readonly, writable, type Writable } from 'svelte/store';
 import { api, driver, type inspectify } from './api';
-import { produce } from 'immer';
 
 export type Job = Omit<inspectify.endpoints.Job, 'kind'> & {
   kind: driver.job.JobKind | { kind: 'Waiting'; data: {} };
 };
 
-const jobsListWritableStore = writable<driver.job.JobId[]>([]);
-export const jobsListStore = readonly(jobsListWritableStore);
-export const jobsStore: Writable<Record<driver.job.JobId, Writable<Job>>> = writable({});
+export const jobsListStore: { jobs: driver.job.JobId[] } = $state({ jobs: [] });
+export const jobsStore: { jobs: Record<driver.job.JobId, Job> } = $state({ jobs: {} });
 
 export const compilationStatus: { status: inspectify.endpoints.CompilationStatus | null } = $state({
   status: null,
@@ -39,8 +36,8 @@ if (browser) {
 
       switch (msg.data.type) {
         case 'Reset': {
-          jobsListWritableStore.set([]);
-          jobsStore.set({});
+          jobsListStore.jobs = [];
+          jobsStore.jobs = {};
           compilationStatus.status = null;
           groupsConfigStore.config = null;
           programsStore.programs = [];
@@ -54,36 +51,25 @@ if (browser) {
         case 'JobChanged': {
           const { job } = msg.data.value;
 
-          jobsStore.update(
-            produce((jobsStore) => {
-              if (!jobsStore[job.id]) {
-                jobsStore[job.id] = writable(job);
-              }
-              jobsStore[job.id].set(job);
-            }),
-          );
+          jobsStore.jobs[job.id] = job;
           break;
         }
         case 'JobsChanged': {
           const { jobs } = msg.data.value;
-          jobsListWritableStore.set(jobs);
-          jobsStore.update(
-            produce((jobsStore) => {
-              for (const id of jobs) {
-                if (!jobsStore[id]) {
-                  jobsStore[id] = writable({
-                    id,
-                    state: 'Queued',
-                    group_name: null,
-                    kind: { kind: 'Waiting', data: {} },
-                    stdout: '',
-                    spans: [],
-                    analysis_data: null,
-                  });
-                }
-              }
-            }),
-          );
+          jobsListStore.jobs = jobs;
+          for (const id of jobs) {
+            if (!jobsStore.jobs[id]) {
+              jobsStore.jobs[id] = {
+                id,
+                state: 'Queued',
+                group_name: null,
+                kind: { kind: 'Waiting', data: {} },
+                stdout: '',
+                spans: [],
+                analysis_data: null,
+              };
+            }
+          }
           break;
         }
         case 'GroupsConfig': {

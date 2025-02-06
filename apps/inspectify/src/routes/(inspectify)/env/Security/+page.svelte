@@ -2,7 +2,7 @@
   import { browser } from '$app/environment';
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import { useIo } from '$lib/io.svelte';
+  import { Io } from '$lib/io.svelte';
   import type { SecurityAnalysis } from '$lib/api';
 
   import ShieldExclamation from '~icons/heroicons/shield-exclamation';
@@ -11,11 +11,10 @@
   import InputOption from '$lib/components/InputOption.svelte';
   import ParsedInput from '../Interpreter/ParsedInput.svelte';
 
-  const io = useIo('Security', { commands: 'skip', classification: {}, lattice: { rules: [] } });
-  const { input, meta } = io;
-  let targets = $derived($meta?.targets ?? []);
+  const io = new Io('Security', { commands: 'skip', classification: {}, lattice: { rules: [] } });
+  let targets = $derived(io.meta?.targets ?? []);
   let classes = $derived(
-    $meta?.lattice.allowed
+    io.meta?.lattice.allowed
       .flatMap((a) => [a.from, a.into])
       .filter((v, i, a) => a.indexOf(v) === i) ?? [],
   );
@@ -35,20 +34,20 @@
     if (browser && classes.length > 0) {
       for (const v of targets) {
         if (
-          !(v.name in $input.classification) ||
-          !classes.includes($input.classification[v.name])
+          !(v.name in io.input.classification) ||
+          !classes.includes(io.input.classification[v.name])
         ) {
-          $input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
+          io.input.classification[v.name] = classes[Math.floor(Math.random() * classes.length)];
         }
       }
       const toDelete: string[] = [];
-      for (const v of Object.keys($input.classification)) {
+      for (const v of Object.keys(io.input.classification)) {
         if (!targets.find((t) => t.name === v)) {
           toDelete.push(v);
         }
       }
       for (const v of toDelete) {
-        delete $input.classification[v];
+        delete io.input.classification[v];
       }
     }
   });
@@ -60,7 +59,7 @@
       <InputOptions title="Security Lattice">
         <InputOption title="Lattice">
           <div class="[&>input]:text-xs">
-            <ParsedInput type="who knows" bind:value={$input.lattice} {stringify} {parse} />
+            <ParsedInput type="who knows" bind:value={io.input.lattice} {stringify} {parse} />
           </div>
         </InputOption>
       </InputOptions>
@@ -73,7 +72,7 @@
             <div class="w-full font-mono">
               <select
                 class="w-full rounded-sm border bg-transparent p-1"
-                bind:value={$input.classification[v.name]}
+                bind:value={io.input.classification[v.name]}
               >
                 {#each classes as c, index}
                   <option value={c} selected={index == 0} class="bg-slate-700">{c}</option>

@@ -4,7 +4,7 @@
   import StatusBar from '$lib/components/StatusBar.svelte';
   import TrackingScroll from '$lib/components/TrackingScroll.svelte';
   import { compilationStatus, jobsStore } from '$lib/events.svelte';
-  import { showStatus } from '$lib/jobs';
+  import { showStatus } from '$lib/jobs.svelte';
 
   import ArrowPath from '~icons/heroicons/arrow-path';
   import Fire from '~icons/heroicons/fire';
@@ -16,7 +16,7 @@
 
   let compilationJob = $derived(
     typeof compilationStatus.status?.id == 'number'
-      ? $jobsStore[compilationStatus.status.id]
+      ? jobsStore.jobs[compilationStatus.status.id]
       : null,
   );
   let compilationError = $derived(compilationStatus.status?.state == 'Failed');
@@ -29,7 +29,7 @@
     </div>
   </main>
 
-  {#if $showStatus}
+  {#if showStatus.show}
     <div class="h-[35vh]">
       <JobPane />
     </div>
@@ -58,9 +58,9 @@
         </div>
         <div class="relative h-full w-full">
           <div class="absolute inset-0 overflow-auto text-sm">
-            {#if $compilationJob}
+            {#if compilationJob}
               <TrackingScroll>
-                <Ansi spans={$compilationJob?.spans} />
+                <Ansi spans={compilationJob?.spans} />
               </TrackingScroll>
             {/if}
           </div>
