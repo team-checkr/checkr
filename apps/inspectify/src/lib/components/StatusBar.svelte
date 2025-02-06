@@ -11,9 +11,9 @@
   import ChevronDoubleUp from '~icons/heroicons/chevron-double-up';
   import Link from '~icons/heroicons/link';
   import { showStatus } from '$lib/jobs';
+  import { PUBLIC_INSPECTIFY_VERSION } from '$env/static/public';
 
-  // TODO
-  const version = '1.2.3';
+  const version = PUBLIC_INSPECTIFY_VERSION;
 
   $: jobs = derived(
     $jobsListStore.map((id) => $jobsStore[id]),

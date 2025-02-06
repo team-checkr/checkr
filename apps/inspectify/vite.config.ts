@@ -2,11 +2,15 @@ import { sveltekit } from '@sveltejs/kit/vite';
 import { defineConfig } from 'vite';
 import Icons from 'unplugin-icons/vite';
 import path from 'path';
+import { execSync } from 'child_process';
 
-// const commitHash =
-//   process.env.GITHUB_REF_NAME ??
-//   execSync("git describe --dirty").toString().trimEnd();
-// process.env.INSPECTIFY_VERSION = commitHash;
+const metadata = JSON.parse(execSync('cargo metadata --format-version 1 --no-deps').toString()) as {
+  packages: { name: string; version: string }[];
+};
+
+const version = metadata.packages.find((x) => x.name == 'inspectify')?.version;
+
+process.env.PUBLIC_INSPECTIFY_VERSION = version;
 
 export default defineConfig({
   resolve: {

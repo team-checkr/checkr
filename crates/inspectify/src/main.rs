@@ -134,6 +134,24 @@ async fn run() -> color_eyre::Result<()> {
 
     let addr = SocketAddr::from(([127, 0, 0, 1], cli.port));
     let listener = tokio::net::TcpListener::bind(addr).await?;
+    {
+        use color_eyre::owo_colors::OwoColorize;
+
+        println!(
+            r#"
+  {name} {version}
+
+  {arrow}  {visit}:   {url}
+  {arrow}  use {open} to open in browser
+    "#,
+            name = "Inspectify".bold().bright_green(),
+            version = format!("v{}", env!("CARGO_PKG_VERSION")).green(),
+            arrow = "➜".green(),
+            visit = "Visit".bold(),
+            url = format!("http://{addr:?}/").cyan(),
+            open = "--open".bold(),
+        );
+    }
     axum::serve(listener, app).await?;
 
     Ok(())
@@ -148,7 +166,7 @@ pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoRespon
         if let Some(index) = Frontend::get("index.html") {
             return Html(index.data).into_response();
         } else {
-            return Html("Frontend has not been build for release yet! Visit <a href=\"http://localhost:3001/\">localhost:3001</a> for the development site!").into_response();
+            return Html("Frontend has not been build for release yet! Visit <a href=\"http://localhost:5173/\">localhost:5173</a> for the development site!").into_response();
         }
     }
 
