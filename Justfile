@@ -68,8 +68,11 @@ CHECKO_REMOTE_HOST := "$CHECKO_REMOTE_HOST"
 CHECKO_REMOTE_PATH := "$CHECKO_REMOTE_PATH"
 
 patch-checko:
-    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cd apps/inspectify && npm run build
-    PUBLIC_API_BASE="" PUBLIC_CHECKO="yes" cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
+    #!/bin/bash
+    export PUBLIC_API_BASE=""
+    export PUBLIC_CHECKO="yes"
+    (cd apps/inspectify && npm run build)
+    cargo zigbuild --target x86_64-unknown-linux-gnu -p inspectify --release
     scp target/x86_64-unknown-linux-gnu/release/inspectify {{CHECKO_REMOTE_HOST}}:{{CHECKO_REMOTE_PATH}}
 
 WIN_REMOTE_HOST := "$WIN_REMOTE_HOST"
