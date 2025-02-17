@@ -28,5 +28,6 @@ install-path = "CARGO_HOME"
 # just = "*"
 # [dist.dependencies.apt]
 # just = "*"
-# [dist.dependencies.chocolatey]
+[dist.dependencies.chocolatey]
+nodejs = "*"
 # just = "*"
