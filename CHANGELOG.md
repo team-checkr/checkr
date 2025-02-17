@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.5] - 2025-02-17
+
+### Miscellaneous Tasks
+
+- Release
+
 ## [0.2.4] - 2025-02-06
 
 ### Miscellaneous Tasks
