@@ -17,7 +17,7 @@ targets = [
     "x86_64-pc-windows-msvc",
 ]
 # Which actions to run on pull requests
-pr-run-mode = "plan"
+pr-run-mode = "upload"
 # Whether to install an updater program
 install-updater = false
 # Path that installers should place binaries in
