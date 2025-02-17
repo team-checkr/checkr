@@ -38,6 +38,7 @@ fn main() {
             .arg("run")
             .arg("build")
             .env("PUBLIC_API_BASE", "")
+            .env("PUBLIC_CHECKO", "")
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .status()
