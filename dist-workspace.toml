@@ -30,7 +30,8 @@ aarch64-pc-windows-msvc.container = "messense/cargo-xwin"
 # TODO: this didn't work on the version of ubuntu dist uses currently
 # [dist.dependencies.homebrew]
 # just = "*"
-# [dist.dependencies.apt]
+[dist.dependencies.apt]
+nodejs = "*"
 # just = "*"
 # [dist.dependencies.chocolatey]
 # nodejs = "*"
