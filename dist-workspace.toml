@@ -23,11 +23,15 @@ install-updater = false
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
 
+[dist.github-custom-runners]
+x86_64-pc-windows-msvc.container = "messense/cargo-xwin"
+aarch64-pc-windows-msvc.container = "messense/cargo-xwin"
+
 # TODO: this didn't work on the version of ubuntu dist uses currently
 # [dist.dependencies.homebrew]
 # just = "*"
 # [dist.dependencies.apt]
 # just = "*"
-[dist.dependencies.chocolatey]
-nodejs = "*"
+# [dist.dependencies.chocolatey]
+# nodejs = "*"
 # just = "*"
