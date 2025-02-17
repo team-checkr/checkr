@@ -37,6 +37,7 @@ fn main() {
             .current_dir(&inspectify_root)
             .arg("run")
             .arg("build")
+            .env("PUBLIC_API_BASE", "")
             .stdout(std::process::Stdio::inherit())
             .stderr(std::process::Stdio::inherit())
             .status()
