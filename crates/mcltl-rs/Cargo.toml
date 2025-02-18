@@ -1,0 +1,24 @@
+[package]
+name = "mcltl"
+version = "0.1.0"
+authors = [
+    "Alessio Coltellacci <lightplay8@gmail.com>",
+    "Oliver Bøving <oliver@bvng.dk>",
+]
+edition = "2021"
+publish = false
+
+[dependencies]
+ahash = "0.8.11"
+clap = { version = "4.4.4", features = ["derive"] }
+dot = "0.1"
+insta = "1.38.0"
+itertools = "0.14.0"
+once_cell = "1.19.0"
+plex = "0.3.0"
+smallvec = "1.13.2"
+smol_str = "0.3.2"
+test-log = { version = "0.2.15", default-features = false, features = [
+    "trace",
+] }
+tracing = "0.1.37"

@@ -1,6 +1,3 @@
 [submodule "starters/fsharp-starter"]
 	path = starters/fsharp-starter
 	url = git@github.com:team-checkr/fsharp-starter.git
-[submodule "crates/mcltl-rs"]
-	path = crates/mcltl-rs
-	url = git@github.com:team-checkr/mcltl-rs.git
