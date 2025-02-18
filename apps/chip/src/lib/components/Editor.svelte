@@ -10,6 +10,7 @@
   export let value: string = '';
   export let markers: MarkerData[] = [];
   export let hoveredMarker: number | null = null;
+  export let readOnly = false;
 
   let editor: Monaco.editor.IStandaloneCodeEditor;
   let monaco: typeof Monaco;
@@ -35,6 +36,7 @@
         theme: 'chip-dark',
         scrollBeyondLastLine: false,
         language: GCL_LANGUAGE_ID,
+        readOnly,
       });
       model = monaco.editor.createModel(value, GCL_LANGUAGE_ID);
       editor.setModel(model);
