@@ -24,8 +24,8 @@ install-updater = false
 install-path = "CARGO_HOME"
 
 [dist.github-custom-runners]
-x86_64-pc-windows-msvc.container = "messense/cargo-xwin"
-aarch64-pc-windows-msvc.container = "messense/cargo-xwin"
+x86_64-pc-windows-msvc = { container = "messense/cargo-xwin", package-manager = "apt" }
+aarch64-pc-windows-msvc = { container = "messense/cargo-xwin", package-manager = "apt" }
 
 # TODO: this didn't work on the version of ubuntu dist uses currently
 # [dist.dependencies.homebrew]
