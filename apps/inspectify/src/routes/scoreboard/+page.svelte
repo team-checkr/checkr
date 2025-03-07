@@ -66,7 +66,7 @@
   </div>
 </nav>
 
-<div class="w-full overflow-auto" style="--name-width: 5rem">
+<div class="w-full overflow-auto" style="--name-width: 11rem">
   <div
     class="grid self-start border-l"
     style="grid-template-columns: var(--name-width) repeat({numberOfPrograms}, 1fr);"

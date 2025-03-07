@@ -42,7 +42,7 @@ checko-debug:
     # rm -rf example/groups/
     # rm -rf ../2024/checko-data/runs.db3
     # rm -rf ../2024/checko-data/groups/
-    RUST_LOG=debug cargo run --release -p inspectify -- --checko ../2024/checko-data
+    RUST_LOG=debug cargo run --release -p inspectify -- --checko ../checko-data
     # CARGO_PROFILE_RELEASE_DEBUG=true RUST_LOG=debug cargo flamegraph --root -p inspectify -- --checko ../2024/checko-data
 
 # Patch inspectify binaries
