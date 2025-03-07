@@ -148,20 +148,29 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             Duration::from_millis(200),
             move |res: notify_debouncer_mini::DebounceEventResult| match res {
                 Ok(events) => {
-                    if !events.iter().any(|e| {
-                        let p = match e.path.strip_prefix(&debouncer_dir) {
-                            Ok(p) => p,
-                            Err(_) => &e.path,
-                        };
+                    let matching_events = events
+                        .iter()
+                        .filter(|e| {
+                            let p = match e.path.strip_prefix(&debouncer_dir) {
+                                Ok(p) => p,
+                                Err(_) => &e.path,
+                            };
 
-                        let matches_positive = matches.iter().any(|pat| pat.matches_path(p));
-                        let matches_negative = not_matches.iter().any(|pat| pat.matches_path(p));
+                            let matches_positive = matches.iter().any(|pat| pat.matches_path(p));
+                            let matches_negative =
+                                not_matches.iter().any(|pat| pat.matches_path(p));
 
-                        matches_positive && !matches_negative
-                    }) {
+                            matches_positive && !matches_negative
+                        })
+                        .collect_vec();
+
+                    tracing::debug!("a file was saved: {events:?}");
+
+                    if matching_events.is_empty() {
                         return;
                     }
-                    tracing::debug!("a file was saved: {events:?}");
+
+                    tracing::debug!("these caused recompiles: {matching_events:?}");
 
                     tx.send(()).expect("sending to file watcher failed");
                 }

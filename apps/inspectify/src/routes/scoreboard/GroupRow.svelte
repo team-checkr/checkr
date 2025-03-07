@@ -108,9 +108,7 @@
   });
 </script>
 
-<div
-  class="row-start-1 flex items-center justify-center border bg-slate-800 px-1 font-mono text-xs font-bold"
->
+<div class="row-start-1 flex items-center border bg-slate-800 px-1 font-mono text-xs font-bold">
   {group.name}
 </div>
 <canvas
