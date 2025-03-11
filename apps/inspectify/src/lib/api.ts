@@ -350,7 +350,8 @@ export namespace inspectify {
       error: (string | null)
     };
     export type GenerateParams = {
-      analysis: ce_shell.Analysis
+      analysis: ce_shell.Analysis,
+      seed: (number | null)
     };
     export type PublicEvent =
       | { "type": "Reset" }

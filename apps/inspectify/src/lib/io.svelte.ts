@@ -58,11 +58,19 @@ export class Io<A extends ce_shell.Analysis> {
     } satisfies Results<A>;
   });
 
-  constructor(analysis: A, defaultInput: Input<A>) {
+  constructor(analysis: A, defaultInput: Input<A>, seed?: number) {
     this.analysis = analysis;
     this.input = defaultInput;
 
     if (!browser) return;
+
+    const params = new URLSearchParams(window.location.search);
+    if (typeof seed != 'number') {
+      const paramSeed = params.get('seed');
+      if (typeof paramSeed == 'string') {
+        seed = parseInt(paramSeed);
+      }
+    }
 
     // Kick off analysis
     $effect(() => {
@@ -145,11 +153,11 @@ export class Io<A extends ce_shell.Analysis> {
       };
     });
 
-    this.generate();
+    this.generate(seed);
   }
 
-  async generate(): Promise<Input<A>> {
-    const result = await api.generate({ analysis: this.analysis }).data;
+  async generate(seed?: number): Promise<Input<A>> {
+    const result = await api.generate({ analysis: this.analysis, seed: seed ?? null }).data;
     this.input = result.json as any;
     return result.json as any;
   }
