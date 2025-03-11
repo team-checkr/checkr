@@ -302,7 +302,14 @@ impl Checko {
             // NOTE: We do the cloning sequentially, because we want to be nice
             // to the remote server
             let gs = checko.group_state(&g, a).await;
-            let repo = checko.update_group_repo(&g, a, deadline).await?;
+            let repo = match checko.update_group_repo(&g, a, deadline).await {
+                Ok(repo) => repo,
+                Err(err) => {
+                    tracing::error!(?g, ?err, "could not update group repo");
+                    gs.set_status(GroupStatus::CompilationError).await;
+                    continue;
+                }
+            };
 
             compile_join_set.spawn(
                 async move {
