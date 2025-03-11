@@ -52,17 +52,19 @@ impl Hash {
     }
 }
 
+fn compute_hash(analysis: Analysis, data: &serde_json::Value) -> Hash {
+    Hash::compute(
+        &serde_json::to_vec(&(analysis, data)).expect("all inputs/output should be serializable"),
+    )
+}
+
 impl Input {
     pub fn new<E: EnvExt>(data: &E::Input) -> Self {
+        let json = serde_json::to_value(data).expect("all input should be serializable");
         Self {
             analysis: E::ANALYSIS,
-            json: serde_json::to_value(data)
-                .expect("all output should be serializable")
-                .into(),
-            hash: Hash::compute(
-                &serde_json::to_vec(&(E::ANALYSIS, data))
-                    .expect("all output should be serializable"),
-            ),
+            hash: compute_hash(E::ANALYSIS, &json),
+            json: Arc::new(json),
         }
     }
 
@@ -79,21 +81,21 @@ impl Input {
     }
 
     pub fn hash(&self) -> Hash {
-        self.hash
+        if self.hash.bytes.iter().all(|b| *b == 0) {
+            compute_hash(self.analysis, &self.json)
+        } else {
+            self.hash
+        }
     }
 }
 
 impl Output {
     pub fn new<E: EnvExt>(data: &E::Output) -> Self {
+        let json = serde_json::to_value(data).expect("all output should be serializable");
         Self {
             analysis: E::ANALYSIS,
-            json: serde_json::to_value(data)
-                .expect("all output should be serializable")
-                .into(),
-            hash: Hash::compute(
-                &serde_json::to_vec(&(E::ANALYSIS, data))
-                    .expect("all output should be serializable"),
-            ),
+            hash: compute_hash(E::ANALYSIS, &json),
+            json: Arc::new(json),
         }
     }
 
@@ -110,7 +112,11 @@ impl Output {
     }
 
     pub fn hash(&self) -> Hash {
-        self.hash
+        if self.hash.bytes.iter().all(|b| *b == 0) {
+            compute_hash(self.analysis, &self.json)
+        } else {
+            self.hash
+        }
     }
 }
 
