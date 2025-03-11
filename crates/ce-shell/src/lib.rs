@@ -4,6 +4,7 @@ mod def;
 mod io;
 
 pub use io::{Error, Hash, Input, Meta, Output};
+use rand::SeedableRng;
 
 pub trait EnvExt: Env {
     const ANALYSIS: Analysis;
@@ -20,3 +21,13 @@ define_shell!(
     ce_security::SecurityEnv[Security, "Security"],
     ce_sign::SignEnv[Sign, "Sign Analysis"],
 );
+
+impl Analysis {
+    pub fn gen_input_seeded(self, seed: Option<u64>) -> Input {
+        let mut rng = match seed {
+            Some(seed) => rand::rngs::SmallRng::seed_from_u64(seed),
+            None => rand::rngs::SmallRng::from_os_rng(),
+        };
+        self.gen_input(&mut rng)
+    }
+}

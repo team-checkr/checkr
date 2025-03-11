@@ -106,9 +106,7 @@ impl ProgramConfig {
                 input: None,
                 ..
             } => CanonicalProgramConfig {
-                input: analysis
-                    .gen_input(&mut rand::rngs::SmallRng::seed_from_u64(*seed))
-                    .to_string(),
+                input: analysis.gen_input_seeded(Some(*seed)).to_string(),
                 shown: self.shown,
             },
             ProgramConfig {
