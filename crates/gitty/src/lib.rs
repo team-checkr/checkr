@@ -67,6 +67,21 @@ pub async fn clone_or_pull(git: &str, path: impl AsRef<Path>) -> color_eyre::Res
     }
 }
 
+pub async fn clone_or_clean_reset_pull(
+    git: &str,
+    path: impl AsRef<Path>,
+) -> color_eyre::Result<()> {
+    let path = path.as_ref();
+    if !path.join(".git").try_exists().unwrap_or(false) {
+        clone(git, path).await
+    } else {
+        checkout_main(git, path).await?;
+        clean(git, path).await?;
+        reset_hard(git, path).await?;
+        pull(git, path).await
+    }
+}
+
 pub async fn clone(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
     let _permit = GIT_SSH_SEMAPHORE.acquire().await;
 
@@ -97,6 +112,36 @@ pub async fn checkout_main(git: &str, path: impl AsRef<Path>) -> color_eyre::Res
         .wrap_err_with(|| {
             format!("could not checkout main branch of group git repository: '{git}'")
         })?;
+    Ok(())
+}
+
+pub async fn clean(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
+    tracing::debug!(?git, "checking out main branch");
+    Command::new("git")
+        .arg("clean")
+        .arg("-f")
+        .env("GIT_SSH_COMMAND", GIT_SSH_COMMAND.as_str())
+        .current_dir(path)
+        .success_without_output()
+        .await
+        .wrap_err_with(|| format!("could clean git repository: '{git}'"))?;
+    Ok(())
+}
+
+pub async fn reset_hard(git: &str, path: impl AsRef<Path>) -> color_eyre::Result<()> {
+    let _permit = GIT_SSH_SEMAPHORE.acquire().await;
+
+    tracing::debug!(?git, "checking out main branch");
+    Command::new("git")
+        .arg("reset")
+        .arg("--hard")
+        .env("GIT_SSH_COMMAND", GIT_SSH_COMMAND.as_str())
+        .current_dir(path)
+        .success_without_output()
+        .await
+        .wrap_err_with(|| format!("could reset --hard git repository: '{git}'"))?;
     Ok(())
 }
 
