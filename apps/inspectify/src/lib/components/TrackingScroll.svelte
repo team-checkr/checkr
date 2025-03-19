@@ -22,7 +22,7 @@
   });
 </script>
 
-<div bind:this={container} class="overflow-auto">
+<div bind:this={container} class="h-full overflow-auto">
   <pre class="p-3 [overflow-anchor:none]"><code>{@render children?.()}</code></pre>
   <div class="[overflow-anchor:auto]"></div>
 </div>
