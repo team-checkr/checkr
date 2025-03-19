@@ -29,7 +29,7 @@ fn main() {
                 );
 
                 // check if C:/Program Files/nodejs/npm.exe exists
-                let Ok(nodejs_path) = PathBuf::from_str("C:/Program Files/nodejs/npm.exe")
+                let Ok(npm_path) = PathBuf::from_str("C:/Program Files/nodejs/npm.exe")
                     .unwrap()
                     .canonicalize()
                 else {
