@@ -86,6 +86,14 @@ impl Env for InterpreterEnv {
     }
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+        if output.termination == TerminationState::Running
+            && output.trace.len() < input.trace_length as usize
+        {
+            return Ok(ValidationResult::Mismatch {
+                reason: "Not enough traces produced".to_string(),
+            });
+        }
+
         let pg =
             gcl::pg::ProgramGraph::new(
                 input.determinism,
