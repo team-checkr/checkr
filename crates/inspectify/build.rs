@@ -12,6 +12,18 @@ fn main() {
         //     .expect("Failed to build the frontend using `just build-ui`");
         // assert!(status.success());
 
+        // try to refreshenv
+        #[cfg(target_os = "windows")]
+        {
+            eprintln!("Refreshing the environment variables using `refreshenv`");
+            let status = std::process::Command::new("refreshenv")
+                .stdout(std::process::Stdio::inherit())
+                .stderr(std::process::Stdio::inherit())
+                .status()
+                .expect("Failed to refreshenv");
+            assert!(status.success());
+        }
+
         // find npm
         let npm_path = if std::process::Command::new("npm")
             .arg("--version")
