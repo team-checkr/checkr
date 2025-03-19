@@ -12,6 +12,41 @@ fn main() {
         //     .expect("Failed to build the frontend using `just build-ui`");
         // assert!(status.success());
 
+        // make sure npm is in path
+        if std::process::Command::new("npm")
+            .arg("--version")
+            .stdout(std::process::Stdio::null())
+            .stderr(std::process::Stdio::null())
+            .status()
+            .is_err()
+        {
+            #[cfg(target_os = "windows")]
+            {
+                eprintln!("npm is not installed. looking for it in C:/Program Files/nodejs/");
+
+                // check if C:/Program Files/nodejs/ exists
+                let Ok(nodejs_path) = PathBuf::from_str("C:/Program Files/nodejs/")
+                    .unwrap()
+                    .canonicalize()
+                else {
+                    eprintln!(
+                        "nodejs is not installed. Please install it using `choco install nodejs`"
+                    );
+                    std::process::exit(1);
+                };
+
+                // add nodejs to path for windows
+                std::env::set_var(
+                    "PATH",
+                    format!(
+                        "{};{}",
+                        std::env::var("PATH").unwrap(),
+                        nodejs_path.display(),
+                    ),
+                );
+            }
+        }
+
         // run the equivilent `cd apps/inspectify && (npm install && npm run build)`
         let inspectify_root =
             PathBuf::from_str(std::env::var("CARGO_MANIFEST_DIR").unwrap().as_str())
