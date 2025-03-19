@@ -4,6 +4,7 @@ mod hub;
 mod job;
 
 use std::{
+    collections::HashMap,
     fmt::Debug,
     path::{Path, PathBuf},
     sync::{Arc, RwLock},
@@ -144,6 +145,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             .map(|p| glob::Pattern::new(p).wrap_err_with(|| format!("{p:?} was not a valid glob")))
             .collect::<color_eyre::Result<Vec<glob::Pattern>>>()?;
         let debouncer_dir = dunce::canonicalize(&dir)?;
+        let mut prev_contents: HashMap<PathBuf, String> = HashMap::new();
         let mut debouncer = notify_debouncer_mini::new_debouncer(
             Duration::from_millis(200),
             move |res: notify_debouncer_mini::DebounceEventResult| match res {
@@ -170,7 +172,37 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                         return;
                     }
 
-                    tracing::debug!("these caused recompiles: {matching_events:?}");
+                    let mut changed = Vec::new();
+
+                    // check if contents have changed
+                    for event in &matching_events {
+                        let Ok(content) = std::fs::read_to_string(&event.path) else {
+                            changed.push(event.path.clone());
+                            continue;
+                        };
+                        match prev_contents.entry(event.path.clone()) {
+                            std::collections::hash_map::Entry::Occupied(mut o) => {
+                                if o.get() != &content {
+                                    changed.push(event.path.clone());
+                                    o.insert(content);
+                                }
+                            }
+                            std::collections::hash_map::Entry::Vacant(v) => {
+                                changed.push(event.path.clone());
+                                v.insert(content);
+                            }
+                        }
+                    }
+
+                    if changed.is_empty() {
+                        tracing::debug!(
+                            ?matching_events,
+                            "these changed, but had the same contents"
+                        );
+                        return;
+                    }
+
+                    tracing::info!(?changed, "recompiling due to changes in these files");
 
                     tx.send(()).expect("sending to file watcher failed");
                 }
