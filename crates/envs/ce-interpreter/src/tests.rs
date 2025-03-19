@@ -1,8 +1,12 @@
 use ce_core::{Env, ValidationResult};
-use gcl::{ast::Variable, pg::Determinism};
+use gcl::{
+    ast::Variable,
+    interpreter::TerminationState,
+    pg::{Determinism, Node},
+};
 use stdx::stringify::Stringify;
 
-use crate::{Input, InterpreterEnv, InterpreterMemory};
+use crate::{Input, InterpreterEnv, InterpreterMemory, Output};
 
 #[test]
 fn initially_stuck_program() {
@@ -88,3 +92,74 @@ fn test_thingy() {
         ValidationResult::TimeOut => panic!(),
     }
 }
+
+#[test]
+fn empty_trace_running() {
+    let commands = Stringify::Unparsed(
+        r#"
+            x := 10
+        "#
+        .to_string(),
+    );
+
+    let input = Input {
+        commands,
+        determinism: Determinism::Deterministic,
+        assignment: InterpreterMemory {
+            variables: [(Variable("x".to_string()), 0)].into_iter().collect(),
+            arrays: Default::default(),
+        },
+        trace_length: 1,
+    };
+    let output = Output {
+        initial_node: Node::Start.to_string(),
+        final_node: Node::End.to_string(),
+        dot: "".to_string(),
+        trace: Vec::new(),
+        termination: TerminationState::Running,
+    };
+
+    assert_eq!(
+        InterpreterEnv::validate(&input, &output).unwrap(),
+        ValidationResult::Mismatch {
+            reason: "Not enough traces produced".to_string()
+        }
+    );
+}
+
+#[test]
+fn empty_trace_terminated() {
+    let commands = Stringify::Unparsed(
+        r#"
+            x := 10
+        "#
+        .to_string(),
+    );
+
+    let input = Input {
+        commands,
+        determinism: Determinism::Deterministic,
+        assignment: InterpreterMemory {
+            variables: [(Variable("x".to_string()), 0)].into_iter().collect(),
+            arrays: Default::default(),
+        },
+        trace_length: 1,
+    };
+    let output = Output {
+        initial_node: Node::Start.to_string(),
+        final_node: Node::End.to_string(),
+        dot: "".to_string(),
+        trace: Vec::new(),
+        termination: TerminationState::Terminated,
+    };
+
+    assert_eq!(
+        InterpreterEnv::validate(&input, &output).unwrap(),
+        ValidationResult::Mismatch {
+            reason: "No execution reached the end".to_string()
+        }
+    );
+}
+
+#[test]
+fn mutation_of_valid_trace() {}
