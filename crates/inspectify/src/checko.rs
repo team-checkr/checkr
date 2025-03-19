@@ -229,7 +229,7 @@ impl Checko {
 
                 let git_pull_result = tokio_retry::Retry::spawn(
                     tokio_retry::strategy::FixedInterval::new(Duration::from_secs(5)).take(15),
-                    || gitty::clone_or_pull(git, &group_path),
+                    || gitty::clone_or_clean_reset_pull(git, &group_path),
                 )
                 .await;
 
