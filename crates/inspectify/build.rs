@@ -20,7 +20,7 @@ fn main() {
             .status()
             .is_ok()
         {
-            "npm"
+            PathBuf::from("npm")
         } else {
             #[cfg(target_os = "windows")]
             {
@@ -46,7 +46,10 @@ fn main() {
             }
         };
 
-        eprintln!("Building the frontend using npm at `{}`", npm_path);
+        eprintln!(
+            "Building the frontend using npm at `{}`",
+            npm_path.display()
+        );
 
         // run the equivilent `cd apps/inspectify && (npm install && npm run build)`
         let inspectify_root =
@@ -60,7 +63,7 @@ fn main() {
                 .canonicalize()
                 .unwrap();
 
-        let status = std::process::Command::new(npm_path)
+        let status = std::process::Command::new(&npm_path)
             .current_dir(&inspectify_root)
             .arg("install")
             .stdout(std::process::Stdio::inherit())
@@ -69,7 +72,7 @@ fn main() {
             .expect("Failed to install the frontend using `npm install`");
         assert!(status.success());
 
-        let status = std::process::Command::new(npm_path)
+        let status = std::process::Command::new(&npm_path)
             .current_dir(&inspectify_root)
             .arg("run")
             .arg("build")
