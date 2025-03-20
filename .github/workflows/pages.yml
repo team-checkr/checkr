@@ -42,7 +42,7 @@ jobs:
       - name: Install wasm-bindgen
         uses: taiki-e/install-action@v2
         with:
-          tool: wasm-bindgen,just
+          tool: wasm-bindgen,wasm-pack,just
 
       - name: Build Frontend
         run: just app-build chip
