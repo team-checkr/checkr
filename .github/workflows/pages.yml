@@ -34,11 +34,6 @@ jobs:
           toolchain: stable
           targets: x86_64-unknown-linux-gnu, wasm32-unknown-unknown
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: "example/lean/.lake/build/doc"
-
       - uses: Swatinem/rust-cache@v2
 
       - name: Install Node
