@@ -2,3 +2,8 @@
   uses: actions/setup-node@v4
 - name: Check node version
   run: npm --version
+- name: Build Inspectify fronend
+  run: |
+    cd ./apps/inspectify/
+    npm install
+    npm run build
