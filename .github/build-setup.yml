@@ -1,2 +1,4 @@
 - name: Install Node
   uses: actions/setup-node@v4
+- name: Check node version
+  run: npm --version
