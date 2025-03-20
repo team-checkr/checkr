@@ -277,7 +277,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                             related_information: None,
                             tags: None,
                             severity: MarkerSeverity::Error,
-                            message: "Exploration of the state space".to_string(),
+                            message: "Explosion of the state space".to_string(),
                             span: MonacoSpan::from_offset_len(src, 0, 0),
                         },
                         Vec::new(),
