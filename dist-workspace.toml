@@ -22,6 +22,7 @@ pr-run-mode = "upload"
 install-updater = false
 # Path that installers should place binaries in
 install-path = "CARGO_HOME"
+github-build-setup = "../build-setup.yml"
 
 # [dist.github-custom-runners]
 # NOTE: this does not seem to work with 0.28.0
