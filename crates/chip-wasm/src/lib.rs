@@ -260,7 +260,7 @@ impl Drop for TimingGuard {
     }
 }
 
-// #[wasm_bindgen]
+#[wasm_bindgen]
 pub fn parse_ltl(src: &str) -> LtLResult {
     let timing = Timing::default();
 
