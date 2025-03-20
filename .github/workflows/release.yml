@@ -127,6 +127,8 @@ jobs:
           fi
       - name: "Install Node"
         uses: "actions/setup-node@v4"
+      - name: "Check node version"
+        run: "npm --version"
       - uses: swatinem/rust-cache@v2
         with:
           key: ${{ join(matrix.targets, '-') }}
