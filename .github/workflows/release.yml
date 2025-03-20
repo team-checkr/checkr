@@ -129,11 +129,14 @@ jobs:
         uses: "actions/setup-node@v4"
       - name: "Check node version"
         run: "npm --version"
-      - name: "Build Inspectify fronend"
+      - name: "Build Inspectify frontend"
         run: |
           cd ./apps/inspectify/
           npm install
           npm run build
+        env:
+          "PUBLIC_API_BASE": ""
+          "PUBLIC_CHECKO": ""
       - uses: swatinem/rust-cache@v2
         with:
           key: ${{ join(matrix.targets, '-') }}

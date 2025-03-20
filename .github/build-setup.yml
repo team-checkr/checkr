@@ -2,7 +2,10 @@
   uses: actions/setup-node@v4
 - name: Check node version
   run: npm --version
-- name: Build Inspectify fronend
+- name: Build Inspectify frontend
+  env:
+    PUBLIC_API_BASE: ""
+    PUBLIC_CHECKO: ""
   run: |
     cd ./apps/inspectify/
     npm install
