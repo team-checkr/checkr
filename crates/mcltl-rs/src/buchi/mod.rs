@@ -709,7 +709,7 @@ impl<S, T: State, AP: AtomicProperty> ProductBuchiNodeSet<S, T, AP> {
         }
     }
     pub fn contains(&self, node: ProductBuchiNodeId<S, T, AP>) -> bool {
-        self.0.get(node.0).map_or(false, |set| set.contains(node.1))
+        self.0.get(node.0).is_some_and(|set| set.contains(node.1))
     }
 }
 
