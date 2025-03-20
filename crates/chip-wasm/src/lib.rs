@@ -5,6 +5,7 @@ use std::collections::HashMap;
 use chip::{
     model_check::{ReachableStates, State},
     parse::SourceSpan,
+    smtlib,
 };
 use itertools::Itertools;
 use miette::Diagnostic;
@@ -161,6 +162,7 @@ impl MonacoSpan {
 #[wasm_bindgen]
 pub fn parse(src: &str) -> ParseResult {
     let res = chip::parse::parse_agcl_program(src);
+    let st = smtlib::Storage::new();
     match res {
         Ok(ast) => ParseResult {
             parse_error: false,
@@ -170,7 +172,7 @@ pub fn parse(src: &str) -> ParseResult {
                 .into_iter()
                 .map(|t| Assertion {
                     implication: t.predicate.to_string(),
-                    smt: t.smt().join("\n"),
+                    smt: t.smt(&st).join("\n"),
                     text: t.source.text,
                     span: MonacoSpan::from_offset_len(
                         src,

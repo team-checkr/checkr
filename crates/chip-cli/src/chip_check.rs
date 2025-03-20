@@ -103,7 +103,8 @@ pub async fn chip_check(
     std::fs::create_dir_all(&working_dir)?;
     let working_dir = working_dir.canonicalize_utf8()?;
     tracing::info!(?working_dir);
-    let prelude = smtlib::lowlevel::ast::Script::parse(chip::SMT_PRELUDE)?;
+    let st = smtlib::Storage::new();
+    let prelude = smtlib::lowlevel::ast::Script::parse(&st, chip::SMT_PRELUDE)?;
     let mut rows: Vec<TaskResultRow> = Vec::new();
     println!("{}", TaskResultRow::header());
     let mut add_row = |row: TaskResultRow| {
@@ -222,13 +223,13 @@ pub async fn chip_check(
             let mut num_timeout = 0;
             for assertion in p.assertions() {
                 let backend = smtlib::backend::z3_binary::tokio::Z3BinaryTokio::new("z3").await?;
-                let mut solver = smtlib::TokioSolver::new(backend).await?;
+                let mut solver = smtlib::TokioSolver::new(&st, backend).await?;
 
-                for cmd in &prelude.0 {
-                    solver.run_command(cmd).await?;
+                for cmd in prelude.0 {
+                    solver.run_command(*cmd).await?;
                 }
 
-                solver.assert(!assertion.predicate.smt()).await?;
+                solver.assert(!assertion.predicate.smt(&st)).await?;
 
                 let res =
                     tokio::time::timeout(tokio::time::Duration::from_secs(3), solver.check_sat())

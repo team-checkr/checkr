@@ -9,3 +9,5 @@ pub mod parse;
 pub mod triples;
 
 pub const SMT_PRELUDE: &str = include_str!("chip-theory.smt2");
+
+pub use smtlib;

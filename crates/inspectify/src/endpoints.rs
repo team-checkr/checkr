@@ -4,7 +4,6 @@ use axum::{extract::State, Json};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Hash, Input};
 use driver::{HubEvent, JobId, JobState};
-use rand::SeedableRng;
 use serde::{Deserialize, Serialize};
 
 use crate::checko::{self, config::GroupName, scoreboard::PublicState};

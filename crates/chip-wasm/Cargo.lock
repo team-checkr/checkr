@@ -149,9 +149,9 @@ dependencies = [
 
 [[package]]
 name = "bumpalo"
-version = "3.15.4"
+version = "3.17.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "7ff69b9dd49fd426c69a0db9fc04dd934cdb6645ff000864d98f7e2af8830eaa"
+checksum = "1628fb46dfa0b37568d12e5edd512553eccf6a22a78e8bde00bb4aed84d5bdbf"
 
 [[package]]
 name = "cfg-if"
@@ -167,7 +167,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "chip"
-version = "0.2.7"
+version = "0.2.8"
 dependencies = [
  "clap",
  "indexmap",
@@ -969,10 +969,11 @@ dependencies = [
 
 [[package]]
 name = "smtlib"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c36878f20c71c73b8787a2321f848d7f4b6dbebdd5207dade293c820e232edef"
+checksum = "516ce9fd6e1ac140108629c5039128abd5b3f116ed75861bd1fbbdc20c0d37bf"
 dependencies = [
+ "indexmap",
  "itertools 0.12.1",
  "miette 5.10.0",
  "smtlib-lowlevel",
@@ -981,10 +982,11 @@ dependencies = [
 
 [[package]]
 name = "smtlib-lowlevel"
-version = "0.2.0"
+version = "0.3.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "c2f4299558c2a6216ae737be12acae2976e62b3d5012910e82cd452a29d7e427"
+checksum = "2e48ee399efb51e84d25d4ac02b7e61141f47781d84d8bfc934b8791b30f6c52"
 dependencies = [
+ "bumpalo",
  "itertools 0.12.1",
  "logos",
  "miette 5.10.0",

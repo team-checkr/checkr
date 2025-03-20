@@ -1,6 +1,7 @@
 use std::collections::BTreeSet;
 
 use itertools::Itertools;
+use smtlib::Sorted;
 
 use crate::{
     ast::{AGCLCommand, AGCLCommands, CommandKind, Predicate},
@@ -203,20 +204,23 @@ impl AGCLCommand {
 }
 
 impl Assertion {
-    pub fn smt(&self) -> impl Iterator<Item = smtlib::lowlevel::ast::Command> {
+    pub fn smt<'st>(
+        &self,
+        st: &'st smtlib::Storage,
+    ) -> impl Iterator<Item = smtlib::lowlevel::ast::Command<'st>> {
         let fv = self.predicate.fv();
 
         fv.into_iter()
             .map(|v| {
                 smtlib::lowlevel::ast::Command::DeclareConst(
-                    smtlib::lowlevel::lexicon::Symbol(v.name().to_string()),
+                    smtlib::lowlevel::lexicon::Symbol(st.alloc_str(v.name())),
                     smtlib::lowlevel::ast::Sort::Sort(smtlib::lowlevel::ast::Identifier::Simple(
-                        smtlib::lowlevel::lexicon::Symbol("Int".to_string()),
+                        smtlib::lowlevel::lexicon::Symbol("Int"),
                     )),
                 )
             })
             .chain([
-                smtlib::lowlevel::ast::Command::Assert((!self.predicate.smt()).into()),
+                smtlib::lowlevel::ast::Command::Assert((!self.predicate.smt(st)).term()),
                 smtlib::lowlevel::ast::Command::CheckSat,
             ])
     }
