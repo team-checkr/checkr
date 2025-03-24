@@ -47,7 +47,7 @@
     "katex": "^0.16.9",
     "monaco-editor": "^0.46.0",
     "vis-network": "^9.1.9",
-    "z3-solver": "^4.13.0"
+    "z3-solver": "=4.13.0"
   },
   "postcss": {
     "plugins": {

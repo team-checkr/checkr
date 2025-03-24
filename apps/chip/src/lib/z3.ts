@@ -7,7 +7,7 @@ let stored = init(async () => {
   const files = {
     'z3-built.js': await import('z3-solver/build/z3-built?url'),
     'z3-built.wasm': await import('z3-solver/build/z3-built.wasm?url'),
-    // 'z3-built.worker.js': await import('z3-solver/build/z3-built.worker?url'),
+    'z3-built.worker.js': await import('z3-solver/build/z3-built.worker?url'),
   };
   return initZ3({
     locateFile: (f: string) => {
