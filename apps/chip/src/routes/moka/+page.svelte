@@ -36,9 +36,9 @@ check ! F ! (x >= -1)       // should hold
 
   let parseError = writable(false);
 
-  const STATES = ['idle', 'checking', 'checked', 'error'];
-  type State = (typeof STATES)[number];
-  let state = writable<State>('idle');
+  const STATUS = ['idle', 'checking', 'checked', 'error'];
+  type Status = (typeof STATUS)[number];
+  let status = writable<Status>('idle');
 
   $: graphs = [
     { title: 'Kripke structure', dot: $result.kripke_str },
@@ -82,7 +82,7 @@ check ! F ! (x >= -1)       // should hold
 
   $: if (browser) {
     const run = async () => {
-      state.set('checked');
+      status.set('checked');
       parseError.set(false);
       const { default: init, parse_ltl } = await import('chip-wasm');
       await init();
@@ -92,9 +92,9 @@ check ! F ! (x >= -1)       // should hold
       if (res.parse_error) parseError.set(true);
       result.set(res);
       if (res.markers.length > 0) {
-        state.set('error');
+        status.set('error');
       } else {
-        state.set('checked');
+        status.set('checked');
       }
     };
     run().catch(console.error);
@@ -180,7 +180,7 @@ check ! F ! (x >= -1)       // should hold
           checking: 'bg-yellow-500',
           checked: 'bg-green-500',
           error: 'bg-red-500',
-        }[$state]}"
+        }[$status]}"
   >
     <span class="font-bold">
       {$parseError
@@ -190,7 +190,7 @@ check ! F ! (x >= -1)       // should hold
             checking: 'Checking...',
             checked: 'Checked',
             error: 'Error',
-          }[$state]}
+          }[$status]}
     </span>
     <div class="flex-1"></div>
     <span class="text-xl">

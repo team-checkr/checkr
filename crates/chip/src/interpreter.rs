@@ -192,6 +192,7 @@ pub enum StepError {
     NegativePower,
     Stuck,
     Halt,
+    HitOld,
 }
 
 impl State {
@@ -395,6 +396,7 @@ impl AExpr {
                     a.pow(b as u32)
                 }
             },
+            AExpr::Old(_) => return Err(StepError::HitOld),
         })
     }
 }

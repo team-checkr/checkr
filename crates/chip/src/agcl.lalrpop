@@ -177,6 +177,7 @@ pub AExpr: AExpr = {
     Target => AExpr::Reference(<>),
     Function<AExprBox> => AExpr::Function(<>),
     "-" <AExpr> => AExpr::Minus(Box::new(<>)),
+    "old" "(" <Target> ")" => AExpr::Old(<>),
     "(" <AExpr_> ")",
 
     #[precedence(level="3")] #[assoc(side="left")]

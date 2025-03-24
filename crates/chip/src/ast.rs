@@ -67,6 +67,7 @@ pub enum AExpr {
     Binary(Box<AExpr>, AOp, Box<AExpr>),
     Minus(Box<AExpr>),
     Function(Function),
+    Old(Target<Box<AExpr>>),
 }
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]

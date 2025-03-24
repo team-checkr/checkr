@@ -224,6 +224,7 @@ impl FreeVariables for AExpr {
             AExpr::Binary(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
             AExpr::Minus(x) => x.fv(),
             AExpr::Function(f) => f.fv(),
+            AExpr::Old(e) => e.fv(),
         }
     }
 }
@@ -322,6 +323,8 @@ impl AExpr {
             AExpr::Binary(l, op, r) => AExpr::binary(l.subst_var(t, x), *op, r.subst_var(t, x)),
             AExpr::Minus(e) => AExpr::Minus(Box::new(e.subst_var(t, x))),
             AExpr::Function(f) => AExpr::Function(f.subst_var(t, x)),
+            // TODO: Should we substitute here?
+            AExpr::Old(_) => self.clone(),
         }
     }
 }

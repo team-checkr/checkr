@@ -98,6 +98,7 @@ impl Display for AExpr {
             AExpr::Binary(l, op, r) => write!(f, "({l} {op} {r})"),
             AExpr::Minus(m) => write!(f, "-{m}"),
             AExpr::Function(fun) => write!(f, "{fun}"),
+            AExpr::Old(target) => write!(f, "old({target})"),
         }
     }
 }

@@ -62,6 +62,7 @@ impl AExpr {
                 let args = f.args().map(|a| a.smt(st).into()).collect::<Vec<_>>();
                 fun.call(&args).unwrap().as_int().unwrap()
             }
+            AExpr::Old(e) => smtlib::Int::new_const(st, e.name()).into(),
         }
     }
 }

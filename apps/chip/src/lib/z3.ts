@@ -47,16 +47,24 @@ export const run = async (query: string, options: RunOptions = {}) =>
 
     const results: string[] = [];
 
+    console.group('smt');
+
     for (const l of query.split('\n')) {
+      console.info('evaluating:', l);
+
       const timeStart = new Date().getTime();
       const res = await Z3.eval_smtlib2_string(ctx, l);
       const timeEnd = new Date().getTime();
       if (timeEnd - timeStart >= timeout) {
+        console.info('timeout');
         results.push('timeout');
       } else {
+        console.info('    result:', res);
         results.push(res);
       }
     }
+
+    console.groupEnd();
 
     Z3.del_context(ctx);
 
