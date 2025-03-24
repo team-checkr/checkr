@@ -170,6 +170,7 @@ Function = {
       right: [
         ['Int'],
         ['Var'],
+        ['"old("', 'Var', '")"'],
         ['"-"', '<AExpr>'],
         ['"("', '<AExpr>', '")"'],
         ['AExpr', '"*"', 'AExpr'],
