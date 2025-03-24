@@ -130,9 +130,9 @@ check ! F ! (x >= -1)       // should hold
         {#if dot}
           <div class="flex flex-1 flex-col p-2">
             <h2 class="text-xl font-bold">{title}</h2>
-            <div class="grid flex-1 grid-cols-1 overflow-auto rounded bg-slate-700">
+            <div class="grid flex-1 grid-cols-1 overflow-auto rounded-sm bg-slate-700">
               {#if dot.includes('digraph')}
-                <div class="m-1 rounded bg-slate-900">
+                <div class="m-1 rounded-sm bg-slate-900">
                   <Network dot={prepareDot(dot)} highlight={['n20']} />
                 </div>
               {:else}
@@ -148,7 +148,7 @@ check ! F ! (x >= -1)       // should hold
       <div class="relative flex-1">
         {#if pauseGraphRendering}
           <button
-            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded border px-3 py-2 text-lg font-bold transition hover:bg-slate-500/10"
+            class="absolute left-1/2 top-1/2 -translate-x-1/2 -translate-y-1/2 rounded-sm border px-3 py-2 text-lg font-bold transition hover:bg-slate-500/10"
             on:click={() => (pauseGraphRendering = false)}
           >
             Graph rendering pause. Click to enable
@@ -192,7 +192,7 @@ check ! F ! (x >= -1)       // should hold
             error: 'Error',
           }[$state]}
     </span>
-    <div class="flex-1" />
+    <div class="flex-1"></div>
     <span class="text-xl">
       <!-- {#if !$parseError && $state == 'checked'}
           {#if $result.is_fully_annotated}
