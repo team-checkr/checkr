@@ -4,12 +4,25 @@
   import Nav from '$lib/components/Nav.svelte';
   import { untrack } from 'svelte';
   import Icon from '~icons/heroicons/check-badge';
+  import { browser } from '$app/environment';
 
-  let program = $state(`{ true }
+  const DEFAULT_PROGRAM = `{ true }
 if
   false -> skip
 fi
-{ true }`);
+{ true }`;
+
+  const PROGRAM_KEY = 'chip-program';
+
+  let program = $state(
+    (browser && typeof localStorage.getItem(PROGRAM_KEY) == 'string'
+      ? localStorage.getItem(PROGRAM_KEY)
+      : null) || DEFAULT_PROGRAM,
+  );
+
+  $effect(() => {
+    localStorage.setItem(PROGRAM_KEY, program);
+  });
 
   let result: ParseResult = $state({
     parse_error: false,
