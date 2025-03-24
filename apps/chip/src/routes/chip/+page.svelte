@@ -118,7 +118,7 @@ fi
             error: 'Verification error',
           }[$state]}
     </span>
-    <div class="flex-1" />
+    <div class="flex-1"></div>
     <span class="text-xl">
       {#if !$parseError && $state == 'verified'}
         {#if $result.is_fully_annotated}

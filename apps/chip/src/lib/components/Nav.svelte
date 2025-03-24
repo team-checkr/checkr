@@ -7,18 +7,22 @@
   import Moon from '~icons/heroicons/moon';
   import QuestionMarkCircle from '~icons/heroicons/question-mark-circle';
 
-  export let title: 'Chip' | 'Moka';
+  interface Props {
+    title: 'Chip' | 'Moka';
+  }
 
-  $: Icon = title == 'Chip' ? ChipIcon : MokaIcon;
+  let { title }: Props = $props();
 
-  let darkTheme = $theme == 'dark';
-  $: {
+  let Icon = $derived(title == 'Chip' ? ChipIcon : MokaIcon);
+
+  let darkTheme = $state($theme == 'dark');
+  $effect(() => {
     if (darkTheme) {
       $theme = 'dark';
     } else {
       $theme = 'light';
     }
-  }
+  });
 </script>
 
 <nav class="flex items-center space-x-2 bg-slate-900 px-2 text-slate-200">
@@ -29,7 +33,7 @@
     </div>
     <span>{title}</span>
   </a>
-  <div class="flex-1" />
+  <div class="flex-1"></div>
   <div>
     <label for="theme" class="flex cursor-pointer select-none items-center space-x-1">
       <span>Switch theme</span>

@@ -2,7 +2,7 @@
   {#each [{ title: 'Chip', sub: 'Program verification' }, { title: 'Moka', sub: 'Model checking' }] as page, i}
     {#if 0 < i}
       <div class="mx-10 flex w-px">
-        <div class="w-px bg-slate-600" />
+        <div class="w-px bg-slate-600"></div>
       </div>
     {/if}
     <a
