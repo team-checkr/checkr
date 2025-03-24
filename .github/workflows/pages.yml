@@ -5,10 +5,8 @@ on:
     branches: ["main"]
     workflow_dispatch:
 
-# Sets permissions of the GITHUB_TOKEN to allow deployment to GitHub Pages
 permissions:
   contents: read
-  pages: write
   id-token: write
 
 # Allow only one concurrent deployment, skipping runs queued between the run in-progress and latest queued.
@@ -47,14 +45,11 @@ jobs:
       - name: Build Frontend
         run: just app-build chip
 
-      - name: Upload artifact
-        uses: actions/upload-pages-artifact@v3
-        with:
-          path: apps/chip/build/
-
-      - name: Setup Pages
-        uses: actions/configure-pages@v5
-
       - name: Deploy to GitHub Pages
         id: deployment
-        uses: actions/deploy-pages@v4
+        uses: peaceiris/actions-gh-pages@4
+        with:
+          personal_token: ${{ secrets.PERSONAL_TOKEN }}
+          external_repository: team-checkr/team-checkr.github.io
+          publish_branch: main
+          publish_dir: apps/chip/build/
