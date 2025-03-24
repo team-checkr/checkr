@@ -35,7 +35,7 @@ fi
 
   let parseError = $state(false);
 
-  const Status = ['idle', 'verifying', 'verified', 'error'] as const;
+  const Status = ['idle', 'verifying', 'verified', 'error', 'timeout'] as const;
   type Status = (typeof Status)[number];
   let status: Status = $state('idle');
 
@@ -68,6 +68,7 @@ fi
       verifications = [];
       status = 'verifying';
       let errors = false;
+      let timeout = false;
       for (const t of thisResult.assertions) {
         const { cancel: cancelZ3, result: resPromise } = z3.run(t.smt, {
           prelude: thisResult.prelude,
@@ -76,6 +77,8 @@ fi
         const res = await resPromise;
         if (res == 'cancelled') return;
 
+        timeout ||= res[res.length - 1].trim() === 'timeout';
+
         const valid = res[res.length - 1].trim() === 'unsat';
 
         if (thisRun !== runId) {
@@ -83,7 +86,7 @@ fi
           return;
         }
 
-        if (!valid) {
+        if (!valid || timeout) {
           errors = true;
           verifications = [
             ...untrack(() => verifications),
@@ -109,7 +112,7 @@ fi
         }
       }
       if (errors) {
-        status = 'error';
+        status = timeout ? 'timeout' : 'error';
       } else {
         status = 'verified';
       }
@@ -139,6 +142,7 @@ fi
           verifying: 'bg-yellow-500',
           verified: 'bg-green-500',
           error: 'bg-red-500',
+          timeout: 'bg-blue-500',
         }[status]}"
   >
     <span class="font-bold">
@@ -149,6 +153,7 @@ fi
             verifying: 'Verifying...',
             verified: 'Verified',
             error: 'Verification error',
+            timeout: 'Verification timed out',
           }[status]}
     </span>
     <div class="flex-1"></div>
