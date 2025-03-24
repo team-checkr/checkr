@@ -31,42 +31,61 @@ export type RunOptions = {
   onStart?: () => void;
 };
 
-export const run = async (query: string, options: RunOptions = {}) =>
-  borrow(async ({ Z3 }) => {
-    options.onStart?.();
+export const run = (
+  query: string,
+  options: RunOptions = {},
+): { cancel: () => void; result: Promise<'cancelled' | string[]> } => {
+  let isCancelled = false;
+  const cancel = () => {
+    isCancelled = true;
+  };
 
-    const timeout = 1000;
+  return {
+    cancel,
+    result: borrow(async ({ Z3 }) => {
+      options.onStart?.();
 
-    Z3.global_param_set('timeout', String(timeout));
+      const timeout = 1000;
 
-    const cfg = Z3.mk_config();
-    const ctx = Z3.mk_context(cfg);
-    Z3.del_config(cfg);
+      Z3.global_param_set('timeout', String(timeout));
 
-    if (options.prelude) await Z3.eval_smtlib2_string(ctx, options.prelude);
+      const cfg = Z3.mk_config();
+      const ctx = Z3.mk_context(cfg);
+      Z3.del_config(cfg);
 
-    const results: string[] = [];
+      if (options.prelude) await Z3.eval_smtlib2_string(ctx, options.prelude);
 
-    console.group('smt');
+      const results: string[] = [];
 
-    for (const l of query.split('\n')) {
-      console.info('evaluating:', l);
+      console.group('smt');
 
-      const timeStart = new Date().getTime();
-      const res = await Z3.eval_smtlib2_string(ctx, l);
-      const timeEnd = new Date().getTime();
-      if (timeEnd - timeStart >= timeout) {
-        console.info('timeout');
-        results.push('timeout');
-      } else {
-        console.info('    result:', res);
-        results.push(res);
+      for (const l of query.split('\n')) {
+        if (isCancelled) {
+          console.info('cancelled');
+          break;
+        }
+
+        console.info('evaluating:', l);
+
+        const timeStart = new Date().getTime();
+        const res = await Z3.eval_smtlib2_string(ctx, l);
+        const timeEnd = new Date().getTime();
+        if (timeEnd - timeStart >= timeout) {
+          console.info('timeout');
+          results.push('timeout');
+        } else {
+          console.info('    result:', res);
+          results.push(res);
+        }
       }
-    }
 
-    console.groupEnd();
+      console.groupEnd();
 
-    Z3.del_context(ctx);
+      Z3.del_context(ctx);
 
-    return results;
-  });
+      if (isCancelled) return 'cancelled';
+
+      return results;
+    }),
+  };
+};

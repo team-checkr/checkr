@@ -1,63 +1,78 @@
 <script lang="ts">
-  import { writable } from 'svelte/store';
-  import { browser } from '$app/environment';
   import Editor from '$lib/components/Editor.svelte';
   import type { MarkerData, MarkerSeverity, ParseResult } from 'chip-wasm';
   import Nav from '$lib/components/Nav.svelte';
+  import { untrack } from 'svelte';
 
-  let program = `{ true }
+  let program = $state(`{ true }
 if
   false -> skip
 fi
-{ true }`;
+{ true }`);
 
-  let result = writable<ParseResult>({
+  let result: ParseResult = $state({
     parse_error: false,
     prelude: '',
     assertions: [],
     markers: [],
     is_fully_annotated: false,
   });
-  let verifications = writable<MarkerData[]>([]);
+  let verifications: MarkerData[] = $state([]);
 
-  let parseError = writable(false);
+  let parseError = $state(false);
 
-  const STATES = ['idle', 'verifying', 'verified', 'error'] as const;
-  type State = (typeof STATES)[number];
-  let state = writable<State>('idle');
+  const Status = ['idle', 'verifying', 'verified', 'error'] as const;
+  type Status = (typeof Status)[number];
+  let status: Status = $state('idle');
 
-  $: if (browser) {
+  let parse: ((src: string) => ParseResult) | null = $state(null);
+
+  $effect.pre(() => {
     const run = async () => {
-      parseError.set(false);
-      const { default: init, parse } = await import('chip-wasm');
+      const { default: init, parse: parseFn } = await import('chip-wasm');
       await init();
-      const res = parse(program);
-      if (res.parse_error) parseError.set(true);
-      result.set(res);
+      parse = parseFn;
     };
     run().catch(console.error);
-  }
+  });
+
+  $effect(() => {
+    if (!parse) return;
+    parseError = false;
+    const res = parse(program);
+    if (res.parse_error) parseError = true;
+    result = res;
+  });
   let runId = 0;
-  $: if (browser) {
+  $effect(() => {
+    const thisResult: ParseResult = $state.snapshot(result) as ParseResult;
+    let cancel = () => {};
+
     const run = async () => {
       const thisRun = ++runId;
       const z3 = await import('$lib/z3');
-      verifications.set([]);
-      state.set('verifying');
+      verifications = [];
+      status = 'verifying';
       let errors = false;
-      for (const t of $result.assertions) {
-        const res = await z3.run(t.smt, { prelude: $result.prelude });
+      for (const t of thisResult.assertions) {
+        const { cancel: cancelZ3, result: resPromise } = z3.run(t.smt, {
+          prelude: thisResult.prelude,
+        });
+        cancel = cancelZ3;
+        const res = await resPromise;
+        if (res == 'cancelled') return;
+
         const valid = res[res.length - 1].trim() === 'unsat';
 
         if (thisRun !== runId) {
-          console.log('aborted', thisRun, runId, result, res);
+          console.info('aborted', thisRun, runId, thisResult, res);
           return;
         }
 
         if (!valid) {
           errors = true;
-          verifications.update((res) => [
-            ...res,
+          verifications = [
+            ...untrack(() => verifications),
             {
               severity: 'Error',
               tags: [],
@@ -76,17 +91,21 @@ fi
                   },
                 ]
               : []),
-          ]);
+          ];
         }
       }
       if (errors) {
-        state.set('error');
+        status = 'error';
       } else {
-        state.set('verified');
+        status = 'verified';
       }
     };
     run().catch(console.error);
-  }
+
+    return () => {
+      cancel();
+    };
+  });
 </script>
 
 <svelte:head>
@@ -97,31 +116,31 @@ fi
 <Nav title="Chip" />
 
 <div class="relative grid grid-rows-[2fr_auto_auto] overflow-hidden bg-slate-800">
-  <Editor bind:value={program} markers={[...$result.markers, ...$verifications]} />
+  <Editor bind:value={program} markers={[...result.markers, ...verifications]} />
   <div
-    class="flex items-center p-2 text-2xl text-white transition duration-500 {$parseError
+    class="flex items-center p-2 text-2xl text-white transition duration-500 {parseError
       ? 'bg-purple-600'
       : {
           idle: 'bg-gray-500',
           verifying: 'bg-yellow-500',
           verified: 'bg-green-500',
           error: 'bg-red-500',
-        }[$state]}"
+        }[status]}"
   >
     <span class="font-bold">
-      {$parseError
+      {parseError
         ? 'Parse error'
         : {
             idle: 'Idle',
             verifying: 'Verifying...',
             verified: 'Verified',
             error: 'Verification error',
-          }[$state]}
+          }[status]}
     </span>
     <div class="flex-1"></div>
     <span class="text-xl">
-      {#if !$parseError && $state == 'verified'}
-        {#if $result.is_fully_annotated}
+      {#if !parseError && status == 'verified'}
+        {#if result.is_fully_annotated}
           The program is <b>fully annotated</b>
         {:else}
           The program is <b><i>not</i> fully annotated</b>
@@ -130,8 +149,8 @@ fi
     </span>
   </div>
   <!-- <div>
-		{#each result.assertions as triple}
-			<pre class="p-4">{triple.smt}</pre>
-		{/each}
-	</div> -->
+    {#each result.assertions as triple}
+      <pre class="p-4">{triple.smt}</pre>
+    {/each}
+  </div> -->
 </div>
