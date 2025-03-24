@@ -175,6 +175,10 @@ pub AExpr: AExpr = {
     #[precedence(level="1")]
     Int => AExpr::Number(<>),
     Target => AExpr::Reference(<>),
+    // TODO: see issue #58
+    // "X" => AExpr::Reference(Target::Variable(Variable("X".to_string()))),
+    // "G" => AExpr::Reference(Target::Variable(Variable("G".to_string()))),
+    // "F" => AExpr::Reference(Target::Variable(Variable("F".to_string()))),
     Function<AExprBox> => AExpr::Function(<>),
     "-" <AExpr> => AExpr::Minus(Box::new(<>)),
     "old" "(" <Target> ")" => AExpr::Old(<>),
