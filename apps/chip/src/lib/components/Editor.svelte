@@ -5,7 +5,7 @@
   import { theme } from '$lib/theme';
   import chipDark from '$lib/themes/dark.json';
   import chipLight from '$lib/themes/light.json';
-  import type monaco from '../monaco';
+  import type monacoT from '../monaco';
 
   export let value: string = '';
   export let markers: MarkerData[] = [];
@@ -59,7 +59,7 @@
   $: if (model && typeof value == 'string' && model.getValue() != value) {
     model.setValue(value);
   }
-  let decorations: monaco.editor.IEditorDecorationsCollection | null = null;
+  let decorations: monacoT.editor.IEditorDecorationsCollection | null = null;
   $: if (model) {
     decorations = editor.createDecorationsCollection();
   }
