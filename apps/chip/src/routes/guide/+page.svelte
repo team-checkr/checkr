@@ -251,6 +251,8 @@ Function = {
   <article class="prose prose-invert mx-auto">
     <h1>Guide</h1>
 
+    Chip is a tool for program verification.
+
     <h2>Grammar</h2>
 
     <Katex math={grammar} displayMode={true} />
