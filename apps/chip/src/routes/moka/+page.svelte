@@ -5,6 +5,7 @@
   import type { LtLResult, MarkerData } from 'chip-wasm';
   import Nav from '$lib/components/Nav.svelte';
   import Network from '$lib/components/Network.svelte';
+  import Icon from '~icons/heroicons/globe-europe-africa';
   import { mirage } from 'ayu';
 
   let program = `> x = 30
@@ -116,7 +117,7 @@ check ! F ! (x >= -1)       // should hold
   <meta name="description" content="Moka" />
 </svelte:head>
 
-<Nav title="Moka" />
+<Nav title="Moka" {Icon} />
 
 <div class="relative grid grid-cols-2 grid-rows-[2fr_auto] bg-slate-800">
   <Editor

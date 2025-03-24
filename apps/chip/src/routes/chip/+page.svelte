@@ -3,6 +3,7 @@
   import type { MarkerData, MarkerSeverity, ParseResult } from 'chip-wasm';
   import Nav from '$lib/components/Nav.svelte';
   import { untrack } from 'svelte';
+  import Icon from '~icons/heroicons/check-badge';
 
   let program = $state(`{ true }
 if
@@ -113,7 +114,7 @@ fi
   <meta name="description" content="Chip" />
 </svelte:head>
 
-<Nav title="Chip" />
+<Nav title="Chip" {Icon} />
 
 <div class="relative grid grid-rows-[2fr_auto_auto] overflow-hidden bg-slate-800">
   <Editor bind:value={program} markers={[...result.markers, ...verifications]} />

@@ -8,6 +8,6 @@
   let { children }: Props = $props();
 </script>
 
-<div class="grid min-h-screen grid-rows-[auto_1fr]">
+<div class="grid min-h-screen grid-rows-[auto_1fr] bg-slate-800">
   {@render children?.()}
 </div>

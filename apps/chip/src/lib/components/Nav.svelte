@@ -1,19 +1,26 @@
 <script lang="ts">
   import { theme } from '$lib/theme';
 
-  import ChipIcon from '~icons/heroicons/check-badge';
-  import MokaIcon from '~icons/heroicons/globe-europe-africa';
   import Sun from '~icons/heroicons/sun';
   import Moon from '~icons/heroicons/moon';
   import QuestionMarkCircle from '~icons/heroicons/question-mark-circle';
+  import type { Component } from 'svelte';
+  import type { SvelteHTMLElements } from 'svelte/elements';
+  import Guide from './Guide.svelte';
 
   interface Props {
-    title: 'Chip' | 'Moka';
+    title: string;
+    Icon: Component<SvelteHTMLElements['svg']>;
   }
 
-  let { title }: Props = $props();
+  let { title, Icon }: Props = $props();
 
-  let Icon = $derived(title == 'Chip' ? ChipIcon : MokaIcon);
+  let showGuide = $state(false);
+
+  const toggleGuide = (e: MouseEvent) => {
+    e.preventDefault();
+    showGuide = !showGuide;
+  };
 
   let darkTheme = $state($theme == 'dark');
   $effect(() => {
@@ -22,6 +29,17 @@
     } else {
       $theme = 'light';
     }
+  });
+
+  $effect(() => {
+    const listener = (e: KeyboardEvent) => {
+      if (showGuide && e.key == 'Escape') {
+        showGuide = false;
+      }
+    };
+    window.addEventListener('keydown', listener);
+
+    return () => window.removeEventListener('keydown', listener);
   });
 </script>
 
@@ -48,8 +66,23 @@
     </label>
     <input class="hidden" type="checkbox" name="theme" id="theme" bind:checked={darkTheme} />
   </div>
-  <a href="/guide" class="flex items-center space-x-1 p-2">
+  <a href="/guide" class="flex items-center space-x-1 p-2" onclick={toggleGuide}>
     <span>Guide</span>
     <QuestionMarkCircle />
   </a>
 </nav>
+
+{#if showGuide}
+  <!-- svelte-ignore a11y_click_events_have_key_events -->
+  <!-- svelte-ignore a11y_no_static_element_interactions -->
+  <div class="z-100 fixed inset-0 grid place-items-center" onclick={() => (showGuide = false)}>
+    <div
+      class="relative max-h-[80vh] overflow-auto rounded-xl bg-slate-800 shadow-2xl"
+      onclick={(e) => e.stopPropagation()}
+    >
+      <div class="px-10 py-5">
+        <Guide />
+      </div>
+    </div>
+  </div>
+{/if}
