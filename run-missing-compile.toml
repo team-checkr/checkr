@@ -1,0 +1,3 @@
+compile = "this-thing-does-not-exist"
+run = "cargo run --release -p checkr -- reference"
+watch = ["*.rs", "*.lalrpop"]

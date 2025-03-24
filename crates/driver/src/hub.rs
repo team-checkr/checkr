@@ -78,7 +78,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
         kind: JobKind,
         cwd: impl AsRef<Path> + Debug,
         meta: M,
-        program: impl AsRef<OsStr> + Debug,
+        program: &str,
         args: impl IntoIterator<Item = impl AsRef<OsStr>> + Debug,
     ) -> Job<M>
     where
@@ -88,7 +88,8 @@ impl<M: Send + Sync + 'static> Hub<M> {
 
         let id = self.next_job_id();
 
-        let mut cmd = tokio::process::Command::new(program);
+        let program = program.to_string();
+        let mut cmd = tokio::process::Command::new(&program);
 
         cmd.current_dir(cwd);
 
@@ -126,9 +127,14 @@ impl<M: Send + Sync + 'static> Hub<M> {
                 let mut child = match cmd.spawn() {
                     Ok(child) => child,
                     Err(e) => {
+                        tracing::error!(program=?program, ?e, "failed to run command");
                         let mut data = data1.write().unwrap();
                         data.state = JobState::Failed;
-                        data.stderr = format!("{:?}", e).into();
+                        data.stderr = format!(
+                            "failed to run command: `{program}` was not found in PATH\n{:?}",
+                            e
+                        )
+                        .into();
                         data.combined = data.stderr.clone();
                         return Either::Left(());
                     }

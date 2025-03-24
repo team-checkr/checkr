@@ -47,6 +47,9 @@ struct Cli {
     /// Location of the directory containing `run.toml`
     #[clap(default_value = ".")]
     dir: PathBuf,
+    /// Location of `run.toml` relative to `dir`
+    #[clap(long, default_value = "run.toml")]
+    run: PathBuf,
     /// The port to host the server on
     #[clap(short, long, default_value = "3000")]
     port: u16,
@@ -73,7 +76,7 @@ async fn run() -> color_eyre::Result<()> {
     let driver = if cli.driver == Some(false) {
         None
     } else {
-        let run_toml_path = dir.join("run.toml");
+        let run_toml_path = dir.join(cli.run);
         let driver = driver::Driver::new_from_path(hub.clone(), dir.clone(), run_toml_path)?;
         let _: Option<_> = driver.start_recompile(InspectifyJobMeta::default());
         Some(driver)
