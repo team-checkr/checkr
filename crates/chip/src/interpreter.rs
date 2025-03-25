@@ -232,11 +232,11 @@ impl State {
     pub fn variables<'a>(&'a self, p: &'a Program) -> impl Iterator<Item = (&'a Variable, i32)> {
         p.variables().zip(self.memory.iter().copied())
     }
-    fn step_exe(
-        &self,
-        p: &Program,
+    fn step_exe<'a>(
+        &'a self,
+        p: &'a Program,
         execution: usize,
-    ) -> Result<impl Iterator<Item = State> + '_, StepError> {
+    ) -> Result<impl Iterator<Item = State> + 'a, StepError> {
         Ok(self
             .step_at(p, self.ptrs[execution])?
             .map(move |(mem, ptr)| {

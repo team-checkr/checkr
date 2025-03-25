@@ -170,21 +170,24 @@ pub fn parse(src: &str) -> ParseResult {
             assertions: ast
                 .assertions()
                 .into_iter()
-                .map(|t| Assertion {
-                    implication: t.predicate.to_string(),
-                    smt: t.smt(&st).join("\n"),
-                    text: t.source.text,
-                    span: MonacoSpan::from_offset_len(
-                        src,
-                        t.source.span.offset(),
-                        t.source.span.len(),
-                    ),
-                    related: t.source.related.map(|(s, span)| {
-                        (
-                            s,
-                            MonacoSpan::from_offset_len(src, span.offset(), span.len()),
-                        )
-                    }),
+                .map(|t| {
+                    let smt = t.smt(&st).join("\n");
+                    Assertion {
+                        implication: t.predicate.to_string(),
+                        smt,
+                        text: t.source.text,
+                        span: MonacoSpan::from_offset_len(
+                            src,
+                            t.source.span.offset(),
+                            t.source.span.len(),
+                        ),
+                        related: t.source.related.map(|(s, span)| {
+                            (
+                                s,
+                                MonacoSpan::from_offset_len(src, span.offset(), span.len()),
+                            )
+                        }),
+                    }
                 })
                 .collect(),
             markers: vec![],
