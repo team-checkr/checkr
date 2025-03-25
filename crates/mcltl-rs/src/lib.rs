@@ -1,5 +1,3 @@
-extern crate plex;
-
 pub mod buchi;
 pub mod ltl;
 pub mod nodes;

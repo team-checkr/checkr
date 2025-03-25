@@ -1,12 +1,9 @@
 use std::collections::BTreeSet;
-use std::convert::TryFrom;
 use std::fmt;
 
 use smol_str::SmolStr;
 
 use crate::buchi::Alphabet;
-
-use super::parser::{lexer::Lexer, parser};
 
 #[derive(Debug, Clone, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct Literal(pub SmolStr);
@@ -68,21 +65,6 @@ pub enum LTLExpression {
     U(Box<LTLExpression>, Box<LTLExpression>),
     R(Box<LTLExpression>, Box<LTLExpression>),
     V(Box<LTLExpression>, Box<LTLExpression>),
-}
-
-impl LTLExpression {
-    pub fn parse(formula: &str) -> Result<Self, &'static str> {
-        let lexer = Lexer::new(formula);
-        parser::parse(lexer).map(|span| span.expr).map_err(|e| e.1)
-    }
-}
-
-impl TryFrom<&str> for LTLExpression {
-    type Error = &'static str;
-
-    fn try_from(formula: &str) -> Result<Self, Self::Error> {
-        Self::parse(formula)
-    }
 }
 
 impl fmt::Display for LTLExpression {

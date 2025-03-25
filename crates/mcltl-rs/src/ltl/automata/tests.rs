@@ -1,9 +1,7 @@
-use std::fmt;
-
 use itertools::Itertools;
 
 use crate::{
-    ltl::{self, expression::Literal},
+    ltl::expression::{LTLExpression, Literal},
     testing::expect,
 };
 
@@ -17,16 +15,12 @@ fn it_should_create_graph_from_ltl() {
     assert_eq!(3, nodes.len());
 }
 
-fn check_nnf(src: impl fmt::Display, f: impl FnOnce(String)) {
-    let s: ltl::expression::LTLExpression =
-        ltl::expression::LTLExpression::try_from(src.to_string().as_str()).unwrap();
+fn check_nnf(s: LTLExpression, f: impl FnOnce(String)) {
     let nnf = s.nnf();
     f(nnf.to_string())
 }
 
-fn check_nodes(src: impl fmt::Display, f: impl FnOnce(String)) {
-    let s: ltl::expression::LTLExpression =
-        ltl::expression::LTLExpression::try_from(src.to_string().as_str()).unwrap();
+fn check_nodes(s: LTLExpression, f: impl FnOnce(String)) {
     let nnf = s.nnf();
     let nodes = AutomataGraph::create_graph(&nnf);
     f(format!(
@@ -54,16 +48,20 @@ fn check_nodes(src: impl fmt::Display, f: impl FnOnce(String)) {
     ));
 }
 
+fn lit(s: &str) -> LTLExpression {
+    LTLExpression::Literal(s.into())
+}
+
 #[test]
 fn nnf_a() {
-    check_nnf("p", expect!(@"p"));
-    check_nnf("p U q", expect!(@"(p U q)"));
+    check_nnf(lit("p"), expect!(@"p"));
+    check_nnf(lit("p").U(lit("q")), expect!(@"(p U q)"));
 }
 
 #[test]
 fn nodes_a() {
     check_nodes(
-        "p",
+        lit("p"),
         expect!(@r###"
             A1
               incoming: [A0i]
@@ -78,7 +76,7 @@ fn nodes_a() {
             "###),
     );
     check_nodes(
-        "p U q",
+        lit("p").U(lit("q")),
         expect!(@r###"
             A2
               incoming: [A0i, A2]

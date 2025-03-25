@@ -75,7 +75,7 @@ macro_rules! kripke {
         ===
         init = [$( $init:ident ),*]
     ) => {{
-        let mut kripke = KripkeStructure::<String, Literal>::new(vec![$(stringify!($init).into(),)*]);
+        let mut kripke = KripkeStructure::<String, $crate::ltl::expression::Literal>::new(vec![$(stringify!($init).into(),)*]);
 
         $(
             let $world = kripke.add_node(stringify!($world).into(), [$(stringify!($prop).into()),*].into_iter().collect());
