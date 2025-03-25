@@ -5,7 +5,9 @@ use petgraph::graph::NodeIndex;
 
 #[derive(Debug)]
 pub struct ParsedGraph {
+    #[allow(unused)]
     pub nodes: BTreeMap<String, Node>,
+    #[allow(unused)]
     pub node_mapping: BTreeMap<String, NodeIndex>,
     pub graph: petgraph::Graph<String, gcl::pg::Action>,
 }

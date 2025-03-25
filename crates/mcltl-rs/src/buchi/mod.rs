@@ -675,6 +675,7 @@ impl<S: State, AP: AtomicProperty> Buchi<S, AP> {
 pub struct ProductBuchi<'a, 'b, S, T, AP: AtomicProperty> {
     a: &'a Buchi<S, AP>,
     b: &'b Buchi<T, AP>,
+    #[allow(clippy::type_complexity)]
     adj_ids_cache: Mutex<
         AHashMap<
             ProductBuchiNodeId<S, T, AP>,

@@ -215,7 +215,7 @@ impl<AP: Clone + Ord> AutomataGraph<AP> {
                     }
                     // n = µ U ϕ or n = µ V ϕ or n = µ | ϕ =>
                     NnfLtl::U(_, _) | NnfLtl::V(_, _) | NnfLtl::Or(_, _) => {
-                        let (new1, next1, new2) = new1_next1_new2(&n);
+                        let NewNextNew { new1, next1, new2 } = new1_next1_new2(&n);
 
                         // Node1 := [Name=new_name(), Father=Name(node), Incoming=Incoming(node),
                         //           New=New(node) ∪ ({New1(n)} \ Old(node)),
@@ -285,25 +285,21 @@ impl<AP: Clone + Ord> AutomataGraph<AP> {
     }
 }
 
+struct NewNextNew<AP> {
+    new1: BTreeSet<NnfLtl<AP>>,
+    next1: BTreeSet<NnfLtl<AP>>,
+    new2: BTreeSet<NnfLtl<AP>>,
+}
+
 /// Encoding of the table from [Simple On-the-Fly Automatic Verification of Linear Temporal
 /// Logic](https://link.springer.com/content/pdf/10.1007/978-0-387-34892-6_1.pdf)
 /// p.9
-fn new1_next1_new2<AP: Clone + Ord>(
-    n: &NnfLtl<AP>,
-) -> (
-    BTreeSet<NnfLtl<AP>>,
-    BTreeSet<NnfLtl<AP>>,
-    BTreeSet<NnfLtl<AP>>,
-) {
+fn new1_next1_new2<AP: Clone + Ord>(n: &NnfLtl<AP>) -> NewNextNew<AP> {
     fn set<'a, T: Clone + Ord + 'a>(ts: impl IntoIterator<Item = &'a Box<T>>) -> BTreeSet<T> {
         ts.into_iter().map(|t| (**t).clone()).collect()
     }
 
-    let (new1, next1, new2): (
-        BTreeSet<NnfLtl<AP>>,
-        BTreeSet<NnfLtl<AP>>,
-        BTreeSet<NnfLtl<AP>>,
-    ) = {
+    let (new1, next1, new2) = {
         let n = Box::new(n.clone());
         match &*n {
             NnfLtl::U(p, q) => (set([p]), set([&n]), set([q])),
@@ -312,7 +308,7 @@ fn new1_next1_new2<AP: Clone + Ord>(
             _ => unreachable!(),
         }
     };
-    (new1, next1, new2)
+    NewNextNew { new1, next1, new2 }
 }
 
 impl<AP: Ord> NnfLtl<AP> {
