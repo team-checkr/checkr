@@ -4,8 +4,9 @@ members = [
     "crates/ce-core",
     "crates/ce-shell",
     "crates/checkr",
-    "crates/chip",
     "crates/chip-cli",
+    "crates/chip-wasm",
+    "crates/chip",
     "crates/driver",
     "crates/envs/*",
     "crates/gcl",
@@ -18,6 +19,7 @@ members = [
 
 [workspace.package]
 version = "0.2.8"
+edition =  "2021"
 repository = "https://github.com/team-checkr/checkr/"
 authors = [
     "Oliver Bøving <oliver@bvng.dk>",

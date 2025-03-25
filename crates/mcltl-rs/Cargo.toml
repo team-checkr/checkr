@@ -5,7 +5,7 @@ authors = [
     "Alessio Coltellacci <lightplay8@gmail.com>",
     "Oliver Bøving <oliver@bvng.dk>",
 ]
-edition = "2021"
+edition.workspace = true
 publish = false
 
 [dependencies]

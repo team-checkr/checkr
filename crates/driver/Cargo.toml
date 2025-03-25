@@ -1,6 +1,6 @@
 [package]
 name = "driver"
-edition = "2021"
+edition.workspace = true
 version.workspace = true
 repository.workspace = true
 authors.workspace = true
