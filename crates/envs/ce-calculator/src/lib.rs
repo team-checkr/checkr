@@ -55,9 +55,9 @@ impl Env for CalcEnv {
                 !output.error.is_empty(),
             ) {
                 // Both errors are present
-                (_, _, true, true) => ValidationResult::CorrectTerminated,
+                (_, _, true, true) => ValidationResult::Correct,
                 // Both results are present
-                (r, o, _, _) if r == o => ValidationResult::CorrectTerminated,
+                (r, o, _, _) if r == o => ValidationResult::Correct,
                 (_, _, _, _) => {
                     let info = format!(
                         "Output: result={:?}, error={:?}; Reference: result={:?}, error={:?}",

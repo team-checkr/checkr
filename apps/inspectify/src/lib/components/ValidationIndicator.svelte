@@ -15,7 +15,7 @@
 <div
   class="col-span-full col-start-2 row-start-2 flex h-6 items-center justify-between text-sm transition {outputState ==
   'Current'
-    ? validation?.type == 'CorrectTerminated' || validation?.type == 'CorrectNonTerminated'
+    ? validation?.type == 'Correct'
       ? 'bg-green-600'
       : validation?.type == 'Failure'
         ? 'bg-red-500'

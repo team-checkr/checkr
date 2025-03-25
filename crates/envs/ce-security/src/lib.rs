@@ -160,7 +160,7 @@ impl Env for SecurityEnv {
             }
         }
 
-        Ok(ValidationResult::CorrectTerminated)
+        Ok(ValidationResult::Correct)
     }
 }
 

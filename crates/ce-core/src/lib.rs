@@ -143,8 +143,7 @@ macro_rules! define_env {
                 let validation_result =
                     <$name as $crate::Env>::validate(&input, &output).expect("failed to validate");
                 match validation_result {
-                    $crate::ValidationResult::CorrectTerminated
-                    | $crate::ValidationResult::CorrectNonTerminated { .. } => {
+                    $crate::ValidationResult::Correct => {
                         // Ok!
                     }
                     res => {
@@ -160,8 +159,7 @@ macro_rules! define_env {
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, Hash, Serialize, Deserialize)]
 #[serde(tag = "type")]
 pub enum ValidationResult {
-    CorrectTerminated,
-    CorrectNonTerminated { iterations: u64 },
+    Correct,
     Mismatch { reason: String },
     TimeOut,
 }

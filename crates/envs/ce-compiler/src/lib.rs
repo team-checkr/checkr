@@ -91,7 +91,7 @@ impl Env for CompilerEnv {
                 reason: "the graphs have different structure".to_string(),
             })
         } else {
-            Ok(ValidationResult::CorrectTerminated)
+            Ok(ValidationResult::Correct)
         }
     }
 }

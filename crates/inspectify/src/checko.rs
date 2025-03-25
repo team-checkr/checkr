@@ -474,12 +474,7 @@ fn compute_validated_job_state(job: &Job<InspectifyJobMeta>) -> JobState {
     };
 
     match (job.state(), validation) {
-        (
-            JobState::Succeeded,
-            Some(
-                ValidationResult::CorrectNonTerminated { .. } | ValidationResult::CorrectTerminated,
-            ),
-        ) => JobState::Succeeded,
+        (JobState::Succeeded, Some(ValidationResult::Correct)) => JobState::Succeeded,
         (JobState::Succeeded, Some(ValidationResult::Mismatch { .. })) => JobState::Warning,
         (JobState::Succeeded, Some(ValidationResult::TimeOut)) => JobState::Timeout,
         (state, _) => state,

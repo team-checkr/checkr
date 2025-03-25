@@ -214,8 +214,7 @@ export namespace SignAnalysis {
 }
 export namespace ce_core {
   export type ValidationResult =
-    | { "type": "CorrectTerminated" }
-    | { "type": "CorrectNonTerminated", iterations: number }
+    | { "type": "Correct" }
     | { "type": "Mismatch", reason: string }
     | { "type": "TimeOut" };
 }

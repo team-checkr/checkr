@@ -143,7 +143,7 @@ export class Io<A extends ce_shell.Analysis> {
           outputState: 'Current',
           output: output?.json as any,
           referenceOutput: output?.json as any,
-          validation: { type: 'CorrectTerminated' },
+          validation: { type: 'Correct' },
           job: null,
         };
       });

@@ -126,7 +126,7 @@ impl Env for SignEnv {
         }
 
         if pool.is_empty() {
-            Ok(ValidationResult::CorrectTerminated)
+            Ok(ValidationResult::Correct)
         } else {
             tracing::error!(missing = format!("{pool:?}"), "oh no...");
             Ok(ValidationResult::Mismatch {

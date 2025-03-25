@@ -55,7 +55,7 @@ impl Env for ParserEnv {
             });
         }
 
-        Ok(ValidationResult::CorrectTerminated)
+        Ok(ValidationResult::Correct)
     }
 }
 

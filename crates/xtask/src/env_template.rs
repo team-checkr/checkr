@@ -21,7 +21,7 @@ impl Env for TemplateEnv {
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        Ok(ValidationResult::CorrectTerminated)
+        Ok(ValidationResult::Correct)
     }
 }
 

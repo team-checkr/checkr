@@ -117,14 +117,12 @@ impl Env for InterpreterEnv {
         }
 
         if output.termination == TerminationState::Running && !possible_executions.is_empty() {
-            return Ok(ValidationResult::CorrectNonTerminated {
-                iterations: output.trace.len() as u64,
-            });
+            return Ok(ValidationResult::Correct);
         }
 
         if output.termination == TerminationState::Terminated {
             if possible_executions.iter().any(|s| s.is_finished()) {
-                return Ok(ValidationResult::CorrectTerminated);
+                return Ok(ValidationResult::Correct);
             }
             return Ok(ValidationResult::Mismatch {
                 reason: "No execution reached the end".to_string(),
@@ -146,12 +144,12 @@ impl Env for InterpreterEnv {
                 });
             }
 
-            return Ok(ValidationResult::CorrectTerminated);
+            return Ok(ValidationResult::Correct);
         }
 
         // TODO: check termination status is correct
 
-        Ok(ValidationResult::CorrectTerminated)
+        Ok(ValidationResult::Correct)
     }
 }
 

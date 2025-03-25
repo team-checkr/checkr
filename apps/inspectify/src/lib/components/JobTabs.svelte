@@ -24,8 +24,7 @@
   );
 
   const validationTypeSymbols: Record<ce_core.ValidationResult['type'], string> = {
-    CorrectTerminated: '✅',
-    CorrectNonTerminated: '✅',
+    Correct: '✅',
     Mismatch: '❌',
     TimeOut: '⚠️',
   };

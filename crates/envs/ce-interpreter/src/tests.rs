@@ -18,7 +18,7 @@ fn initially_stuck_program() {
     };
     let output = InterpreterEnv::run(&input).unwrap();
     match InterpreterEnv::validate(&input, &output).unwrap() {
-        ValidationResult::CorrectTerminated | ValidationResult::CorrectNonTerminated { .. } => (),
+        ValidationResult::Correct => (),
         ValidationResult::Mismatch { .. } | ValidationResult::TimeOut => panic!(),
     }
 }
@@ -50,7 +50,7 @@ fn test_true_skip() {
     };
     let output = InterpreterEnv::run(&input).unwrap();
     match InterpreterEnv::validate(&input, &output).unwrap() {
-        ValidationResult::CorrectTerminated | ValidationResult::CorrectNonTerminated { .. } => (),
+        ValidationResult::Correct => (),
         ValidationResult::Mismatch { reason } => panic!("reason: {reason:?}"),
         ValidationResult::TimeOut => panic!(),
     }
@@ -87,7 +87,7 @@ fn test_thingy() {
     };
     let output = InterpreterEnv::run(&input).unwrap();
     match InterpreterEnv::validate(&input, &output).unwrap() {
-        ValidationResult::CorrectTerminated | ValidationResult::CorrectNonTerminated { .. } => (),
+        ValidationResult::Correct => (),
         ValidationResult::Mismatch { reason } => panic!("reason: {reason:?}"),
         ValidationResult::TimeOut => panic!(),
     }
