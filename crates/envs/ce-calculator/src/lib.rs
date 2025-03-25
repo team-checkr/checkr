@@ -1,4 +1,4 @@
-use ce_core::{define_env, gen::GclGenContext, rand, Env, Generate, ValidationResult};
+use ce_core::{define_env, gn::GclGenContext, rand, Env, Generate, ValidationResult};
 use gcl::ast::AExpr;
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;

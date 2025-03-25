@@ -1,8 +1,8 @@
-pub mod gen;
+pub mod gn;
 
 use std::sync::Arc;
 
-pub use gen::Generate;
+pub use gn::Generate;
 use itertools::Either;
 use serde::{Deserialize, Serialize};
 
