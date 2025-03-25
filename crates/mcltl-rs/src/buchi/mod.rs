@@ -352,7 +352,8 @@ impl<S: State, AP: AtomicProperty + fmt::Display, B: BuchiLike<S, AP>> fmt::Disp
 }
 
 ///  generalized Büchi automaton (GBA) automaton.
-/// The difference with the Büchi automaton is its accepting condition, i.e., a set of sets of states.
+/// The difference with the Büchi automaton is its accepting condition, i.e., a
+/// set of sets of states.
 #[derive(Debug, Clone, Eq, PartialEq)]
 pub struct GeneralBuchi<S, AP: AtomicProperty> {
     alphabet: Alphabet<AP>,
@@ -833,20 +834,23 @@ impl<S: State, AP: AtomicProperty> std::ops::Index<BuchiNodeId<S, AP>> for Buchi
     }
 }
 
-/// Multiple sets of states in acceptance condition can be translated into one set of states
-/// by an automata construction, which is known as "counting construction".
-/// Let's say `A = (Q, Σ, ∆, q0, {F1,...,Fn})` is a GBA, where `F1,...,Fn` are sets of accepting states
-/// then the equivalent Büchi automaton is `A' = (Q', Σ, ∆',q'0,F')`, where
+/// Multiple sets of states in acceptance condition can be translated into one
+/// set of states by an automata construction, which is known as "counting
+/// construction". Let's say `A = (Q, Σ, ∆, q0, {F1,...,Fn})` is a GBA, where
+/// `F1,...,Fn` are sets of accepting states then the equivalent Büchi automaton
+/// is `A' = (Q', Σ, ∆',q'0,F')`, where
 /// * `Q' = Q × {1,...,n}`
 /// * `q'0 = ( q0,1 )`
-/// * `∆' = { ( (q,i), a, (q',j) ) | (q,a,q') ∈ ∆ and if q ∈ Fi then j=((i+1) mod n) else j=i }`
+/// * `∆' = { ( (q,i), a, (q',j) ) | (q,a,q') ∈ ∆ and if q ∈ Fi then j=((i+1)
+///   mod n) else j=i }`
 /// * `F'=F1× {1}`
 impl<S: State, AP: AtomicProperty> GeneralBuchi<S, AP> {
     pub fn to_buchi(&self) -> Buchi<(S, usize), AP> {
         let mut ba: Buchi<(S, usize), AP> = Buchi::new(self.alphabet().into_owned());
 
         if self.accepting_states.is_empty() {
-            // tracing::debug!(%self, "no accepting states found, adding all states as accepting states");
+            // tracing::debug!(%self, "no accepting states found, adding all states as
+            // accepting states");
             let mut gb = self.clone();
             let accepting_states = gb.nodes().collect();
             gb.add_accepting_state(&accepting_states);
@@ -873,7 +877,8 @@ impl<S: State, AP: AtomicProperty> GeneralBuchi<S, AP> {
             ba.add_accepting_state(accepting);
         }
 
-        // ∆'((q, i), A) = if q ∈ Fi then { (q', i+1) | q' ∈ ∆(q, A) } else { (q', i) | q' ∈ ∆(q, A) }
+        // ∆'((q, i), A) = if q ∈ Fi then { (q', i+1) | q' ∈ ∆(q, A) } else { (q', i) |
+        // q' ∈ ∆(q, A) }
         for (i, f) in self.accepting_states().enumerate() {
             for n in self.nodes() {
                 for (adj, adj_labels) in self.adj_labels(n) {

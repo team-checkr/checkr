@@ -56,11 +56,6 @@ impl<S: State, AP: AtomicProperty> AcceptingCycle<S, AP> {
 
                 // x := top(S1)
 
-                // tracing::debug!(adj=?product_buchi.adj(x), ids=?product_buchi.adj_ids(x).collect_vec(), found=?product_buchi.adj_ids(x).find(|y|
-                //     {let res = !M1.contains(*y);
-                //     // tracing::debug!(?y, set=?M1, found=?res);
-                //     res}
-                // ));
                 // if there is a y in succ(x) with M1[h(y)] = 0
                 if let Some(y) = product_buchi.adj_ids(x).find(|y| !M1.contains(*y)) {
                     // tracing::debug!(?x, ?y, "found");
@@ -91,7 +86,6 @@ impl<S: State, AP: AtomicProperty> AcceptingCycle<S, AP> {
 
                             // v := top(S2)
 
-                            // tracing::debug!(?v, ?x, succ=?product_buchi.adj(v), contained=?product_buchi.adj(v).contains_key(x));
                             // if x ∈ succ(v)
                             if product_buchi.adj_ids(v).contains(&x) {
                                 // tracing::debug!(?S1, ?S2, "found!");
@@ -186,11 +180,6 @@ impl<S: State, T: State, AP: AtomicProperty> ProductAcceptingCycle<S, T, AP> {
 
                 // x := top(S1)
 
-                // tracing::debug!(adj=?product_buchi.adj(x), ids=?product_buchi.adj_ids(x).collect_vec(), found=?product_buchi.adj_ids(x).find(|y|
-                //     {let res = !M1.contains(*y);
-                //     // tracing::debug!(?y, set=?M1, found=?res);
-                //     res}
-                // ));
                 // if there is a y in succ(x) with M1[h(y)] = 0
                 if let Some(y) = product_buchi.adj_ids(x).find(|y| !M1.contains(*y)) {
                     // tracing::debug!(?x, ?y, "found");
@@ -222,7 +211,6 @@ impl<S: State, T: State, AP: AtomicProperty> ProductAcceptingCycle<S, T, AP> {
 
                             // v := top(S2)
 
-                            // tracing::debug!(?v, ?x, succ=?product_buchi.adj(v), contained=?product_buchi.adj(v).contains_key(x));
                             // if x ∈ succ(v)
                             if product_buchi.adj_ids(v).any(|y| y == x) {
                                 // tracing::debug!(?S1, ?S2, "found!");
@@ -257,9 +245,7 @@ impl<S: State, T: State, AP: AtomicProperty> ProductAcceptingCycle<S, T, AP> {
 #[cfg(test)]
 mod tests {
     use super::*;
-
     use crate::buchi;
-
     use crate::ltl::expression::Literal;
 
     #[test]

@@ -1,14 +1,15 @@
 use core::fmt;
 use std::marker::PhantomData;
 
+use dot;
+use itertools::Itertools;
+
 use crate::{
     buchi::{
         AtomicProperty, AtomicPropertySet, Buchi, BuchiLike, GeneralBuchi, Neighbors, ProductBuchi,
     },
     state::State,
 };
-use dot;
-use itertools::Itertools;
 
 type Node = String;
 type Edge<'a, AP> = (String, Neighbors<AP>, String);

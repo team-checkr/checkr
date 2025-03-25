@@ -4,9 +4,8 @@ use std::sync::Arc;
 
 pub use gn::Generate;
 use itertools::Either;
-use serde::{Deserialize, Serialize};
-
 pub use rand;
+use serde::{Deserialize, Serialize};
 
 #[derive(Debug, Clone, thiserror::Error)]
 pub enum EnvError {

@@ -1,8 +1,7 @@
 mod gcl_gen;
 
-use rand::Rng;
-
 pub use gcl_gen::Context as GclGenContext;
+use rand::Rng;
 
 pub trait Generate: 'static {
     type Context;

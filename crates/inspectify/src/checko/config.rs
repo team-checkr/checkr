@@ -117,8 +117,9 @@ impl ProgramConfig {
             pc => todo!("{pc:?}"),
         })
     }
-    // pub fn canonicalize(&self, analysis: Analysis) -> Result<CanonicalProgramConfig> {
-    //     let p = self.generated_program(analysis)?;
+    // pub fn canonicalize(&self, analysis: Analysis) ->
+    // Result<CanonicalProgramConfig> {     let p =
+    // self.generated_program(analysis)?;
 
     //     Ok(CanonicalProgramConfig {
     //         src: p.cmds.to_string(),

@@ -2,6 +2,7 @@ use std::collections::{BTreeSet, HashMap};
 
 use itertools::Itertools;
 
+use super::expression::NnfLtl;
 use crate::{
     buchi::{
         Alphabet, AtomicProperty, AtomicPropertySet, BuchiLike as _, BuchiLikeMut as _,
@@ -10,8 +11,6 @@ use crate::{
     nodes::NodeSet,
     state::State,
 };
-
-use super::expression::NnfLtl;
 
 #[derive(Clone, Copy, Eq, PartialEq, PartialOrd, Ord, Hash)]
 pub struct AutomataId(u32);
@@ -146,10 +145,12 @@ impl<AP: Clone + Ord> AutomataGraph<AP> {
                     let p2 = nd.next == node.next;
                     // tracing::debug!(?nd, ?p1, ?p2, "checking");
                     if !p1 {
-                        // tracing::debug!(oldf=?nd.oldf, oldf=?node.oldf, "oldf");
+                        // tracing::debug!(oldf=?nd.oldf, oldf=?node.oldf,
+                        // "oldf");
                     }
                     if !p2 {
-                        // tracing::debug!(next_nd=?nd.next, next_node=?node.next, "next");
+                        // tracing::debug!(next_nd=?nd.next,
+                        // next_node=?node.next, "next");
                     }
                     p1 && p2
                 }) {
@@ -186,7 +187,8 @@ impl<AP: Clone + Ord> AutomataGraph<AP> {
                 match &n {
                     // n = Pn, or ¬Pn or n = true or n = false =>
                     NnfLtl::Literal { .. } | NnfLtl::Bool(_) => {
-                        // if n = false or Neg(n) ∈ Old(node) then (* Current node contains a contradiction *)
+                        // if n = false or Neg(n) ∈ Old(node) then
+                        // (* Current node contains a contradiction *)
                         let matches = match &n {
                             NnfLtl::Bool(false) => true,
                             NnfLtl::Literal {
@@ -246,7 +248,8 @@ impl<AP: Clone + Ord> AutomataGraph<AP> {
                     // n = µ & ϕ =>
                     NnfLtl::And(p, q) => {
                         // return (expand([Name=Name(node), Father=Father(node,
-                        //                 Incoming=Incoming(node), New=New(node) ∪ ({µ, ϕ} \ Old(node)),
+                        //                 Incoming=Incoming(node),
+                        //                 New=New(node) ∪ ({µ, ϕ} \ Old(node)),
                         //                 Old=Old(node) ∪ {µ, ϕ}, Next=Next(node)], node_set))
                         let n = Node {
                             name: node.name,
@@ -291,8 +294,8 @@ struct NewNextNew<AP> {
     new2: BTreeSet<NnfLtl<AP>>,
 }
 
-/// Encoding of the table from [Simple On-the-Fly Automatic Verification of Linear Temporal
-/// Logic](https://link.springer.com/content/pdf/10.1007/978-0-387-34892-6_1.pdf)
+/// Encoding of the table from [Simple On-the-Fly Automatic Verification of
+/// Linear Temporal Logic](https://link.springer.com/content/pdf/10.1007/978-0-387-34892-6_1.pdf)
 /// p.9
 fn new1_next1_new2<AP: Clone + Ord>(n: &NnfLtl<AP>) -> NewNextNew<AP> {
     fn set<'a, T: Clone + Ord + 'a>(ts: impl IntoIterator<Item = &'a Box<T>>) -> BTreeSet<T> {

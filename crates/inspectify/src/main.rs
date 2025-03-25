@@ -195,7 +195,8 @@ pub async fn static_dir(uri: axum::http::Uri) -> impl axum::response::IntoRespon
     }
 }
 
-/// Write the TypeScript client to the apps/inspectify/src/lib/api.ts file if it exists.
+/// Write the TypeScript client to the apps/inspectify/src/lib/api.ts file if it
+/// exists.
 ///
 /// Returns `true` if the file exists, `false` otherwise.
 fn populate_ts_client(endpoints: &tapi::endpoints::Endpoints<AppState>) -> bool {

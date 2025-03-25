@@ -1,11 +1,10 @@
 use itertools::Itertools;
 
+use super::*;
 use crate::{
     ltl::expression::{LTLExpression, Literal},
     testing::expect,
 };
-
-use super::*;
 
 #[test]
 fn it_should_create_graph_from_ltl() {

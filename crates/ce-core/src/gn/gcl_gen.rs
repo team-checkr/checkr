@@ -1,8 +1,7 @@
-use rand::{Rng, seq::IndexedRandom};
-
 use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
 };
+use rand::{Rng, seq::IndexedRandom};
 
 use crate::Generate;
 

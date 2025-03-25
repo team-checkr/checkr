@@ -81,8 +81,8 @@ impl Worklist for LiFo {
 //         match (v.is_empty(), p.is_empty()) {
 //             (true, true) => return None,
 //             (true, false) => {
-//                 *v = pg.reverse_post_order().filter(|n| p.contains(n)).collect();
-//                 p.clear();
+//                 *v = pg.reverse_post_order().filter(|n|
+// p.contains(n)).collect();                 p.clear();
 //                 v.pop_back()
 //             }
 //             _ => v.pop_back(),

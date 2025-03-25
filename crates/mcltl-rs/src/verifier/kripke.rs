@@ -163,9 +163,8 @@ pub enum Expr<S, AP: AtomicProperty> {
 #[cfg(test)]
 mod tests {
 
-    use crate::buchi::BuchiLike as _;
-
     use super::*;
+    use crate::buchi::BuchiLike as _;
 
     #[test]
     fn it_should_compute_nba_from_kripke_struct() {

@@ -18,10 +18,9 @@ use gcl::{
 };
 use indexmap::{IndexMap, IndexSet};
 use itertools::Itertools;
+pub use semantics::{Bools, Sign, SignAnalysis, SignMemory, Signs};
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
-
-pub use semantics::{Bools, Sign, SignAnalysis, SignMemory, Signs};
 
 define_env!(SignEnv);
 

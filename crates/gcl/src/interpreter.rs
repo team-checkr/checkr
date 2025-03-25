@@ -1,13 +1,14 @@
 use std::collections::BTreeMap;
 
+use itertools::Itertools;
+use serde::{Deserialize, Serialize};
+use stdx::stringify::Stringify;
+
 use crate::{
     ast::{Array, Int, Variable},
     pg::{Edge, Node, ProgramGraph},
     semantics::{SemanticsContext, SemanticsError},
 };
-use itertools::Itertools;
-use serde::{Deserialize, Serialize};
-use stdx::stringify::Stringify;
 
 #[derive(
     tapi::Tapi, Debug, Default, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Serialize, Deserialize,

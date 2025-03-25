@@ -8,9 +8,8 @@ use ce_shell::Input;
 use color_eyre::eyre::Context;
 use rusqlite::OptionalExtension;
 
-use crate::endpoints::InspectifyJobMeta;
-
 use super::{compression::Compressed, config::GroupConfig};
+use crate::endpoints::InspectifyJobMeta;
 
 #[derive(Clone)]
 pub struct CheckoDb {

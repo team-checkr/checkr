@@ -105,7 +105,8 @@ impl<M: Send + Sync + 'static> Hub<M> {
         let (events_tx, events_rx) = tokio::sync::broadcast::channel(128);
 
         // Terminate the job if it has been running for longer than the timeout.
-        // We give a generous timeout for compilation jobs, and a more strict one for analysis jobs.
+        // We give a generous timeout for compilation jobs, and a more strict one for
+        // analysis jobs.
         let timeout = match &kind {
             JobKind::Analysis(_) => Duration::from_secs(10),
             JobKind::Compilation => Duration::from_secs(60),

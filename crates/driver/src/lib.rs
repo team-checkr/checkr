@@ -14,7 +14,6 @@ use std::{
 use ce_shell::Input;
 use color_eyre::eyre::Context;
 use config::RunOption;
-
 pub use hub::{Hub, HubEvent};
 use itertools::Itertools;
 pub use job::{Job, JobData, JobEvent, JobId, JobKind, JobState};

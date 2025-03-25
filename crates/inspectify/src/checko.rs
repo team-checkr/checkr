@@ -20,9 +20,8 @@ use itertools::Itertools;
 use rand::seq::SliceRandom;
 use tracing::Instrument;
 
-use crate::endpoints::InspectifyJobMeta;
-
 use self::config::{GroupConfig, GroupName};
+use crate::endpoints::InspectifyJobMeta;
 
 pub struct Checko {
     hub: Hub<InspectifyJobMeta>,
