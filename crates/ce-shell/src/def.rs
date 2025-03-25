@@ -131,22 +131,10 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
-            pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
+            fn validate_output_helper(&self, output: &Output) -> Result<ValidationResult, EnvError> {
                 assert_eq!(self.analysis(), output.analysis());
 
-                static VALIDATION:
-                    once_cell::sync::Lazy<dashmap::DashMap<
-                        ($crate::io::Hash, $crate::io::Hash),
-                        Result<ValidationResult, EnvError>
-                    >> = once_cell::sync::Lazy::new(Default::default);
-
-                let key = (self.hash(), output.hash());
-                if let Some(result) = VALIDATION.get(&key) {
-                    return result.clone();
-                }
-
-                let result = (|| match self.analysis() {
+                match self.analysis() {
                     $(Analysis::$name => {
                         let input: <$krate as Env>::Input = self.data::<$krate>()
                             .map_err(EnvError::from_parse_input(&self.json()))?;
@@ -154,11 +142,7 @@ macro_rules! define_shell {
                             .map_err(EnvError::from_parse_output(&output.json()))?;
                         <$krate as Env>::validate(&input, &output)
                     }),*
-                })();
-
-                VALIDATION.insert(key, result.clone());
-
-                result
+                }
             }
         }
 

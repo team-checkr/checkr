@@ -31,3 +31,28 @@ impl Analysis {
         self.gen_input(&mut rng)
     }
 }
+
+impl Input {
+    #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
+    pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
+        assert_eq!(self.analysis(), output.analysis());
+
+        static VALIDATION: once_cell::sync::Lazy<
+            dashmap::DashMap<
+                (crate::io::Hash, crate::io::Hash),
+                Result<ValidationResult, EnvError>,
+            >,
+        > = once_cell::sync::Lazy::new(Default::default);
+
+        let key = (self.hash(), output.hash());
+        if let Some(result) = VALIDATION.get(&key) {
+            return result.clone();
+        }
+
+        let result = self.validate_output_helper(output);
+
+        VALIDATION.insert(key, result.clone());
+
+        result
+    }
+}
