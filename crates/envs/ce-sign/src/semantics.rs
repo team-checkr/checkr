@@ -3,8 +3,8 @@ use std::collections::BTreeMap;
 use gcl::{
     ast::{AExpr, Array, BExpr, Int, Target, Variable},
     pg::{
-        analysis::{Direction, MonotoneFramework},
         Action, Edge, ProgramGraph,
+        analysis::{Direction, MonotoneFramework},
     },
     semantics::SemanticsError,
 };

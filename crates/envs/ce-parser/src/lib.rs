@@ -1,4 +1,4 @@
-use ce_core::{define_env, rand, Env, Generate, ValidationResult};
+use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use gcl::{ast::Commands, interpreter::InterpreterMemory};
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
@@ -41,7 +41,7 @@ impl Env for ParserEnv {
             (Err(err), _) | (_, Err(err)) => {
                 return Ok(ValidationResult::Mismatch {
                     reason: format!("failed to parse pretty output: {:?}", err),
-                })
+                });
             }
         };
 

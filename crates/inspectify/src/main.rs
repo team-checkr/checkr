@@ -4,12 +4,12 @@ mod endpoints;
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
 use axum::{
-    response::{Html, IntoResponse},
     Router,
+    response::{Html, IntoResponse},
 };
 use clap::Parser;
 use endpoints::InspectifyJobMeta;
-use tapi::{endpoints::RouterExt, Tapi};
+use tapi::{Tapi, endpoints::RouterExt};
 use tracing_subscriber::prelude::*;
 
 use crate::endpoints::AppState;

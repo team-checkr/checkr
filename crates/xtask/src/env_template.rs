@@ -1,4 +1,4 @@
-use ce_core::{define_env, rand, Env, Generate, ValidationResult};
+use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use serde::{Deserialize, Serialize};
 
 define_env!(TemplateEnv);

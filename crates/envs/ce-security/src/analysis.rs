@@ -1,10 +1,10 @@
 use std::collections::{BTreeMap, BTreeSet};
 
 use gcl::ast::{Command, Commands, Guard, Target};
-use itertools::{chain, Itertools};
+use itertools::{Itertools, chain};
 use serde::{Deserialize, Serialize};
 
-use crate::{flow, Flow};
+use crate::{Flow, flow};
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "SecurityAnalysis")]

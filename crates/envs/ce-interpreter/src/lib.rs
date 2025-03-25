@@ -4,9 +4,8 @@ mod tests;
 use std::collections::BTreeSet;
 
 use ce_core::{
-    define_env,
+    Env, Generate, ValidationResult, define_env,
     rand::{self, seq::IndexedRandom},
-    Env, Generate, ValidationResult,
 };
 use gcl::{
     ast::{Commands, Int, TargetDef},

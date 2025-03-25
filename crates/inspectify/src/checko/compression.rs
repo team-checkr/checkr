@@ -1,6 +1,6 @@
 use std::marker::PhantomData;
 
-use rusqlite::{types::FromSql, ToSql};
+use rusqlite::{ToSql, types::FromSql};
 
 pub struct Compressed<T> {
     data: Vec<u8>,

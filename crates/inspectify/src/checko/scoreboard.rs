@@ -5,7 +5,7 @@ use driver::JobState;
 use indexmap::IndexMap;
 use itertools::{Either, Itertools};
 
-use super::{config::GroupName, Checko, GroupStatus};
+use super::{Checko, GroupStatus, config::GroupName};
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, serde::Serialize)]
 pub struct PublicAnalysis {

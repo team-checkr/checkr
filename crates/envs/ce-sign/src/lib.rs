@@ -5,16 +5,15 @@ mod semantics;
 use std::collections::BTreeSet;
 
 use ce_core::{
-    define_env,
+    Env, EnvError, Generate, ValidationResult, define_env,
     rand::{self, seq::IndexedRandom},
-    Env, EnvError, Generate, ValidationResult,
 };
 use gcl::{
     ast::{Commands, Target, TargetDef},
     memory::Memory,
     pg::{
-        analysis::{mono_analysis, FiFo},
         Determinism, Node, ProgramGraph,
+        analysis::{FiFo, mono_analysis},
     },
 };
 use indexmap::{IndexMap, IndexSet};

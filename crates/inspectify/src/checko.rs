@@ -12,7 +12,7 @@ use std::{
 
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Input};
-use color_eyre::{eyre::Context, Result};
+use color_eyre::{Result, eyre::Context};
 use driver::{Driver, Hub, Job, JobState};
 use futures_util::{StreamExt, TryStreamExt};
 use indexmap::IndexMap;

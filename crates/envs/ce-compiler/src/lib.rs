@@ -2,14 +2,14 @@ mod dot;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ce_core::{define_env, Env, Generate, ValidationResult};
+use ce_core::{Env, Generate, ValidationResult, define_env};
 use gcl::{
     ast::Commands,
     interpreter::InterpreterMemory,
     pg::{Determinism, ProgramGraph},
 };
 use itertools::Itertools;
-use rand::{seq::IndexedRandom, Rng};
+use rand::{Rng, seq::IndexedRandom};
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
 
@@ -81,7 +81,7 @@ impl Env for CompilerEnv {
             Err(err) => {
                 return Ok(ValidationResult::Mismatch {
                     reason: format!("failed to parse dot: {err}"),
-                })
+                });
             }
         };
         let o_g = dot::dot_to_petgraph(&o_dot).expect("we always produce valid dot");

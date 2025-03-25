@@ -1,6 +1,6 @@
 use std::{sync::Arc, time::Duration};
 
-use axum::{extract::State, Json};
+use axum::{Json, extract::State};
 use ce_core::ValidationResult;
 use ce_shell::{Analysis, Hash, Input};
 use driver::{HubEvent, JobId, JobState};

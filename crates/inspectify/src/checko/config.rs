@@ -3,7 +3,7 @@
 use std::{collections::BTreeMap, fs, path::Path, sync::Arc};
 
 use ce_shell::{Analysis, Input};
-use color_eyre::{eyre::Context, Result};
+use color_eyre::{Result, eyre::Context};
 use indexmap::IndexMap;
 use serde::{Deserialize, Serialize};
 use smol_str::SmolStr;

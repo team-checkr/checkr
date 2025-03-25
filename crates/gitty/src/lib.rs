@@ -3,7 +3,7 @@ mod tests;
 
 use std::{path::Path, process::Stdio};
 
-use color_eyre::eyre::{bail, Context};
+use color_eyre::eyre::{Context, bail};
 use tokio::process::Command;
 
 static GIT_SSH_SEMAPHORE: stdx::concurrency::Semaphore = stdx::concurrency::semaphore();

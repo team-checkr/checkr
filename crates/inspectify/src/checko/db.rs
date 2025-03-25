@@ -66,7 +66,10 @@ impl CheckoDb {
         if let Some(prev) = self.get_cached_run(key)? {
             if prev != *data {
                 tracing::error!(
-                    "cached run for git_hash: {:?}, input: {:?} already exists but with different data", key.1.git_hash, key.1.input);
+                    "cached run for git_hash: {:?}, input: {:?} already exists but with different data",
+                    key.1.git_hash,
+                    key.1.input,
+                );
             }
             return Ok(());
         }

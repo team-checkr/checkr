@@ -3,7 +3,7 @@ use std::{
     fmt::Debug,
     path::Path,
     process::Stdio,
-    sync::{atomic::AtomicUsize, Arc, RwLock},
+    sync::{Arc, RwLock, atomic::AtomicUsize},
     time::Duration,
 };
 
@@ -11,8 +11,8 @@ use itertools::Either;
 use tokio::{io::AsyncReadExt, sync::Mutex};
 
 use crate::{
-    job::{Job, JobData, JobEvent, JobInner, JobKind},
     JobId, JobState,
+    job::{Job, JobData, JobEvent, JobInner, JobKind},
 };
 
 #[derive(Debug, Clone, Copy, PartialEq, Eq, PartialOrd, Ord, Hash)]
