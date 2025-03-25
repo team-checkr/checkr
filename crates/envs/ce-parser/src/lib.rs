@@ -62,9 +62,9 @@ impl Env for ParserEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         Self {
-            commands: Stringify::new(Commands::gen(&mut Default::default(), rng)),
+            commands: Stringify::new(Commands::gn(&mut Default::default(), rng)),
         }
     }
 }

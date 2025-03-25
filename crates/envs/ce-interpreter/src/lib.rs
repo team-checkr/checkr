@@ -159,8 +159,8 @@ impl Env for InterpreterEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
-        let commands = gcl::ast::Commands::gen(&mut Default::default(), rng);
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
+        let commands = gcl::ast::Commands::gn(&mut Default::default(), rng);
         let initial_memory = gcl::memory::Memory::from_targets_with(
             commands.fv(),
             &mut rng,

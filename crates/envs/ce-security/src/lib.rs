@@ -168,8 +168,8 @@ impl Env for SecurityEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
-        let commands = Commands::gen(&mut Default::default(), rng);
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+        let commands = Commands::gn(&mut Default::default(), rng);
 
         let lattice_options = [
             // public < private

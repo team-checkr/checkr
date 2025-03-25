@@ -99,13 +99,13 @@ impl Env for CompilerEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: ce_core::rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: ce_core::rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         let determinism = *[Determinism::Deterministic, Determinism::NonDeterministic]
             .choose(rng)
             .unwrap();
 
         Input {
-            commands: Stringify::new(Commands::gen(&mut Default::default(), rng)),
+            commands: Stringify::new(Commands::gn(&mut Default::default(), rng)),
             determinism,
         }
     }

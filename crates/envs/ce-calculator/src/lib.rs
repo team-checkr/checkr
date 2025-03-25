@@ -75,9 +75,9 @@ impl Env for CalcEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         let mut gen_expr = || {
-            AExpr::gen(
+            AExpr::gn(
                 &mut GclGenContext {
                     names: Vec::new(),
                     ..GclGenContext::new(25, rng)

@@ -77,7 +77,7 @@ impl Context {
                     Box::new(|cx, rng| {
                         Target::Array(
                             Array(cx.names.choose(rng).cloned().unwrap().to_uppercase()),
-                            Box::new(AExpr::gen(cx, rng)),
+                            Box::new(AExpr::gn(cx, rng)),
                         )
                     }),
                 ),
@@ -107,14 +107,14 @@ impl Context {
         } else {
             self.fuel -= n as u32;
         }
-        (0..n).map(|_| G::gen(self, rng)).collect()
+        (0..n).map(|_| G::gn(self, rng)).collect()
     }
 }
 
 impl Generate for Commands {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         Commands(cx.many(1, 10, rng))
     }
 }
@@ -164,7 +164,7 @@ impl Generate for Commands {
 
 impl Generate for Command {
     type Context = Context;
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.recursion_limit = 5;
         cx.negation_limit = 3;
         cx.sample(
@@ -173,7 +173,7 @@ impl Generate for Command {
                 (
                     1.0,
                     Box::new(|cx, rng| {
-                        Command::Assignment(Target::gen(cx, rng), AExpr::gen(cx, rng))
+                        Command::Assignment(Target::gn(cx, rng), AExpr::gn(cx, rng))
                     }),
                 ),
                 (0.6, Box::new(|cx, rng| Command::If(cx.many(1, 10, rng)))),
@@ -189,7 +189,7 @@ impl Generate for Command {
 impl Generate for Target<Box<AExpr>> {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.reference(rng)
     }
 }
@@ -197,16 +197,16 @@ impl Generate for Target<Box<AExpr>> {
 impl Generate for Guard {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.recursion_limit = 5;
         cx.negation_limit = 3;
-        Guard(BExpr::gen(cx, rng), Commands::gen(cx, rng))
+        Guard(BExpr::gn(cx, rng), Commands::gn(cx, rng))
     }
 }
 
 impl Generate for AExpr {
     type Context = Context;
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![
@@ -226,7 +226,7 @@ impl Generate for AExpr {
                     },
                     Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
-                        AExpr::binary(AExpr::gen(cx, rng), AOp::gen(cx, rng), AExpr::gen(cx, rng))
+                        AExpr::binary(AExpr::gn(cx, rng), AOp::gn(cx, rng), AExpr::gn(cx, rng))
                     }),
                 ),
             ],
@@ -237,7 +237,7 @@ impl Generate for AExpr {
 impl Generate for AOp {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![
@@ -257,7 +257,7 @@ impl Generate for AOp {
 impl Generate for BExpr {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![
@@ -266,29 +266,21 @@ impl Generate for BExpr {
                     if cx.recursion_limit == 0 { 0.0 } else { 0.7 },
                     Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
-                        BExpr::Rel(
-                            AExpr::gen(cx, rng),
-                            RelOp::gen(cx, rng),
-                            AExpr::gen(cx, rng),
-                        )
+                        BExpr::Rel(AExpr::gn(cx, rng), RelOp::gn(cx, rng), AExpr::gn(cx, rng))
                     }),
                 ),
                 (
                     if cx.recursion_limit == 0 { 0.0 } else { 0.7 },
                     Box::new(|cx, rng| {
                         cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
-                        BExpr::logic(
-                            BExpr::gen(cx, rng),
-                            LogicOp::gen(cx, rng),
-                            BExpr::gen(cx, rng),
-                        )
+                        BExpr::logic(BExpr::gn(cx, rng), LogicOp::gn(cx, rng), BExpr::gn(cx, rng))
                     }),
                 ),
                 (
                     if cx.negation_limit == 0 { 0.0 } else { 0.4 },
                     Box::new(|cx, rng| {
                         cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
-                        BExpr::Not(Box::new(BExpr::gen(cx, rng)))
+                        BExpr::Not(Box::new(BExpr::gn(cx, rng)))
                     }),
                 ),
             ],
@@ -299,7 +291,7 @@ impl Generate for BExpr {
 impl Generate for RelOp {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![
@@ -316,7 +308,7 @@ impl Generate for RelOp {
 impl Generate for LogicOp {
     type Context = Context;
 
-    fn gen<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
         cx.sample(
             rng,
             vec![

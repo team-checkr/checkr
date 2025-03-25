@@ -58,7 +58,7 @@ macro_rules! define_shell {
             pub fn gen_input(self, rng: &mut rand::rngs::SmallRng) -> Input {
                 match self {
                     $(Analysis::$name => {
-                        let input = <$krate as Env>::Input::gen(&mut (), rng);
+                        let input = <$krate as Env>::Input::gn(&mut (), rng);
                         Input::new::<$krate>(&input)
                     }),*
                 }

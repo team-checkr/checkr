@@ -19,7 +19,7 @@ members = [
 
 [workspace.package]
 version = "0.2.8"
-edition =  "2021"
+edition = "2021"
 repository = "https://github.com/team-checkr/checkr/"
 authors = [
     "Oliver Bøving <oliver@bvng.dk>",

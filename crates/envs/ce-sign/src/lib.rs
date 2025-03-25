@@ -141,13 +141,13 @@ impl Env for SignEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
-        let commands = Commands::gen(&mut Default::default(), rng);
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
+        let commands = Commands::gn(&mut Default::default(), rng);
         let assignment: SignMemory = Memory::from_targets_with(
             commands.fv(),
             &mut rng,
-            |rng, _| Generate::gen(&mut (), rng),
-            |rng, _| Generate::gen(&mut (), rng),
+            |rng, _| Generate::gn(&mut (), rng),
+            |rng, _| Generate::gn(&mut (), rng),
         )
         .into();
 
@@ -166,7 +166,7 @@ impl Generate for Input {
 impl Generate for Sign {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
         *[Sign::Positive, Sign::Zero, Sign::Negative]
             .choose(rng)
             .unwrap()
@@ -175,7 +175,7 @@ impl Generate for Sign {
 impl Generate for Signs {
     type Context = ();
 
-    fn gen<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
-        [Sign::gen(cx, rng)].into_iter().collect()
+    fn gn<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        [Sign::gn(cx, rng)].into_iter().collect()
     }
 }

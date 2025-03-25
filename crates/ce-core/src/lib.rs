@@ -139,7 +139,7 @@ macro_rules! define_env {
                 <$crate::rand::rngs::SmallRng as $crate::rand::SeedableRng>::seed_from_u64(0xCEC34);
             for _ in 0..1000 {
                 let input =
-                    <<$name as $crate::Env>::Input as $crate::Generate>::gen(&mut (), &mut rng);
+                    <<$name as $crate::Env>::Input as $crate::Generate>::gn(&mut (), &mut rng);
                 let output = <$name as $crate::Env>::run(&input).unwrap();
                 let validation_result =
                     <$name as $crate::Env>::validate(&input, &output).expect("failed to validate");

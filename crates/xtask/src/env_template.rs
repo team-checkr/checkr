@@ -28,7 +28,7 @@ impl Env for TemplateEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gen<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
+    fn gn<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
         Self::default()
     }
 }
