@@ -9,7 +9,7 @@ app-build app:
     cd apps/{{app}} && (npm install && npm run build)
 
 build-wasm:
-    cd crates/chip-wasm && just build
+    cd crates/chip-wasm && wasm-pack build --target web --release
 
 # Inspectify
 
