@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.10] - 2025-03-28
+
+### Features
+
+- Add debug information to chip-cli
+
 ## [0.2.9] - 2025-03-28
 
 ### Features
@@ -19,6 +25,7 @@ All notable changes to this project will be documented in this file.
 - Add `rustfmt.toml`
 - Set `publish = false` in chip-wasm
 - Move chip-wasm build commands into root Justfile
+- Release
 
 ### Refactor
 
