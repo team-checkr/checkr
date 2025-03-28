@@ -7,6 +7,9 @@ authors.workspace = true
 license.workspace = true
 publish = false
 
+[package.metadata.dist]
+dist = true
+
 [dependencies]
 camino.workspace = true
 chip.workspace = true
