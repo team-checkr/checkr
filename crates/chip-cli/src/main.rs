@@ -40,14 +40,24 @@ struct Cli {
 
 #[derive(Debug, clap::Subcommand)]
 enum Cmd {
+    /// Test all groups printing the results to stdout
     ChipCheck {
+        /// The .toml files containing the groups
         groups: Utf8PathBuf,
+        /// The directory containing the reference tests (.gcl files)
         reference: Utf8PathBuf,
+        /// The subdirectory of the repository containing the tasks (e.g.
+        /// "task4")
         tasks_dir: String,
     },
+    /// Test all groups printing the results to stdout
     MokaCheck {
+        /// The .toml files containing the groups
         groups: Utf8PathBuf,
+        /// The directory containing the reference tests (.gcl files)
         reference: Utf8PathBuf,
+        /// The subdirectory of the repository containing the tasks (e.g.
+        /// "task4")
         tasks_dir: String,
     },
 }

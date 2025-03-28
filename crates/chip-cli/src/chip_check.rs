@@ -67,16 +67,22 @@ pub async fn chip_check(
     groups: &Utf8PathBuf,
     tasks_dir: &String,
 ) -> Result<(), color_eyre::eyre::Error> {
+    tracing::debug!(?reference, ?groups, ?tasks_dir, "running chip_check");
     let reference = reference.canonicalize_utf8()?;
-    tracing::info!(?reference);
+    tracing::info!(?reference, "canonicalized reference dir");
     let mut tests: Vec<Test> = Vec::new();
     for e in std::fs::read_dir(&reference)? {
         let e = e?;
         if !e.file_type()?.is_file() {
             continue;
         }
+        // only accept .gcl files
+        if !e.file_name().to_string_lossy().ends_with(".gcl") {
+            continue;
+        }
         let path = Utf8PathBuf::from_path_buf(e.path().to_path_buf())
             .map_err(|p| color_eyre::Report::msg(format!("could not convert path: {:?}", p)))?;
+        tracing::debug!(?path, "reading test");
         let src = std::fs::read_to_string(&path)?;
         let program = chip::parse::parse_agcl_program(&src)?;
         let pre = program
