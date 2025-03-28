@@ -2,6 +2,41 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.9] - 2025-03-28
+
+### Features
+
+- Increase timeout and add timeout message
+- Build chip-cli in ci
+
+### Miscellaneous Tasks
+
+- Remove all parsin functionality from mcltl
+- Add `chip-wasm` too the project workspace
+- Update MSRV to 1.85.1
+- Upgrade to Rust `edition = 2024`
+- Run `cargo fmt`
+- Add `rustfmt.toml`
+- Set `publish = false` in chip-wasm
+- Move chip-wasm build commands into root Justfile
+
+### Refactor
+
+- Move caching of `validate_output` out of macro
+- Rename `Generate::gen` to `gn` due to `gen` becoming a keyword
+- Rename `mod gen` to `gn` due to `gen` becoming a keyword
+- Remove `CorrectNonTerminated` and rename `CorrectTerminated` to `Correct`
+
+### Misc
+
+- Fix some clippy lints
+
+## [0.2.8] - 2025-03-20
+
+### Miscellaneous Tasks
+
+- Release
+
 ## [0.2.7] - 2025-03-20
 
 ### Miscellaneous Tasks
