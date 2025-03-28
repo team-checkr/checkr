@@ -44,7 +44,9 @@ struct Cli {
 #[derive(Debug, clap::Subcommand)]
 enum Cmd {
     /// Test all groups printing the results to stdout
-    ChipGroup {
+    ///
+    /// Either --chip or --moka must be set
+    Group {
         /// The .toml files containing the groups
         groups: Utf8PathBuf,
         /// The directory containing the reference tests (.gcl files)
@@ -52,17 +54,14 @@ enum Cmd {
         /// The subdirectory of the repository containing the tasks (e.g.
         /// "task4")
         tasks_dir: String,
+        /// Test Chip programs
+        #[clap(long)]
+        chip: bool,
+        /// Test Moka programs
+        #[clap(long)]
+        moka: bool,
     },
-    /// Test all groups printing the results to stdout
-    MokaGroup {
-        /// The .toml files containing the groups
-        groups: Utf8PathBuf,
-        /// The directory containing the reference tests (.gcl files)
-        reference: Utf8PathBuf,
-        /// The subdirectory of the repository containing the tasks (e.g.
-        /// "task4")
-        tasks_dir: String,
-    },
+
     /// Check a program
     ///
     /// If neither --chip nor --moka is set, the kind will be determined from
@@ -101,16 +100,28 @@ async fn run() -> Result<()> {
     let cli = Cli::parse();
 
     match &cli.cmd {
-        Cmd::ChipGroup {
+        Cmd::Group {
             groups,
             reference,
             tasks_dir,
-        } => chip_check::chip_check(reference, groups, tasks_dir).await?,
-        Cmd::MokaGroup {
-            groups,
-            reference,
-            tasks_dir,
-        } => moka_check::moka_check(reference, groups, tasks_dir).await?,
+            chip,
+            moka,
+        } => match (chip, moka) {
+            (true, true) => {
+                tracing::error!("Both --chip and --moka are set, only one can be set");
+                std::process::exit(1);
+            }
+            (true, false) => {
+                chip_check::chip_check(reference, groups, tasks_dir).await?;
+            }
+            (false, true) => {
+                moka_check::moka_check(reference, groups, tasks_dir).await?;
+            }
+            (false, false) => {
+                tracing::error!("Neither --chip nor --moka are set, one must be set");
+                std::process::exit(1);
+            }
+        },
         Cmd::Check {
             path,
             timeout,
@@ -118,11 +129,6 @@ async fn run() -> Result<()> {
             chip,
             moka,
         } => {
-            #[derive(Debug)]
-            enum Kind {
-                Chip,
-                Moka,
-            }
             let src =
                 std::fs::read_to_string(path).with_context(|| format!("failed to read {path}"))?;
             let kind = match (chip, moka) {
@@ -204,4 +210,10 @@ enum OutputFormat {
     #[default]
     Human,
     Json,
+}
+
+#[derive(Debug)]
+enum Kind {
+    Chip,
+    Moka,
 }
