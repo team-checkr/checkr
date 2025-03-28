@@ -2,11 +2,26 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.11] - 2025-03-28
+
+### Features
+
+- Add `chip check` to check Chip programs from the command line
+
+### Refactor
+
+- Rename `chip-cli` binary to `chip`
+- Rename `chip chip-group` to `chip group --chip` and `chip moka-group` to `chip group --moka`
+
 ## [0.2.10] - 2025-03-28
 
 ### Features
 
 - Add debug information to chip-cli
+
+### Miscellaneous Tasks
+
+- Release
 
 ## [0.2.9] - 2025-03-28
 
