@@ -161,6 +161,7 @@ async fn run() -> Result<()> {
                 Kind::Chip => {
                     let p = chip::parse::parse_agcl_program(&src)
                         .with_context(|| format!("failed to parse {path}"))?;
+                    let mut did_error = false;
                     for r in chip_check::chip_chip(Duration::from_secs(*timeout), &p).await? {
                         let span = r.assertion.source.span;
                         let text = r
@@ -184,6 +185,7 @@ async fn run() -> Result<()> {
                                 "{text}",
                             ),
                         };
+                        did_error = true;
                         match format {
                             OutputFormat::Human => {
                                 let report = miette::Report::new(diag).with_source_code(
@@ -195,6 +197,9 @@ async fn run() -> Result<()> {
                                 serde_json::to_writer(std::io::stdout(), &diag)?;
                             }
                         }
+                    }
+                    if did_error {
+                        std::process::exit(1);
                     }
                 }
                 Kind::Moka => todo!("implement moka check"),
