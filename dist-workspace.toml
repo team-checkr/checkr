@@ -25,10 +25,10 @@ install-path = "CARGO_HOME"
 github-build-setup = "../build-setup.yml"
 
 [dist.github-custom-runners]
-runner = "ubuntu-22.04"
+global = "ubuntu-latest"
 
 [dist.github-custom-runners.x86_64-unknown-linux-gnu]
-runner = "ubuntu-22.04"
+runner = "ubuntu-latest"
 
 # TODO: this didn't work on the version of ubuntu dist uses currently
 # [dist.dependencies.homebrew]
