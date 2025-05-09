@@ -2,11 +2,29 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.12] - 2025-05-09
+
+### Features
+
+- Add error code when chip finds a verification error
+
+### Miscellaneous Tasks
+
+- Update chip-wasm version
+
+### Chip
+
+- Add formatter, syntax equiv, and fully annotated check to the cli
+
 ## [0.2.11] - 2025-03-28
 
 ### Features
 
 - Add `chip check` to check Chip programs from the command line
+
+### Miscellaneous Tasks
+
+- Release
 
 ### Refactor
 
