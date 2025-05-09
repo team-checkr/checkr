@@ -2,6 +2,12 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.13] - 2025-05-09
+
+### Miscellaneous Tasks
+
+- Update dist runner
+
 ## [0.2.12] - 2025-05-09
 
 ### Features
@@ -11,6 +17,7 @@ All notable changes to this project will be documented in this file.
 ### Miscellaneous Tasks
 
 - Update chip-wasm version
+- Release
 
 ### Chip
 
