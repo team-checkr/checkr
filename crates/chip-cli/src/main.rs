@@ -4,6 +4,10 @@ mod moka_check;
 use std::time::Duration;
 
 use camino::Utf8PathBuf;
+use chip::{
+    ast::{Command, Commands, PredicateBlock, PredicateChain},
+    ast_ext::SyntacticallyEquiv,
+};
 use chip_check::AssertionResultKind;
 use clap::Parser as _;
 use color_eyre::{Result, eyre::Context as _};
@@ -69,11 +73,34 @@ enum Cmd {
     Check {
         /// The .gcl file to check
         path: Utf8PathBuf,
+        /// The reference file to check against
+        ///
+        /// Checks that the program is syntaxically equivalent to the reference
+        /// and that the reference precondition implies the precondition of the
+        /// given program, and that the reference postcondition is implied by
+        /// the postcondition of the given program.
+        #[clap(long)]
+        reference: Option<Utf8PathBuf>,
+        /// Check that the program is fully annotated
+        #[clap(long)]
+        fully: bool,
         #[clap(long, short, default_value = "human")]
         format: OutputFormat,
         /// Timeout per assertion in seconds
         #[clap(long, short, default_value = "3")]
         timeout: u64,
+        /// If the program is a chip program
+        #[clap(long)]
+        chip: bool,
+        /// If the program is a moka program
+        #[clap(long)]
+        moka: bool,
+    },
+
+    /// Format a program
+    Fmt {
+        /// The .gcl file to format
+        path: Utf8PathBuf,
         /// If the program is a chip program
         #[clap(long)]
         chip: bool,
@@ -124,6 +151,8 @@ async fn run() -> Result<()> {
         },
         Cmd::Check {
             path,
+            reference,
+            fully,
             timeout,
             format,
             chip,
@@ -131,72 +160,100 @@ async fn run() -> Result<()> {
         } => {
             let src =
                 std::fs::read_to_string(path).with_context(|| format!("failed to read {path}"))?;
-            let kind = match (chip, moka) {
-                (true, true) => {
-                    tracing::error!("Both --chip and --moka are set, only one can be set");
-                    std::process::exit(1);
+            let report_diag = |diag: miette::MietteDiagnostic| match format {
+                OutputFormat::Human => {
+                    let report = miette::Report::new(diag)
+                        .with_source_code(miette::NamedSource::new(path, src.to_string()));
+                    println!("{report:?}");
+                    Ok(())
                 }
-                (true, false) => Kind::Chip,
-                (false, true) => Kind::Moka,
-                (false, false) => match () {
-                    () if src.trim().starts_with(">") => {
-                        tracing::debug!(kind=?Kind::Moka, "determined from starting '>'");
-                        Kind::Moka
-                    }
-                    () if src.trim().starts_with("{") => {
-                        tracing::debug!(kind=?Kind::Chip, "determined from starting '{{'");
-                        Kind::Chip
-                    }
-                    () if src.trim().ends_with("}") => {
-                        tracing::debug!(kind=?Kind::Chip, "determined from ending '}}'");
-                        Kind::Chip
-                    }
-                    _ => {
-                        tracing::debug!(kind=?Kind::Chip, "defaulting to chip");
-                        Kind::Chip
-                    }
-                },
+                OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &diag),
             };
-            match kind {
+            match determine_chip_or_moka(chip, moka, &src) {
                 Kind::Chip => {
                     let p = chip::parse::parse_agcl_program(&src)
                         .with_context(|| format!("failed to parse {path}"))?;
                     let mut did_error = false;
-                    for r in chip_check::chip_chip(Duration::from_secs(*timeout), &p).await? {
-                        let span = r.assertion.source.span;
-                        let text = r
-                            .assertion
-                            .source
-                            .text
-                            .as_deref()
-                            .unwrap_or("Verification failed");
-                        let label = miette::LabeledSpan::at((span.offset(), span.len()), text);
 
-                        let diag = match r.result {
-                            AssertionResultKind::Unsat => continue,
-                            AssertionResultKind::Timeout => miette::diagnostic!(
-                                labels = [label],
-                                severity = miette::Severity::Warning,
-                                "Timed out while checking",
-                            ),
-                            _ => miette::diagnostic!(
-                                labels = [label],
+                    if *fully {
+                        did_error |= p.is_fully_annotated();
+                        report_diag(miette::diagnostic!(
+                            labels = [],
+                            severity = miette::Severity::Error,
+                            "The program is not fully annotated",
+                        ))?;
+                    }
+
+                    did_error |= check_program(*timeout, report_diag, &p).await?;
+                    if let Some(reference_path) = reference {
+                        let reference = std::fs::read_to_string(reference_path)
+                            .with_context(|| format!("failed to read {reference_path}"))?;
+                        let reference = chip::parse::parse_agcl_program(&reference)
+                            .with_context(|| format!("failed to parse {reference_path}"))?;
+
+                        if !reference.is_syntactically_equiv(&p) {
+                            did_error = true;
+                            report_diag(miette::diagnostic!(
+                                labels = [],
                                 severity = miette::Severity::Error,
-                                "{text}",
-                            ),
-                        };
-                        did_error = true;
-                        match format {
-                            OutputFormat::Human => {
-                                let report = miette::Report::new(diag).with_source_code(
-                                    miette::NamedSource::new(path, src.to_string()),
-                                );
-                                println!("{report:?}");
-                            }
-                            OutputFormat::Json => {
-                                serde_json::to_writer(std::io::stdout(), &diag)?;
-                            }
+                                "The program is not syntactically equivalent to the reference",
+                            ))?;
                         }
+                        // NOTE: create a new program where the reference
+                        // precondition is followed by the precondition of the
+                        // program and then skip.
+                        let pre_hack: Commands<chip::ast::PredicateChain, PredicateBlock> =
+                            Commands(
+                                [Command {
+                                    kind: chip::ast::CommandKind::Skip,
+                                    span: (0, 0).into(),
+                                    pre: PredicateChain {
+                                        predicates: reference
+                                            .precondition()
+                                            .iter()
+                                            .flat_map(|pre| &pre.predicates)
+                                            .chain(
+                                                p.precondition()
+                                                    .iter()
+                                                    .flat_map(|pre| &pre.predicates),
+                                            )
+                                            .cloned()
+                                            .collect(),
+                                    },
+                                    post: PredicateChain {
+                                        predicates: [].to_vec(),
+                                    },
+                                }]
+                                .to_vec(),
+                            );
+                        // NOTE: do the same for the postcondition, but flip the order of reference
+                        // and p
+                        let post_hack: Commands<chip::ast::PredicateChain, PredicateBlock> =
+                            Commands(
+                                [Command {
+                                    kind: chip::ast::CommandKind::Skip,
+                                    span: (0, 0).into(),
+                                    pre: PredicateChain {
+                                        predicates: [].to_vec(),
+                                    },
+                                    post: PredicateChain {
+                                        predicates: reference
+                                            .postcondition()
+                                            .iter()
+                                            .flat_map(|pre| &pre.predicates)
+                                            .chain(
+                                                p.postcondition()
+                                                    .iter()
+                                                    .flat_map(|pre| &pre.predicates),
+                                            )
+                                            .cloned()
+                                            .collect(),
+                                    },
+                                }]
+                                .to_vec(),
+                            );
+                        did_error |= check_program(*timeout, report_diag, &pre_hack).await?;
+                        did_error |= check_program(*timeout, report_diag, &post_hack).await?;
                     }
                     if did_error {
                         std::process::exit(1);
@@ -205,9 +262,89 @@ async fn run() -> Result<()> {
                 Kind::Moka => todo!("implement moka check"),
             }
         }
+        Cmd::Fmt { path, chip, moka } => {
+            let src =
+                std::fs::read_to_string(path).with_context(|| format!("failed to read {path}"))?;
+            match determine_chip_or_moka(chip, moka, &src) {
+                Kind::Chip => {
+                    let p = chip::parse::parse_agcl_program(&src)
+                        .with_context(|| format!("failed to parse {path}"))?;
+                    println!("{p}");
+                }
+                Kind::Moka => {
+                    let p = chip::parse::parse_ltl_program(&src)
+                        .with_context(|| format!("failed to parse {path}"))?;
+                    println!("{p}");
+                }
+            }
+        }
     }
 
     Ok(())
+}
+
+fn determine_chip_or_moka(chip: &bool, moka: &bool, src: &str) -> Kind {
+    match (chip, moka) {
+        (true, true) => {
+            tracing::error!("Both --chip and --moka are set, only one can be set");
+            std::process::exit(1);
+        }
+        (true, false) => Kind::Chip,
+        (false, true) => Kind::Moka,
+        (false, false) => match () {
+            () if src.trim().starts_with(">") => {
+                tracing::debug!(kind=?Kind::Moka, "determined from starting '>'");
+                Kind::Moka
+            }
+            () if src.trim().starts_with("{") => {
+                tracing::debug!(kind=?Kind::Chip, "determined from starting '{{'");
+                Kind::Chip
+            }
+            () if src.trim().ends_with("}") => {
+                tracing::debug!(kind=?Kind::Chip, "determined from ending '}}'");
+                Kind::Chip
+            }
+            _ => {
+                tracing::debug!(kind=?Kind::Chip, "defaulting to chip");
+                Kind::Chip
+            }
+        },
+    }
+}
+
+async fn check_program(
+    timeout: u64,
+    report_diag: impl Fn(miette::MietteDiagnostic) -> Result<(), serde_json::Error>,
+    p: &Commands<PredicateChain, PredicateBlock>,
+) -> Result<bool> {
+    let mut did_error = false;
+    for r in chip_check::chip_chip(Duration::from_secs(timeout), p).await? {
+        let span = r.assertion.source.span;
+        let text = r
+            .assertion
+            .source
+            .text
+            .as_deref()
+            .unwrap_or("Verification failed");
+        let label = miette::LabeledSpan::at((span.offset(), span.len()), text);
+
+        let diag = match r.result {
+            AssertionResultKind::Unsat => continue,
+            AssertionResultKind::Timeout => miette::diagnostic!(
+                labels = [label],
+                severity = miette::Severity::Warning,
+                "Timed out while checking",
+            ),
+            _ => miette::diagnostic!(
+                labels = [label],
+                severity = miette::Severity::Error,
+                "{text}",
+            ),
+        };
+        did_error = true;
+        report_diag(diag)?;
+    }
+    Ok(did_error)
 }
 
 #[derive(Debug, Default, Clone, Copy, clap::ValueEnum)]

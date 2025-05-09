@@ -102,6 +102,15 @@ impl From<Array> for Target<()> {
     }
 }
 
+impl<Pred, Inv> Commands<Pred, Inv> {
+    pub fn precondition(&self) -> Option<&Pred> {
+        self.0.first().map(|c| &c.pre)
+    }
+    pub fn postcondition(&self) -> Option<&Pred> {
+        self.0.last().map(|c| &c.post)
+    }
+}
+
 pub trait SyntacticallyEquiv {
     #[allow(clippy::wrong_self_convention)]
     fn is_syntactically_equiv(self, other: Self) -> bool;

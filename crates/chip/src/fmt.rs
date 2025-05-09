@@ -3,8 +3,9 @@ use std::fmt::Display;
 use itertools::Itertools;
 
 use crate::ast::{
-    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, Locator, LogicOp,
-    PredicateBlock, PredicateChain, Quantifier, RelOp, Target, Variable,
+    AExpr, AOp, Array, BExpr, Command, CommandKind, Commands, Function, Guard, LTLFormula,
+    LTLProgram, Locator, LogicOp, PredicateBlock, PredicateChain, Quantifier, RelOp, Target,
+    Variable,
 };
 
 impl Display for Variable {
@@ -42,6 +43,11 @@ impl<Prev: Display, Inv: Display> Display for Command<Prev, Inv> {
         write!(f, "{pres}\n{}\n{posts}", self.kind)
     }
 }
+impl Command<(), ()> {
+    fn fmt(&self) -> String {
+        self.kind.fmt()
+    }
+}
 
 impl<Prev: Display, Inv: Display> Display for CommandKind<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
@@ -56,10 +62,30 @@ impl<Prev: Display, Inv: Display> Display for CommandKind<Prev, Inv> {
         }
     }
 }
+impl CommandKind<(), ()> {
+    fn fmt(&self) -> String {
+        match self {
+            CommandKind::Assignment(target, expr) => format!("{target} := {expr}"),
+            CommandKind::Skip => "skip".to_string(),
+            CommandKind::Placeholder => "placeholder".to_string(),
+            CommandKind::If(guards) => {
+                format!("if {}\nfi", guards.iter().map(|g| g.fmt()).format("\n[] "))
+            }
+            CommandKind::Loop((), guards) => {
+                format!("do {}\nod", guards.iter().map(|g| g.fmt()).format("\n[] "))
+            }
+        }
+    }
+}
 
 impl<Prev: Display, Inv: Display> Display for Commands<Prev, Inv> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         write!(f, "{}", self.0.iter().format(" ;\n"))
+    }
+}
+impl Commands<(), ()> {
+    fn fmt(&self) -> String {
+        format!("{}", self.0.iter().map(|c| c.fmt()).format(" ;\n"))
     }
 }
 
@@ -71,6 +97,19 @@ impl<Prev: Display, Inv: Display> Display for Guard<Prev, Inv> {
             self.guard,
             self.cmds
                 .to_string()
+                .lines()
+                .map(|l| format!("   {l}"))
+                .format("\n")
+        )
+    }
+}
+impl Guard<(), ()> {
+    fn fmt(&self) -> String {
+        format!(
+            "{} ->\n{}",
+            self.guard,
+            self.cmds
+                .fmt()
                 .lines()
                 .map(|l| format!("   {l}"))
                 .format("\n")
@@ -166,5 +205,54 @@ impl Display for Locator {
             Locator::Stuck => write!(f, "stuck"),
             Locator::Terminated => write!(f, "terminated"),
         }
+    }
+}
+impl Display for LTLFormula {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            LTLFormula::Bool(b) => write!(f, "{b}"),
+            LTLFormula::Locator(locator) => write!(f, "{locator}"),
+            LTLFormula::Rel(aexpr, rel_op, aexpr1) => write!(f, "({aexpr} {rel_op} {aexpr1})"),
+            LTLFormula::Not(ltlformula) => write!(f, "!{ltlformula}"),
+            LTLFormula::And(ltlformula, ltlformula1) => write!(f, "({ltlformula} & {ltlformula1})"),
+            LTLFormula::Or(ltlformula, ltlformula1) => write!(f, "({ltlformula} | {ltlformula1})"),
+            LTLFormula::Implies(ltlformula, ltlformula1) => {
+                write!(f, "({ltlformula} ==> {ltlformula1})")
+            }
+            LTLFormula::Until(ltlformula, ltlformula1) => {
+                write!(f, "({ltlformula} U {ltlformula1})")
+            }
+            LTLFormula::Next(ltlformula) => write!(f, "X({ltlformula})"),
+            LTLFormula::Globally(ltlformula) => write!(f, "G({ltlformula})"),
+            LTLFormula::Finally(ltlformula) => write!(f, "F({ltlformula})"),
+        }
+    }
+}
+impl Display for LTLProgram {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        let init = self
+            .initial
+            .iter()
+            .map(|(var, val)| format!("{var} = {val}"))
+            .format(", ");
+        writeln!(f, "> {init}")?;
+
+        if self.commands.len() == 1 {
+            writeln!(f, "{}", &self.commands[0].fmt())?;
+        } else {
+            writeln!(f, "par")?;
+            writeln!(
+                f,
+                "{}",
+                self.commands.iter().map(|c| c.fmt()).format("\n[]\n")
+            )?;
+            writeln!(f, "rap")?;
+        }
+
+        for p in &self.properties {
+            writeln!(f, "check {}", p.1)?;
+        }
+
+        Ok(())
     }
 }
