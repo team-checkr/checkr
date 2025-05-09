@@ -2,11 +2,18 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.2.14] - 2025-05-09
+
+### Miscellaneous Tasks
+
+- Update dist runner
+
 ## [0.2.13] - 2025-05-09
 
 ### Miscellaneous Tasks
 
 - Update dist runner
+- Release
 
 ## [0.2.12] - 2025-05-09
 
