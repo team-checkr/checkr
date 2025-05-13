@@ -143,8 +143,11 @@ async fn run() -> Result<()> {
                 .map(|s| s.to_string())
                 .collect_vec();
 
+            let progress = indicatif::ProgressBar::new(versions.len() as u64);
+
             versions
                 .par_iter()
+                .progress_with(progress.clone())
                 .map(|version| -> Result<()> {
                     let sh = xshell::Shell::new()?;
                     let new_path = format!(
@@ -159,24 +162,38 @@ async fn run() -> Result<()> {
                     {
                         let f = f?;
                         let f = f.path();
-                        let start = std::time::Instant::now();
-                        let output = cmd!(sh, "./target/release/chip check {f}")
-                            .ignore_status()
-                            .output()?;
-                        let elapsed = start.elapsed();
-                        println!(
+
+                        // NOTE: Do three runs, drop the longest and take the average
+                        let mut times = Vec::new();
+
+                        let mut status_code = 0;
+
+                        for _ in 0..3 {
+                            let start = std::time::Instant::now();
+                            let output = cmd!(sh, "./target/release/chip check {f}")
+                                .ignore_status()
+                                .output()?;
+                            let elapsed = start.elapsed();
+                            times.push(elapsed.as_millis());
+                            status_code = output.status.code().unwrap();
+                        }
+
+                        times.sort();
+                        times.pop();
+                        let elapsed = times.iter().sum::<u128>() / times.len() as u128;
+
+                        progress.println(format!(
                             "{}\t{}\t{}\t{}",
                             version,
                             f.file_name().unwrap().to_str().unwrap(),
-                            output.status.code().unwrap(),
-                            elapsed.as_millis()
-                        );
+                            status_code,
+                            elapsed
+                        ));
                     }
 
                     Ok(())
                 })
-                .progress()
-                .collect::<Result<()>>()?;
+                .collect::<Result<Vec<()>>>()?;
         }
     }
 
