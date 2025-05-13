@@ -1,6 +1,10 @@
+use itertools::Itertools;
 use smtlib::prelude::*;
 
-use crate::ast::{AExpr, AOp, BExpr, Function, LogicOp, Quantifier, RelOp};
+use crate::{
+    ast::{AExpr, AGCLCommands, AOp, BExpr, Function, LogicOp, Quantifier, RelOp},
+    ast_ext::FreeVariables,
+};
 
 impl BExpr {
     pub fn smt<'st>(&self, st: &'st smtlib::Storage) -> smtlib::Bool<'st> {
@@ -78,5 +82,22 @@ impl Function {
             Function::Exp(_, _) => vec![smtlib::Int::sort(); 2],
         };
         smtlib::funs::Fun::new(st, self.name(), vars, smtlib::Int::sort())
+    }
+
+    pub fn theory(&self) -> &'static str {
+        match self {
+            Function::Division(_, _) => "",
+            Function::Min(_, _) => include_str!("theories/min.smt"),
+            Function::Max(_, _) => include_str!("theories/max.smt"),
+            Function::Fac(_) => include_str!("theories/fac.smt"),
+            Function::Fib(_) => include_str!("theories/fib.smt"),
+            Function::Exp(_, _) => include_str!("theories/exp.smt"),
+        }
+    }
+}
+
+impl AGCLCommands {
+    pub fn prelude(&self) -> String {
+        self.funs().iter().sorted().map(|f| f.theory()).join("\n")
     }
 }

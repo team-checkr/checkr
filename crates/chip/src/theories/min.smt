@@ -1,0 +1,5 @@
+(declare-fun min (Int Int) Int)
+(assert (forall ((x Int) (y Int))
+    (=> (< x y) (= x (min x y)))))
+(assert (forall ((x Int) (y Int))
+    (=> (>= x y) (= y (min x y)))))

@@ -262,7 +262,7 @@ pub async fn chip_chip(
     p: &chip::ast::AGCLCommands,
 ) -> Result<Vec<AssertionResult>, color_eyre::eyre::Error> {
     let st = smtlib::Storage::new();
-    let prelude = smtlib::lowlevel::ast::Script::parse(&st, chip::SMT_PRELUDE)?;
+    let prelude = smtlib::lowlevel::ast::Script::parse(&st, &p.prelude())?;
 
     let mut assertion_results: Vec<AssertionResult> = Vec::new();
     for assertion in p.assertions() {

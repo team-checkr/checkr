@@ -1,13 +1,17 @@
 mod env_template;
+mod z3_versions;
 
 use std::path::{Path, PathBuf};
 
 use clap::Parser;
 use color_eyre::Result;
 use heck::{ToKebabCase, ToPascalCase, ToSnakeCase};
+use indicatif::ParallelProgressIterator;
 use itertools::Itertools;
+use rayon::iter::{IntoParallelRefIterator, ParallelIterator as _};
 use toml_edit::DocumentMut;
 use xshell::cmd;
+use z3_versions::z3_versions_dir;
 
 #[derive(Debug, Parser)]
 enum Cli {
@@ -27,6 +31,12 @@ enum Cli {
         #[clap(long)]
         long_name: String,
     },
+    /// Download binaries for Z3
+    Z3Versions {
+        #[clap(long, default_value = "arm64-osx")]
+        target: String,
+    },
+    ChipBench,
 }
 
 async fn run() -> Result<()> {
@@ -118,6 +128,55 @@ async fn run() -> Result<()> {
             sh.create_dir(short_name.to_pascal_case())?;
             sh.change_dir(short_name.to_pascal_case());
             sh.write_file("./+page.svelte", template_src)?;
+        }
+        Cli::Z3Versions { target } => {
+            z3_versions::run(&target).await?;
+        }
+        Cli::ChipBench => {
+            let sh = xshell::Shell::new()?;
+
+            cmd!(sh, "cargo build --release --bin chip").run()?;
+
+            let versions: Vec<String> = cmd!(sh, "ls z3-versions")
+                .read()?
+                .lines()
+                .map(|s| s.to_string())
+                .collect_vec();
+
+            versions
+                .par_iter()
+                .map(|version| -> Result<()> {
+                    let sh = xshell::Shell::new()?;
+                    let new_path = format!(
+                        "{}:{}",
+                        z3_versions_dir().join(version).display(),
+                        env!("PATH")
+                    );
+                    let _env = sh.push_env("PATH", new_path);
+
+                    for f in
+                        std::fs::read_dir(project_root().parent().unwrap().join("bench/passing"))?
+                    {
+                        let f = f?;
+                        let f = f.path();
+                        let start = std::time::Instant::now();
+                        let output = cmd!(sh, "./target/release/chip check {f}")
+                            .ignore_status()
+                            .output()?;
+                        let elapsed = start.elapsed();
+                        println!(
+                            "{}\t{}\t{}\t{}",
+                            version,
+                            f.file_name().unwrap().to_str().unwrap(),
+                            output.status.code().unwrap(),
+                            elapsed.as_millis()
+                        );
+                    }
+
+                    Ok(())
+                })
+                .progress()
+                .collect::<Result<()>>()?;
         }
     }
 

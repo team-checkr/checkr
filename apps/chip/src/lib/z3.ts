@@ -53,11 +53,14 @@ export const run = (
       const ctx = Z3.mk_context(cfg);
       Z3.del_config(cfg);
 
-      if (options.prelude) await Z3.eval_smtlib2_string(ctx, options.prelude);
+      console.group('smt');
+
+      if (options.prelude) {
+        console.info('prelude:', '\n' + options.prelude);
+        await Z3.eval_smtlib2_string(ctx, options.prelude);
+      }
 
       const results: string[] = [];
-
-      console.group('smt');
 
       for (const l of query.split('\n')) {
         if (isCancelled) {
@@ -78,6 +81,11 @@ export const run = (
           results.push(res);
         }
       }
+
+      const version = await Z3.eval_smtlib2_string(ctx, '(get-info :version)');
+      console.info(version);
+      const stats = await Z3.eval_smtlib2_string(ctx, '(get-info :all-statistics)');
+      console.info(stats);
 
       console.groupEnd();
 

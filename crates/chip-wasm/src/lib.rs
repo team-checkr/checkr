@@ -166,7 +166,7 @@ pub fn parse(src: &str) -> ParseResult {
     match res {
         Ok(ast) => ParseResult {
             parse_error: false,
-            prelude: chip::SMT_PRELUDE.to_string(),
+            prelude: ast.prelude(),
             assertions: ast
                 .assertions()
                 .into_iter()
@@ -195,7 +195,7 @@ pub fn parse(src: &str) -> ParseResult {
         },
         Err(err) => ParseResult {
             parse_error: true,
-            prelude: chip::SMT_PRELUDE.to_string(),
+            prelude: "".to_string(),
             assertions: vec![],
             markers: err
                 .labels()

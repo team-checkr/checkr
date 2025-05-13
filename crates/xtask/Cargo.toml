@@ -11,7 +11,10 @@ ce-core.workspace = true
 clap.workspace = true
 color-eyre.workspace = true
 heck = "0.5.0"
+indicatif = { version = "0.17.11", features = ["rayon"] }
 itertools.workspace = true
+rayon = "1.10.0"
+reqwest = { version = "0.12.15", features = ["json"] }
 serde.workspace = true
 serde_json.workspace = true
 tapi.workspace = true

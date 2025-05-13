@@ -2,3 +2,4 @@
 .docker-cache/
 inspectify-binaries/
 .env
+/z3-versions

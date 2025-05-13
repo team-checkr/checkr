@@ -162,10 +162,14 @@ impl<Pred, Inv> SyntacticallyEquiv for &'_ Guard<Pred, Inv> {
 
 pub trait FreeVariables {
     fn fv(&self) -> IndexSet<Target>;
+    fn funs(&self) -> IndexSet<Function>;
 }
 
 impl FreeVariables for () {
     fn fv(&self) -> IndexSet<Target> {
+        Default::default()
+    }
+    fn funs(&self) -> IndexSet<Function> {
         Default::default()
     }
 }
@@ -174,22 +178,33 @@ impl<T: FreeVariables> FreeVariables for &[T] {
     fn fv(&self) -> IndexSet<Target> {
         self.iter().flat_map(|x| x.fv()).collect()
     }
+    fn funs(&self) -> IndexSet<Function> {
+        self.iter().flat_map(|x| x.funs()).collect()
+    }
 }
 
 impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for Commands<Pred, Inv> {
     fn fv(&self) -> IndexSet<Target> {
         self.0.iter().flat_map(|c| c.fv()).collect()
     }
+    fn funs(&self) -> IndexSet<Function> {
+        self.0.iter().flat_map(|c| c.funs()).collect()
+    }
 }
-impl<Pred: FreeVariables, Inv: FreeVariables> Command<Pred, Inv> {
-    pub fn fv(&self) -> IndexSet<Target> {
+impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for Command<Pred, Inv> {
+    fn fv(&self) -> IndexSet<Target> {
         let a = self.pre.fv();
         let b = self.post.fv();
         itertools::chain!(a, self.kind.fv(), b).collect()
     }
+    fn funs(&self) -> IndexSet<Function> {
+        let a = self.pre.funs();
+        let b = self.post.funs();
+        itertools::chain!(a, self.kind.funs(), b).collect()
+    }
 }
-impl<Pred: FreeVariables, Inv: FreeVariables> CommandKind<Pred, Inv> {
-    pub fn fv(&self) -> IndexSet<Target> {
+impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for CommandKind<Pred, Inv> {
+    fn fv(&self) -> IndexSet<Target> {
         match self {
             CommandKind::Assignment(x, a) => x.fv().union(&a.fv()).cloned().collect(),
             CommandKind::Skip | CommandKind::Placeholder => IndexSet::default(),
@@ -197,20 +212,41 @@ impl<Pred: FreeVariables, Inv: FreeVariables> CommandKind<Pred, Inv> {
             CommandKind::Loop(inv, c) => inv.fv().union(&c.as_slice().fv()).cloned().collect(),
         }
     }
+    fn funs(&self) -> IndexSet<Function> {
+        match self {
+            CommandKind::Assignment(x, a) => x.funs().union(&a.funs()).cloned().collect(),
+            CommandKind::Skip | CommandKind::Placeholder => IndexSet::default(),
+            CommandKind::If(c) => c.as_slice().funs(),
+            CommandKind::Loop(inv, c) => inv.funs().union(&c.as_slice().funs()).cloned().collect(),
+        }
+    }
 }
 impl<Pred: FreeVariables, Inv: FreeVariables> FreeVariables for Guard<Pred, Inv> {
     fn fv(&self) -> IndexSet<Target> {
         self.guard.fv().union(&self.cmds.fv()).cloned().collect()
+    }
+    fn funs(&self) -> IndexSet<Function> {
+        self.guard
+            .funs()
+            .union(&self.cmds.funs())
+            .cloned()
+            .collect()
     }
 }
 impl FreeVariables for PredicateChain {
     fn fv(&self) -> IndexSet<Target> {
         self.predicates.as_slice().fv()
     }
+    fn funs(&self) -> IndexSet<Function> {
+        self.predicates.as_slice().funs()
+    }
 }
 impl FreeVariables for PredicateBlock {
     fn fv(&self) -> IndexSet<Target> {
         self.predicate.fv()
+    }
+    fn funs(&self) -> IndexSet<Function> {
+        self.predicate.funs()
     }
 }
 impl FreeVariables for Target<Box<AExpr>> {
@@ -224,6 +260,12 @@ impl FreeVariables for Target<Box<AExpr>> {
             }
         }
     }
+    fn funs(&self) -> IndexSet<Function> {
+        match self {
+            Target::Variable(_) => Default::default(),
+            Target::Array(_, idx) => idx.funs(),
+        }
+    }
 }
 impl FreeVariables for AExpr {
     fn fv(&self) -> IndexSet<Target> {
@@ -234,6 +276,16 @@ impl FreeVariables for AExpr {
             AExpr::Minus(x) => x.fv(),
             AExpr::Function(f) => f.fv(),
             AExpr::Old(e) => e.fv(),
+        }
+    }
+    fn funs(&self) -> IndexSet<Function> {
+        match self {
+            AExpr::Number(_) => Default::default(),
+            AExpr::Reference(v) => v.funs(),
+            AExpr::Binary(l, _, r) => l.funs().union(&r.funs()).cloned().collect(),
+            AExpr::Minus(x) => x.funs(),
+            AExpr::Function(f) => [f.clone()].into(),
+            AExpr::Old(e) => e.funs(),
         }
     }
 }
@@ -249,6 +301,15 @@ impl FreeVariables for BExpr {
                 fv.shift_remove(x);
                 fv
             }
+        }
+    }
+    fn funs(&self) -> IndexSet<Function> {
+        match self {
+            BExpr::Bool(_) => Default::default(),
+            BExpr::Rel(l, _, r) => l.funs().union(&r.funs()).cloned().collect(),
+            BExpr::Logic(l, _, r) => l.funs().union(&r.funs()).cloned().collect(),
+            BExpr::Not(x) => x.funs(),
+            BExpr::Quantified(_, _, b) => b.funs(),
         }
     }
 }
@@ -374,6 +435,18 @@ impl FreeVariables for LTLFormula {
             }
             LTLFormula::Until(l, r) => l.fv().union(&r.fv()).cloned().collect(),
             LTLFormula::Next(x) | LTLFormula::Globally(x) | LTLFormula::Finally(x) => x.fv(),
+        }
+    }
+    fn funs(&self) -> IndexSet<Function> {
+        match self {
+            LTLFormula::Bool(_) | LTLFormula::Locator(_) => Default::default(),
+            LTLFormula::Rel(l, _, r) => l.funs().union(&r.funs()).cloned().collect(),
+            LTLFormula::Not(x) => x.funs(),
+            LTLFormula::And(l, r) | LTLFormula::Or(l, r) | LTLFormula::Implies(l, r) => {
+                l.funs().union(&r.funs()).cloned().collect()
+            }
+            LTLFormula::Until(l, r) => l.funs().union(&r.funs()).cloned().collect(),
+            LTLFormula::Next(x) | LTLFormula::Globally(x) | LTLFormula::Finally(x) => x.funs(),
         }
     }
 }
