@@ -132,8 +132,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
                         let mut data = data1.write().unwrap();
                         data.state = JobState::Failed;
                         data.stderr = format!(
-                            "failed to run command: `{program}` was not found in PATH\n{:?}",
-                            e
+                            "failed to run command: `{program}` was not found in PATH\n{e:?}"
                         )
                         .into();
                         data.combined = data.stderr.clone();

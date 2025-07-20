@@ -82,7 +82,7 @@ pub async fn chip_check(
             continue;
         }
         let path = Utf8PathBuf::from_path_buf(e.path().to_path_buf())
-            .map_err(|p| color_eyre::Report::msg(format!("could not convert path: {:?}", p)))?;
+            .map_err(|p| color_eyre::Report::msg(format!("could not convert path: {p:?}")))?;
         tracing::debug!(?path, "reading test");
         let src =
             std::fs::read_to_string(&path).with_context(|| format!("failed to read {path}"))?;

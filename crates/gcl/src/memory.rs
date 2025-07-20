@@ -66,7 +66,7 @@ impl<T, A> Memory<T, A> {
         Self { variables, arrays }
     }
 
-    pub fn iter(&self) -> impl Iterator<Item = MemoryRef<T, A>> + Clone {
+    pub fn iter(&self) -> impl Iterator<Item = MemoryRef<'_, T, A>> + Clone {
         chain!(
             self.variables
                 .iter()

@@ -17,7 +17,7 @@ impl<T> FromSql for Compressed<T> {
 }
 
 impl<T> ToSql for Compressed<T> {
-    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput> {
+    fn to_sql(&self) -> rusqlite::Result<rusqlite::types::ToSqlOutput<'_>> {
         self.data.to_sql()
     }
 }

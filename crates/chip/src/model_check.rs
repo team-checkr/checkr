@@ -199,7 +199,7 @@ pub struct Pipeline {
 impl Pipeline {
     pub fn product_ba(
         &self,
-    ) -> ProductBuchi<State, (mcltl::ltl::automata::AutomataId, usize), Literal> {
+    ) -> ProductBuchi<'_, '_, State, (mcltl::ltl::automata::AutomataId, usize), Literal> {
         ProductBuchi::new(&self.buchi, &self.buchi_property)
     }
 }

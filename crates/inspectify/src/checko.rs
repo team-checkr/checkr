@@ -264,7 +264,7 @@ impl Checko {
             }
             (_, Some(path)) => {
                 let path = dunce::canonicalize(PathBuf::from(path.as_str()))
-                    .wrap_err_with(|| format!("could not canonicalize group path: '{}'", path))?;
+                    .wrap_err_with(|| format!("could not canonicalize group path: '{path}'"))?;
                 Ok(GroupRepo {
                     path,
                     git_hash: None,

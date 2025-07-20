@@ -260,7 +260,7 @@ where
             .fold("".to_string(), |acc, a| acc + &format!("{},", a.0));
         buff.push_str(&format!("{}{}.adj = [{}]\n", &buff, self.id, adjs));
 
-        write!(f, "{}", buff)
+        write!(f, "{buff}")
     }
 }
 

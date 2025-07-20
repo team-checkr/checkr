@@ -134,11 +134,11 @@ impl<N> NodeArena<N> {
         NodeId::new(id)
     }
 
-    pub fn iter(&self) -> std::slice::Iter<N> {
+    pub fn iter(&self) -> std::slice::Iter<'_, N> {
         self.nodes.iter()
     }
 
-    pub fn iter_mut(&mut self) -> std::slice::IterMut<N> {
+    pub fn iter_mut(&mut self) -> std::slice::IterMut<'_, N> {
         self.nodes.iter_mut()
     }
 

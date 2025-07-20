@@ -65,7 +65,7 @@ pub async fn moka_check(
             continue;
         }
         let path = Utf8PathBuf::from_path_buf(e.path().to_path_buf())
-            .map_err(|p| color_eyre::Report::msg(format!("could not convert path: {:?}", p)))?;
+            .map_err(|p| color_eyre::Report::msg(format!("could not convert path: {p:?}")))?;
         let src = std::fs::read_to_string(&path)?;
         let ltl_program = chip::parse::parse_ltl_program(&src)?;
 

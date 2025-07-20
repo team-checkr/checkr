@@ -40,7 +40,7 @@ impl Env for ParserEnv {
             (Ok(ours), Ok(theirs)) => (ours, theirs),
             (Err(err), _) | (_, Err(err)) => {
                 return Ok(ValidationResult::Mismatch {
-                    reason: format!("failed to parse pretty output: {:?}", err),
+                    reason: format!("failed to parse pretty output: {err:?}"),
                 });
             }
         };

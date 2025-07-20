@@ -45,7 +45,7 @@ impl CheckoDb {
         })
     }
 
-    pub fn conn(&self) -> std::sync::MutexGuard<rusqlite::Connection> {
+    pub fn conn(&self) -> std::sync::MutexGuard<'_, rusqlite::Connection> {
         self.conn.lock().unwrap()
     }
 

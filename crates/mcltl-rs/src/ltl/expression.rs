@@ -72,16 +72,16 @@ impl fmt::Display for LTLExpression {
         match self {
             LTLExpression::True => write!(f, "T"),
             LTLExpression::False => write!(f, "⊥"),
-            LTLExpression::Literal(l) => write!(f, "{}", l),
-            LTLExpression::Not(e) => write!(f, "¬{}", e),
-            LTLExpression::And(p, q) => write!(f, "{} ∧ {}", p, q),
-            LTLExpression::Or(p, q) => write!(f, "{} ∨ {}", p, q),
-            LTLExpression::G(e) => write!(f, "G ({})", e),
-            LTLExpression::F(e) => write!(f, "F ({})", e),
-            LTLExpression::X(e) => write!(f, "X ({})", e),
-            LTLExpression::U(p, q) => write!(f, "({} U {})", p, q),
-            LTLExpression::R(p, q) => write!(f, "({} R {})", p, q),
-            LTLExpression::V(p, q) => write!(f, "({} V {})", p, q),
+            LTLExpression::Literal(l) => write!(f, "{l}"),
+            LTLExpression::Not(e) => write!(f, "¬{e}"),
+            LTLExpression::And(p, q) => write!(f, "{p} ∧ {q}"),
+            LTLExpression::Or(p, q) => write!(f, "{p} ∨ {q}"),
+            LTLExpression::G(e) => write!(f, "G ({e})"),
+            LTLExpression::F(e) => write!(f, "F ({e})"),
+            LTLExpression::X(e) => write!(f, "X ({e})"),
+            LTLExpression::U(p, q) => write!(f, "({p} U {q})"),
+            LTLExpression::R(p, q) => write!(f, "({p} R {q})"),
+            LTLExpression::V(p, q) => write!(f, "({p} V {q})"),
         }
     }
 }
@@ -279,18 +279,18 @@ impl<L: fmt::Display> fmt::Display for NnfLtl<L> {
         match self {
             NnfLtl::Literal { negated, name } => {
                 if *negated {
-                    write!(f, "¬{}", name)
+                    write!(f, "¬{name}")
                 } else {
-                    write!(f, "{}", name)
+                    write!(f, "{name}")
                 }
             }
             NnfLtl::Bool(true) => write!(f, "T"),
             NnfLtl::Bool(false) => write!(f, "⊥"),
-            NnfLtl::U(p, q) => write!(f, "({} U {})", p, q),
-            NnfLtl::V(p, q) => write!(f, "({} V {})", p, q),
-            NnfLtl::Or(p, q) => write!(f, "{} ∨ {}", p, q),
-            NnfLtl::And(p, q) => write!(f, "{} ∧ {}", p, q),
-            NnfLtl::X(p) => write!(f, "X ({})", p),
+            NnfLtl::U(p, q) => write!(f, "({p} U {q})"),
+            NnfLtl::V(p, q) => write!(f, "({p} V {q})"),
+            NnfLtl::Or(p, q) => write!(f, "{p} ∨ {q}"),
+            NnfLtl::And(p, q) => write!(f, "{p} ∧ {q}"),
+            NnfLtl::X(p) => write!(f, "X ({p})"),
         }
     }
 }

@@ -36,7 +36,7 @@ impl Env for CalcEnv {
         let (result, error) = match expr.semantics(&gcl::semantics::EmptySemanticsContext) {
             Ok(result) => (result.to_string(), String::new()),
             Err(err) => {
-                let error = format!("{}", err);
+                let error = format!("{err}");
                 (String::new(), error)
             }
         };

@@ -400,7 +400,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                         fn wrap(&self, s: impl std::fmt::Display) -> String {
                             match self {
                                 CellType::Plain => s.to_string(),
-                                CellType::Code => format!("<code>{}</code>", s),
+                                CellType::Code => format!("<code>{s}</code>"),
                             }
                         }
                     }
@@ -466,7 +466,7 @@ pub fn parse_ltl(src: &str) -> LtLResult {
                             related_information: None,
                             tags: None,
                             severity: MarkerSeverity::Error,
-                            message: format!("LTL property does not hold\n\n{}", html_table),
+                            message: format!("LTL property does not hold\n\n{html_table}"),
                             span: MonacoSpan::from_offset_len(
                                 src,
                                 property_span.offset(),
