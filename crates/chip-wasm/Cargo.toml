@@ -14,7 +14,7 @@ crate-type = ["cdylib", "rlib"]
 chip.workspace = true
 comfy-table = { version = "7.1.1", default-features = false }
 console_error_panic_hook = "0.1.7"
-getrandom = { version = "0.2.14", features = ["js"] }
+getrandom = { version = "0.3.3", features = ["wasm_js"] }
 indexmap.workspace = true
 itertools.workspace = true
 mcltl.workspace = true
@@ -26,6 +26,6 @@ smol_str.workspace = true
 thiserror.workspace = true
 tracing-wasm = "0.2.1"
 tracing.workspace = true
-tsify = { version = "0.4.5", default-features = false, features = ["js"] }
+tsify = { version = "0.5.5", default-features = false, features = ["js"] }
 wasm-bindgen = "0.2.87"
 web-sys = { version = "0.3.69", features = ["console"] }
