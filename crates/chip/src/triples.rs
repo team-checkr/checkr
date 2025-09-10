@@ -1,10 +1,10 @@
-use std::collections::BTreeSet;
+use std::{collections::BTreeSet, ops::Not};
 
 use itertools::Itertools;
 use smtlib::Sorted;
 
 use crate::{
-    ast::{AGCLCommand, AGCLCommands, CommandKind, Predicate},
+    ast::{AGCLCommand, AGCLCommands, BExpr, CommandKind, Predicate},
     ast_ext::FreeVariables,
     parse::SourceSpan,
 };
@@ -85,7 +85,7 @@ impl AGCLCommand {
             }
             CommandKind::Skip | CommandKind::Placeholder => {}
             CommandKind::If(gcs) => {
-                acc = gcs
+                let mut new = gcs
                     .iter()
                     .map(|gc| {
                         let mut q = gc.cmds.tri(acc.clone());
@@ -101,6 +101,18 @@ impl AGCLCommand {
                         acc.predicate_spans.extend(c.predicate_spans);
                         acc
                     });
+
+                let implicit_else_guard = gcs
+                    .iter()
+                    .fold(BExpr::Bool(false), |a, gc| a.or(gc.guard.clone()))
+                    .not();
+                new.predicate_spans.extend(
+                    acc.predicate_spans
+                        .iter()
+                        .map(|(p, s)| (implicit_else_guard.clone().implies(p.clone()), s.clone())),
+                );
+
+                acc = new;
             }
             CommandKind::Loop(inv, gcs) => {
                 // 1. P => I
