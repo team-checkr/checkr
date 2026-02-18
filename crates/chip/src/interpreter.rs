@@ -411,7 +411,7 @@ impl State {
 
                 Ok(Either::Right(results.into_iter()))
             }
-            TupleSpaceType::Queue | TupleSpaceType::FIFO => {
+            TupleSpaceType::FIFO => {
                 let mut found_pos = None;
 
                 for (pos, t) in tuple_spaces[*ts_index as usize].iter().enumerate() {
@@ -436,7 +436,7 @@ impl State {
                     return Err(StepError::Stuck);
                 }
             }
-            TupleSpaceType::Stack | TupleSpaceType::LIFO => {
+            TupleSpaceType::LIFO => {
                 let mut found_pos = None;
 
                 for (pos, t) in tuple_spaces[*ts_index as usize].iter().enumerate().rev() {
@@ -459,6 +459,120 @@ impl State {
                     Ok(Either::Left([(new_mem, new_ts, ptr.bump())].into_iter()))
                 } else {
                     return Err(StepError::Stuck);
+                }
+            }
+            TupleSpaceType::Queue => {
+                if let Some(t) = tuple_spaces[*ts_index as usize].first() {
+                    if self.matches(t, fields, p)? {
+                        let (new_mem, new_ts) = self.update_mem(
+                            0,
+                            fields,
+                            memory.clone(),
+                            tuple_spaces.clone(),
+                            ts_index,
+                            p,
+                            remove,
+                        );
+                        return Ok(Either::Left([(new_mem, new_ts, ptr.bump())].into_iter()));
+                    }
+                }
+                Err(StepError::Stuck)
+            }
+            TupleSpaceType::Stack => {
+                if let Some(t) = tuple_spaces[*ts_index as usize].last() {
+                    let pos = tuple_spaces[*ts_index as usize].len() - 1;
+                    if self.matches(t, fields, p)? {
+                        let (new_mem, new_ts) = self.update_mem(
+                            pos,
+                            fields,
+                            memory.clone(),
+                            tuple_spaces.clone(),
+                            ts_index,
+                            p,
+                            remove,
+                        );
+                        return Ok(Either::Left([(new_mem, new_ts, ptr.bump())].into_iter()));
+                    }
+                }
+                Err(StepError::Stuck)
+            }
+        }
+    }
+
+    fn eval_guard(&self, p: &Program, expr: &BExpr) -> Vec<(Memory, Vec<Vec<Vec<Int>>>)> {
+        match expr {
+            BExpr::OP(Operation::Get(t, f)) => {
+                let ts_index = p.tuple_space_index(t.name()).unwrap();
+                let ts_type = p.tuple_spaces[ts_index as usize].space_type.clone();
+                self.match_tuple_space_type(&ts_type, &ts_index, f, p, &InstrPtr(0), true)
+                    .map(|either| either.into_iter().map(|(m, ts, _)| (m, ts)).collect())
+                    .unwrap_or_default()
+            }
+            BExpr::OP(Operation::Query(t, f)) => {
+                let ts_index = p.tuple_space_index(t.name()).unwrap();
+                let ts_type = p.tuple_spaces[ts_index as usize].space_type.clone();
+                self.match_tuple_space_type(&ts_type, &ts_index, f, p, &InstrPtr(0), false)
+                    .map(|either| either.into_iter().map(|(m, ts, _)| (m, ts)).collect())
+                    .unwrap_or_default()
+            }
+            BExpr::OP(Operation::Put(t, args)) => {
+                let ts_index = p.tuple_space_index(t.name()).unwrap();
+                let ts_meta = &p.tuple_spaces[ts_index as usize];
+                if let TupleSpaceSize::Finite(max) = ts_meta.size {
+                    if self.tuple_spaces[ts_index as usize].len() >= max as usize {
+                        return vec![];
+                    }
+                }
+                let mut ts = self.tuple_spaces.clone();
+                let values = args
+                    .iter()
+                    .map(|e| e.evaluate(p, self).unwrap_or(0))
+                    .collect();
+                ts[ts_index as usize].push(values);
+                vec![(self.memory.clone(), ts)]
+            }
+            BExpr::Logic(l, LogicOp::And | LogicOp::Land, r) => self
+                .eval_guard(p, l)
+                .into_iter()
+                .flat_map(|(m, ts)| {
+                    State {
+                        ptrs: self.ptrs.clone(),
+                        memory: m,
+                        tuple_spaces: ts,
+                    }
+                    .eval_guard(p, r)
+                })
+                .collect(),
+            BExpr::Logic(l, LogicOp::Or | LogicOp::Lor, r) => {
+                let left_res = self.eval_guard(p, l);
+
+                if left_res.is_empty() {
+                    self.eval_guard(p, r)
+                } else {
+                    let chained: Vec<_> = left_res
+                        .iter()
+                        .flat_map(|(m, ts)| {
+                            State {
+                                ptrs: self.ptrs.clone(),
+                                memory: m.clone(),
+                                tuple_spaces: ts.clone(),
+                            }
+                            .eval_guard(p, r)
+                        })
+                        .collect();
+
+                    if !chained.is_empty() {
+                        chained
+                    } else {
+                        left_res
+                    }
+                }
+            }
+            _ => {
+                if expr.evaluate(p, self).unwrap_or(false) {
+                    vec![(self.memory.clone(), self.tuple_spaces.clone())]
+                } else {
+                    vec![]
                 }
             }
         }
@@ -484,8 +598,8 @@ impl State {
             Instr::Branch { choices, otherwise } => {
                 let mut valid = Vec::new();
                 for (b, target) in choices {
-                    if b.evaluate(p, self)? {
-                        valid.push((self.memory.clone(), self.tuple_spaces.clone(), *target));
+                    for (mem, ts) in self.eval_guard(p, b) {
+                        valid.push((mem, ts, *target));
                     }
                 }
                 if valid.is_empty() {
@@ -692,7 +806,7 @@ impl BExpr {
             }
             BExpr::Not(e) => !e.evaluate(p, state)?,
             BExpr::Quantified(_, _, _) => todo!(),
-            BExpr::OP(_) => true,
+            BExpr::OP(_) => !state.eval_guard(p, self).is_empty(),
         })
     }
 }
