@@ -185,7 +185,7 @@ pub enum TupleSpaceType {
     LIFO,
 }
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
-pub enum TupleSpaceSize {
+pub enum BufferSize {
     Finite(i32),
     Infinite,
 }
@@ -193,19 +193,27 @@ pub enum TupleSpaceSize {
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub struct TupleSpace {
     pub space_type: TupleSpaceType,
-    pub size: TupleSpaceSize,
+    pub size: BufferSize,
     pub space: Vec<Vec<Int>>,
+}
+
+#[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
+pub struct Channel {
+    pub size: BufferSize,
+    pub channel: Vec<Int>,
 }
 
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum AssignmentKind {
     Int(Variable, i32),
     TupleSpace(Variable, TupleSpace),
+    Channel(Variable, Channel),
 }
 
 pub struct LTLProgram {
     pub initial: IndexMap<Variable, i32>,
     pub tuple_spaces: IndexMap<Variable, TupleSpace>,
+    pub channels: IndexMap<Variable, Channel>,
     pub commands: Vec<Commands<(), ()>>,
     pub properties: Vec<LTLProperty>,
 }

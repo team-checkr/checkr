@@ -7,7 +7,7 @@ use mcltl::ltl::expression::Literal;
 use crate::{
     ast::{
         AExpr, AOp, BExpr, Command, CommandKind, Commands, Field, Function, Int, LTLFormula,
-        Locator, LogicOp, Operation, RelOp, Target, TupleSpace, TupleSpaceSize, TupleSpaceType,
+        Locator, LogicOp, Operation, RelOp, Target, TupleSpace, BufferSize, TupleSpaceType,
         Variable,
     },
     ast_ext::FreeVariables,
@@ -32,7 +32,7 @@ enum Instr {
     },
     Goto(InstrPtr),
     Halt,
-    Put(TupleSpaceSize, u32, Vec<AExpr>),
+    Put(BufferSize, u32, Vec<AExpr>),
     Get(TupleSpaceType, u32, Vec<Field>),
     Query(TupleSpaceType, u32, Vec<Field>),
 }
@@ -50,7 +50,7 @@ pub struct Program {
 pub struct TupleSpaceMeta {
     pub name: Variable,
     pub space_type: TupleSpaceType,
-    pub size: TupleSpaceSize,
+    pub size: BufferSize,
 }
 
 impl std::ops::Index<InstrPtr> for Program {
@@ -518,7 +518,7 @@ impl State {
             BExpr::OP(Operation::Put(t, args)) => {
                 let ts_index = p.tuple_space_index(t.name()).unwrap();
                 let ts_meta = &p.tuple_spaces[ts_index as usize];
-                if let TupleSpaceSize::Finite(max) = ts_meta.size {
+                if let BufferSize::Finite(max) = ts_meta.size {
                     if self.tuple_spaces[ts_index as usize].len() >= max as usize {
                         return vec![];
                     }
@@ -627,14 +627,14 @@ impl State {
                 let mut tuple_spaces = self.tuple_spaces.clone();
 
                 match ts_max_size {
-                    TupleSpaceSize::Finite(max_size) => {
+                    BufferSize::Finite(max_size) => {
                         if tuple_spaces[*ts_index as usize].len() < *max_size as usize {
                             tuple_spaces[*ts_index as usize].push(values);
                         } else {
                             return Err(StepError::Stuck);
                         }
                     }
-                    TupleSpaceSize::Infinite => {
+                    BufferSize::Infinite => {
                         tuple_spaces[*ts_index as usize].push(values);
                     }
                 }

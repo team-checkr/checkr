@@ -230,7 +230,7 @@ pub LTLProgram: LTLProgram = {
     <assignments:LTLInitialAssign>
     <commands:LTLCommands>
     <properties:LTLProperty*> =>? {
-        let (initial, tuple_spaces) = assignments;
+        let (initial, tuple_spaces, channels) = assignments;
 
         for command in &commands.0 {
             if let CommandKind::O(operation) = &command.kind {
@@ -257,6 +257,7 @@ pub LTLProgram: LTLProgram = {
         Ok(LTLProgram {
             initial,
             tuple_spaces,
+            channels,
             commands: vec![commands],
             properties,
         })
@@ -267,7 +268,7 @@ pub LTLProgram: LTLProgram = {
     <commands:SepNonEmpty<LTLCommands, "[]">>
     "rap"
     <properties:LTLProperty*> =>? {
-        let (initial, tuple_spaces) = assignments;
+        let (initial, tuple_spaces, channels) = assignments;
 
         for commands in &commands {
             for command in &commands.0 {
@@ -296,16 +297,18 @@ pub LTLProgram: LTLProgram = {
         Ok(LTLProgram {
             initial,
             tuple_spaces,
+            channels,
             commands,
             properties,
         })
     },
 };
 
-LTLInitialAssign: (IndexMap<Variable, i32>, IndexMap<Variable, TupleSpace>) = {
+LTLInitialAssign: (IndexMap<Variable, i32>, IndexMap<Variable, TupleSpace>, IndexMap<Variable, Channel>) = {
     <lines:(">" <SepNonEmpty<LTLAssignment, ",">>)*> => {
         let mut initial = IndexMap::new();
-        let mut tuple_spaces = IndexMap::new();    
+        let mut tuple_spaces = IndexMap::new();
+        let mut channels = IndexMap::new(); 
         for line in lines {
             for assignment in line {
                 match assignment {
@@ -317,11 +320,17 @@ LTLInitialAssign: (IndexMap<Variable, i32>, IndexMap<Variable, TupleSpace>) = {
                             space: ts.space,
                         });
                     },
+                    AssignmentKind::Channel(var, ch) => {
+                        channels.insert(var, Channel {
+                            size: ch.size,
+                            channel: ch.channel,
+                        });
+                    },
                 }
             }
         }
 
-        (initial, tuple_spaces)
+        (initial, tuple_spaces, channels)
     }
 };
 
@@ -333,6 +342,10 @@ LTLAssignment: AssignmentKind = {
         size: ts.1,
         space: ts.2,
     }),
+    <var:Var> "=" <ch:Channel> => AssignmentKind::Channel(Variable(var), Channel {
+        size: ch.0,
+        channel: ch.1,
+    }),
 };
 
 TupleSpaceType: TupleSpaceType = {
@@ -343,14 +356,19 @@ TupleSpaceType: TupleSpaceType = {
     "L" => TupleSpaceType::LIFO,
 };
 
-TupleSpaceSize: TupleSpaceSize = {
-    <n:Int> => TupleSpaceSize::Finite(n),
-    "INF" => TupleSpaceSize::Infinite,
+BufferSize: BufferSize = {
+    <n:Int> => BufferSize::Finite(n),
+    "INF" => BufferSize::Infinite,
 };
 
 TupleSpaceValues: Vec<Vec<Int>> = {
     "{" "}" => vec![],
     "{" <tuples:SepNonEmpty<Tuple, ",">> "}" => tuples,
+};
+
+ChannelValues: Vec<Int> = {
+    "{" "}" => vec![],
+    "{" <values:SepNonEmpty<Value, ",">> "}" => values,
 };
 
 Tuple: Vec<Int> = {
@@ -376,13 +394,13 @@ Value: Int = {
     "-" <value:Int> => -value,
 }
 
-TupleSpace: (TupleSpaceType, TupleSpaceSize, Vec<Vec<Int>>) = {  
-    <from:@L> "(" <space_type:TupleSpaceType> "," <size:TupleSpaceSize> "," <space:TupleSpaceValues> ")" <to:@R> =>? {  
+TupleSpace: (TupleSpaceType, BufferSize, Vec<Vec<Int>>) = {  
+    <from:@L> "(" <space_type:TupleSpaceType> "," <size:BufferSize> "," <space:TupleSpaceValues> ")" <to:@R> =>? {  
         match size {  
-            TupleSpaceSize::Finite(n) => {  
+            BufferSize::Finite(n) => {  
                 if space.len() as i32 > n {  
                     Err(lalrpop_util::ParseError::User {  
-                        error: crate::parse::CustomError::TooManyTuples {  
+                        error: crate::parse::CustomError::BufferOverflow {  
                             size: n,  
                             actual: space.len() as i32,  
                             from,  
@@ -393,8 +411,32 @@ TupleSpace: (TupleSpaceType, TupleSpaceSize, Vec<Vec<Int>>) = {
                     Ok((space_type, size, space))  
                 }  
             }  
-            TupleSpaceSize::Infinite => {  
+            BufferSize::Infinite => {  
                 Ok((space_type, size, space))  
+            }  
+        }  
+    }  
+};
+
+Channel: (BufferSize, Vec<Int>) = {  
+    <from:@L> "(" <size:BufferSize> "," <channel:ChannelValues> ")" <to:@R> =>? {  
+        match size {  
+            BufferSize::Finite(n) => {  
+                if channel.len() as i32 > n {  
+                    Err(lalrpop_util::ParseError::User {  
+                        error: crate::parse::CustomError::BufferOverflow {  
+                            size: n,  
+                            actual: channel.len() as i32,  
+                            from,  
+                            to,  
+                        },  
+                    })  
+                } else {  
+                    Ok((size, channel))  
+                }  
+            }  
+            BufferSize::Infinite => {  
+                Ok((size, channel))  
             }  
         }  
     }  
