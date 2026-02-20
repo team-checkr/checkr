@@ -421,6 +421,7 @@ LTLFormula: LTLFormula = {
     "G" <LTLFormula> => LTLFormula::Globally(Box::new(<>)),
     "F" <LTLFormula> => LTLFormula::Finally(Box::new(<>)),
     "(" <LTLFormula_> ")",
+    <OperationP> => LTLFormula::Operation(Box::new(<>)),
 
     #[precedence(level="1")] #[assoc(side="left")]
     <l:LTLFormula> "&" <r:LTLFormula> => LTLFormula::And(Box::new(l), Box::new(r)),

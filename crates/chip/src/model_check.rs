@@ -8,7 +8,7 @@ use mcltl::{
 };
 
 use crate::{
-    ast::{BExpr, Locator, Target},
+    ast::{BExpr, Locator, Operation, Target},
     ast_ext::FreeVariables,
 };
 
@@ -110,6 +110,7 @@ impl ReachableStates {
     fn build_kripke(
         &self,
         relational_properties: &[(crate::ast::AExpr, crate::ast::RelOp, crate::ast::AExpr)],
+        operation_properties: &[Operation],
     ) -> mcltl::verifier::kripke::KripkeStructure<State, Literal> {
         let mut kripke: mcltl::verifier::kripke::KripkeStructure<State, Literal> =
             mcltl::verifier::kripke::KripkeStructure::new(
@@ -129,6 +130,13 @@ impl ReachableStates {
                         holds.then(|| Literal::from(format!("p{idx}")))
                     })
                     .collect::<<Literal as AtomicProperty>::Set>();
+
+                for (idx, op) in operation_properties.iter().enumerate() {
+                    let holds = BExpr::OP(op.clone()).evaluate(&self.program, state).is_ok_and(|x| x);
+                    if holds {
+                        assignment.insert(Literal::from(format!("o{idx}")));
+                    }
+                }
 
                 if state.is_terminated(&self.program) {
                     assignment.insert(Locator::Terminated.to_lit());
@@ -153,8 +161,10 @@ impl ReachableStates {
 
     pub fn pipeline(&self, property: &crate::ast::LTLFormula) -> Pipeline {
         let mut relational_properties = Vec::new();
+        let mut operation_properties = Vec::new();
+
         let ltl_property: mcltl::ltl::expression::LTLExpression =
-            !property.to_mcltl(&mut relational_properties);
+            !property.to_mcltl(&mut relational_properties, &mut operation_properties);
         let nnf_ltl_property: mcltl::ltl::expression::NnfLtl<Literal> = ltl_property.nnf();
 
         let alphabet: Alphabet<Literal> = [
@@ -166,7 +176,7 @@ impl ReachableStates {
         .collect();
 
         let kripke: mcltl::verifier::kripke::KripkeStructure<State, Literal> =
-            self.build_kripke(&relational_properties);
+            self.build_kripke(&relational_properties, &operation_properties);
 
         let buchi: mcltl::buchi::Buchi<State, Literal> = {
             let mut buchi = kripke.to_buchi(Some(&alphabet));
@@ -184,6 +194,7 @@ impl ReachableStates {
 
         Pipeline {
             relational_properties: relational_properties.to_vec(),
+            operation_properties,
             ltl_property,
             nnf_ltl_property,
             kripke,
@@ -196,6 +207,7 @@ impl ReachableStates {
 
 pub struct Pipeline {
     pub relational_properties: Vec<(crate::ast::AExpr, crate::ast::RelOp, crate::ast::AExpr)>,
+    pub operation_properties: Vec<Operation>,
     pub ltl_property: mcltl::ltl::expression::LTLExpression,
     pub nnf_ltl_property: mcltl::ltl::expression::NnfLtl<Literal>,
     pub kripke: mcltl::verifier::kripke::KripkeStructure<State, Literal>,

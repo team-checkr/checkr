@@ -163,6 +163,7 @@ pub enum LTLFormula {
     Bool(bool),
     Locator(Locator),
     Rel(AExpr, RelOp, AExpr),
+    Operation(Box<Operation>),
     Not(Box<LTLFormula>),
     And(Box<LTLFormula>, Box<LTLFormula>),
     Or(Box<LTLFormula>, Box<LTLFormula>),

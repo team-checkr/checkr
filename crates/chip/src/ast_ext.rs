@@ -494,6 +494,7 @@ impl FreeVariables for LTLFormula {
             // Globally(Box<LTLFormula>), Finally(Box<LTLFormula>),
             LTLFormula::Bool(_) | LTLFormula::Locator(_) => Default::default(),
             LTLFormula::Rel(l, _, r) => l.fv().union(&r.fv()).cloned().collect(),
+            LTLFormula::Operation(op) => op.fv(),
             LTLFormula::Not(x) => x.fv(),
             LTLFormula::And(l, r) | LTLFormula::Or(l, r) | LTLFormula::Implies(l, r) => {
                 l.fv().union(&r.fv()).cloned().collect()
@@ -506,6 +507,7 @@ impl FreeVariables for LTLFormula {
         match self {
             LTLFormula::Bool(_) | LTLFormula::Locator(_) => Default::default(),
             LTLFormula::Rel(l, _, r) => l.funs().union(&r.funs()).cloned().collect(),
+            LTLFormula::Operation(op) => op.funs(),
             LTLFormula::Not(x) => x.funs(),
             LTLFormula::And(l, r) | LTLFormula::Or(l, r) | LTLFormula::Implies(l, r) => {
                 l.funs().union(&r.funs()).cloned().collect()

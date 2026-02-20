@@ -815,6 +815,7 @@ impl LTLFormula {
     pub fn to_mcltl(
         &self,
         rels: &mut Vec<(AExpr, RelOp, AExpr)>,
+        operations: &mut Vec<Operation>,
     ) -> mcltl::ltl::expression::LTLExpression {
         use mcltl::ltl::expression::LTLExpression;
 
@@ -834,14 +835,26 @@ impl LTLFormula {
                 };
                 LTLExpression::Literal(format!("p{idx}").into())
             }
-            LTLFormula::Not(e) => !e.to_mcltl(rels),
-            LTLFormula::And(p, q) => p.to_mcltl(rels) & q.to_mcltl(rels),
-            LTLFormula::Or(p, q) => p.to_mcltl(rels) | q.to_mcltl(rels),
-            LTLFormula::Implies(p, q) => !p.to_mcltl(rels) | q.to_mcltl(rels),
-            LTLFormula::Until(p, q) => p.to_mcltl(rels).U(q.to_mcltl(rels)),
-            LTLFormula::Next(p) => LTLExpression::X(Box::new(p.to_mcltl(rels))),
-            LTLFormula::Globally(p) => LTLExpression::G(Box::new(p.to_mcltl(rels))),
-            LTLFormula::Finally(p) => LTLExpression::F(Box::new(p.to_mcltl(rels))),
+            LTLFormula::Operation(op) => {
+                let idx = if let Some(idx) = operations
+                    .iter()
+                    .position(|x| x == op.as_ref())
+                {
+                    idx
+                } else {
+                    operations.push(op.as_ref().clone());
+                    operations.len() - 1
+                };
+                LTLExpression::Literal(format!("o{idx}").into())
+            }
+            LTLFormula::Not(e) => !e.to_mcltl(rels, operations),
+            LTLFormula::And(p, q) => p.to_mcltl(rels, operations) & q.to_mcltl(rels, operations),
+            LTLFormula::Or(p, q) => p.to_mcltl(rels, operations) | q.to_mcltl(rels, operations),
+            LTLFormula::Implies(p, q) => !p.to_mcltl(rels, operations) | q.to_mcltl(rels, operations),
+            LTLFormula::Until(p, q) => p.to_mcltl(rels, operations).U(q.to_mcltl(rels, operations)),
+            LTLFormula::Next(p) => LTLExpression::X(Box::new(p.to_mcltl(rels, operations))),
+            LTLFormula::Globally(p) => LTLExpression::G(Box::new(p.to_mcltl(rels, operations))),
+            LTLFormula::Finally(p) => LTLExpression::F(Box::new(p.to_mcltl(rels, operations))),
         }
     }
 }

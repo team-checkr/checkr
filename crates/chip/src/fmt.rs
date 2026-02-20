@@ -243,6 +243,7 @@ impl Display for LTLFormula {
             LTLFormula::Bool(b) => write!(f, "{b}"),
             LTLFormula::Locator(locator) => write!(f, "{locator}"),
             LTLFormula::Rel(aexpr, rel_op, aexpr1) => write!(f, "({aexpr} {rel_op} {aexpr1})"),
+            LTLFormula::Operation(op) => write!(f, "{op}"),
             LTLFormula::Not(ltlformula) => write!(f, "!{ltlformula}"),
             LTLFormula::And(ltlformula, ltlformula1) => write!(f, "({ltlformula} & {ltlformula1})"),
             LTLFormula::Or(ltlformula, ltlformula1) => write!(f, "({ltlformula} | {ltlformula1})"),
