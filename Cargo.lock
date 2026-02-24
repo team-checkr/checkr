@@ -391,6 +391,18 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-minimizer"
+version = "0.3.0"
+dependencies = [
+ "ce-core",
+ "itertools 0.14.0",
+ "serde",
+ "serde_json",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-parser"
 version = "0.3.0"
 dependencies = [
@@ -442,6 +454,7 @@ dependencies = [
  "ce-compiler",
  "ce-core",
  "ce-interpreter",
+ "ce-minimizer",
  "ce-parser",
  "ce-riscv",
  "ce-security",

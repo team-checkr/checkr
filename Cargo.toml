@@ -38,6 +38,7 @@ ce-calculator = { path = "./crates/envs/ce-calculator" }
 ce-compiler = { path = "./crates/envs/ce-compiler" }
 ce-core = { path = "./crates/ce-core" }
 ce-interpreter = { path = "./crates/envs/ce-interpreter" }
+ce-minimizer = { path = "./crates/envs/ce-minimizer" }
 ce-parser = { path = "./crates/envs/ce-parser" }
 ce-riscv = { path = "./crates/envs/ce-riscv" }
 ce-security = { path = "./crates/envs/ce-security" }
