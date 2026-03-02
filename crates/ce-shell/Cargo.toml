@@ -9,6 +9,7 @@ license.workspace = true
 # See more keys and their definitions at https://doc.rust-lang.org/cargo/reference/manifest.html
 
 [dependencies]
+ce-bigcl.workspace = true
 ce-calculator.workspace = true
 ce-compiler.workspace = true
 ce-core.workspace = true

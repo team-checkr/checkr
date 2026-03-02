@@ -160,6 +160,7 @@ macro_rules! define_env {
 #[serde(tag = "type")]
 pub enum ValidationResult {
     Correct,
+    Unknown { reason: String },
     Mismatch { reason: String },
     TimeOut,
 }

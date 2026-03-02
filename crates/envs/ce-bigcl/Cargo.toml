@@ -1,0 +1,17 @@
+[package]
+name = "ce-bigcl"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+ce-core.workspace = true
+gcl.workspace = true
+itertools.workspace = true
+serde.workspace = true
+serde_json.workspace = true
+stdx.workspace = true
+tapi.workspace = true
+tracing.workspace = true

@@ -315,6 +315,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-bigcl"
+version = "0.2.14"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "itertools 0.14.0",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-calculator"
 version = "0.2.14"
 dependencies = [
@@ -405,6 +419,7 @@ dependencies = [
 name = "ce-shell"
 version = "0.2.14"
 dependencies = [
+ "ce-bigcl",
  "ce-calculator",
  "ce-compiler",
  "ce-core",

@@ -2,6 +2,7 @@ use crate::{
     ast::{AExpr, AOp, Array, BExpr, Int, LogicOp, RelOp, Target, Variable},
     pg::Action,
 };
+use indexmap::IndexSet;
 
 #[derive(Debug, PartialEq, Eq, thiserror::Error)]
 pub enum SemanticsError {
@@ -37,6 +38,14 @@ pub trait SemanticsContext: Sized + Clone {
     ) -> Result<Self, SemanticsError>;
     fn array_length(&self, array: &Array) -> Result<Int, SemanticsError>;
     fn array_count(&self, array: &Array, element: Int) -> Result<Int, SemanticsError>;
+
+    fn agrees_on(&self, vars: &IndexSet<Target>, other: &Self) -> bool {
+        vars.iter().all(|t| match t {
+            Target::Variable(v) => self.variable(v) == other.variable(v),
+            Target::Array(a, ()) => (0..self.array_length(a).unwrap_or_default())
+                .all(|idx| self.array_element(a, idx) == other.array_element(a, idx)),
+        })
+    }
 }
 
 #[derive(Clone)]
