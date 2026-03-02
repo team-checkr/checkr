@@ -2,6 +2,7 @@ use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use gcl::{
     ast::{AExpr, BExpr, Command, Commands, Guard, LogicOp, Target, Variable},
     interpreter::InterpreterMemory,
+    pg::Node,
     semantics::SemanticsContext,
 };
 use serde::{Deserialize, Serialize};
@@ -404,19 +405,23 @@ fn check_programs_for_semantic_equivalence(p1: &Commands, p2: &Commands) -> Vali
     for _ in 0..n_samples {
         let assignment = generate_input_assignment(p2, &mut rng);
 
-        let mut exe1 = gcl::interpreter::Execution::new(assignment.clone());
-        let mut exe2 = gcl::interpreter::Execution::new(assignment.clone());
+        let mut node1 = Node::Start;
+        let mut mem1 = assignment.clone();
+        let mut node2 = Node::Start;
+        let mut mem2 = assignment.clone();
         let mut term1 = false;
         let mut term2 = false;
 
         for _ in 0..n_steps {
-            if !term1 && let Some(next1) = exe1.nexts(&pg1).first() {
-                exe1 = next1.clone();
+            if !term1 && let Some(next) = node1.next(&pg1, &mem1) {
+                node1 = next.0;
+                mem1 = next.1;
             } else {
                 term1 = true;
             }
-            if !term2 && let Some(next2) = exe2.nexts(&pg2).first() {
-                exe2 = next2.clone();
+            if !term2 && let Some(next) = node2.next(&pg2, &mem2) {
+                node2 = next.0;
+                mem2 = next.1;
             } else {
                 term2 = true;
             }
@@ -424,15 +429,11 @@ fn check_programs_for_semantic_equivalence(p1: &Commands, p2: &Commands) -> Vali
 
         match (term1, term2) {
             (true, true) => {
-                if exe1.current_mem().agrees_on(&p1.fv(), exe2.current_mem()) {
+                if mem1.agrees_on(&p1.fv(), &mem2) {
                     // NOTE: nothing more to do!
                 } else {
                     return ValidationResult::Mismatch {
-                        reason: format!(
-                            "final memories differ:\n{:?}\n{:?}",
-                            exe1.current_mem(),
-                            exe2.current_mem()
-                        ),
+                        reason: format!("final memories differ:\n{:?}\n{:?}", mem1, mem2),
                     };
                 }
             }

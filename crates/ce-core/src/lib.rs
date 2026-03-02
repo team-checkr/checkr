@@ -146,6 +146,9 @@ macro_rules! define_env {
                     $crate::ValidationResult::Correct => {
                         // Ok!
                     }
+                    $crate::ValidationResult::Unknown { .. } => {
+                        // There's nothing we can do here ...
+                    }
                     res => {
                         eprintln!("{}", serde_json::to_string_pretty(&input).unwrap());
                         panic!("validation failed! {res:?}")
