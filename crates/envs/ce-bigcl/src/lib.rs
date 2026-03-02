@@ -10,14 +10,15 @@ use stdx::stringify::Stringify;
 define_env!(BiGCLEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "BiGCL")]
 pub struct Input {
     commands: Stringify<Commands>,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
-#[tapi(path = "Parser")]
+#[tapi(path = "BiGCL")]
 pub struct Output {
-    pretty: Stringify<Commands>,
+    binary: Stringify<Commands>,
 }
 
 impl Env for BiGCLEnv {
@@ -29,7 +30,7 @@ impl Env for BiGCLEnv {
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(Output {
-            pretty: Stringify::new(
+            binary: Stringify::new(
                 input
                     .commands
                     .try_parse()
@@ -42,11 +43,11 @@ impl Env for BiGCLEnv {
     }
 
     fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        let (o_cmds, t_cmds) = match (input.commands.try_parse(), output.pretty.try_parse()) {
+        let (o_cmds, t_cmds) = match (input.commands.try_parse(), output.binary.try_parse()) {
             (Ok(ours), Ok(theirs)) => (ours, theirs),
             (Err(err), _) | (_, Err(err)) => {
                 return Ok(ValidationResult::Mismatch {
-                    reason: format!("failed to parse pretty output: {err:?}"),
+                    reason: format!("failed to parse output: {err:?}"),
                 });
             }
         };
@@ -375,7 +376,7 @@ impl Binify for AExpr {
                 let fresh = ctx.fresh();
                 let cmd = Command::Assignment(
                     fresh.clone(),
-                    AExpr::Binary(Box::new(l), op.clone(), Box::new(r)),
+                    AExpr::Binary(Box::new(l), *op, Box::new(r)),
                 );
                 cmds.0.push(cmd);
                 (cmds, AExpr::Reference(fresh))
@@ -423,7 +424,7 @@ fn check_programs_for_semantic_equivalence(p1: &Commands, p2: &Commands) -> Vali
 
         match (term1, term2) {
             (true, true) => {
-                if exe1.current_mem().agrees_on(&p1.fv(), &exe2.current_mem()) {
+                if exe1.current_mem().agrees_on(&p1.fv(), exe2.current_mem()) {
                     // NOTE: nothing more to do!
                 } else {
                     return ValidationResult::Mismatch {

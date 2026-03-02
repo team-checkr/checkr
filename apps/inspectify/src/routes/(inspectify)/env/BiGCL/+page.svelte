@@ -14,9 +14,9 @@
     <div class="relative">
       <div class="absolute inset-0 grid">
         <pre class="p-2"><code
-            >{#if output}{output.pretty}{/if}</code
+            >{#if output}{output.binary}{/if}</code
           ></pre>
       </div>
     </div>
-{/snippet}
+  {/snippet}
 </Env>
