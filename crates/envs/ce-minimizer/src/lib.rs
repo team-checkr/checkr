@@ -24,8 +24,11 @@ impl Env for MinimizerEnv {
 
     type Meta = ();
 
-    fn run(_input: &Self::Input) -> ce_core::Result<Self::Output> {
-        Ok(Output::default())
+    fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
+        let test_output = parse_dfa(&input.dfa);
+            //.map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"));
+        
+        Ok(Output {dfa: format!("{:?}", test_output)})
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
