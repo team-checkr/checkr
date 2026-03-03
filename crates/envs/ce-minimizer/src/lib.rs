@@ -1,13 +1,21 @@
+mod dfa;
+
 use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use serde::{Deserialize, Serialize};
+
+use dfa::*;
 
 define_env!(MinimizerEnv);
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Input {}
+pub struct Input {
+    dfa: String
+}
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
-pub struct Output {}
+pub struct Output {
+    dfa: String
+}
 
 impl Env for MinimizerEnv {
     type Input = Input;
