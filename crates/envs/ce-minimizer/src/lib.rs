@@ -28,7 +28,10 @@ impl Env for MinimizerEnv {
         let test_output = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         
-        Ok(Output {dfa: format!("{:?}", test_output)})
+        let dfa = NamedDFA::build(test_output);
+        dfa.dfa.to_dot();
+
+        Ok(Output {dfa: dfa.dfa.to_dot()})
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {

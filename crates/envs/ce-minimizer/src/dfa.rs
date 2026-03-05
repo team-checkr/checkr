@@ -1,7 +1,25 @@
-use thiserror::Error;
+use std::{collections::HashMap, usize};
 
-type Table = Vec<Vec<bool>>;
+use tapi::kind::Name;
+
 pub type Node = usize;
+
+#[derive(Debug)]
+pub struct State {
+    id: Node,
+    name: String,
+    accepting: bool,
+    initial: bool
+}
+
+#[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
+pub struct DFA {
+    state_count: usize,
+    edges: Vec<Edge>,
+    initial: Node, 
+    accepting: Vec<Node>,
+    alphabet: Vec<char>
+}
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
 pub struct Edge {
@@ -10,17 +28,9 @@ pub struct Edge {
     to: Node,
 }
 
-#[derive(Debug)]
-pub struct State {
-    position: Node,
-    state_name: String,
-    accepting: bool,
-    initial: bool
-}
-
-#[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
-pub struct DFA {
-    edges: Vec<Edge>
+pub struct NamedDFA {
+    pub dfa: DFA,
+    pub names: Vec<String>,  // names[i] = name of state i
 }
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
@@ -163,13 +173,59 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
     })
 }
 
+impl NamedDFA {
+    pub fn build(raw_dfa: RawDFA) -> Self {
+        let name_to_index: HashMap<String, Node> = raw_dfa.state_names
+            .iter()
+            .enumerate()
+            .map(|(i, name)| (name.clone(), i))
+            .collect();
+
+        let initial = name_to_index[&raw_dfa.initial.unwrap()];
+
+        let accepting = raw_dfa.accepting.iter()
+            .map(|name| name_to_index[name])
+            .collect();
+
+        let edges = raw_dfa.transitions.iter()
+            .map(|(from, sym, to)| Edge {
+                from: name_to_index[from],
+                symbol: *sym,
+                to: name_to_index[to],
+            })
+            .collect();
+
+        NamedDFA {
+            dfa: DFA { state_count: raw_dfa.state_names.len(), edges, initial, accepting, alphabet: raw_dfa.alphabet },
+            names: raw_dfa.state_names
+        }
+    } 
+}
+
 impl DFA {
     pub fn add_edge(&mut self, edge: Edge) {
         self.edges.push(edge)
-    }
+    }  
 
-    pub fn new(&mut self, automaton: RawDFA) {
+    pub fn to_dot(&self) -> String {
+        let mut s = "digraph DFA {\n  rankdir=LR\n\n".to_string();
 
+        // Initial state arrow
+        s.push_str("  __start [label=\"\", shape=none]\n");
+        s.push_str(&format!("  __start -> {}\n", self.initial));
+
+        // Accept states
+        for &node in &self.accepting {
+            s.push_str(&format!("  {} [shape=doublecircle]\n", node));
+        }
+
+        for edge in &self.edges {
+            s.push_str(&format!("  {} -> {} [label=\"{}\"]\n", edge.from, edge.to, edge.symbol));
+        }
+
+        s.push_str("  2 [borderWidth=5]\n");
+        s.push_str("}");
+        s
     }
 
     fn find_equivalent_states(&mut self) {

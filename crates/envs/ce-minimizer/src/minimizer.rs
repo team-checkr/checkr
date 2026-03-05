@@ -1,0 +1,1 @@
+type Table = Vec<Vec<bool>>;
