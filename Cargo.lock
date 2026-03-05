@@ -399,6 +399,7 @@ dependencies = [
  "serde",
  "serde_json",
  "tapi",
+ "thiserror 1.0.69",
  "tracing",
 ]
 

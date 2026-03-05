@@ -134,9 +134,12 @@ export class Io<A extends ce_shell.Analysis> {
     $effect(() => {
       if (!browser) return;
 
+      const inputSnapshot = $state.snapshot(this.input);
+
       const analysisRequest = api.reference({
         analysis,
-        json: this.input,
+        //json: this.input,
+        json: inputSnapshot,
         // TODO: we should avoid this somehow
         hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
       });
@@ -144,7 +147,8 @@ export class Io<A extends ce_shell.Analysis> {
       analysisRequest.data.then(({ output, error, meta, annotation }) => {
         this.meta = meta.json;
         this.reference = {
-          input: this.input,
+          //input: this.input,
+          input: inputSnapshot,
           outputState: 'Current',
           output: output?.json as any,
           referenceOutput: output?.json as any,

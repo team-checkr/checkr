@@ -1,4 +1,4 @@
-
+use thiserror::Error;
 
 type Table = Vec<Vec<bool>>;
 pub type Node = usize;
@@ -32,16 +32,19 @@ pub struct RawDFA {
     transitions: Vec<(String, char, String)> 
 }
 
-// #[derive(Debug, Error)]
-// pub enum ParseErrorDFA {
-//     #[error("missing")]
-//     MissingStates,
+#[derive(Debug, thiserror::Error)]
+pub enum ParseErrorDFA {
+    #[error("invalid transition")]
+    BadTransition,
 
-//     #[error("invalid transition at line")]
-//     BadTransition,
-// }
+    #[error("invalid alphabet symbol: one char expected")]
+    BadAlphabetSymbol,
 
-pub fn parse_dfa(input: &str) -> RawDFA {
+    #[error("bad input")]
+    BadInput,
+}
+
+pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
     #[derive(PartialEq)]
     enum Section { Null, States, Initial, Accepting, Alphabet, Transitions}
     let mut current_section = Section::Null;
@@ -98,8 +101,8 @@ pub fn parse_dfa(input: &str) -> RawDFA {
                 if let Some(c) = parse_one_char(&token) {
                     alphabet.push(c);
                 } else {
-                    // invalid symbol -> in strict mode you'd error; here we just ignore or panic
-                    panic!("Invalid alphabet symbol: {token}");
+                    //Can also be ignored, error thrown when a transition symbol is not a char
+                    return Err(ParseErrorDFA::BadAlphabetSymbol);
                 }
             }
             continue;
@@ -117,7 +120,7 @@ pub fn parse_dfa(input: &str) -> RawDFA {
             accepting.extend(split_list(rest));
             continue;
         }
-        if line == "transitions:" {
+        if let Some(_) = line.strip_prefix("transitions:") {
             current_section = Section::Transitions;
             continue;
         }
@@ -141,24 +144,23 @@ pub fn parse_dfa(input: &str) -> RawDFA {
                 if let Some(t) = parse_transition(line) {
                     transitions.push(t);
                 } else {
-                    panic!("Invalid transition line: {line}");
+                    return Err(ParseErrorDFA::BadTransition);
                 }
             }
             Section::Null | Section::Initial => {
-                // line outside a section: ignore or panic
-                panic!("Line outside a section: {line}");
+                return Err(ParseErrorDFA::BadInput);
             }
         }
     }
     
-   
+    Ok(
     RawDFA {
         state_names,
         alphabet,
         initial,
         accepting,
         transitions,
-    }
+    })
 }
 
 impl DFA {
