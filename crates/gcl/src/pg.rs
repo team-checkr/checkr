@@ -3,7 +3,6 @@ pub mod analysis;
 use std::{
     collections::{BTreeMap, VecDeque},
     str::FromStr,
-    sync::atomic::AtomicU64,
 };
 
 use indexmap::{IndexMap, IndexSet};
@@ -77,18 +76,6 @@ impl std::fmt::Display for Node {
     }
 }
 
-static NODE_ID: AtomicU64 = AtomicU64::new(0);
-impl Node {
-    fn fresh() -> Node {
-        Node::Node(NodeId(
-            NODE_ID.fetch_add(1, std::sync::atomic::Ordering::Relaxed),
-        ))
-    }
-    fn reset() {
-        NODE_ID.store(0, std::sync::atomic::Ordering::Relaxed);
-    }
-}
-
 #[derive(Debug, Clone, PartialEq, Eq, PartialOrd, Ord, Hash)]
 pub enum Action {
     Assignment(Target<Box<AExpr>>, AExpr),
@@ -137,19 +124,32 @@ impl std::fmt::Display for Action {
     }
 }
 
+#[derive(Default)]
+struct EdgesCtx {
+    next: u64,
+}
+
+impl EdgesCtx {
+    fn fresh(&mut self) -> Node {
+        let id = self.next;
+        self.next += 1;
+        Node::Node(NodeId(id))
+    }
+}
+
 trait Edges {
-    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge>;
+    fn edges(&self, ctx: &mut EdgesCtx, det: Determinism, s: Node, t: Node) -> Vec<Edge>;
 }
 
 impl Edges for Commands {
-    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
+    fn edges(&self, ctx: &mut EdgesCtx, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         let mut edges = vec![];
 
         let mut prev = s;
         for (idx, cmd) in self.0.iter().enumerate() {
             let is_last = idx + 1 == self.0.len();
-            let next = if is_last { t } else { Node::fresh() };
-            edges.extend(cmd.edges(det, prev, next));
+            let next = if is_last { t } else { ctx.fresh() };
+            edges.extend(cmd.edges(ctx, det, prev, next));
             prev = next;
         }
 
@@ -158,7 +158,7 @@ impl Edges for Commands {
 }
 
 /// Computes the edges and the condition which is true iff all guards are false
-fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edge>, BExpr) {
+fn guard_edges(ctx: &mut EdgesCtx, det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edge>, BExpr) {
     match det {
         Determinism::Deterministic => {
             // See the "if" and "do" Commands on Page 25 of Formal Methods
@@ -167,7 +167,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
             let mut edges = vec![];
 
             for Guard(b, c) in guards {
-                let q = Node::fresh();
+                let q = ctx.fresh();
 
                 edges.push(Edge(
                     s,
@@ -178,7 +178,7 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
                     )),
                     q,
                 ));
-                edges.extend(c.edges(det, q, t));
+                edges.extend(c.edges(ctx, det, q, t));
                 prev = BExpr::logic(b.to_owned().clone(), LogicOp::Lor, prev);
             }
 
@@ -189,8 +189,8 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
             let e = guards
                 .iter()
                 .flat_map(|Guard(b, c)| {
-                    let q = Node::fresh();
-                    let mut edges = c.edges(det, q, t);
+                    let q = ctx.fresh();
+                    let mut edges = c.edges(ctx, det, q, t);
                     edges.push(Edge(s, Action::Condition(b.clone()), q));
                     edges
                 })
@@ -201,15 +201,15 @@ fn guard_edges(det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edg
 }
 
 impl Edges for Command {
-    fn edges(&self, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
+    fn edges(&self, ctx: &mut EdgesCtx, det: Determinism, s: Node, t: Node) -> Vec<Edge> {
         match self {
             Command::Assignment(v, expr) => {
                 vec![Edge(s, Action::Assignment(v.clone(), expr.clone()), t)]
             }
             Command::Skip => vec![Edge(s, Action::Skip, t)],
-            Command::If(guards) => guard_edges(det, guards, s, t).0,
+            Command::If(guards) => guard_edges(ctx, det, guards, s, t).0,
             Command::Loop(guards) => {
-                let (mut edges, b) = guard_edges(det, guards, s, s);
+                let (mut edges, b) = guard_edges(ctx, det, guards, s, s);
                 edges.push(Edge(s, Action::Condition(b), t));
                 edges
             }
@@ -227,8 +227,7 @@ fn done(guards: &[Guard]) -> BExpr {
 
 impl ProgramGraph {
     pub fn new(det: Determinism, cmds: &Commands) -> Self {
-        Node::reset();
-        let edges = cmds.edges(det, Node::Start, Node::End);
+        let edges = cmds.edges(&mut Default::default(), det, Node::Start, Node::End);
         let mut outgoing: IndexMap<Node, Vec<Edge>> = Default::default();
         let mut nodes: IndexSet<Node> = Default::default();
 

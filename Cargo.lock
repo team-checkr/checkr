@@ -403,6 +403,22 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-riscv"
+version = "0.2.14"
+dependencies = [
+ "ce-bigcl",
+ "ce-core",
+ "gcl",
+ "indexmap",
+ "itertools 0.14.0",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-security"
 version = "0.2.14"
 dependencies = [
@@ -426,6 +442,7 @@ dependencies = [
  "ce-core",
  "ce-interpreter",
  "ce-parser",
+ "ce-riscv",
  "ce-security",
  "ce-sign",
  "dashmap",

@@ -25,6 +25,15 @@ where
         }
     }
 }
+impl<T> std::fmt::Display for Stringify<T> where
+    T: FromStr + Display, {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            Self::Parsed(t) => write!(f, "{t}"),
+            Self::Unparsed(s) => write!(f, "{s}"),
+        }
+    }
+}
 
 impl<T: FromStr + Display> Serialize for Stringify<T> {
     fn serialize<S>(&self, serializer: S) -> Result<S::Ok, S::Error>

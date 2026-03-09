@@ -77,7 +77,7 @@ impl Generate for Input {
 }
 
 #[derive(Debug)]
-struct Ctx {
+pub struct Ctx {
     next_id: u32,
     fv: IndexSet<String>,
 }
@@ -107,7 +107,7 @@ trait IsAtomic {
     fn is_atomic(&self) -> bool;
 }
 
-trait Binify {
+pub trait Binify {
     type Output;
     fn binify(&self, ctx: &mut Ctx) -> Self::Output;
 }

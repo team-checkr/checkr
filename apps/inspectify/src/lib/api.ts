@@ -227,6 +227,14 @@ export namespace ce_core {
     | { "type": "Mismatch", reason: string }
     | { "type": "TimeOut" };
 }
+export namespace ce_riscv {
+  export type Input = {
+    commands: string
+  };
+  export type Output = {
+    assembly: string
+  };
+}
 export namespace ce_shell {
   export type Envs =
     | { "analysis": "Calculator", "io": { input: Calculator.Input, output: Calculator.Output, meta: void } }
@@ -234,6 +242,7 @@ export namespace ce_shell {
     | { "analysis": "Compiler", "io": { input: Compiler.Input, output: Compiler.Output, meta: void } }
     | { "analysis": "Interpreter", "io": { input: Interpreter.Input, output: Interpreter.Output, meta: GCL.TargetDef[] } }
     | { "analysis": "BiGCL", "io": { input: BiGCL.Input, output: BiGCL.Output, meta: void } }
+    | { "analysis": "RiscV", "io": { input: ce_riscv.Input, output: ce_riscv.Output, meta: void } }
     | { "analysis": "Security", "io": { input: SecurityAnalysis.Input, output: SecurityAnalysis.Output, meta: SecurityAnalysis.Meta } }
     | { "analysis": "Sign", "io": { input: SignAnalysis.Input, output: SignAnalysis.Output, meta: GCL.TargetDef[] } };
   export type Analysis =
@@ -242,9 +251,10 @@ export namespace ce_shell {
     | "Compiler"
     | "Interpreter"
     | "BiGCL"
+    | "RiscV"
     | "Security"
     | "Sign";
-  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "BiGCL", "Security", "Sign"];
+  export const ANALYSIS: Analysis[] = ["Calculator", "Parser", "Compiler", "Interpreter", "BiGCL", "RiscV", "Security", "Sign"];
   export namespace io {
     export type Input = {
       analysis: ce_shell.Analysis,
@@ -359,13 +369,13 @@ export namespace inspectify {
       output: (ce_shell.io.Output | null),
       error: (string | null)
     };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type GenerateParams = {
       analysis: ce_shell.Analysis,
       seed: (number | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type CompilationStatus = {
       id: (driver.job.JobId | null),
       state: driver.job.JobState,

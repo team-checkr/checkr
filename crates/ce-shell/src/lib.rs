@@ -19,6 +19,7 @@ define_shell!(
     ce_compiler::CompilerEnv[Compiler, "Compiler"],
     ce_interpreter::InterpreterEnv[Interpreter, "Interpreter"],
     ce_bigcl::BiGCLEnv[BiGCL, "BiGCL"],
+    ce_riscv::RiscVEnv[RiscV, "RISC-V"],
     ce_security::SecurityEnv[Security, "Security"],
     ce_sign::SignEnv[Sign, "Sign Analysis"],
 );

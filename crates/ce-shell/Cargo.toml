@@ -15,6 +15,7 @@ ce-compiler.workspace = true
 ce-core.workspace = true
 ce-interpreter.workspace = true
 ce-parser.workspace = true
+ce-riscv.workspace = true
 ce-security.workspace = true
 ce-sign.workspace = true
 dashmap.workspace = true

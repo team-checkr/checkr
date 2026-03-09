@@ -165,7 +165,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                         })
                         .collect_vec();
 
-                    tracing::debug!("a file was saved: {events:?}");
+                    tracing::trace!("a file was saved: {events:?}");
 
                     if matching_events.is_empty() {
                         return;
@@ -194,7 +194,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                     }
 
                     if changed.is_empty() {
-                        tracing::debug!(
+                        tracing::trace!(
                             ?matching_events,
                             "these changed, but had the same contents"
                         );
