@@ -4,7 +4,7 @@
   import { crossfade } from 'svelte/transition';
   import { quintOut } from 'svelte/easing';
   import type { ce_shell } from '$lib/api';
-  import type { Input, Io, Meta, Output } from '$lib/io.svelte';
+  import type { Input, Io, Meta, Output, Annotation } from '$lib/io.svelte';
   import Ansi from './Ansi.svelte';
   import JobTabs from './JobTabs.svelte';
   import TrackingScroll from './TrackingScroll.svelte';
@@ -20,6 +20,7 @@
           meta: Meta<A>;
           output: Output<A>;
           referenceOutput: Output<A>;
+          annotation: Annotation<A> | null;
         },
       ]
     >;
@@ -63,6 +64,7 @@
                   meta: notNull(io.meta),
                   output: notNull(results.output),
                   referenceOutput: notNull(results.referenceOutput),
+                  annotation: results.annotation,
                 })}
               </div>
             </div>

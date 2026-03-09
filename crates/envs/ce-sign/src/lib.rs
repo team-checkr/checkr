@@ -119,11 +119,14 @@ impl Env for SignEnv {
                 pool.remove(idx);
             } else {
                 tracing::error!(not_in_reference = format!("{o:?}"), "damn...");
-                return Ok((ValidationResult::Mismatch {
-                    reason: format!(
-                        "Produced world which did not exist in reference: {n:?} ~> {o:?}"
-                    ),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!(
+                            "Produced world which did not exist in reference: {n:?} ~> {o:?}"
+                        ),
+                    },
+                    (),
+                ));
             }
         }
 
@@ -131,9 +134,12 @@ impl Env for SignEnv {
             Ok((ValidationResult::Correct, ()))
         } else {
             tracing::error!(missing = format!("{pool:?}"), "oh no...");
-            Ok((ValidationResult::Mismatch {
-                reason: "Reference had world which was not present".to_string(),
-            }, ()))
+            Ok((
+                ValidationResult::Mismatch {
+                    reason: "Reference had world which was not present".to_string(),
+                },
+                (),
+            ))
         }
     }
 }

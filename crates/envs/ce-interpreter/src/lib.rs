@@ -86,13 +86,19 @@ impl Env for InterpreterEnv {
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         if output.termination == TerminationState::Running
             && output.trace.len() < input.trace_length as usize
         {
-            return Ok((ValidationResult::Mismatch {
-                reason: "Not enough traces produced".to_string(),
-            }, ()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "Not enough traces produced".to_string(),
+                },
+                (),
+            ));
         }
 
         let pg =
@@ -112,9 +118,12 @@ impl Env for InterpreterEnv {
                 .collect();
 
             if possible_executions.is_empty() {
-                return Ok((ValidationResult::Mismatch {
-                    reason: "No possible execution found".to_string(),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: "No possible execution found".to_string(),
+                    },
+                    (),
+                ));
             }
         }
 
@@ -126,24 +135,33 @@ impl Env for InterpreterEnv {
             if possible_executions.iter().any(|s| s.is_finished()) {
                 return Ok((ValidationResult::Correct, ()));
             }
-            return Ok((ValidationResult::Mismatch {
-                reason: "No execution reached the end".to_string(),
-            }, ()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "No execution reached the end".to_string(),
+                },
+                (),
+            ));
         }
 
         if output.trace.len() < input.trace_length as usize
             || output.termination == TerminationState::Stuck
         {
             if output.termination == TerminationState::Running {
-                return Ok((ValidationResult::Mismatch {
-                    reason: "Not enough traces were produced".to_string(),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: "Not enough traces were produced".to_string(),
+                    },
+                    (),
+                ));
             }
 
             if !possible_executions.iter().any(|exe| exe.is_stuck(&pg)) {
-                return Ok((ValidationResult::Mismatch {
-                    reason: "No stuck execution found".to_string(),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: "No stuck execution found".to_string(),
+                    },
+                    (),
+                ));
             }
 
             return Ok((ValidationResult::Correct, ()));

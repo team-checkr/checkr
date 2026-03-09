@@ -51,8 +51,12 @@ impl Env for RiscVEnv {
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, Annotation)> {
-                let cmd =
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, Annotation)> {
+        // TODO: use output
+        let cmd =
             input
                 .commands
                 .try_parse()
@@ -79,8 +83,7 @@ impl Env for RiscVEnv {
 }
 
 fn compile(input: &Input, cmd: Commands) -> RiscVFile {
-    let mut ctx =
-        ce_bigcl::Ctx::new(cmd.fv().into_iter().map(|t| t.name().to_string()).collect());
+    let mut ctx = ce_bigcl::Ctx::new(cmd.fv().into_iter().map(|t| t.name().to_string()).collect());
     let cmd = cmd.binify(&mut ctx);
     // TODO: x1-x31 are reserved for the RISC-V architecture, so we should not use them for variables. We should use x32 and above instead.
     let fv = cmd.fv();
@@ -334,8 +337,18 @@ impl RiscVFile {
             insts: Vec::new(),
         };
         let mem = RiscVMemory {
-            labels: self.data.iter().enumerate().map(|(index, (label, _init))| (label.clone(), Word(index as _))).collect(),
-            heap: self.data.into_iter().enumerate().map(|(index, (_label, init))| (Word(index as _), init)).collect(),
+            labels: self
+                .data
+                .iter()
+                .enumerate()
+                .map(|(index, (label, _init))| (label.clone(), Word(index as _)))
+                .collect(),
+            heap: self
+                .data
+                .into_iter()
+                .enumerate()
+                .map(|(index, (_label, init))| (Word(index as _), init))
+                .collect(),
             regs: Default::default(),
         };
         for item in self.text {
@@ -397,11 +410,11 @@ impl RiskVVM<'_> {
     }
 
     fn run(&mut self) -> StepResult {
-        for _ in 0..100 {
+        for _ in 0..10000 {
             match self.step() {
                 StepResult::Exit => return StepResult::Exit,
                 StepResult::Stuck => return StepResult::Stuck,
-                StepResult::Ok => {},
+                StepResult::Ok => {}
             }
         }
         StepResult::Ok
@@ -453,10 +466,13 @@ impl RiskVVM<'_> {
                     );
                 }
                 Instruction::div(reg, reg1, reg2) => {
-                    self.memory.set_reg(
-                        reg.clone(),
-                        self.memory.load_reg(reg1) / self.memory.load_reg(reg2),
-                    );
+                    let r = self.memory.load_reg(reg2);
+                    if r == Word(0) {
+                        return StepResult::Stuck;
+                    } else {
+                        self.memory
+                            .set_reg(reg.clone(), self.memory.load_reg(reg1) / r);
+                    }
                 }
                 Instruction::j(label) => {
                     if let Some(pc) = self.asm.lookup_label(label) {
@@ -535,31 +551,31 @@ impl RiscVMemory {
 impl std::ops::Add for Word {
     type Output = Word;
     fn add(self, rhs: Self) -> Self::Output {
-        Word(self.0 + rhs.0)
+        Word(self.0.wrapping_add(rhs.0))
     }
 }
 impl std::ops::Sub for Word {
     type Output = Word;
     fn sub(self, rhs: Self) -> Self::Output {
-        Word(self.0 - rhs.0)
+        Word(self.0.wrapping_sub(rhs.0))
     }
 }
 impl std::ops::Mul for Word {
     type Output = Word;
     fn mul(self, rhs: Self) -> Self::Output {
-        Word(self.0 * rhs.0)
+        Word(self.0.wrapping_mul(rhs.0))
     }
 }
 impl std::ops::Div for Word {
     type Output = Word;
     fn div(self, rhs: Self) -> Self::Output {
-        Word(self.0 / rhs.0)
+        Word(self.0.wrapping_div(rhs.0))
     }
 }
 impl std::ops::Neg for Word {
     type Output = Word;
     fn neg(self) -> Self::Output {
-        Word(-self.0)
+        Word(self.0.wrapping_neg())
     }
 }
 
@@ -691,7 +707,7 @@ impl std::fmt::Display for RiscVFile {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         writeln!(f, ".data")?;
         for (name, word) in &self.data {
-            writeln!(f, "{name}:\t.word {word}")?;
+            writeln!(f, "{name}:\t\t.word {word}")?;
         }
 
         writeln!(f, ".text")?;

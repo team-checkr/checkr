@@ -25,8 +25,10 @@ where
         }
     }
 }
-impl<T> std::fmt::Display for Stringify<T> where
-    T: FromStr + Display, {
+impl<T> std::fmt::Display for Stringify<T>
+where
+    T: FromStr + Display,
+{
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Self::Parsed(t) => write!(f, "{t}"),

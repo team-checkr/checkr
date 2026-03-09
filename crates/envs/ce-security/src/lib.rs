@@ -126,7 +126,10 @@ impl Env for SecurityEnv {
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         let refernce = Self::run(input)?;
 
         let compare_sets = |a: &[Flow], b: &[Flow]| {
@@ -136,29 +139,44 @@ impl Env for SecurityEnv {
         };
 
         if !compare_sets(&output.actual, &refernce.actual) {
-            return Ok((ValidationResult::Mismatch {
-                reason: "actual flows does not match reference".to_string(),
-            },()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "actual flows does not match reference".to_string(),
+                },
+                (),
+            ));
         }
         if !compare_sets(&output.allowed, &refernce.allowed) {
-            return Ok((ValidationResult::Mismatch {
-                reason: "allowed flows does not match reference".to_string(),
-            },()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "allowed flows does not match reference".to_string(),
+                },
+                (),
+            ));
         }
         if !compare_sets(&output.violations, &refernce.violations) {
-            return Ok((ValidationResult::Mismatch {
-                reason: "violations does not match reference".to_string(),
-            },()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "violations does not match reference".to_string(),
+                },
+                (),
+            ));
         }
         if output.is_secure != refernce.is_secure {
             if refernce.is_secure {
-                return Ok((ValidationResult::Mismatch {
-                    reason: "expected secure, but got insecure".to_string(),
-                },()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: "expected secure, but got insecure".to_string(),
+                    },
+                    (),
+                ));
             } else {
-                return Ok((ValidationResult::Mismatch {
-                    reason: "expected insecure, but got secure".to_string(),
-                },()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: "expected insecure, but got secure".to_string(),
+                    },
+                    (),
+                ));
             }
         }
 

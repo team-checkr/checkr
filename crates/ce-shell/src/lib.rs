@@ -3,7 +3,7 @@
 mod def;
 mod io;
 
-pub use io::{Error, Hash, Input, Meta, Output, Annotation};
+pub use io::{Annotation, Error, Hash, Input, Meta, Output};
 use rand::SeedableRng;
 
 pub trait EnvExt: Env {
@@ -36,7 +36,10 @@ impl Analysis {
 
 impl Input {
     #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
-    pub fn validate_output(&self, output: &Output) -> Result<(ValidationResult, Annotation), EnvError> {
+    pub fn validate_output(
+        &self,
+        output: &Output,
+    ) -> Result<(ValidationResult, Annotation), EnvError> {
         assert_eq!(self.analysis(), output.analysis());
 
         static VALIDATION: once_cell::sync::Lazy<

@@ -5,9 +5,9 @@ use gcl::{
     pg::Node,
     semantics::SemanticsContext,
 };
+use indexmap::IndexSet;
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
-use indexmap::IndexSet;
 
 define_env!(BiGCLEnv);
 
@@ -33,38 +33,48 @@ impl Env for BiGCLEnv {
     type Annotation = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        let cmd = input
-                    .commands
-                    .try_parse()
-                    .map_err(ce_core::EnvError::invalid_input_for_program(
-                        "failed to parse commands",
-                    ))?;
-                    let mut fv = Ctx::new(cmd.fv().into_iter().map(|t|t.name().to_string()).collect());
+        let cmd =
+            input
+                .commands
+                .try_parse()
+                .map_err(ce_core::EnvError::invalid_input_for_program(
+                    "failed to parse commands",
+                ))?;
+        let mut fv = Ctx::new(cmd.fv().into_iter().map(|t| t.name().to_string()).collect());
         Ok(Output {
-            binary: Stringify::new(
-                cmd
-                    .binify(&mut fv),
-            ),
+            binary: Stringify::new(cmd.binify(&mut fv)),
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         let (o_cmds, t_cmds) = match (input.commands.try_parse(), output.binary.try_parse()) {
             (Ok(ours), Ok(theirs)) => (ours, theirs),
             (Err(err), _) | (_, Err(err)) => {
-                return Ok((ValidationResult::Mismatch {
-                    reason: format!("failed to parse output: {err:?}"),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!("failed to parse output: {err:?}"),
+                    },
+                    (),
+                ));
             }
         };
 
         if !t_cmds.is_binary() {
-            return Ok((ValidationResult::Mismatch {
-                reason: "the output program is not of binary form".to_string(),
-            }, ()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: "the output program is not of binary form".to_string(),
+                },
+                (),
+            ));
         }
 
-        Ok((check_programs_for_semantic_equivalence(&o_cmds, &t_cmds), ()))
+        Ok((
+            check_programs_for_semantic_equivalence(&o_cmds, &t_cmds),
+            (),
+        ))
     }
 }
 
@@ -86,18 +96,17 @@ pub struct Ctx {
 
 impl Ctx {
     pub fn new(fv: IndexSet<String>) -> Ctx {
-        Ctx {
-            next_id: 0,
-            fv,
-        }
+        Ctx { next_id: 0, fv }
     }
     fn fresh<T>(&mut self) -> Target<T> {
         loop {
             let id = self.next_id;
             self.next_id += 1;
             let name = format!("tmp{id}_");
-            if self.fv.contains(&name) {continue;}
-            return Target::Variable(Variable(name))
+            if self.fv.contains(&name) {
+                continue;
+            }
+            return Target::Variable(Variable(name));
         }
     }
 }
@@ -514,7 +523,9 @@ impl IsBinary for Command {
                 }
             }
             Command::Loop(guards) => {
-                if let [Guard(a, _)] = guards.as_slice() && a.is_binary() {
+                if let [Guard(a, _)] = guards.as_slice()
+                    && a.is_binary()
+                {
                     true
                 } else {
                     false

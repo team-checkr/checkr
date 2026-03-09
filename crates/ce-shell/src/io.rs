@@ -159,6 +159,10 @@ impl Annotation {
         }
     }
 
+    pub fn default<E: EnvExt>() -> Annotation {
+        Annotation::new::<E>(&E::Annotation::default())
+    }
+
     pub fn analysis(&self) -> Analysis {
         self.analysis
     }

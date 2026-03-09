@@ -158,7 +158,13 @@ impl Edges for Commands {
 }
 
 /// Computes the edges and the condition which is true iff all guards are false
-fn guard_edges(ctx: &mut EdgesCtx, det: Determinism, guards: &[Guard], s: Node, t: Node) -> (Vec<Edge>, BExpr) {
+fn guard_edges(
+    ctx: &mut EdgesCtx,
+    det: Determinism,
+    guards: &[Guard],
+    s: Node,
+    t: Node,
+) -> (Vec<Edge>, BExpr) {
     match det {
         Determinism::Deterministic => {
             // See the "if" and "do" Commands on Page 25 of Formal Methods

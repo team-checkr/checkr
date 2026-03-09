@@ -462,7 +462,7 @@ fn compute_validated_job_state(job: &Job<InspectifyJobMeta>) -> JobState {
     let output = input.analysis().output_from_str(&job.stdout());
     let validation = match (job.state(), &output) {
         (JobState::Succeeded, Ok(output)) => Some(match input.validate_output(output) {
-            Ok(output) => output,
+            Ok((output, _)) => output,
             Err(e) => ValidationResult::Mismatch {
                 reason: format!("failed to validate output: {e:?}"),
             },

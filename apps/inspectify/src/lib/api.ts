@@ -234,17 +234,20 @@ export namespace ce_riscv {
   export type Output = {
     assembly: string
   };
+export type Annotation = {
+    output: string
+  };
 }
 export namespace ce_shell {
   export type Envs =
-    | { "analysis": "Calculator", "io": { input: Calculator.Input, output: Calculator.Output, meta: void } }
-    | { "analysis": "Parser", "io": { input: Parser.Input, output: Parser.Output, meta: void } }
-    | { "analysis": "Compiler", "io": { input: Compiler.Input, output: Compiler.Output, meta: void } }
-    | { "analysis": "Interpreter", "io": { input: Interpreter.Input, output: Interpreter.Output, meta: GCL.TargetDef[] } }
-    | { "analysis": "BiGCL", "io": { input: BiGCL.Input, output: BiGCL.Output, meta: void } }
-    | { "analysis": "RiscV", "io": { input: ce_riscv.Input, output: ce_riscv.Output, meta: void } }
-    | { "analysis": "Security", "io": { input: SecurityAnalysis.Input, output: SecurityAnalysis.Output, meta: SecurityAnalysis.Meta } }
-    | { "analysis": "Sign", "io": { input: SignAnalysis.Input, output: SignAnalysis.Output, meta: GCL.TargetDef[] } };
+    | { "analysis": "Calculator", "io": { input: Calculator.Input, output: Calculator.Output, meta: void, annotation: void } }
+    | { "analysis": "Parser", "io": { input: Parser.Input, output: Parser.Output, meta: void, annotation: void } }
+    | { "analysis": "Compiler", "io": { input: Compiler.Input, output: Compiler.Output, meta: void, annotation: void } }
+    | { "analysis": "Interpreter", "io": { input: Interpreter.Input, output: Interpreter.Output, meta: GCL.TargetDef[], annotation: void } }
+    | { "analysis": "BiGCL", "io": { input: BiGCL.Input, output: BiGCL.Output, meta: void, annotation: void } }
+    | { "analysis": "RiscV", "io": { input: ce_riscv.Input, output: ce_riscv.Output, meta: void, annotation: ce_riscv.Annotation } }
+    | { "analysis": "Security", "io": { input: SecurityAnalysis.Input, output: SecurityAnalysis.Output, meta: SecurityAnalysis.Meta, annotation: void } }
+    | { "analysis": "Sign", "io": { input: SignAnalysis.Input, output: SignAnalysis.Output, meta: GCL.TargetDef[], annotation: void } };
   export type Analysis =
     | "Calculator"
     | "Parser"
@@ -272,6 +275,10 @@ export namespace ce_shell {
       analysis: ce_shell.Analysis,
       json: any,
       hash: ce_shell.io.Hash
+    };
+    export type Annotation = {
+      analysis: ce_shell.Analysis,
+      json: any
     };
   }
 }
@@ -367,6 +374,7 @@ export namespace inspectify {
     export type ReferenceExecution = {
       meta: ce_shell.io.Meta,
       output: (ce_shell.io.Output | null),
+      annotation: (ce_shell.io.Annotation | null),
       error: (string | null)
     };
     export type GenerateParams = {
@@ -407,7 +415,8 @@ export namespace inspectify {
       meta: ce_shell.io.Meta,
       output: (ce_shell.io.Output | null),
       reference_output: (ce_shell.io.Output | null),
-      validation: (ce_core.ValidationResult | null)
+      validation: (ce_core.ValidationResult | null),
+      annotation: (ce_shell.io.Annotation | null)
     };
   }
 }

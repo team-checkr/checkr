@@ -34,27 +34,36 @@ impl Env for ParserEnv {
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         let (o_cmds, t_cmds) = match (
             Self::run(input)?.pretty.try_parse(),
             output.pretty.try_parse(),
         ) {
             (Ok(ours), Ok(theirs)) => (ours, theirs),
             (Err(err), _) | (_, Err(err)) => {
-                return Ok((ValidationResult::Mismatch {
-                    reason: format!("failed to parse pretty output: {err:?}"),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!("failed to parse pretty output: {err:?}"),
+                    },
+                    (),
+                ));
             }
         };
 
         if !check_programs_for_semantic_equivalence(&o_cmds, &t_cmds) {
-            return Ok((ValidationResult::Mismatch {
-                reason: concat!(
-                    "the pretty printed program is not semantically equivalent ",
-                    "to the original program"
-                )
-                .to_string(),
-            }, ()));
+            return Ok((
+                ValidationResult::Mismatch {
+                    reason: concat!(
+                        "the pretty printed program is not semantically equivalent ",
+                        "to the original program"
+                    )
+                    .to_string(),
+                },
+                (),
+            ));
         }
 
         Ok((ValidationResult::Correct, ()))

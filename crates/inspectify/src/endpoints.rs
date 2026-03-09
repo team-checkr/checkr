@@ -70,6 +70,7 @@ struct AnalysisData {
     output: Option<ce_shell::Output>,
     reference_output: Option<ce_shell::Output>,
     validation: Option<ce_core::ValidationResult>,
+    annotation: Option<ce_shell::Annotation>,
 }
 
 impl AppState {
@@ -100,25 +101,30 @@ impl AppState {
                     }
                 };
                 let output = input.analysis().output_from_str(&stdout);
-                let validation = match (state, &output) {
-                    (JobState::Succeeded, Ok(output)) => {
-                        Some(match input.validate_output(output) {
-                            Ok(output) => output,
-                            Err(e) => ValidationResult::Mismatch {
+                let (validation, annotation) = match (state, &output) {
+                    (JobState::Succeeded, Ok(output)) => match input.validate_output(output) {
+                        Ok((val, ann)) => (Some(val), Some(ann)),
+                        Err(e) => (
+                            Some(ValidationResult::Mismatch {
                                 reason: format!("failed to validate output: {e:?}"),
-                            },
-                        })
-                    }
-                    (JobState::Succeeded, Err(e)) => Some(ValidationResult::Mismatch {
-                        reason: format!("failed to parse output: {e:?}"),
-                    }),
-                    _ => None,
+                            }),
+                            None,
+                        ),
+                    },
+                    (JobState::Succeeded, Err(e)) => (
+                        Some(ValidationResult::Mismatch {
+                            reason: format!("failed to parse output: {e:?}"),
+                        }),
+                        None,
+                    ),
+                    _ => (None, None),
                 };
                 Some(AnalysisData {
                     meta,
                     output: output.ok(),
                     reference_output,
                     validation,
+                    annotation,
                 })
             }
             _ => None,

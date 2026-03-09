@@ -17,6 +17,7 @@ macro_rules! define_shell {
                 input: <$krate as Env>::Input,
                 output: <$krate as Env>::Output,
                 meta: <$krate as Env>::Meta,
+                annotation: <$krate as Env>::Annotation,
             },)*
         }
 

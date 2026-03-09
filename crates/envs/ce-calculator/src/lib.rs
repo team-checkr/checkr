@@ -46,7 +46,10 @@ impl Env for CalcEnv {
         Ok(Output { result, error })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         let reference = Self::run(input)?;
 
         Ok((
@@ -69,8 +72,9 @@ impl Env for CalcEnv {
                         reason: format!("Did not produce same as reference. {info}"),
                     }
                 }
-            }, ())
-        )
+            },
+            (),
+        ))
     }
 }
 

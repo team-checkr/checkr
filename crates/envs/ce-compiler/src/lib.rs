@@ -49,7 +49,10 @@ impl Env for CompilerEnv {
         Ok(Output { dot })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
         let commands =
             input
                 .commands
@@ -81,17 +84,23 @@ impl Env for CompilerEnv {
         let t_g = match dot::dot_to_petgraph(&output.dot) {
             Ok(t_g) => t_g,
             Err(err) => {
-                return Ok((ValidationResult::Mismatch {
-                    reason: format!("failed to parse dot: {err}"),
-                }, ()));
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!("failed to parse dot: {err}"),
+                    },
+                    (),
+                ));
             }
         };
         let o_g = dot::dot_to_petgraph(&o_dot).expect("we always produce valid dot");
 
         if action_bag(&o_g, &sample_mems) != action_bag(&t_g, &sample_mems) {
-            Ok((ValidationResult::Mismatch {
-                reason: "the graphs have different structure".to_string(),
-            }, ()))
+            Ok((
+                ValidationResult::Mismatch {
+                    reason: "the graphs have different structure".to_string(),
+                },
+                (),
+            ))
         } else {
             Ok((ValidationResult::Correct, ()))
         }

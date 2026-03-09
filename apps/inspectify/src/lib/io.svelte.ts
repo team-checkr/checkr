@@ -10,6 +10,7 @@ type OutputState = 'None' | 'Stale' | 'Current';
 export type Input<A extends ce_shell.Analysis> = Mapping[A]['input'];
 export type Output<A extends ce_shell.Analysis> = Mapping[A]['output'];
 export type Meta<A extends ce_shell.Analysis> = Mapping[A]['meta'];
+export type Annotation<A extends ce_shell.Analysis> = Mapping[A]['annotation'];
 
 export type Results<A extends ce_shell.Analysis> = {
   input: Input<A>;
@@ -17,6 +18,7 @@ export type Results<A extends ce_shell.Analysis> = {
   output: Output<A> | null;
   referenceOutput: Output<A> | null;
   validation: ce_core.ValidationResult | { type: 'Failure'; message: string } | null;
+  annotation: Annotation<A> | null;
   job: Job | null;
 };
 
@@ -26,6 +28,7 @@ const defaultResults = <A extends ce_shell.Analysis>(): Results<A> => ({
   output: null,
   referenceOutput: null,
   validation: null,
+  annotation: null,
   job: null,
 });
 
@@ -46,6 +49,7 @@ export class Io<A extends ce_shell.Analysis> {
         output: null,
         referenceOutput: null,
         validation: null,
+        annotation: null,
       } satisfies Results<A>;
     const job = jobsStore.jobs[this.currentJob.jobId];
     return {
@@ -54,6 +58,7 @@ export class Io<A extends ce_shell.Analysis> {
       output: job.analysis_data?.output?.json as any,
       referenceOutput: job.analysis_data?.reference_output?.json as any,
       validation: job.analysis_data?.validation as any,
+      annotation: job.analysis_data?.annotation?.json as any,
       job: job,
     } satisfies Results<A>;
   });
@@ -136,7 +141,7 @@ export class Io<A extends ce_shell.Analysis> {
         hash: { bytes: [0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0] },
       });
 
-      analysisRequest.data.then(({ output, error, meta }) => {
+      analysisRequest.data.then(({ output, error, meta, annotation }) => {
         this.meta = meta.json;
         this.reference = {
           input: this.input,
@@ -144,6 +149,7 @@ export class Io<A extends ce_shell.Analysis> {
           output: output?.json as any,
           referenceOutput: output?.json as any,
           validation: { type: 'Correct' },
+          annotation: annotation?.json as any,
           job: null,
         };
       });

@@ -16,12 +16,17 @@ impl Env for TemplateEnv {
 
     type Meta = ();
 
+    type Annotation = ();
+
     fn run(_input: &Self::Input) -> ce_core::Result<Self::Output> {
         Ok(Output::default())
     }
 
-    fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        Ok(ValidationResult::Correct)
+    fn validate(
+        _input: &Self::Input,
+        _output: &Self::Output,
+    ) -> ce_core::Result<(ValidationResult, ())> {
+        Ok((ValidationResult::Correct, ()))
     }
 }
 

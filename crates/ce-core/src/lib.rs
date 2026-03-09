@@ -135,7 +135,10 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
     }
 
     fn run(input: &Self::Input) -> Result<Self::Output>;
-    fn validate(input: &Self::Input, output: &Self::Output) -> Result<(ValidationResult, Self::Annotation)>;
+    fn validate(
+        input: &Self::Input,
+        output: &Self::Output,
+    ) -> Result<(ValidationResult, Self::Annotation)>;
 }
 
 #[macro_export]
