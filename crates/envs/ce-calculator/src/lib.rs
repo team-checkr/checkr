@@ -25,6 +25,8 @@ impl Env for CalcEnv {
 
     type Meta = ();
 
+    type Annotation = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let expr =
             input
@@ -44,10 +46,10 @@ impl Env for CalcEnv {
         Ok(Output { result, error })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
         let reference = Self::run(input)?;
 
-        Ok(
+        Ok((
             match (
                 &reference.result,
                 &output.result,
@@ -67,7 +69,7 @@ impl Env for CalcEnv {
                         reason: format!("Did not produce same as reference. {info}"),
                     }
                 }
-            },
+            }, ())
         )
     }
 }

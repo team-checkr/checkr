@@ -24,6 +24,12 @@ pub struct Meta {
     json: Arc<serde_json::Value>,
 }
 
+#[derive(tapi::Tapi, Debug, Clone, PartialEq, Eq, serde::Serialize, serde::Deserialize)]
+pub struct Annotation {
+    analysis: Analysis,
+    json: Arc<serde_json::Value>,
+}
+
 #[derive(
     tapi::Tapi,
     Debug,
@@ -143,6 +149,29 @@ impl Meta {
     }
 }
 
+impl Annotation {
+    pub fn new<E: EnvExt>(data: &E::Annotation) -> Self {
+        Self {
+            analysis: E::ANALYSIS,
+            json: serde_json::to_value(data)
+                .expect("all output should be serializable")
+                .into(),
+        }
+    }
+
+    pub fn analysis(&self) -> Analysis {
+        self.analysis
+    }
+
+    pub fn json(&self) -> Arc<serde_json::Value> {
+        self.json.clone()
+    }
+
+    pub fn data<E: Env>(&self) -> Result<E::Annotation, serde_json::Error> {
+        serde_json::from_value((*self.json).clone())
+    }
+}
+
 impl std::fmt::Display for Input {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.json.fmt(f)
@@ -154,6 +183,11 @@ impl std::fmt::Display for Output {
     }
 }
 impl std::fmt::Display for Meta {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        self.json.fmt(f)
+    }
+}
+impl std::fmt::Display for Annotation {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         self.json.fmt(f)
     }

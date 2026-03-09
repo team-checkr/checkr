@@ -48,6 +48,8 @@ impl Env for SignEnv {
 
     type Meta = BTreeSet<TargetDef>;
 
+    type Annotation = ();
+
     fn meta(input: &Self::Input) -> Self::Meta {
         if let Ok(commands) = input.commands.try_parse() {
             commands.fv().into_iter().map(|t| t.def()).collect()
@@ -107,7 +109,7 @@ impl Env for SignEnv {
     fn validate(
         input: &Self::Input,
         output: &Self::Output,
-    ) -> ce_core::Result<ce_core::ValidationResult> {
+    ) -> ce_core::Result<(ce_core::ValidationResult, ())> {
         let reference = Self::run(input)?;
 
         let mut pool = reference.nodes.values().collect_vec();
@@ -117,21 +119,21 @@ impl Env for SignEnv {
                 pool.remove(idx);
             } else {
                 tracing::error!(not_in_reference = format!("{o:?}"), "damn...");
-                return Ok(ValidationResult::Mismatch {
+                return Ok((ValidationResult::Mismatch {
                     reason: format!(
                         "Produced world which did not exist in reference: {n:?} ~> {o:?}"
                     ),
-                });
+                }, ()));
             }
         }
 
         if pool.is_empty() {
-            Ok(ValidationResult::Correct)
+            Ok((ValidationResult::Correct, ()))
         } else {
             tracing::error!(missing = format!("{pool:?}"), "oh no...");
-            Ok(ValidationResult::Mismatch {
+            Ok((ValidationResult::Mismatch {
                 reason: "Reference had world which was not present".to_string(),
-            })
+            }, ()))
         }
     }
 }

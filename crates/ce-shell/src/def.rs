@@ -131,7 +131,7 @@ macro_rules! define_shell {
                     }),*
                 }
             }
-            fn validate_output_helper(&self, output: &Output) -> Result<ValidationResult, EnvError> {
+            fn validate_output_helper(&self, output: &Output) -> Result<(ValidationResult, Annotation), EnvError> {
                 assert_eq!(self.analysis(), output.analysis());
 
                 match self.analysis() {
@@ -140,7 +140,9 @@ macro_rules! define_shell {
                             .map_err(EnvError::from_parse_input(&self.json()))?;
                         let output: <$krate as Env>::Output = output.data::<$krate>()
                             .map_err(EnvError::from_parse_output(&output.json()))?;
-                        <$krate as Env>::validate(&input, &output)
+                        let (val, ann) = <$krate as Env>::validate(&input, &output)?;
+                        let ann = Annotation::new::<$krate>(&ann);
+                        Ok((val, ann))
                     }),*
                 }
             }

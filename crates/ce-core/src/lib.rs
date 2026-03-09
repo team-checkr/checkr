@@ -117,13 +117,25 @@ pub trait Env: Default + std::fmt::Debug + Clone + PartialEq {
         + PartialEq
         + Send
         + Sync;
+    type Annotation: Default
+        + Serialize
+        + for<'a> Deserialize<'a>
+        + tapi::Tapi
+        + std::fmt::Debug
+        + Clone
+        + PartialEq
+        + Send
+        + Sync;
 
     fn meta(_input: &Self::Input) -> Self::Meta {
         Default::default()
     }
+    fn annotate(_input: &Self::Input, _output: &Self::Output) -> Self::Annotation {
+        Default::default()
+    }
 
     fn run(input: &Self::Input) -> Result<Self::Output>;
-    fn validate(input: &Self::Input, output: &Self::Output) -> Result<ValidationResult>;
+    fn validate(input: &Self::Input, output: &Self::Output) -> Result<(ValidationResult, Self::Annotation)>;
 }
 
 #[macro_export]
@@ -140,7 +152,7 @@ macro_rules! define_env {
                 let input =
                     <<$name as $crate::Env>::Input as $crate::Generate>::gn(&mut (), &mut rng);
                 let output = <$name as $crate::Env>::run(&input).unwrap();
-                let validation_result =
+                let (validation_result, _) =
                     <$name as $crate::Env>::validate(&input, &output).expect("failed to validate");
                 match validation_result {
                     $crate::ValidationResult::Correct => {

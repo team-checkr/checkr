@@ -30,6 +30,8 @@ impl Env for BiGCLEnv {
 
     type Meta = ();
 
+    type Annotation = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let cmd = input
                     .commands
@@ -46,23 +48,23 @@ impl Env for BiGCLEnv {
         })
     }
 
-    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<ValidationResult> {
+    fn validate(input: &Self::Input, output: &Self::Output) -> ce_core::Result<(ValidationResult, ())> {
         let (o_cmds, t_cmds) = match (input.commands.try_parse(), output.binary.try_parse()) {
             (Ok(ours), Ok(theirs)) => (ours, theirs),
             (Err(err), _) | (_, Err(err)) => {
-                return Ok(ValidationResult::Mismatch {
+                return Ok((ValidationResult::Mismatch {
                     reason: format!("failed to parse output: {err:?}"),
-                });
+                }, ()));
             }
         };
 
         if !t_cmds.is_binary() {
-            return Ok(ValidationResult::Mismatch {
+            return Ok((ValidationResult::Mismatch {
                 reason: "the output program is not of binary form".to_string(),
-            });
+            }, ()));
         }
 
-        Ok(check_programs_for_semantic_equivalence(&o_cmds, &t_cmds))
+        Ok((check_programs_for_semantic_equivalence(&o_cmds, &t_cmds), ()))
     }
 }
 

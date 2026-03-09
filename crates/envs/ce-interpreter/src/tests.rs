@@ -17,7 +17,7 @@ fn initially_stuck_program() {
         trace_length: 1,
     };
     let output = InterpreterEnv::run(&input).unwrap();
-    match InterpreterEnv::validate(&input, &output).unwrap() {
+    match InterpreterEnv::validate(&input, &output).unwrap().0 {
         ValidationResult::Correct => (),
         ValidationResult::Unknown { .. }
         | ValidationResult::Mismatch { .. }
@@ -51,7 +51,7 @@ fn test_true_skip() {
         trace_length: 11,
     };
     let output = InterpreterEnv::run(&input).unwrap();
-    match InterpreterEnv::validate(&input, &output).unwrap() {
+    match InterpreterEnv::validate(&input, &output).unwrap().0 {
         ValidationResult::Correct => (),
         ValidationResult::Mismatch { reason } => panic!("reason: {reason:?}"),
         ValidationResult::Unknown { .. } | ValidationResult::TimeOut => panic!(),
@@ -88,7 +88,7 @@ fn test_thingy() {
         trace_length: 11,
     };
     let output = InterpreterEnv::run(&input).unwrap();
-    match InterpreterEnv::validate(&input, &output).unwrap() {
+    match InterpreterEnv::validate(&input, &output).unwrap().0 {
         ValidationResult::Correct => (),
         ValidationResult::Mismatch { reason } => panic!("reason: {reason:?}"),
         ValidationResult::Unknown { .. } => panic!(),
@@ -123,7 +123,7 @@ fn empty_trace_running() {
     };
 
     assert_eq!(
-        InterpreterEnv::validate(&input, &output).unwrap(),
+        InterpreterEnv::validate(&input, &output).unwrap().0,
         ValidationResult::Mismatch {
             reason: "Not enough traces produced".to_string()
         }
@@ -157,7 +157,7 @@ fn empty_trace_terminated() {
     };
 
     assert_eq!(
-        InterpreterEnv::validate(&input, &output).unwrap(),
+        InterpreterEnv::validate(&input, &output).unwrap().0,
         ValidationResult::Mismatch {
             reason: "No execution reached the end".to_string()
         }
