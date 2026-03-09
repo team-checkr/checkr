@@ -7,6 +7,7 @@ authors.workspace = true
 license.workspace = true
 
 [dependencies]
+indexmap.workspace = true
 ce-core.workspace = true
 gcl.workspace = true
 itertools.workspace = true

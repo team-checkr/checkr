@@ -320,6 +320,7 @@ version = "0.2.14"
 dependencies = [
  "ce-core",
  "gcl",
+ "indexmap",
  "itertools 0.14.0",
  "serde",
  "serde_json",

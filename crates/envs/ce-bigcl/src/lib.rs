@@ -7,6 +7,7 @@ use gcl::{
 };
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
+use indexmap::IndexSet;
 
 define_env!(BiGCLEnv);
 
@@ -30,15 +31,17 @@ impl Env for BiGCLEnv {
     type Meta = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        Ok(Output {
-            binary: Stringify::new(
-                input
+        let cmd = input
                     .commands
                     .try_parse()
                     .map_err(ce_core::EnvError::invalid_input_for_program(
                         "failed to parse commands",
-                    ))?
-                    .binify(&mut Default::default()),
+                    ))?;
+                    let mut fv = Ctx::new(cmd.fv().into_iter().map(|t|t.name().to_string()).collect());
+        Ok(Output {
+            binary: Stringify::new(
+                cmd
+                    .binify(&mut fv),
             ),
         })
     }
@@ -73,16 +76,27 @@ impl Generate for Input {
     }
 }
 
-#[derive(Debug, Default)]
+#[derive(Debug)]
 struct Ctx {
     next_id: u32,
+    fv: IndexSet<String>,
 }
 
 impl Ctx {
+    pub fn new(fv: IndexSet<String>) -> Ctx {
+        Ctx {
+            next_id: 0,
+            fv,
+        }
+    }
     fn fresh<T>(&mut self) -> Target<T> {
-        let id = self.next_id;
-        self.next_id += 1;
-        Target::Variable(Variable(format!("tmp{id}_")))
+        loop {
+            let id = self.next_id;
+            self.next_id += 1;
+            let name = format!("tmp{id}_");
+            if self.fv.contains(&name) {continue;}
+            return Target::Variable(Variable(name))
+        }
     }
 }
 
@@ -139,24 +153,15 @@ impl Binify for Command {
                 |else_, Guard(b, c)| {
                     let tmp = ctx.fresh();
                     let pre = b.bitify(ctx, &tmp);
+                    let g = BExpr::Rel(
+                        AExpr::Reference(tmp.clone()),
+                        gcl::ast::RelOp::Eq,
+                        AExpr::Number(1),
+                    );
                     pre.extend(Command::If(
                         [
-                            Guard(
-                                BExpr::Rel(
-                                    AExpr::Reference(tmp.clone()),
-                                    gcl::ast::RelOp::Eq,
-                                    AExpr::Number(1),
-                                ),
-                                c.binify(ctx),
-                            ),
-                            Guard(
-                                BExpr::Rel(
-                                    AExpr::Reference(tmp),
-                                    gcl::ast::RelOp::Eq,
-                                    AExpr::Number(0),
-                                ),
-                                else_,
-                            ),
+                            Guard(g.clone(), c.binify(ctx)),
+                            Guard(BExpr::Not(Box::new(g)), else_),
                         ]
                         .to_vec(),
                     ))
@@ -496,9 +501,23 @@ impl IsBinary for Command {
         match self {
             Command::Assignment(t, a) => t.is_binary() && a.is_binary(),
             Command::Skip => true,
-            Command::If(guards) | Command::Loop(guards) => guards
-                .iter()
-                .all(|Guard(b, c)| b.is_binary() && c.is_binary()),
+            Command::If(guards) => {
+                if let [Guard(a, _), Guard(BExpr::Not(b), _)] = guards.as_slice()
+                    && a == &**b
+                    && a.is_binary()
+                {
+                    true
+                } else {
+                    false
+                }
+            }
+            Command::Loop(guards) => {
+                if let [Guard(a, _)] = guards.as_slice() && a.is_binary() {
+                    true
+                } else {
+                    false
+                }
+            }
         }
     }
 }
@@ -528,7 +547,7 @@ impl IsBinary for BExpr {
             BExpr::Bool(_) => true,
             BExpr::Rel(l, _, r) => l.is_atomic() && r.is_atomic(),
             BExpr::Logic(_, _, _) => false,
-            BExpr::Not(x) => x.is_binary(),
+            BExpr::Not(_) => false,
         }
     }
 }
