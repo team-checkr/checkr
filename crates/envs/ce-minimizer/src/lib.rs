@@ -25,13 +25,16 @@ impl Env for MinimizerEnv {
     type Meta = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
+        eprintln!("run called with: {:?}", input.dfa);
+        
         let test_output = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         
-        let dfa = NamedDFA::build(test_output);
-        dfa.dfa.to_dot();
+        let dfa = NamedDFA::build(test_output)
+            .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
 
-        Ok(Output {dfa: dfa.dfa.to_dot()})
+        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names) })
+        //Ok(Output {dfa: dfa.dfa.to_dot()})
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
@@ -43,6 +46,8 @@ impl Generate for Input {
     type Context = ();
 
     fn gn<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
-        Self::default()
+        Self {
+            dfa: "states: q0 q1\nalphabet: a b\ninitial: q0\naccepting: q1\ntransitions:\nq0,a -> q1\nq1,b -> q0".to_string()
+        }
     }
 }

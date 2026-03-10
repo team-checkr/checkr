@@ -1,7 +1,5 @@
 use std::{collections::HashMap, usize};
 
-use tapi::kind::Name;
-
 pub type Node = usize;
 
 #[derive(Debug)]
@@ -49,6 +47,12 @@ pub enum ParseErrorDFA {
 
     #[error("invalid alphabet symbol: one char expected")]
     BadAlphabetSymbol,
+
+    #[error("initial state missing")]
+    NoInitialState,
+
+    #[error("accepting states missing")]
+    NoAcceptingStates,
 
     #[error("bad input")]
     BadInput,
@@ -174,31 +178,37 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
 }
 
 impl NamedDFA {
-    pub fn build(raw_dfa: RawDFA) -> Self {
+    pub fn build(raw_dfa: RawDFA) -> Result<Self,ParseErrorDFA> {
         let name_to_index: HashMap<String, Node> = raw_dfa.state_names
             .iter()
             .enumerate()
             .map(|(i, name)| (name.clone(), i))
             .collect();
 
-        let initial = name_to_index[&raw_dfa.initial.unwrap()];
+        // Check if raw dfa has an initial state and that the state declared in initial is also in states
+        let initial = *name_to_index.get(&raw_dfa.initial.ok_or(ParseErrorDFA::NoInitialState)?).ok_or(ParseErrorDFA::BadInput)?;
 
-        let accepting = raw_dfa.accepting.iter()
-            .map(|name| name_to_index[name])
+        let accepting: Result<Vec<Node>, ParseErrorDFA> = raw_dfa.accepting.iter()
+            .map(|name| Ok(name_to_index.get(name).copied().ok_or(ParseErrorDFA::BadInput)?))
             .collect();
 
-        let edges = raw_dfa.transitions.iter()
-            .map(|(from, sym, to)| Edge {
-                from: name_to_index[from],
+        let accepting = accepting?;
+
+        let edges: Result<Vec<Edge>, ParseErrorDFA> = raw_dfa.transitions.iter()
+            .map(|(from, sym, to)| Ok(Edge {
+                from: *name_to_index.get(from).ok_or(ParseErrorDFA::BadTransition)?,
                 symbol: *sym,
-                to: name_to_index[to],
-            })
+                to: *name_to_index.get(to).ok_or(ParseErrorDFA::BadTransition)?,
+            }))
             .collect();
-
+        
+        let edges = edges?;
+            
+        Ok(
         NamedDFA {
             dfa: DFA { state_count: raw_dfa.state_names.len(), edges, initial, accepting, alphabet: raw_dfa.alphabet },
             names: raw_dfa.state_names
-        }
+        })
     } 
 }
 
@@ -219,11 +229,16 @@ impl DFA {
             s.push_str(&format!("  {} [shape=doublecircle]\n", node));
         }
 
+        // ////multiple symbols on one edge
+        // let mut edge_map: HashMap<(Node, Node), Vec<char>> = HashMap::new();
+        // for edge in &self.edges {
+        //     edge_map.entry((edge.from, edge.to)).or_default().push(edge.symbol);
+        // }
+
         for edge in &self.edges {
             s.push_str(&format!("  {} -> {} [label=\"{}\"]\n", edge.from, edge.to, edge.symbol));
         }
 
-        s.push_str("  2 [borderWidth=5]\n");
         s.push_str("}");
         s
     }

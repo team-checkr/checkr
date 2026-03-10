@@ -3,6 +3,7 @@
   import StandardInput from '$lib/components/StandardInput.svelte';
   import Network from '$lib/components/Network.svelte';
   import { Io } from '$lib/io.svelte';
+  import DfaGraph from '$lib/components/DfaGraph.svelte';
 
   const io = new Io('Minimizer', { dfa: 'skip' });
 </script>
@@ -14,7 +15,8 @@
   {#snippet outputView({ output, referenceOutput })}
     <div class="relative">
       <div class="absolute inset-0 grid overflow-auto">
-        <Network dot={output.dfa || ''} />
+        <!-- <DfaGraph dot={output.dfa || ''} /> -->
+        <p>{output.dfa || ''}</p>
       </div>
     </div>
   {/snippet}
