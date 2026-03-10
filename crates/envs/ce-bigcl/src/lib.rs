@@ -136,7 +136,11 @@ impl Binify for Commands {
 }
 impl Binify for Command {
     type Output = Commands;
+
     fn binify(&self, ctx: &mut Ctx) -> Commands {
+        if self.is_binary() {
+            return Commands([self.clone()].to_vec());
+        }
         match self {
             Command::Assignment(target, x) => {
                 let (target_cmds, target) = target.binify(ctx);
@@ -162,6 +166,16 @@ impl Binify for Command {
                     .to_vec(),
                 ),
                 |else_, Guard(b, c)| {
+                    if b.is_binary() {
+                        return Command::If(
+                            [
+                                Guard(b.clone(), c.binify(ctx)),
+                                Guard(BExpr::Not(Box::new(b.clone())), else_),
+                            ]
+                            .to_vec(),
+                        )
+                        .binify(ctx);
+                    }
                     let tmp = ctx.fresh();
                     let pre = b.bitify(ctx, &tmp);
                     let g = BExpr::Rel(

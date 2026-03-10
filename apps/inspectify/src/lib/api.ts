@@ -234,7 +234,7 @@ export namespace ce_riscv {
   export type Output = {
     assembly: string
   };
-export type Annotation = {
+  export type Annotation = {
     output: string
   };
 }
@@ -374,7 +374,6 @@ export namespace inspectify {
     export type ReferenceExecution = {
       meta: ce_shell.io.Meta,
       output: (ce_shell.io.Output | null),
-      annotation: (ce_shell.io.Annotation | null),
       error: (string | null)
     };
     export type GenerateParams = {
