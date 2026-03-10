@@ -1,7 +1,5 @@
 use std::{collections::HashMap, usize};
 
-use itertools::all;
-
 pub type Node = usize;
 
 #[derive(Debug)]
@@ -181,7 +179,7 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
 
 impl NamedDFA {
     pub fn build(raw_dfa: RawDFA) -> Result<Self,ParseErrorDFA> {
-        // Start with declared states, then add any referenced but undeclared ones
+        // start with declared states, then add any referenced but undeclared ones
         let mut all_names: Vec<String> = raw_dfa.state_names.clone();
         
         for (from, _, to) in &raw_dfa.transitions {
@@ -193,6 +191,13 @@ impl NamedDFA {
         }
         for name in &raw_dfa.accepting {
             if !all_names.contains(name) { all_names.push(name.clone()); }
+        }
+
+        let mut all_alphabet_symbols = raw_dfa.alphabet;
+
+        // infer alphabet
+        for (_ , symbol, _) in &raw_dfa.transitions {
+            if !all_alphabet_symbols.contains(symbol) { all_alphabet_symbols.push(*symbol) }
         }
 
         // create index/id for the states
@@ -225,7 +230,7 @@ impl NamedDFA {
             
         Ok(
         NamedDFA {
-            dfa: DFA { state_count: all_names.len(), edges, initial, accepting, alphabet: raw_dfa.alphabet },
+            dfa: DFA { state_count: all_names.len(), edges, initial, accepting, alphabet: all_alphabet_symbols },
             names: all_names
         })
     } 
