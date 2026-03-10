@@ -1,5 +1,7 @@
 use std::{collections::HashMap, usize};
 
+use itertools::all;
+
 pub type Node = usize;
 
 #[derive(Debug)]
@@ -179,14 +181,31 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
 
 impl NamedDFA {
     pub fn build(raw_dfa: RawDFA) -> Result<Self,ParseErrorDFA> {
-        let name_to_index: HashMap<String, Node> = raw_dfa.state_names
+        // Start with declared states, then add any referenced but undeclared ones
+        let mut all_names: Vec<String> = raw_dfa.state_names.clone();
+        
+        for (from, _, to) in &raw_dfa.transitions {
+            if !all_names.contains(from) { all_names.push(from.clone()) }
+            if !all_names.contains(to) { all_names.push(to.clone()) }
+        }
+        if let Some(ref init) = raw_dfa.initial {
+            if !all_names.contains(init) { all_names.push(init.clone()); }
+        }
+        for name in &raw_dfa.accepting {
+            if !all_names.contains(name) { all_names.push(name.clone()); }
+        }
+
+        // create index/id for the states
+        let name_to_index: HashMap<String, Node> = all_names
             .iter()
             .enumerate()
             .map(|(i, name)| (name.clone(), i))
             .collect();
 
         // Check if raw dfa has an initial state and that the state declared in initial is also in states
-        let initial = *name_to_index.get(&raw_dfa.initial.ok_or(ParseErrorDFA::NoInitialState)?).ok_or(ParseErrorDFA::BadInput)?;
+        let initial = *name_to_index
+            .get(&raw_dfa.initial.ok_or(ParseErrorDFA::NoInitialState)?)
+            .ok_or(ParseErrorDFA::BadInput)?;
 
         let accepting: Result<Vec<Node>, ParseErrorDFA> = raw_dfa.accepting.iter()
             .map(|name| Ok(name_to_index.get(name).copied().ok_or(ParseErrorDFA::BadInput)?))
@@ -206,8 +225,8 @@ impl NamedDFA {
             
         Ok(
         NamedDFA {
-            dfa: DFA { state_count: raw_dfa.state_names.len(), edges, initial, accepting, alphabet: raw_dfa.alphabet },
-            names: raw_dfa.state_names
+            dfa: DFA { state_count: all_names.len(), edges, initial, accepting, alphabet: raw_dfa.alphabet },
+            names: all_names
         })
     } 
 }
