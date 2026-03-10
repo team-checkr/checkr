@@ -20,7 +20,7 @@
         </div>
       </div>
       <div>
-        <h1>Here</h1>
+        <hr>
         <pre><code>{annotation?.output}</code></pre>
       </div>
     </div>

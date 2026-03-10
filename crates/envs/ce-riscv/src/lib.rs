@@ -23,7 +23,6 @@ pub struct Output {
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Annotation {
-    // ALBERTO
     output: String,
 }
 
@@ -76,7 +75,7 @@ impl Env for RiscVEnv {
         let step_result = vm.run();
 
         let ann = Annotation {
-            output: format!("finish: {step_result:?}\n\n{}", vm.display()),
+            output: format!("STATUS\n=========\n{step_result:?}\n\n{}", vm.display()),
         };
         Ok((ValidationResult::Correct, ann))
     }
@@ -406,7 +405,23 @@ enum StepResult {
 
 impl RiskVVM<'_> {
     fn display(&self) -> String {
-        format!("mem: {:?}, pc: {:?}", self.memory, self.pc.0)
+        //let mut s = format!("mem: {:?}, pc: {:?}\n", self.memory, self.pc.0);
+        let mut s = String::new();
+        s.push_str("CONTROL\n=========\n");
+        s.push_str(&format!("pc: {}\n", self.pc.0));
+        s.push_str("\nREGISTERS\n=========\n");
+        for reg in &self.memory.regs {
+            s.push_str(&format!("{}: {}\n", reg.0, reg.1 .0));
+        }
+        s.push_str("\nVARIABLES\n=========\n");
+        for label in &self.memory.labels {
+            s.push_str(&format!("{}@{}: {}\n", label.0, label.1, self.memory.load_at(*label.1)));
+        }
+        s.push_str("\nMEMORY\n=========\n");
+        for heap in &self.memory.heap {
+            s.push_str(&format!("{}: {}\n", heap.0 .0, heap.1 .0));
+        }
+        return s;
     }
 
     fn run(&mut self) -> StepResult {
