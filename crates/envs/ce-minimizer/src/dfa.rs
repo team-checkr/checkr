@@ -1,5 +1,8 @@
 use std::{collections::HashMap, usize};
 
+use itertools::enumerate;
+use tapi::kind::Name;
+
 pub type Node = usize;
 
 #[derive(Debug)]
@@ -52,7 +55,7 @@ pub enum ParseErrorDFA {
     NoInitialState,
 
     #[error("accepting states missing")]
-    NoAcceptingStates,
+    NoAcceptingStates, //Think if this should be handled as error
 
     #[error("bad input")]
     BadInput,
@@ -180,6 +183,7 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
 impl NamedDFA {
     pub fn build(raw_dfa: RawDFA) -> Result<Self,ParseErrorDFA> {
         // start with declared states, then add any referenced but undeclared ones
+        // infer states
         let mut all_names: Vec<String> = raw_dfa.state_names.clone();
         
         for (from, _, to) in &raw_dfa.transitions {
@@ -193,9 +197,9 @@ impl NamedDFA {
             if !all_names.contains(name) { all_names.push(name.clone()); }
         }
 
+        // infer alphabet
         let mut all_alphabet_symbols = raw_dfa.alphabet;
 
-        // infer alphabet
         for (_ , symbol, _) in &raw_dfa.transitions {
             if !all_alphabet_symbols.contains(symbol) { all_alphabet_symbols.push(*symbol) }
         }
@@ -236,31 +240,47 @@ impl NamedDFA {
     } 
 }
 
-impl DFA {
+impl NamedDFA {
     pub fn add_edge(&mut self, edge: Edge) {
-        self.edges.push(edge)
+        self.dfa.edges.push(edge)
     }  
 
     pub fn to_dot(&self) -> String {
         let mut s = "digraph DFA {\n  rankdir=LR\n\n".to_string();
 
-        // Initial state arrow
-        s.push_str("  __start [label=\"\", shape=none]\n");
-        s.push_str(&format!("  __start -> {}\n", self.initial));
+        s.push_str("  // States\n");
+        s.push_str("  __start [label=\"\", shape=none]\n"); // startstate
+        for (node, state) in enumerate(&self.names) {
+            s.push_str(&format!("  {} [label=\"{}\", shape={}]\n",
+                node, 
+                state, 
+                if self.dfa.accepting.contains(&node) {"doublecircle"} else {"circle"}
+            ));
+        }
+        s.push_str("\n");
 
-        // Accept states
-        for &node in &self.accepting {
-            s.push_str(&format!("  {} [shape=doublecircle]\n", node));
+        s.push_str("  // Initial\n");
+        s.push_str(&format!("  __start -> {}\n", self.dfa.initial));
+        s.push_str(&format!("\n"));
+
+        s.push_str("  // Transitions\n");
+        // multiple symbols on one edge
+        
+        let mut edge_map: HashMap<(Node, Node), Vec<char>> = HashMap::new();
+        for edge in &self.dfa.edges {
+            edge_map.entry((edge.from, edge.to)).or_default().push(edge.symbol);
         }
 
-        // ////multiple symbols on one edge
-        // let mut edge_map: HashMap<(Node, Node), Vec<char>> = HashMap::new();
-        // for edge in &self.edges {
-        //     edge_map.entry((edge.from, edge.to)).or_default().push(edge.symbol);
-        // }
-
-        for edge in &self.edges {
-            s.push_str(&format!("  {} -> {} [label=\"{}\"]\n", edge.from, edge.to, edge.symbol));
+        for ((from, to), symbols) in edge_map {
+            s.push_str(&format!("  {} -> {} [label=\"{}\"]\n", 
+                from, 
+                to, 
+                {
+                    let mut chars: Vec<String> = symbols.iter().map(|c| c.to_string()).collect();
+                    chars.sort();
+                    chars.join(",")
+                }
+            ));
         }
 
         s.push_str("}");

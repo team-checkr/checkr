@@ -14,7 +14,8 @@ pub struct Input {
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Output {
-    dfa: String
+    dfa: String,
+    dot: String
 }
 
 impl Env for MinimizerEnv {
@@ -33,7 +34,9 @@ impl Env for MinimizerEnv {
         let dfa = NamedDFA::build(test_output)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
 
-        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names) })
+        let dot = dfa.to_dot();
+
+        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names), dot })
         //Ok(Output {dfa: dfa.dfa.to_dot()})
     }
 
