@@ -45,8 +45,11 @@ pub enum ParseErrorDFA {
     #[error("initial state missing")]
     NoInitialState,
 
-    #[error("accepting states missing")]
-    NoAcceptingStates, //Think if this should be handled as error
+    #[error("state found in transition is not declared")]
+    MissingState,
+
+    #[error("alphabet symbol found in transition is not declared")]
+    MissingSymbol,
 
     #[error("bad input")]
     BadInput,
@@ -87,10 +90,14 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
         let from = from.trim().to_string();
 
         let sym = parse_one_char(sym_str)?;
+        
         if from.is_empty() || to.is_empty() { return None; }
+        if from.contains(char::is_whitespace) || to.contains(char::is_whitespace) { return None; }
 
         Some((from, sym, to))
     }
+
+    let mut has_transitions_section = false;
 
     for raw_line in input.lines() {
         let line = raw_line.trim();
@@ -130,6 +137,7 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
         }
         if let Some(_) = line.strip_prefix("transitions:") {
             current_section = Section::Transitions;
+            has_transitions_section = true;
             continue;
         }
 
@@ -161,6 +169,10 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
         }
     }
     
+    if !has_transitions_section {
+        return Err(ParseErrorDFA::BadInput);
+    }
+
     Ok(
     RawDFA {
         state_names,
@@ -189,10 +201,28 @@ impl NamedDFA {
         }
 
         // infer alphabet
-        let mut all_alphabet_symbols = raw_dfa.alphabet;
+        let mut all_alphabet_symbols = raw_dfa.alphabet.clone();
 
         for (_ , symbol, _) in &raw_dfa.transitions {
             if !all_alphabet_symbols.contains(symbol) { all_alphabet_symbols.push(*symbol) }
+        }
+        
+        // check against declared states
+        if !raw_dfa.state_names.is_empty() {
+            for name in &all_names {
+                if !raw_dfa.state_names.contains(name) {
+                    return Err(ParseErrorDFA::MissingState);
+                }
+            }
+        }
+
+        // check against declared alphabet symbols
+        if !raw_dfa.alphabet.is_empty() {
+            for sym in &all_alphabet_symbols {
+                if !raw_dfa.alphabet.contains(sym) {
+                    return Err(ParseErrorDFA::MissingSymbol);
+                }
+            }   
         }
 
         // create index/id for the states
