@@ -247,7 +247,8 @@ export namespace ce_minimizer {
   };
   export type Output = {
     dfa: string,
-    dot: string
+    dot: string,
+    minimized_dot: string
   };
 }
 export namespace ce_shell {

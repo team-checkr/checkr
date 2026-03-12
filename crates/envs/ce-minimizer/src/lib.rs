@@ -15,7 +15,8 @@ pub struct Input {
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 pub struct Output {
     dfa: String,
-    dot: String
+    dot: String, 
+    minimized_dot: String
 }
 
 impl Env for MinimizerEnv {
@@ -36,8 +37,8 @@ impl Env for MinimizerEnv {
 
         let dot = dfa.to_dot();
 
-        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names), dot })
-        //Ok(Output {dfa: dfa.dfa.to_dot()})
+        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names), dot, ..Default::default() })
+        
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {

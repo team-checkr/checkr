@@ -13,11 +13,26 @@
     <StandardInput analysis="Minimizer" code="dfa" {io} />
   {/snippet}
   {#snippet outputView({ output, referenceOutput })}
-    <div class="relative">
-      <div class="absolute inset-0 grid overflow-auto">
-        <Graphviz dot={output.dot || ''} />
-        <p>{output.dfa || ''}</p>
+    <div class="flex flex-col h-full w-full">
+
+      <div class="flex flex-col flex-1 min-h-0">
+        <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Original</h1>
+        <div class="relative flex-1">
+          <div class="absolute inset-0">
+            <Graphviz dot={output.dot || ''} />
+          </div>
+        </div>
       </div>
+
+      <div class="flex flex-col flex-1 min-h-0">
+        <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Minimized</h1>
+        <div class="relative flex-1">
+          <div class="absolute inset-0">
+            <Graphviz dot={output.minimized_dot || output.dot || ''} />
+          </div>
+        </div>
+      </div>
+
     </div>
   {/snippet}
 </Env>

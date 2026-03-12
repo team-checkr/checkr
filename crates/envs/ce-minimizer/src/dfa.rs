@@ -1,17 +1,8 @@
 use std::{collections::HashMap, usize};
 
 use itertools::enumerate;
-use tapi::kind::Name;
 
 pub type Node = usize;
-
-#[derive(Debug)]
-pub struct State {
-    id: Node,
-    name: String,
-    accepting: bool,
-    initial: bool
-}
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
 pub struct DFA {
