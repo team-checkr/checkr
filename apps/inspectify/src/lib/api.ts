@@ -248,8 +248,17 @@ export namespace ce_minimizer {
   export type Output = {
     dfa: string,
     dot: string,
-    minimized_dot: string
+    minimized_dot: string,
+    errors: ce_minimizer.dfa.SemanticErrorDFA[]
   };
+  export namespace dfa {
+    export type SemanticErrorDFA =
+      | "Incomplete"
+      | "Nondeterministic"
+      | "InvalidInitialState"
+      | "InvalidAcceptingState";
+    export const SEMANTIC_ERROR_DFA: SemanticErrorDFA[] = ["Incomplete", "Nondeterministic", "InvalidInitialState", "InvalidAcceptingState"];
+  }
 }
 export namespace ce_shell {
   export type Envs =

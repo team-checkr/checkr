@@ -16,7 +16,8 @@ pub struct Input {
 pub struct Output {
     dfa: String,
     dot: String, 
-    minimized_dot: String
+    minimized_dot: String,
+    errors: Vec<SemanticErrorDFA>
 }
 
 impl Env for MinimizerEnv {
@@ -27,17 +28,17 @@ impl Env for MinimizerEnv {
     type Meta = ();
 
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
-        eprintln!("run called with: {:?}", input.dfa);
-        
         let test_output = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         
-        let dfa = NamedDFA::build(test_output)
+        let named_dfa = NamedDFA::build(test_output)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
 
-        let dot = dfa.to_dot();
+        let dot = named_dfa.to_dot();
 
-        Ok( Output { dfa: format!("{:?} \n {:?}", dfa.dfa, dfa.names), dot, ..Default::default() })
+        let semantic_errors = named_dfa.dfa.validate();
+
+        Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, errors: semantic_errors, ..Default::default() })
         
     }
 
