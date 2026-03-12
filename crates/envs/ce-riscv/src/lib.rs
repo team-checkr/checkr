@@ -125,7 +125,7 @@ fn compile(input: &Input, cmd: Commands) -> RiscVFile {
             }
             [
                 Edge(_, Action::Condition(a), t),
-                Edge(_, Action::Condition(_b), f),
+                Edge(_, Action::Condition(b), f),
             ] => {
                 // NOTE: we know that b is !a
                 match a {
@@ -174,7 +174,7 @@ fn compile(input: &Input, cmd: Commands) -> RiscVFile {
                         }
                     }
                     BExpr::Logic(_, _, _) => unreachable!(),
-                    BExpr::Not(_) => unreachable!(),
+                    BExpr::Not(_) => unreachable!("found edge with ¬. they were: {a} and {b}"),
                 }
             }
             edges => todo!("\n\n{}\n\n{cmd}\n\n{edges:?}", input.commands),

@@ -5,7 +5,7 @@ use thiserror::Error;
 
 use crate::RiscVFile;
 
-lalrpop_mod!(riscv);
+lalrpop_mod!(riscv, "/parse/riscv.rs");
 
 pub fn parse_file(src: &str) -> Result<RiscVFile, ParseError> {
     static PARSER: Lazy<riscv::FileParser> = Lazy::new(riscv::FileParser::new);

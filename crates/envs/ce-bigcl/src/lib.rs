@@ -463,7 +463,12 @@ fn check_programs_for_semantic_equivalence(p1: &Commands, p2: &Commands) -> Vali
                     // NOTE: nothing more to do!
                 } else {
                     return ValidationResult::Mismatch {
-                        reason: format!("final memories differ:\n{:?}\n{:?}", mem1, mem2),
+                        reason: format!(
+                            "final memories differ:
+                        {:?}
+                        {:?}",
+                            mem1, mem2
+                        ),
                     };
                 }
             }
@@ -527,20 +532,20 @@ impl IsBinary for Command {
             Command::Assignment(t, a) => t.is_binary() && a.is_binary(),
             Command::Skip => true,
             Command::If(guards) => {
-                if let [Guard(a, _), Guard(BExpr::Not(b), _)] = guards.as_slice()
+                if let [Guard(a, a_body), Guard(BExpr::Not(b), b_body)] = guards.as_slice()
                     && a == &**b
                     && a.is_binary()
                 {
-                    true
+                    a_body.is_binary() && b_body.is_binary()
                 } else {
                     false
                 }
             }
             Command::Loop(guards) => {
-                if let [Guard(a, _)] = guards.as_slice()
+                if let [Guard(a, a_body)] = guards.as_slice()
                     && a.is_binary()
                 {
-                    true
+                    a_body.is_binary()
                 } else {
                     false
                 }
@@ -576,5 +581,65 @@ impl IsBinary for BExpr {
             BExpr::Logic(_, _, _) => false,
             BExpr::Not(_) => false,
         }
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn test_1() {
+        let res = BExpr::Logic(
+            Box::new(BExpr::Bool(true)),
+            LogicOp::Or,
+            Box::new(BExpr::Not(Box::new(BExpr::Rel(
+                AExpr::Number(1),
+                gcl::ast::RelOp::Eq,
+                AExpr::Number(2),
+            )))),
+        )
+        .bitify(
+            &mut Ctx::new(Default::default()),
+            &Target::Variable(Variable("target".to_string())),
+        );
+
+        assert!(res.is_binary());
+
+        assert_eq!(
+            res.to_string(),
+            r#"if true ->
+   target := 1
+[] !true ->
+   tmp0_ := 1 ;
+   tmp0_ := (1 - tmp0_) ;
+   if (tmp0_ = 1) ->
+      if (1 = 2) ->
+         tmp2_ := 1
+      [] !(1 = 2) ->
+         tmp2_ := 0
+      fi ;
+      tmp2_ := (1 - tmp2_) ;
+      if (tmp2_ = 1) ->
+         target := 1
+      [] !(tmp2_ = 1) ->
+         if (1 = 2) ->
+            tmp1_ := 1
+         [] !(1 = 2) ->
+            tmp1_ := 0
+         fi ;
+         tmp1_ := (1 - tmp1_) ;
+         tmp1_ := (1 - tmp1_) ;
+         if (tmp1_ = 1) ->
+            target := 0
+         [] !(tmp1_ = 1) ->
+            stuck_ := (1 / 0)
+         fi
+      fi
+   [] !(tmp0_ = 1) ->
+      stuck_ := (1 / 0)
+   fi
+fi"#
+        );
     }
 }
