@@ -411,6 +411,7 @@ dependencies = [
  "gcl",
  "indexmap",
  "itertools 0.14.0",
+ "riscvy",
  "serde",
  "serde_json",
  "stdx",
@@ -2613,6 +2614,20 @@ dependencies = [
 ]
 
 [[package]]
+name = "riscvy"
+version = "0.2.14"
+dependencies = [
+ "indexmap",
+ "itertools 0.14.0",
+ "lalrpop",
+ "lalrpop-util",
+ "miette 7.6.0",
+ "once_cell",
+ "text-size",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "rle-decode-fast"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -3204,6 +3219,12 @@ dependencies = [
  "quote",
  "syn 2.0.104",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "textwrap"

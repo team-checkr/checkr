@@ -17,3 +17,4 @@ serde_json.workspace = true
 stdx.workspace = true
 tapi.workspace = true
 tracing.workspace = true
+riscvy.workspace = true

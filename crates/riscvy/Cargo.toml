@@ -1,0 +1,19 @@
+[package]
+name = "riscvy"
+version.workspace = true
+edition.workspace = true
+repository.workspace = true
+authors.workspace = true
+license.workspace = true
+
+[dependencies]
+indexmap.workspace = true
+itertools.workspace = true
+lalrpop-util = { workspace = true, features = ["lexer"] }
+miette.workspace = true
+once_cell.workspace = true
+text-size = "1.1.1"
+thiserror.workspace = true
+
+[build-dependencies]
+lalrpop.workspace = true

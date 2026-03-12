@@ -264,12 +264,12 @@ export namespace ce_shell {
       json: any,
       hash: ce_shell.io.Hash
     };
+    export type Hash = {
+      bytes: number[]
+    };
     export type Meta = {
       analysis: ce_shell.Analysis,
       json: any
-    };
-    export type Hash = {
-      bytes: number[]
     };
     export type Output = {
       analysis: ce_shell.Analysis,
@@ -376,13 +376,13 @@ export namespace inspectify {
       output: (ce_shell.io.Output | null),
       error: (string | null)
     };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type GenerateParams = {
       analysis: ce_shell.Analysis,
       seed: (number | null)
     };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type CompilationStatus = {
       id: (driver.job.JobId | null),
       state: driver.job.JobState,

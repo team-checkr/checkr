@@ -1,0 +1,65 @@
+use std::str::FromStr;
+use crate::{Label, RiscVFile, Word, Instruction, Reg};
+use itertools::Either;
+
+grammar;
+
+pub File: RiscVFile = {
+    ".data"
+        <data:DataEntry*>
+    ".text"
+        <text:LabelOrInstruction*> =>
+    {
+        RiscVFile { data, text }
+    }
+};
+
+DataEntry: (Label, Word) = {
+    <Label> ":" ".word" <Word>
+};
+
+Word: Word = { <Num> => Word(<>) };
+
+Num: i32 = <s:r"-?[0-9]+"> => i32::from_str(s).unwrap();
+
+Label: Label = {
+    <r"[a-zA-Z_][a-zA-Z0-9_]*"> => Label(<>.to_string()),
+};
+
+Reg: Reg = {
+    "t0" => Reg::t0(),
+    "t1" => Reg::t1(),
+    "t2" => Reg::t2(),
+    "a0" => Reg::a0(),
+    "a1" => Reg::a1(),
+    "a2" => Reg::a2(),
+    "a3" => Reg::a3(),
+    "a4" => Reg::a4(),
+    "a5" => Reg::a5(),
+    "a6" => Reg::a6(),
+    "a7" => Reg::a7(),
+}
+
+LabelOrInstruction: Either<Label, Instruction> = {
+    <Label> ":" => Either::Left(<>),
+    <Instruction> => Either::Right(<>),
+};
+
+Instruction: Instruction = {
+    "li" <Reg> "," <Word> => Instruction::li(<>),
+    "lw" <Reg> "," <Label> => Instruction::lw(<>),
+    "la" <Reg> "," <Label> => Instruction::la(<>),
+    "mv" <Reg> "," <Reg> => Instruction::mv(<>),
+    "sw" <Reg> "," <Word> "(" <Reg> ")" => Instruction::sw(<>),
+    "add" <Reg> "," <Reg> "," <Reg> => Instruction::add(<>),
+    "neg" <Reg> "," <Reg> => Instruction::neg(<>),
+    "sub" <Reg> "," <Reg> "," <Reg> => Instruction::sub(<>),
+    "mul" <Reg> "," <Reg> "," <Reg> => Instruction::mul(<>),
+    "div" <Reg> "," <Reg> "," <Reg> => Instruction::div(<>),
+    "j" <Label> => Instruction::j(<>),
+    "beq" <Reg> "," <Reg> "," <Label> => Instruction::beq(<>),
+    "bne" <Reg> "," <Reg> "," <Label> => Instruction::bne(<>),
+    "blt" <Reg> "," <Reg> "," <Label> => Instruction::blt(<>),
+    "ebreak" => Instruction::ebreak,
+    "ecall" => Instruction::ecall,
+};
