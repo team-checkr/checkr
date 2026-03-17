@@ -90,7 +90,7 @@ impl Env for RiscVEnv {
         let mut ref_vm = RiscVVM::new(&asm, mem);
         let ref_result = ref_vm.run(10000);
 
-        let display_data = ref_vm.to_display();
+        let display_data = their_vm.to_display();
 
         let ann = Annotation {
             pc: display_data.pc,
@@ -115,8 +115,17 @@ impl Env for RiscVEnv {
 
         match (their_result, ref_result) {
             (StepResult::Exit, StepResult::Exit) => {}
-            (StepResult::Ok, StepResult::Ok) => {}
             (StepResult::Stuck, StepResult::Stuck) => {}
+            (StepResult::Ok, _) | (_, StepResult::Ok) => {
+                return Ok((
+                    ValidationResult::Unknown {
+                        reason: format!(
+                            "programs did terminate. got: {their_result}, expected: {ref_result}"
+                        ),
+                    },
+                    ann,
+                ));
+            }
             (_, _) => {
                 return Ok((
                     ValidationResult::Mismatch {
