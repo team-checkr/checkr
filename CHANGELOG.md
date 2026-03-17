@@ -2,11 +2,38 @@
 
 All notable changes to this project will be documented in this file.
 
+## [0.3.0] - 2026-03-17
+
+### Bug Fixes
+
+- `getrandom` wasm build error
+- `cargo xtask new-env`
+
+### Features
+
+- Add binary update flow using bins built in ci
+- Add more granularity for `run.toml` `run` and `compile`
+
+### Miscellaneous Tasks
+
+- Bump rust and cargo update and check/clippy fixes
+- Update `dist`
+
+### Chip
+
+- Construct smt theory on-demand, add chip/z3 bench facilities
+- Minor bench improvements
+
+### Riscv
+
+- Update interpreter
+
 ## [0.2.14] - 2025-05-09
 
 ### Miscellaneous Tasks
 
 - Update dist runner
+- Release
 
 ## [0.2.13] - 2025-05-09
 
