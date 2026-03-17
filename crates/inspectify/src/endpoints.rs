@@ -376,6 +376,7 @@ async fn exec_analysis(
 struct ReferenceExecution {
     meta: ce_shell::Meta,
     output: Option<ce_shell::Output>,
+    annotation: Option<ce_shell::Annotation>,
     error: Option<String>,
 }
 
@@ -383,9 +384,15 @@ struct ReferenceExecution {
 async fn exec_reference(Json(input): Json<ce_shell::Input>) -> Json<ReferenceExecution> {
     let output = input.reference_output();
     let error = output.as_ref().err().map(|e| e.to_string());
+    let output = output.ok();
+    let annotation = output
+        .as_ref()
+        .and_then(|o| input.validate_output(o).ok())
+        .map(|(_, ann)| ann);
     Json(ReferenceExecution {
         meta: input.meta(),
-        output: output.ok(),
+        output,
+        annotation,
         error,
     })
 }

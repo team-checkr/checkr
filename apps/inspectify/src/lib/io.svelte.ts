@@ -54,7 +54,7 @@ export class Io<A extends ce_shell.Analysis> {
     const job = jobsStore.jobs[this.currentJob.jobId];
     return {
       input: this.currentJob.input,
-      outputState: job.analysis_data?.output?.json ? 'Current' : 'Stale',
+      outputState: (job.analysis_data?.output?.json || job.state != 'Running') ? 'Current' : 'Stale',
       output: job.analysis_data?.output?.json as any,
       referenceOutput: job.analysis_data?.reference_output?.json as any,
       validation: job.analysis_data?.validation as any,

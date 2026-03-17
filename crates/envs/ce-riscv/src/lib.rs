@@ -4,6 +4,7 @@ use gcl::{
     ast::{AExpr, AOp, Array, BExpr, Commands, RelOp, Target, Variable},
     pg::{Action, Edge, Node, ProgramGraph},
 };
+use indexmap::IndexMap;
 use riscvy::{Instruction, Label, Reg, RiscVFile, RiscVVM, Word};
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
@@ -11,18 +12,25 @@ use stdx::stringify::Stringify;
 define_env!(RiscVEnv);
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "RiscV")]
 pub struct Input {
     commands: Stringify<Commands>,
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "RiscV")]
 pub struct Output {
     assembly: String,
 }
 
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
+#[tapi(path = "RiscV")]
 pub struct Annotation {
-    output: String,
+    pub pc: usize,
+    pub regs: IndexMap<String, i32>,
+    /// Map from name of label to it's location in memory and the value at that location
+    pub variables: IndexMap<String, (i32, i32)>,
+    pub memory: IndexMap<i32, i32>,
 }
 
 impl Env for RiscVEnv {
@@ -42,7 +50,7 @@ impl Env for RiscVEnv {
                 .map_err(ce_core::EnvError::invalid_input_for_program(
                     "failed to parse commands",
                 ))?;
-        let file = compile(input, cmd);
+        let file = compile(input, &cmd);
 
         Ok(Output {
             assembly: file.to_string(),
@@ -72,22 +80,75 @@ impl Env for RiscVEnv {
                 .map_err(ce_core::EnvError::invalid_input_for_program(
                     "failed to parse commands",
                 ))?;
-        let reference_file = compile(input, cmd);
 
         let (mem, asm) = file.assemble();
+        let mut their_vm = RiscVVM::new(&asm, mem);
+        let their_result = their_vm.run(10000);
 
-        let mut vm = RiscVVM::new(&asm, mem);
+        let ref_file = compile(input, &cmd);
+        let (mem, asm) = ref_file.assemble();
+        let mut ref_vm = RiscVVM::new(&asm, mem);
+        let ref_result = ref_vm.run(10000);
 
-        let step_result = vm.run();
+        let display_data = ref_vm.to_display();
 
         let ann = Annotation {
-            output: format!("STATUS\n=========\n{step_result:?}\n\n{}", vm.display()),
+            pc: display_data.pc,
+            memory: display_data
+                .memory
+                .into_iter()
+                .map(|(l, w)| (l.0, w.0))
+                .collect(),
+            regs: display_data
+                .regs
+                .into_iter()
+                .map(|(l, w)| (l, w.0))
+                .collect(),
+            variables: display_data
+                .variables
+                .into_iter()
+                .map(|(l, (a, b))| (l, (a.0, b.0)))
+                .collect(),
         };
+
+        use riscvy::StepResult;
+
+        match (their_result, ref_result) {
+            (StepResult::Exit, StepResult::Exit) => {}
+            (StepResult::Ok, StepResult::Ok) => {}
+            (StepResult::Stuck, StepResult::Stuck) => {}
+            (_, _) => {
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!(
+                            "programs stopped at different times. got: {their_result}, expected: {ref_result}",
+                        ),
+                    },
+                    ann,
+                ));
+            }
+        }
+
+        for v in cmd.fv() {
+            let x = their_vm.mem().load_word(&Label(format!("v{v}")));
+            let y = ref_vm.mem().load_word(&Label(format!("v{v}")));
+            if x != y {
+                return Ok((
+                    ValidationResult::Mismatch {
+                        reason: format!(
+                            "variable '{v}' has different value at end. got: {y}, expected: {x}",
+                        ),
+                    },
+                    ann,
+                ));
+            }
+        }
+
         Ok((ValidationResult::Correct, ann))
     }
 }
 
-fn compile(input: &Input, cmd: Commands) -> RiscVFile {
+fn compile(input: &Input, cmd: &Commands) -> RiscVFile {
     let mut ctx = ce_bigcl::Ctx::new(cmd.fv().into_iter().map(|t| t.name().to_string()).collect());
     let cmd = cmd.binify(&mut ctx);
     let fv = cmd.fv();

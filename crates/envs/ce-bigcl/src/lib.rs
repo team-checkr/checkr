@@ -82,8 +82,13 @@ impl Generate for Input {
     type Context = ();
 
     fn gn<R: rand::Rng>(_cx: &mut Self::Context, rng: &mut R) -> Self {
+        use ce_core::gn::GclGenContext;
+        let mut cx = GclGenContext {
+            fuel: 5,
+            ..GclGenContext::default()
+        };
         Self {
-            commands: Stringify::new(Commands::gn(&mut Default::default(), rng)),
+            commands: Stringify::new(Commands(cx.many(1, 4, rng))),
         }
     }
 }

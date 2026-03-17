@@ -156,11 +156,50 @@ pub struct RiscVVM<'a> {
     pc: ProgramPoint,
 }
 
-#[derive(Debug)]
+#[derive(Debug, Clone, Copy)]
 pub enum StepResult {
     Ok,
     Stuck,
     Exit,
+}
+
+impl std::fmt::Display for StepResult {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        match self {
+            StepResult::Exit => write!(f, "exit"),
+            StepResult::Stuck => write!(f, "stuck"),
+            StepResult::Ok => write!(f, "ok"),
+        }
+    }
+}
+
+pub struct RicVVMDisplay {
+    pub pc: usize,
+    pub regs: IndexMap<String, Word>,
+    /// Map from name of label to it's location in memory and the value at that location
+    pub variables: IndexMap<String, (Word, Word)>,
+    pub memory: IndexMap<Word, Word>,
+}
+
+impl std::fmt::Display for RicVVMDisplay {
+    fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
+        //let mut s = format!("mem: {:?}, pc: {:?}\n", self.memory, self.pc.0);
+        writeln!(f, "CONTROL\n=========")?;
+        writeln!(f, "pc: {}", self.pc)?;
+        writeln!(f, "\nREGISTERS\n=========")?;
+        for (reg, w) in &self.regs {
+            writeln!(f, "{reg}: {w}")?;
+        }
+        writeln!(f, "\nVARIABLES\n=========")?;
+        for (label, (loc, w)) in &self.variables {
+            writeln!(f, "{label}@{loc}: {w}")?;
+        }
+        writeln!(f, "\nMEMORY\n=========")?;
+        for (loc, w) in &self.memory {
+            writeln!(f, "{loc}: {w}")?;
+        }
+        Ok(())
+    }
 }
 
 impl<'a> RiscVVM<'a> {
@@ -172,33 +211,31 @@ impl<'a> RiscVVM<'a> {
         }
     }
 
-    pub fn display(&self) -> String {
-        //let mut s = format!("mem: {:?}, pc: {:?}\n", self.memory, self.pc.0);
-        let mut s = String::new();
-        s.push_str("CONTROL\n=========\n");
-        s.push_str(&format!("pc: {}\n", self.pc.0));
-        s.push_str("\nREGISTERS\n=========\n");
-        for reg in &self.memory.regs {
-            s.push_str(&format!("{}: {}\n", reg.0, reg.1.0));
+    pub fn to_display(&self) -> RicVVMDisplay {
+        RicVVMDisplay {
+            pc: self.pc.0,
+            regs: self
+                .memory
+                .regs
+                .iter()
+                .map(|(reg, w)| (reg.to_string(), *w))
+                .collect(),
+            variables: self
+                .memory
+                .labels
+                .iter()
+                .map(|(label, loc)| (label.to_string(), (*loc, self.memory.load_at(*loc))))
+                .collect(),
+            memory: self.memory.heap.iter().map(|(loc, w)| (*loc, *w)).collect(),
         }
-        s.push_str("\nVARIABLES\n=========\n");
-        for label in &self.memory.labels {
-            s.push_str(&format!(
-                "{}@{}: {}\n",
-                label.0,
-                label.1,
-                self.memory.load_at(*label.1)
-            ));
-        }
-        s.push_str("\nMEMORY\n=========\n");
-        for heap in &self.memory.heap {
-            s.push_str(&format!("{}: {}\n", heap.0.0, heap.1.0));
-        }
-        s
     }
 
-    pub fn run(&mut self) -> StepResult {
-        for _ in 0..10000 {
+    pub fn display(&self) -> String {
+        self.to_display().to_string()
+    }
+
+    pub fn run(&mut self, steps: usize) -> StepResult {
+        for _ in 0..steps {
             match self.step() {
                 StepResult::Exit => return StepResult::Exit,
                 StepResult::Stuck => return StepResult::Stuck,
@@ -206,6 +243,10 @@ impl<'a> RiscVVM<'a> {
             }
         }
         StepResult::Ok
+    }
+
+    pub fn mem(&self) -> &RiscVMemory {
+        &self.memory
     }
 
     fn step(&mut self) -> StepResult {
@@ -316,7 +357,7 @@ impl RiscVMemory {
     fn set_reg(&mut self, reg: Reg, word: Word) {
         self.regs.insert(reg, word);
     }
-    fn load_reg(&self, reg: &Reg) -> Word {
+    pub fn load_reg(&self, reg: &Reg) -> Word {
         self.regs.get(reg).copied().unwrap_or_default()
     }
     fn set_at(&mut self, address: Word, word: Word) {
@@ -328,7 +369,7 @@ impl RiscVMemory {
     fn set_word(&mut self, label: Label, word: Word) {
         self.set_at(self.load_address(&label), word);
     }
-    fn load_word(&self, label: &Label) -> Word {
+    pub fn load_word(&self, label: &Label) -> Word {
         self.load_at(self.load_address(label))
     }
     fn load_address(&self, label: &Label) -> Word {

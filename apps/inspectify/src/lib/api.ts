@@ -171,6 +171,20 @@ export namespace Parser {
     pretty: string
   };
 }
+export namespace RiscV {
+  export type Input = {
+    commands: string
+  };
+  export type Output = {
+    assembly: string
+  };
+  export type Annotation = {
+    pc: number,
+    regs: Record<string, number>,
+    variables: Record<string, [number, number]>,
+    memory: Record<number, number>
+  };
+}
 export namespace SecurityAnalysis {
   export type Input = {
     commands: string,
@@ -227,17 +241,6 @@ export namespace ce_core {
     | { "type": "Mismatch", reason: string }
     | { "type": "TimeOut" };
 }
-export namespace ce_riscv {
-  export type Input = {
-    commands: string
-  };
-  export type Output = {
-    assembly: string
-  };
-  export type Annotation = {
-    output: string
-  };
-}
 export namespace ce_shell {
   export type Envs =
     | { "analysis": "Calculator", "io": { input: Calculator.Input, output: Calculator.Output, meta: void, annotation: void } }
@@ -245,7 +248,7 @@ export namespace ce_shell {
     | { "analysis": "Compiler", "io": { input: Compiler.Input, output: Compiler.Output, meta: void, annotation: void } }
     | { "analysis": "Interpreter", "io": { input: Interpreter.Input, output: Interpreter.Output, meta: GCL.TargetDef[], annotation: void } }
     | { "analysis": "BiGCL", "io": { input: BiGCL.Input, output: BiGCL.Output, meta: void, annotation: void } }
-    | { "analysis": "RiscV", "io": { input: ce_riscv.Input, output: ce_riscv.Output, meta: void, annotation: ce_riscv.Annotation } }
+    | { "analysis": "RiscV", "io": { input: RiscV.Input, output: RiscV.Output, meta: void, annotation: RiscV.Annotation } }
     | { "analysis": "Security", "io": { input: SecurityAnalysis.Input, output: SecurityAnalysis.Output, meta: SecurityAnalysis.Meta, annotation: void } }
     | { "analysis": "Sign", "io": { input: SignAnalysis.Input, output: SignAnalysis.Output, meta: GCL.TargetDef[], annotation: void } };
   export type Analysis =
@@ -264,12 +267,12 @@ export namespace ce_shell {
       json: any,
       hash: ce_shell.io.Hash
     };
-    export type Hash = {
-      bytes: number[]
-    };
     export type Meta = {
       analysis: ce_shell.Analysis,
       json: any
+    };
+    export type Hash = {
+      bytes: number[]
     };
     export type Output = {
       analysis: ce_shell.Analysis,
@@ -364,6 +367,15 @@ export namespace inspectify {
     }
   }
   export namespace endpoints {
+    export type ReferenceExecution = {
+      meta: ce_shell.io.Meta,
+      output: (ce_shell.io.Output | null),
+      annotation: (ce_shell.io.Annotation | null),
+      error: (string | null)
+    };
+    export type PublicEvent =
+      | { "type": "Reset" }
+      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type Event =
       | { "type": "Reset" }
       | { "type": "CompilationStatus", "value": { status: inspectify.endpoints.CompilationStatus } }
@@ -371,14 +383,6 @@ export namespace inspectify {
       | { "type": "JobsChanged", "value": { jobs: driver.job.JobId[] } }
       | { "type": "GroupsConfig", "value": { config: inspectify.checko.config.GroupsConfig } }
       | { "type": "ProgramsConfig", "value": { programs: inspectify.endpoints.Program[] } };
-    export type ReferenceExecution = {
-      meta: ce_shell.io.Meta,
-      output: (ce_shell.io.Output | null),
-      error: (string | null)
-    };
-    export type PublicEvent =
-      | { "type": "Reset" }
-      | { "type": "StateChanged", "value": inspectify.checko.scoreboard.PublicState };
     export type GenerateParams = {
       analysis: ce_shell.Analysis,
       seed: (number | null)
