@@ -1,8 +1,12 @@
+mod instr;
 mod parse;
+mod vm;
 
 use indexmap::IndexMap;
 use itertools::Either;
 pub use parse::ParseError;
+
+pub use crate::instr::Instruction;
 
 #[derive(Debug, Default, Clone, Copy, Hash, PartialEq, Eq, PartialOrd, Ord)]
 pub struct Word(pub i32);
@@ -51,11 +55,11 @@ impl Reg {
 #[derive(Default)]
 pub struct RiscVFile {
     data: Vec<(Label, Word)>,
-    text: Vec<Either<Label, Instruction>>,
+    text: Vec<Either<Label, Instruction<Reg, Label, Label>>>,
 }
 
 #[derive(Debug, Default, Clone, Copy)]
-pub struct ProgramPoint(usize);
+pub struct ProgramPoint(u32);
 
 impl ProgramPoint {
     pub fn inc(self) -> ProgramPoint {
@@ -65,7 +69,7 @@ impl ProgramPoint {
 
 pub struct RiscVAssembly {
     labels: IndexMap<Label, ProgramPoint>,
-    insts: Vec<Instruction>,
+    insts: Vec<Instruction<Reg, Label, Label>>,
 }
 
 pub enum CallNumber {}
@@ -83,77 +87,29 @@ impl RiscVFile {
     pub fn push_label(&mut self, label: Label) {
         self.text.push(Either::Left(label));
     }
-    pub fn push_inst(&mut self, inst: Instruction) {
+    pub fn push_inst(&mut self, inst: Instruction<Reg, Label, Label>) {
         self.text.push(Either::Right(inst));
     }
     pub fn push_halt(&mut self) {
         self.push_inst(Instruction::li(Reg::a7(), CallNumber::EXIT));
         self.push_inst(Instruction::ecall);
     }
-    pub fn assemble(self) -> (RiscVMemory, RiscVAssembly) {
-        let mut asm = RiscVAssembly {
-            labels: Default::default(),
-            insts: Vec::new(),
-        };
-        let mem = RiscVMemory {
-            labels: self
-                .data
-                .iter()
-                .enumerate()
-                .map(|(index, (label, _init))| (label.clone(), Word(index as _)))
-                .collect(),
-            heap: self
-                .data
-                .into_iter()
-                .enumerate()
-                .map(|(index, (_label, init))| (Word(index as _), init))
-                .collect(),
-            regs: Default::default(),
-        };
-        for item in self.text {
-            match item {
-                Either::Left(l) => {
-                    asm.labels.insert(l, ProgramPoint(asm.insts.len()));
-                }
-                Either::Right(inst) => {
-                    asm.insts.push(inst);
-                }
-            }
-        }
-        (mem, asm)
+
+    pub fn run(&self, steps: usize) -> (StepResult, RiscVVMDisplay) {
+        let (bin, init_mem) = vm::Binary::from_file(self);
+        let mut vm = vm::VM::new(init_mem);
+        let res = vm.run(&bin, steps);
+        (res, vm.display(&bin))
     }
 }
 
 impl RiscVAssembly {
-    pub fn inst(&self, pc: ProgramPoint) -> Option<&Instruction> {
-        self.insts.get(pc.0)
+    pub fn inst(&self, pc: ProgramPoint) -> Option<&Instruction<Reg, Label, Label>> {
+        self.insts.get(pc.0 as usize)
     }
     pub fn lookup_label(&self, l: &Label) -> Option<ProgramPoint> {
         self.labels.get(l).copied()
     }
-}
-
-#[allow(non_camel_case_types)]
-mod helpers {
-    pub type rd = super::Reg;
-    pub type rs = super::Reg;
-    pub type rs1 = super::Reg;
-    pub type rs2 = super::Reg;
-    pub type val = super::Word;
-    pub type label = super::Label;
-}
-
-#[derive(Debug)]
-pub struct RiscVMemory {
-    regs: IndexMap<Reg, Word>,     // contents of registers
-    labels: IndexMap<Label, Word>, // where in the heap is label l stored
-    heap: IndexMap<Word, Word>,    // heap position to value stored there
-}
-
-pub struct RiscVVM<'a> {
-    asm: &'a RiscVAssembly,
-    memory: RiscVMemory,
-    pc: ProgramPoint,
 }
 
 #[derive(Debug, Clone, Copy)]
@@ -173,15 +129,16 @@ impl std::fmt::Display for StepResult {
     }
 }
 
-pub struct RicVVMDisplay {
-    pub pc: usize,
+pub struct RiscVVMDisplay {
+    pub pc: u32,
     pub regs: IndexMap<String, Word>,
-    /// Map from name of label to it's location in memory and the value at that location
+    /// Map from name of label to it's location in memory and the value at that
+    /// location
     pub variables: IndexMap<String, (Word, Word)>,
-    pub memory: IndexMap<Word, Word>,
+    pub memory: Vec<Word>,
 }
 
-impl std::fmt::Display for RicVVMDisplay {
+impl std::fmt::Display for RiscVVMDisplay {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         //let mut s = format!("mem: {:?}, pc: {:?}\n", self.memory, self.pc.0);
         writeln!(f, "CONTROL\n=========")?;
@@ -195,185 +152,10 @@ impl std::fmt::Display for RicVVMDisplay {
             writeln!(f, "{label}@{loc}: {w}")?;
         }
         writeln!(f, "\nMEMORY\n=========")?;
-        for (loc, w) in &self.memory {
+        for (loc, w) in self.memory.iter().enumerate() {
             writeln!(f, "{loc}: {w}")?;
         }
         Ok(())
-    }
-}
-
-impl<'a> RiscVVM<'a> {
-    pub fn new(asm: &'a RiscVAssembly, memory: RiscVMemory) -> RiscVVM<'a> {
-        RiscVVM {
-            asm,
-            memory,
-            pc: Default::default(),
-        }
-    }
-
-    pub fn to_display(&self) -> RicVVMDisplay {
-        RicVVMDisplay {
-            pc: self.pc.0,
-            regs: self
-                .memory
-                .regs
-                .iter()
-                .map(|(reg, w)| (reg.to_string(), *w))
-                .collect(),
-            variables: self
-                .memory
-                .labels
-                .iter()
-                .map(|(label, loc)| (label.to_string(), (*loc, self.memory.load_at(*loc))))
-                .collect(),
-            memory: self.memory.heap.iter().map(|(loc, w)| (*loc, *w)).collect(),
-        }
-    }
-
-    pub fn display(&self) -> String {
-        self.to_display().to_string()
-    }
-
-    pub fn run(&mut self, steps: usize) -> StepResult {
-        for _ in 0..steps {
-            match self.step() {
-                StepResult::Exit => return StepResult::Exit,
-                StepResult::Stuck => return StepResult::Stuck,
-                StepResult::Ok => {}
-            }
-        }
-        StepResult::Ok
-    }
-
-    pub fn mem(&self) -> &RiscVMemory {
-        &self.memory
-    }
-
-    fn step(&mut self) -> StepResult {
-        if let Some(inst) = self.asm.inst(self.pc) {
-            self.pc = self.pc.inc();
-
-            match inst {
-                Instruction::li(reg, word) => {
-                    self.memory.set_reg(reg.clone(), *word);
-                }
-                Instruction::lw(reg, label) => {
-                    self.memory
-                        .set_reg(reg.clone(), self.memory.load_word(label));
-                }
-                Instruction::la(reg, label) => {
-                    self.memory
-                        .set_reg(reg.clone(), self.memory.load_address(label));
-                }
-                Instruction::mv(reg, reg1) => {
-                    self.memory.set_reg(reg.clone(), self.memory.load_reg(reg1));
-                }
-                Instruction::sw(reg, o, reg1) => {
-                    self.memory
-                        .set_at(*o + self.memory.load_reg(reg1), self.memory.load_reg(reg));
-                }
-                Instruction::add(reg, reg1, reg2) => {
-                    self.memory.set_reg(
-                        reg.clone(),
-                        self.memory.load_reg(reg1) + self.memory.load_reg(reg2),
-                    );
-                }
-                Instruction::neg(reg, reg1) => {
-                    self.memory
-                        .set_reg(reg.clone(), -self.memory.load_reg(reg1));
-                }
-                Instruction::sub(reg, reg1, reg2) => {
-                    self.memory.set_reg(
-                        reg.clone(),
-                        self.memory.load_reg(reg1) - self.memory.load_reg(reg2),
-                    );
-                }
-                Instruction::mul(reg, reg1, reg2) => {
-                    self.memory.set_reg(
-                        reg.clone(),
-                        self.memory.load_reg(reg1) * self.memory.load_reg(reg2),
-                    );
-                }
-                Instruction::div(reg, reg1, reg2) => {
-                    let r = self.memory.load_reg(reg2);
-                    if r == Word(0) {
-                        return StepResult::Stuck;
-                    } else {
-                        self.memory
-                            .set_reg(reg.clone(), self.memory.load_reg(reg1) / r);
-                    }
-                }
-                Instruction::j(label) => {
-                    if let Some(pc) = self.asm.lookup_label(label) {
-                        self.pc = pc
-                    } else {
-                        return StepResult::Stuck;
-                    }
-                }
-                Instruction::beq(reg, reg1, label) => {
-                    let Some(pc) = self.asm.lookup_label(label) else {
-                        return StepResult::Stuck;
-                    };
-
-                    if self.memory.load_reg(reg) == self.memory.load_reg(reg1) {
-                        self.pc = pc;
-                    }
-                }
-                Instruction::bne(reg, reg1, label) => {
-                    let Some(pc) = self.asm.lookup_label(label) else {
-                        return StepResult::Stuck;
-                    };
-
-                    if self.memory.load_reg(reg) != self.memory.load_reg(reg1) {
-                        self.pc = pc;
-                    }
-                }
-                Instruction::blt(reg, reg1, label) => {
-                    let Some(pc) = self.asm.lookup_label(label) else {
-                        return StepResult::Stuck;
-                    };
-
-                    if self.memory.load_reg(reg) < self.memory.load_reg(reg1) {
-                        self.pc = pc;
-                    }
-                }
-                Instruction::ebreak => return StepResult::Stuck,
-                Instruction::ecall => match self.memory.load_reg(&Reg::a7()) {
-                    CallNumber::EXIT => {
-                        return StepResult::Exit;
-                    }
-                    _ => return StepResult::Stuck,
-                },
-            }
-
-            StepResult::Ok
-        } else {
-            StepResult::Stuck
-        }
-    }
-}
-
-impl RiscVMemory {
-    fn set_reg(&mut self, reg: Reg, word: Word) {
-        self.regs.insert(reg, word);
-    }
-    pub fn load_reg(&self, reg: &Reg) -> Word {
-        self.regs.get(reg).copied().unwrap_or_default()
-    }
-    fn set_at(&mut self, address: Word, word: Word) {
-        self.heap.insert(address, word);
-    }
-    fn load_at(&self, word: Word) -> Word {
-        self.heap.get(&word).copied().unwrap_or_default()
-    }
-    fn set_word(&mut self, label: Label, word: Word) {
-        self.set_at(self.load_address(&label), word);
-    }
-    pub fn load_word(&self, label: &Label) -> Word {
-        self.load_at(self.load_address(label))
-    }
-    fn load_address(&self, label: &Label) -> Word {
-        self.labels.get(label).copied().unwrap_or_default()
     }
 }
 
@@ -406,133 +188,6 @@ impl std::ops::Neg for Word {
     fn neg(self) -> Self::Output {
         Word(self.0.wrapping_neg())
     }
-}
-
-use helpers::*;
-
-#[derive(Debug, Clone)]
-#[allow(non_camel_case_types, unused)]
-pub enum Instruction {
-    // Load and Store Instructions
-    // These instructions load data from memory into a register, copy data between registers, or
-    // store data from a register into memory.
-    /// `li rd, val`
-    ///
-    /// ## Load immediate
-    /// Load into register rd the 32-bit word val. (Pseudo instruction)
-    li(rd, val),
-
-    /// `lw rd, label`
-    ///
-    /// ## Load word
-    /// Load into register rd the word stored at memory address label. (Pseudo
-    /// instruction)
-    lw(rd, label),
-
-    /// `la rd, label`
-    ///
-    /// ## Load absolute
-    /// Load into register rd the memory address label. (Pseudo instruction)
-    la(rd, label),
-
-    /// `mv rd, rs`
-    ///
-    /// ## Move
-    /// Move (i.e. copy) the content of register rs into register rd.
-    mv(rd, rs),
-
-    /// `sw rs2, offset(rs1)`
-    ///
-    /// ## Store word
-    /// Store the 32-bit word contained in the register rs2 into memory. The
-    /// destination memory address is computed adding the word offset to the
-    /// content of register rs1.
-    sw(rs2, Word, rs1),
-
-    // Integer Arithmetic Instructions
-    // These instructions operate on base integer registers.
-    /// `add rd, rs1, rs2`
-    ///
-    /// ## Addition
-    /// Add the contents of registers rs1 and rs2 and store the result in
-    /// register rd.
-    add(rd, rs1, rs2),
-
-    /// `neg rd, rs2`
-    ///
-    /// ## Negation
-    /// Negates the contents of register rs2 and store the result in register
-    /// rd.
-    neg(rd, rs2),
-
-    /// `sub rd, rs1, rs2`
-    ///
-    /// ## Subtraction
-    /// Subtract the contents of register rs2 from rs1 and store the result in
-    /// register rd.
-    sub(rd, rs1, rs2),
-
-    /// `mul rd, rs1, rs2`
-    ///
-    /// ## Multiplication
-    /// Multiply the contents of registers rs2 and rs1 and store the result in
-    /// register rd.
-    mul(rd, rs1, rs2),
-
-    /// `div rd, rs1, rs2`
-    ///
-    /// ## Division
-    /// Divide the content of register rs1 by rs2 and store the result in
-    /// register rd.
-    div(rd, rs1, rs2),
-
-    // Control Transfer Instructions
-    // These instructions perform jumps, with or without conditions.
-    /// `j label`
-    ///
-    /// ## Jump
-    /// Jump to memory address label and execute the code stored there. (Pseudo
-    /// instruction)
-    j(label),
-
-    /// `beq rs1, rs2, label`
-    ///
-    /// ## Branch if equal
-    /// Compare the contents of registers rs1 and rs2, and jump to label if they
-    /// are equal.
-    beq(rs1, rs2, label),
-
-    /// `bne rs1, rs2, label`
-    ///
-    /// ## Branch if not equal
-    /// Compare the contents of registers rs1 and rs2, and jump to label if they
-    /// are not equal.
-    bne(rs1, rs2, label),
-
-    /// `blt rs1, rs2, label`
-    ///
-    /// ## Branch if less than
-    /// Compare the contents of registers rs1 and rs2, and jump to label if the
-    /// content of rs1 is smaller than the content of rs2.
-    blt(rs1, rs2, label),
-
-    // System Instructions
-    // These instructions allow a RISC-V assembly program to interact with the surrounding
-    // operating system.
-    /// `ebreak`
-    ///
-    /// ## Environment break
-    /// Stop the execution. This instruction acts as a breakpoint, and is used
-    /// e.g. to let debuggers take control of a running program.
-    ebreak,
-
-    /// `ecall`
-    ///
-    /// ## Environment call
-    /// Perform a system call. This will become clearer in when we will discuss
-    /// the RISC-V Assembly Program Structure and RARS — RISC-V Assembler and
-    /// Runtime Simulator.
-    ecall,
 }
 
 impl std::fmt::Display for RiscVFile {
@@ -577,7 +232,7 @@ impl std::fmt::Display for Reg {
         Ok(())
     }
 }
-impl std::fmt::Display for Instruction {
+impl std::fmt::Display for Instruction<Reg, Label, Label> {
     fn fmt(&self, f: &mut std::fmt::Formatter<'_>) -> std::fmt::Result {
         match self {
             Instruction::li(r, v) => write!(f, "\tli {r}, {v}"),

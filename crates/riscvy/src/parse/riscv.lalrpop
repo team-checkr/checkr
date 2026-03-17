@@ -40,12 +40,12 @@ Reg: Reg = {
     "a7" => Reg::a7(),
 }
 
-LabelOrInstruction: Either<Label, Instruction> = {
+LabelOrInstruction: Either<Label, Instruction<Reg, Label, Label>> = {
     <Label> ":" => Either::Left(<>),
     <Instruction> => Either::Right(<>),
 };
 
-Instruction: Instruction = {
+Instruction: Instruction<Reg, Label, Label> = {
     "li" <Reg> "," <Word> => Instruction::li(<>),
     "lw" <Reg> "," <Label> => Instruction::lw(<>),
     "la" <Reg> "," <Label> => Instruction::la(<>),

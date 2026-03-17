@@ -5,7 +5,7 @@ use gcl::{
     pg::{Action, Edge, Node, ProgramGraph},
 };
 use indexmap::IndexMap;
-use riscvy::{Instruction, Label, Reg, RiscVFile, RiscVVM, Word};
+use riscvy::{Instruction, Label, Reg, RiscVFile, Word};
 use serde::{Deserialize, Serialize};
 use stdx::stringify::Stringify;
 
@@ -26,11 +26,12 @@ pub struct Output {
 #[derive(tapi::Tapi, Debug, Default, Clone, PartialEq, Serialize, Deserialize)]
 #[tapi(path = "RiscV")]
 pub struct Annotation {
-    pub pc: usize,
+    pub pc: u32,
     pub regs: IndexMap<String, i32>,
-    /// Map from name of label to it's location in memory and the value at that location
+    /// Map from name of label to it's location in memory and the value at that
+    /// location
     pub variables: IndexMap<String, (i32, i32)>,
-    pub memory: IndexMap<i32, i32>,
+    pub memory: Vec<i32>,
 }
 
 impl Env for RiscVEnv {
@@ -61,7 +62,7 @@ impl Env for RiscVEnv {
         input: &Self::Input,
         output: &Self::Output,
     ) -> ce_core::Result<(ValidationResult, Annotation)> {
-        let file = match riscvy::RiscVFile::parse(&output.assembly) {
+        let their_file = match riscvy::RiscVFile::parse(&output.assembly) {
             Ok(file) => file,
             Err(err) => {
                 return Ok((
@@ -80,47 +81,36 @@ impl Env for RiscVEnv {
                 .map_err(ce_core::EnvError::invalid_input_for_program(
                     "failed to parse commands",
                 ))?;
-
-        let (mem, asm) = file.assemble();
-        let mut their_vm = RiscVVM::new(&asm, mem);
-        let their_result = their_vm.run(10000);
-
         let ref_file = compile(input, &cmd);
-        let (mem, asm) = ref_file.assemble();
-        let mut ref_vm = RiscVVM::new(&asm, mem);
-        let ref_result = ref_vm.run(10000);
 
-        let display_data = their_vm.to_display();
+        let (their_res, their_display) = their_file.run(10_000);
+        let (ref_res, ref_display) = ref_file.run(10_000);
 
         let ann = Annotation {
-            pc: display_data.pc,
-            memory: display_data
-                .memory
-                .into_iter()
-                .map(|(l, w)| (l.0, w.0))
-                .collect(),
-            regs: display_data
+            pc: their_display.pc,
+            memory: their_display.memory.into_iter().map(|w| w.0).collect(),
+            regs: their_display
                 .regs
                 .into_iter()
                 .map(|(l, w)| (l, w.0))
                 .collect(),
-            variables: display_data
+            variables: their_display
                 .variables
-                .into_iter()
-                .map(|(l, (a, b))| (l, (a.0, b.0)))
+                .iter()
+                .map(|(l, (a, b))| (l.clone(), (a.0, b.0)))
                 .collect(),
         };
 
         use riscvy::StepResult;
 
-        match (their_result, ref_result) {
+        match (their_res, ref_res) {
             (StepResult::Exit, StepResult::Exit) => {}
             (StepResult::Stuck, StepResult::Stuck) => {}
             (StepResult::Ok, _) | (_, StepResult::Ok) => {
                 return Ok((
                     ValidationResult::Unknown {
                         reason: format!(
-                            "programs did terminate. got: {their_result}, expected: {ref_result}"
+                            "programs did terminate. got: {their_res}, expected: {ref_res}"
                         ),
                     },
                     ann,
@@ -130,7 +120,7 @@ impl Env for RiscVEnv {
                 return Ok((
                     ValidationResult::Mismatch {
                         reason: format!(
-                            "programs stopped at different times. got: {their_result}, expected: {ref_result}",
+                            "programs stopped at different times. got: {their_res}, expected: {ref_res}",
                         ),
                     },
                     ann,
@@ -139,8 +129,16 @@ impl Env for RiscVEnv {
         }
 
         for v in cmd.fv() {
-            let x = their_vm.mem().load_word(&Label(format!("v{v}")));
-            let y = ref_vm.mem().load_word(&Label(format!("v{v}")));
+            let (_, x) = their_display
+                .variables
+                .get(&format!("v{v}"))
+                .copied()
+                .unwrap_or_default();
+            let (_, y) = ref_display
+                .variables
+                .get(&format!("v{v}"))
+                .copied()
+                .unwrap_or_default();
             if x != y {
                 return Ok((
                     ValidationResult::Mismatch {
