@@ -90,8 +90,6 @@ impl Env for RiscVEnv {
 fn compile(input: &Input, cmd: Commands) -> RiscVFile {
     let mut ctx = ce_bigcl::Ctx::new(cmd.fv().into_iter().map(|t| t.name().to_string()).collect());
     let cmd = cmd.binify(&mut ctx);
-    // TODO: x1-x31 are reserved for the RISC-V architecture, so we should not use
-    // them for variables. We should use x32 and above instead.
     let fv = cmd.fv();
     let pg = ProgramGraph::new(gcl::pg::Determinism::NonDeterministic, &cmd);
 
