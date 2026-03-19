@@ -6,11 +6,11 @@ pub type Node = usize;
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
 pub struct DFA {
-    state_count: usize,
+    pub state_count: usize,
     edges: Vec<Edge>,
-    initial: Node, 
-    accepting: Vec<Node>,
-    alphabet: Vec<char>
+    pub initial: Node, 
+    pub accepting: Vec<Node>,
+    pub alphabet: Vec<char>
 }
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
@@ -349,5 +349,15 @@ impl DFA {
         }
 
         errors
+    }
+
+    pub fn delta(&self, node:Node, symbol:char) -> Option<Node> {
+        for edge in &self.edges {
+            if edge.from == node && edge.symbol == symbol {
+                return Some(edge.to);
+            } 
+        }
+
+        None
     }
 }
