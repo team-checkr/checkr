@@ -45,7 +45,7 @@ pub enum ParseErrorDFA {
     #[error("initial state missing")]
     NoInitialState,
 
-    #[error("state found in transition is not declared")]
+    #[error("state is not declared")]
     MissingState,
 
     #[error("alphabet symbol found in transition is not declared")]
@@ -322,13 +322,13 @@ impl DFA {
     pub fn validate(&self) -> Vec<SemanticErrorDFA> {
         let mut errors = Vec::new();
 
-        // completeness
+        // completeness (check for  missing transitions)
         let incomplete = (0..self.state_count).any(|node| {
             self.alphabet.iter().any(|symbol| {
                 !self.edges.iter().any(|e| e.from == node && e.symbol == *symbol)
             })
         });
-        if incomplete { errors.push(SemanticErrorDFA::Incomplete); }
+        if incomplete { errors.push(SemanticErrorDFA::Nondeterministic); }
 
         // determinism
         let nondeterministic = (0..self.state_count).any(|node| {
