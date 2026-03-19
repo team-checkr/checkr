@@ -1,4 +1,5 @@
 mod dfa;
+mod minimizer;
 
 use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use serde::{Deserialize, Serialize};

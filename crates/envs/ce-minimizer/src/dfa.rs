@@ -19,7 +19,7 @@ pub struct Edge {
     symbol: char,
     to: Node,
 }
-
+#[derive(Default)]
 pub struct NamedDFA {
     pub dfa: DFA,
     pub names: Vec<String>,  // names[i] = name of state i
