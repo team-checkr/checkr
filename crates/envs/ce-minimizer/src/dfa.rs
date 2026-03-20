@@ -7,7 +7,7 @@ pub type Node = usize;
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
 pub struct DFA {
     pub state_count: usize,
-    edges: Vec<Edge>,
+    pub edges: Vec<Edge>,
     pub initial: Node, 
     pub accepting: Vec<Node>,
     pub alphabet: Vec<char>
@@ -15,9 +15,9 @@ pub struct DFA {
 
 #[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
 pub struct Edge {
-    from: Node,
-    symbol: char,
-    to: Node,
+    pub from: Node,
+    pub symbol: char,
+    pub to: Node,
 }
 #[derive(Default)]
 pub struct NamedDFA {

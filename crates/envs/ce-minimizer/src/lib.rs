@@ -5,6 +5,7 @@ use ce_core::{Env, Generate, ValidationResult, define_env, rand};
 use serde::{Deserialize, Serialize};
 
 use dfa::*;
+use minimizer::*;
 
 define_env!(MinimizerEnv);
 
@@ -37,9 +38,11 @@ impl Env for MinimizerEnv {
 
         let dot = named_dfa.to_dot();
 
+        let minimized_dot = named_dfa.minimize().to_dot();
+
         let semantic_errors = named_dfa.dfa.validate();
 
-        Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, errors: semantic_errors, ..Default::default() })
+        Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, minimized_dot, errors: semantic_errors })
         
     }
 
@@ -53,7 +56,7 @@ impl Generate for Input {
 
     fn gn<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
         Self {
-            dfa: "states: q0 q1\nalphabet: a b\ninitial: q0\naccepting: q1\ntransitions:\nq0,a -> q1\nq1,b -> q0".to_string()
+            dfa: "".to_string()
         }
     }
 }
