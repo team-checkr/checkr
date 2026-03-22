@@ -1,7 +1,6 @@
 <script lang="ts">
   import Env from '$lib/components/Env.svelte';
   import StandardInput from '$lib/components/StandardInput.svelte';
-  import Network from '$lib/components/Network.svelte';
   import { Io } from '$lib/io.svelte';
   import Graphviz from '$lib/components/Graphviz.svelte';
 
@@ -33,7 +32,7 @@
         <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Minimized</h1>
         <div class="relative flex-1">
           <div class="absolute inset-0">
-            <Graphviz dot={output.minimized_dot || output.dot || ''} />
+            <Graphviz dot={output.minimized_dot || ''} />
           </div>
         </div>
       </div>

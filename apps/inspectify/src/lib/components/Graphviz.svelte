@@ -8,8 +8,10 @@
   let svg = $state('');
 
   // Load graphviz once
-  Graphviz.load().then(g => {
-    graphviz = g;
+  $effect(() => {
+    Graphviz.load().then(g => {
+        graphviz = g;
+    });
   });
 
   // Only re-render when dot changes

@@ -38,12 +38,17 @@ impl Env for MinimizerEnv {
 
         let dot = named_dfa.to_dot();
 
-        let minimized_dot = named_dfa.minimize().to_dot();
-
         let semantic_errors = named_dfa.dfa.validate();
 
-        Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, minimized_dot, errors: semantic_errors })
-        
+        let mut minimized_dot = "".to_string();
+
+        if semantic_errors.is_empty() {
+            let minimized_dfa = named_dfa.minimize()
+                .map_err(ce_core::EnvError::invalid_input_for_program("failed to minimize dfa"))?;
+            minimized_dot = minimized_dfa.to_dot();
+        }
+
+        Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, minimized_dot, errors: semantic_errors })        
     }
 
     fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {

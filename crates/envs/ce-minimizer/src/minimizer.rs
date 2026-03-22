@@ -1,7 +1,3 @@
-use core::{num, panic};
-
-use tapi::kind::Name;
-
 use super::{NamedDFA, Node, Edge, DFA};
 
 #[derive(PartialEq)]
@@ -9,9 +5,16 @@ enum Equivalence { Equivalent, Distinguishable }
 
 type EquivTable = Vec<Vec<bool>>;
 
+#[derive(Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize, thiserror::Error)]
+pub enum MinimizationError {
+    #[error("transition not found")]
+    IncompleteInput,
+}
+
 impl NamedDFA {
-    pub fn minimize(&self) -> NamedDFA {
-        let table = self.build_equivalence_table();
+    
+    pub fn minimize(&self) -> Result<NamedDFA, MinimizationError>{
+        let table = self.build_equivalence_table()?;
         
         //partition the states into blocks of mutually equivalent states
         let n = self.dfa.state_count;
@@ -75,20 +78,20 @@ impl NamedDFA {
             })
             .collect();
 
-
-        NamedDFA {
-            dfa: DFA {
-                state_count: num_classes,
-                edges: new_edges,
-                initial: new_initial,
-                accepting: new_accepting,
-                alphabet: self.dfa.alphabet.clone(), // alphabet doesn't change
-            },
-            names: new_names,
-        }
+        Ok(
+            NamedDFA {
+                dfa: DFA {
+                    state_count: num_classes,
+                    edges: new_edges,
+                    initial: new_initial,
+                    accepting: new_accepting,
+                    alphabet: self.dfa.alphabet.clone(), // alphabet doesn't change
+                },
+                names: new_names,
+        })
     }
     
-    fn build_equivalence_table(&self) -> EquivTable {
+    fn build_equivalence_table(&self) -> Result<EquivTable, MinimizationError> {
         let n = self.dfa.state_count;
 
         // All pairs assumed equivalent (false), (true) pair is distinguishable
@@ -98,7 +101,7 @@ impl NamedDFA {
         for p in 0..n {
             for q in 0..n {
                 let p_acc = self.dfa.accepting.contains(&p);
-                let q_acc: bool = self.dfa.accepting.contains(&q);
+                let q_acc = self.dfa.accepting.contains(&q);
                 if p_acc != q_acc {
                     table[p][q] = true;
                     table[q][p] = true;
@@ -113,8 +116,8 @@ impl NamedDFA {
                 for q in 0..n {
                     if table[p][q] { continue; }
                     for symbol in &self.dfa.alphabet {
-                        let dp = self.dfa.delta(p, *symbol).expect("valid node expected");
-                        let dq = self.dfa.delta(p, *symbol).expect("valid node expected");
+                        let dp = self.dfa.delta(p, *symbol).ok_or(MinimizationError::IncompleteInput)?;
+                        let dq = self.dfa.delta(q, *symbol).ok_or(MinimizationError::IncompleteInput)?;
                         if table[dp][dq] {
                             table[p][q] = true;
                             table[q][p] = true;
@@ -126,7 +129,7 @@ impl NamedDFA {
             }
         }
 
-        table
+        Ok(table)
     }
 
     fn equivalent(&self, q0:Node, q1:Node, table: &EquivTable) -> Equivalence {
