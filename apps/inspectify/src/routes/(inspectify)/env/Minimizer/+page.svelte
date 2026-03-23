@@ -28,14 +28,16 @@
         </div>
       </div>
 
-      <div class="flex flex-col flex-1 min-h-0">
-        <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Minimized</h1>
-        <div class="relative flex-1">
-          <div class="absolute inset-0">
-            <Graphviz dot={output.minimized_dot || ''} />
+      {#if output.minimized_dot}
+        <div class="flex flex-col flex-1 min-h-0">
+          <h1 class="border-t bg-slate-900 p-2 text-2xl font-light italic">Minimized</h1>
+          <div class="relative flex-1">
+            <div class="absolute inset-0">
+              <Graphviz dot={output.minimized_dot} />
+            </div>
           </div>
         </div>
-      </div>
+      {/if}
 
     </div>
   {/snippet}

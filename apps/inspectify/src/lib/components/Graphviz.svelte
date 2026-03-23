@@ -19,6 +19,8 @@
     const currentDot = dot;
     if (graphviz && currentDot) {
       svg = graphviz.dot(dot);
+    } else {
+      svg = "";
     }
   });
 </script>

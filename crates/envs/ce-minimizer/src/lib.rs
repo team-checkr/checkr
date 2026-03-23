@@ -1,7 +1,7 @@
 mod dfa;
 mod minimizer;
 
-use ce_core::{Env, Generate, ValidationResult, define_env, rand};
+use ce_core::{Env, Generate, ValidationResult, define_env, rand, EnvError};
 use serde::{Deserialize, Serialize};
 
 use dfa::*;
@@ -29,6 +29,8 @@ impl Env for MinimizerEnv {
 
     type Meta = ();
 
+    type Annotation = ();
+
     fn run(input: &Self::Input) -> ce_core::Result<Self::Output> {
         let test_output = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
@@ -51,8 +53,8 @@ impl Env for MinimizerEnv {
         Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, minimized_dot, errors: semantic_errors })        
     }
 
-    fn validate(_input: &Self::Input, _output: &Self::Output) -> ce_core::Result<ValidationResult> {
-        Ok(ValidationResult::Correct)
+    fn validate(_input: &Self::Input, _output: &Self::Output) -> Result<(ValidationResult, ()), EnvError> {
+        Ok((ValidationResult::Correct, ()))
     }
 }
 
