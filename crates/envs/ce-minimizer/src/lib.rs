@@ -1,12 +1,14 @@
 mod dfa;
 mod minimizer;
+mod dfa_gen;
 
 use ce_core::{Env, Generate, ValidationResult, define_env, rand, EnvError};
 use serde::{Deserialize, Serialize};
+use crate::rand::{seq::IndexedRandom};
 
 use dfa::*;
 use minimizer::*;
- use std::collections::{HashSet, VecDeque};
+use std::collections::{HashSet, VecDeque};
 
 define_env!(MinimizerEnv);
 
@@ -143,9 +145,48 @@ impl Env for MinimizerEnv {
 impl Generate for Input {
     type Context = ();
 
-    fn gn<R: rand::Rng>(_cx: &mut Self::Context, _rng: &mut R) -> Self {
-        Self {
-            dfa: "".to_string()
+    fn gn<R: rand::Rng>(cx: &mut Self::Context, rng: &mut R) -> Self {
+        let state_count = rng.random_range(2..=4);
+        let states: Vec<String> = (0..state_count)
+            .map(|i| format!("q{i}"))
+            .collect();
+        
+        let alphabet_pool = vec!['0', '1', 'a', 'b'];
+        let mut alphabet: Vec<char> = alphabet_pool
+            .into_iter()
+            .filter(|_| rng.random_bool(0.7))
+            .collect();
+
+        if alphabet.is_empty() {
+            alphabet.push('0'); // guarantees at least one symbol
         }
+
+        let mut accepting_states: Vec<String> = states
+            .iter()
+            .filter(|_| rng.random_bool(0.3))
+            .cloned()
+            .collect();
+
+        if accepting_states.is_empty() {
+            accepting_states.push(states[0].clone()); // same guard as alphabet
+        }
+
+        let mut transitions: Vec<String> = Vec::new();
+        for state in &states {
+            for symbol in &alphabet {
+                let target = states.choose(rng).unwrap();
+                transitions.push(format!("{state}, {symbol} -> {target}"));
+            }
+        }
+
+        let dfa = format!(
+            "states: {}\ninitial: q0\nalphabet: {}\naccepting: {}\ntransitions:\n{}",
+            states.join(" "),
+            alphabet.iter().map(|c| c.to_string()).collect::<Vec<_>>().join(" "), 
+            accepting_states.join(" "), 
+            transitions.join("\n")
+        );
+        Self { dfa }
     }
 }
+
