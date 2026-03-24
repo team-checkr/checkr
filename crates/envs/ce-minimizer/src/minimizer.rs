@@ -46,7 +46,6 @@ impl NamedDFA {
         let mut new_edges: Vec<Edge> = Vec::new();
         for c in 0..num_classes {
             let rep = representative[c];
-            // find all edges leaving the representative in the original DFA
             for edge in &self.dfa.edges {
                 if edge.from == rep {
                     new_edges.push(Edge {
@@ -58,18 +57,14 @@ impl NamedDFA {
             }
         }
 
-        // New accepting states = classes whose representative is accepting
         let new_accepting: Vec<Node> = (0..num_classes)
             .filter(|&c| self.dfa.accepting.contains(&representative[c]))
             .collect();
 
-        // 5. New start state = class of the original initial state
         let new_initial = class[self.dfa.initial];
 
-        // 6. New names = name of each class's representative
         let new_names: Vec<String> = (0..num_classes)
             .map(|c| {
-                // collect all original state names whose class is c
                 let members: Vec<&str> = (0..n)
                     .filter(|&p| class[p] == c)
                     .map(|p| self.names[p].as_str())
@@ -85,7 +80,7 @@ impl NamedDFA {
                     edges: new_edges,
                     initial: new_initial,
                     accepting: new_accepting,
-                    alphabet: self.dfa.alphabet.clone(), // alphabet doesn't change
+                    alphabet: self.dfa.alphabet.clone(),
                 },
                 names: new_names,
         })
