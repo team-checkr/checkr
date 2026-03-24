@@ -360,4 +360,8 @@ impl DFA {
 
         None
     }
+
+    pub fn is_accepting(&self, node:Node) -> bool {
+        self.accepting.contains(&node)
+    }
 }

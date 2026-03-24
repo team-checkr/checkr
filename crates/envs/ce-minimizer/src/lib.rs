@@ -6,6 +6,7 @@ use serde::{Deserialize, Serialize};
 
 use dfa::*;
 use minimizer::*;
+ use std::collections::{HashSet, VecDeque};
 
 define_env!(MinimizerEnv);
 
@@ -53,7 +54,88 @@ impl Env for MinimizerEnv {
         Ok( Output { dfa: format!("{:?} \n {:?}", named_dfa.dfa, named_dfa.names), dot, minimized_dot, errors: semantic_errors })        
     }
 
-    fn validate(_input: &Self::Input, _output: &Self::Output) -> Result<(ValidationResult, ()), EnvError> {
+    fn validate(input: &Self::Input, output: &Self::Output) -> Result<(ValidationResult, ()), EnvError> {
+        //input is for reference implementation and output is for the student
+        
+        let reference_dfa = parse_dfa(&input.dfa)
+            .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
+        let reference_dfa = NamedDFA::build(reference_dfa)
+            .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
+        let reference_dfa_min = reference_dfa.minimize()
+                .map_err(ce_core::EnvError::invalid_input_for_program("failed to minimize dfa"))?;
+
+        let their_dfa = parse_dfa(&output.dfa)
+            .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
+        let their_dfa = NamedDFA::build(their_dfa)
+            .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
+        let their_dfa_min =  their_dfa.minimize()
+                .map_err(ce_core::EnvError::invalid_input_for_program("failed to minimize dfa"))?;
+
+        let mut original_dfa_match = false;
+
+        // -- original dfa validation
+        let mut visited = HashSet::new();
+        let mut queue = VecDeque::new();
+
+        queue.push_back((reference_dfa.dfa.initial, their_dfa.dfa.initial, String::new()));
+
+        while let Some((p, q, path)) = queue.pop_front() {
+            if !visited.insert((p, q)) { continue; }
+
+            if reference_dfa.dfa.is_accepting(p) != their_dfa.dfa.is_accepting(q) {
+                return Ok((ValidationResult::Mismatch { reason: format!(
+                    "original dfa disagrees on the string \"{path}\" - expected {}, got {}", 
+                    if reference_dfa.dfa.is_accepting(p) {"accepted"} else {"rejected"}, 
+                    if their_dfa.dfa.is_accepting(q) {"accepted"} else {"rejected"}
+                ) }, ()));
+            }
+
+            if reference_dfa.dfa.alphabet != their_dfa.dfa.alphabet {
+                return Ok((ValidationResult::Mismatch { reason: format!("alphabets differ") }, ()))
+            }
+
+            for symbol in &reference_dfa.dfa.alphabet {
+                let p2 = reference_dfa.dfa.delta(p, *symbol)
+                    .ok_or(MinimizationError::IncompleteInput)
+                    .map_err(ce_core::EnvError::invalid_input_for_program("failted to traverse dfa"))?;
+                let q2 = their_dfa.dfa.delta(q, *symbol)
+                    .ok_or(MinimizationError::IncompleteInput)
+                    .map_err(ce_core::EnvError::invalid_input_for_program("failed to traverse dfa"))?;
+                
+                queue.push_back((p2, q2, format!("{path}{symbol}")));
+            }   
+        }
+
+        original_dfa_match = true;
+
+        // -- minimized dfa validation
+        // while let Some((p, q, path)) = queue.pop_front() {
+        //     if !visited.insert((p, q)) { continue; }
+
+        //     if reference_dfa_min.dfa.is_accepting(p) != their_dfa_min.dfa.is_accepting(q) {
+        //         return Ok((ValidationResult::Mismatch { reason: format!(
+        //             "minimized dfa disagrees on the string \"{path}\" - expected {}, got {}", 
+        //             if reference_dfa_min.dfa.is_accepting(p) {"accepted"} else {"rejected"}, 
+        //             if their_dfa_min.dfa.is_accepting(p) {"accepted"} else {"rejected"}
+        //         ) }, ()));
+        //     }
+
+        //     if reference_dfa_min.dfa.alphabet != their_dfa_min.dfa.alphabet {
+        //         return Ok((ValidationResult::Mismatch { reason: format!("alphabets differ") }, ()))
+        //     }
+
+        //     for symbol in &reference_dfa_min.dfa.alphabet {
+        //         let p2 = reference_dfa_min.dfa.delta(p, *symbol)
+        //             .ok_or(MinimizationError::IncompleteInput)
+        //             .map_err(ce_core::EnvError::invalid_input_for_program("failted to traverse dfa"))?;
+        //         let q2 = their_dfa_min.dfa.delta(q, *symbol)
+        //             .ok_or(MinimizationError::IncompleteInput)
+        //             .map_err(ce_core::EnvError::invalid_input_for_program("failed to traverse dfa"))?;
+                
+        //         queue.push_back((p2, q2, format!("{path}{symbol}")));
+        //     }   
+        // }
+
         Ok((ValidationResult::Correct, ()))
     }
 }
