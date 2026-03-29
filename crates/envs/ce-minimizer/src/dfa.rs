@@ -19,7 +19,7 @@ pub struct Edge {
     pub symbol: char,
     pub to: Node,
 }
-#[derive(Default)]
+#[derive(Default, Debug, PartialEq)]
 pub struct NamedDFA {
     pub dfa: DFA,
     pub names: Vec<String>,  // names[i] = name of state i
@@ -34,7 +34,7 @@ pub struct RawDFA {
     transitions: Vec<(String, char, String)> 
 }
 
-#[derive(Debug, thiserror::Error)]
+#[derive(Debug, thiserror::Error, PartialEq)]
 pub enum ParseErrorDFA {
     #[error("invalid transition")]
     BadTransition,
@@ -363,5 +363,101 @@ impl DFA {
 
     pub fn is_accepting(&self, node:Node) -> bool {
         self.accepting.contains(&node)
+    }
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    //parse_dfa test cases
+    const EMPTY_INPUT: &str = "";
+    const INVALID_ALPHABET_INPUT: &str = "alphabet: ab\ninitial: q0\ntransitions:\nq0,a->q1\nq1,b->q0";
+    const BAD_TRANSITION_INPUT1: &str = "alphabet: a b\ninitial: q0\ntransitions:\nq0a->q1\nq1,b->q0";
+    const BAD_TRANSITION_INPUT2: &str = "alphabet: a b\ninitial: q0\ntransitions:\nq0,a->q1\nq1,b>q0";
+
+    //build test_cases
+    const MISSING_INITIAL_INPUT: &str = "transitions:\nq0,a->q1\nq1,a->q0";
+    const MISSING_SYMBOL_INPUT: &str = "states: q0 q1\nalphabet: 0\naccepting: q1\ninitial: q0\ntransitions:\nq0,0->q1\nq0,1->q0\nq1,1->q0\nq1,1->q1";
+    const MISSING_STATE_INPUT: &str = "states: q0 \nalphabet: 0 1\naccepting: q1\ninitial: q0\ntransitions:\nq0,0->q1\nq0,1->q0\nq1,1->q0\nq1,1->q1";
+
+    const DFA1: &str = "states: q0 q1 \nalphabet: 0 1\naccepting: q1\ninitial: q0\ntransitions:\nq0,0->q1\nq0,1->q0\nq1,1->q0\nq1,1->q1";
+    const DFA2: &str = "alphabet: 0 1\naccepting: C\ninitial: A\ntransitions:\nA,0->B\nA, 1->F\nB, 1 -> C\nB,0->G\nC,1->C\nC,0->A\nD,0->C\nD,1->G\nE,0->H\nE,1->F\nF,0->C\nF,1->G\nG,0->G
+    \nG,1->E\nH,0->G\nH,1->C";
+    const DFA3: &str = "states: q0 q1 q2 q3 q4 q5 q6\ninitial: q0\nalphabet: 1\naccepting: q0\ntransitions:\nq0, 1 -> q4\nq1, 1 -> q2\nq2, 1 -> q0\nq3, 1 -> q3\nq4, 1 -> q3\nq5, 1 -> q5\nq6, 1 -> q3";
+
+    //parse_dfa tests
+    #[test] 
+    fn empty() {
+        let result = parse_dfa(EMPTY_INPUT);
+        assert_eq!(result, Err(ParseErrorDFA::BadInput))
+    }
+
+    #[test] 
+    fn invalid_alphabet_symbol() {
+        let result = parse_dfa(INVALID_ALPHABET_INPUT);
+        assert_eq!(result, Err(ParseErrorDFA::BadAlphabetSymbol))
+    }
+
+    #[test]
+    fn bad_transition1() {
+        let result = parse_dfa(BAD_TRANSITION_INPUT1);
+        assert_eq!(result, Err(ParseErrorDFA::BadTransition))
+    }
+
+    #[test]
+    fn bad_transition2() {
+        let result = parse_dfa(BAD_TRANSITION_INPUT2);
+        assert_eq!(result, Err(ParseErrorDFA::BadTransition))
+    }
+
+    //build tests
+    #[test]
+    fn missing_initial_state() {
+        let raw = parse_dfa(MISSING_INITIAL_INPUT).unwrap();
+        let result = NamedDFA::build(raw);
+        assert_eq!(result, Err(ParseErrorDFA::NoInitialState))
+    }
+
+    #[test]
+    fn missing_symbol() {
+        let raw = parse_dfa(MISSING_SYMBOL_INPUT).unwrap();
+        let result = NamedDFA::build(raw);
+        assert_eq!(result, Err(ParseErrorDFA::MissingSymbol))
+    }
+
+    #[test] 
+    fn missing_state() {
+        let raw = parse_dfa(MISSING_STATE_INPUT).unwrap();
+        let result = NamedDFA::build(raw);
+        assert_eq!(result, Err(ParseErrorDFA::MissingState))
+    }
+
+    //write tests for valid entered dfas as well
+    #[test]
+    fn valid_dfa_parses_correctly() {
+        let raw = parse_dfa(DFA1).unwrap();
+        let result = NamedDFA::build(raw).unwrap();
+
+        assert_eq!(result.dfa.state_count, 2);
+        assert_eq!(result.dfa.initial, 0);
+        assert_eq!(result.dfa.accepting, vec![1]);
+        assert_eq!(result.names, vec!["q0", "q1"]);
+
+        let raw = parse_dfa(DFA2).unwrap();
+        let result = NamedDFA::build(raw).unwrap();
+
+        assert_eq!(result.dfa.state_count, 8);
+        assert_eq!(result.dfa.initial, 0);
+        assert_eq!(result.dfa.accepting, vec![3]);
+        assert_eq!(result.names, vec!["A", "B", "F", "C", "G", "D", "E", "H"]);
+
+        let raw = parse_dfa(DFA3).unwrap();
+        let result = NamedDFA::build(raw).unwrap();
+
+        assert_eq!(result.dfa.state_count, 7);
+        assert_eq!(result.dfa.initial, 0);
+        assert_eq!(result.dfa.accepting, vec![0]);
+        assert_eq!(result.names, vec!["q0", "q1", "q2", "q3", "q4", "q5", "q6"]);
     }
 }
