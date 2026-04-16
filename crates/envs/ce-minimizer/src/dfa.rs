@@ -1,4 +1,4 @@
-use std::{collections::HashMap, usize};
+use std::{collections::HashMap, collections::HashSet, usize};
 
 use itertools::enumerate;
 
@@ -13,7 +13,7 @@ pub struct DFA {
     pub alphabet: Vec<char>
 }
 
-#[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize)]
+#[derive(Default, Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize, Eq, Hash)]
 pub struct Edge {
     pub from: Node,
     pub symbol: char,
@@ -66,6 +66,8 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
     let mut accepting: Vec<String> = Vec::new();
     let mut transitions: Vec<(String, char, String)> = Vec::new();
 
+    let mut seen_sections: HashSet<&str> = HashSet::new();
+
     // helper: split "q0,q1 q2" into ["q0","q1","q2"]
     fn split_list(s: &str) -> Vec<String> {
         s.split(|c: char| c == ',' || c.is_whitespace())
@@ -106,11 +108,19 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
         }
         
         if let Some(rest) = line.strip_prefix("states:") {
+            if !seen_sections.insert("states") {
+                return Err(ParseErrorDFA::BadInput);
+            }
+
             current_section = Section::States;
             state_names.extend(split_list(rest));
             continue;
         }
         if let Some(rest) = line.strip_prefix("alphabet:") {
+            if !seen_sections.insert("alphabet") {
+                return Err(ParseErrorDFA::BadInput);
+            }
+            
             current_section = Section::Alphabet;
             for token in split_list(rest) {
                 if let Some(c) = parse_one_char(&token) {
@@ -123,6 +133,10 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
             continue;
         }
         if let Some(rest) = line.strip_prefix("initial:") {
+            if !seen_sections.insert("initial") {
+                return Err(ParseErrorDFA::BadInput);
+            }
+            
             current_section = Section::Initial;
             let v = rest.trim();
             if !v.is_empty() {
@@ -131,11 +145,19 @@ pub fn parse_dfa(input: &str) -> Result<RawDFA,ParseErrorDFA> {
             continue;
         }
         if let Some(rest) = line.strip_prefix("accepting:") {
+            if !seen_sections.insert("accepting") {
+                return Err(ParseErrorDFA::BadInput);
+            }
+            
             current_section = Section::Accepting;
             accepting.extend(split_list(rest));
             continue;
         }
         if let Some(_) = line.strip_prefix("transitions:") {
+            if !seen_sections.insert("transitions") {
+                return Err(ParseErrorDFA::BadInput);
+            }
+            
             current_section = Section::Transitions;
             has_transitions_section = true;
             continue;
@@ -252,7 +274,16 @@ impl NamedDFA {
             .collect();
         
         let edges = edges?;
-            
+
+        //Check for duplicates and give an error
+        let has_duplicates = {
+            let set: HashSet<_> = edges.iter().collect();
+            set.len() != edges.len()
+        };
+        if has_duplicates {
+            return Err(ParseErrorDFA::BadInput)
+        }
+
         Ok(
         NamedDFA {
             dfa: DFA { state_count: all_names.len(), edges, initial, accepting, alphabet: all_alphabet_symbols },
