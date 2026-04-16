@@ -39,7 +39,7 @@ impl Env for MinimizerEnv {
         let test_output = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         
-        let named_dfa = NamedDFA::build(test_output)
+        let mut named_dfa = NamedDFA::build(test_output)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
 
         let dot = named_dfa.to_dot();
@@ -62,14 +62,14 @@ impl Env for MinimizerEnv {
         
         let reference_dfa = parse_dfa(&input.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
-        let reference_dfa = NamedDFA::build(reference_dfa)
+        let mut reference_dfa = NamedDFA::build(reference_dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         let reference_dfa_min = reference_dfa.minimize()
                 .map_err(ce_core::EnvError::invalid_input_for_program("failed to minimize dfa"))?;
 
         let their_dfa = parse_dfa(&output.dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
-        let their_dfa = NamedDFA::build(their_dfa)
+        let mut their_dfa = NamedDFA::build(their_dfa)
             .map_err(ce_core::EnvError::invalid_input_for_program("failed to parse DFA"))?;
         let their_dfa_min =  their_dfa.minimize()
                 .map_err(ce_core::EnvError::invalid_input_for_program("failed to minimize dfa"))?;

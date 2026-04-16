@@ -1,4 +1,7 @@
+use tapi::kind::Name;
+
 use super::{NamedDFA, Node, Edge, DFA};
+use std::collections::{HashSet, VecDeque, HashMap};
 
 #[derive(PartialEq)]
 enum Equivalence { Equivalent, Distinguishable }
@@ -13,7 +16,10 @@ pub enum MinimizationError {
 
 impl NamedDFA {
     
-    pub fn minimize(&self) -> Result<NamedDFA, MinimizationError>{
+    pub fn minimize(&mut self) -> Result<NamedDFA, MinimizationError>{
+        // Remove unreachable states first 
+        self.remove_unreachable_states();
+        
         let table = self.build_equivalence_table()?;
         
         //partition the states into blocks of mutually equivalent states
@@ -86,6 +92,56 @@ impl NamedDFA {
         })
     }
     
+    fn remove_unreachable_states(&mut self) {
+        //Perform a BFS
+        let mut visited: HashSet<Node> = HashSet::new();
+        let mut queue: VecDeque<Node> = VecDeque::new();
+
+        queue.push_back(self.dfa.initial);
+        
+        while let Some(current) = queue.pop_front() {
+            if visited.contains(&current) {
+                continue;
+            }
+            visited.insert(current);
+
+            for edge in &self.dfa.edges {
+                if edge.from == current {
+                    queue.push_back(edge.to);
+                }
+            }
+        }   
+
+        self.dfa.edges.retain(|e| visited.contains(&e.from));
+
+        self.dfa.accepting.retain(|s| visited.contains(s));
+
+        //remap unreachable states
+        let mut remap: HashMap<Node, Node> = HashMap::new();
+        for (new_id, old_id) in visited.iter().enumerate() {
+            remap.insert(*old_id, new_id);
+        }
+
+        let mut new_names = vec![String::new(); visited.len()];
+        for (old_id, name) in self.names.iter().enumerate() {
+            if let Some(&new_id) = remap.get(&old_id) {
+                new_names[new_id] = name.clone();
+            }
+        }
+        self.names = new_names;
+
+        for edge in &mut self.dfa.edges {
+            edge.from = remap[&edge.from];
+            edge.to = remap[&edge.to];
+        }
+
+        self.dfa.accepting = self.dfa.accepting.iter().map(|s| remap[s]).collect();
+
+        self.dfa.initial = remap[&self.dfa.initial];
+
+        self.dfa.state_count = visited.len();
+    }
+
     fn build_equivalence_table(&self) -> Result<EquivTable, MinimizationError> {
         let n = self.dfa.state_count;
 
@@ -139,3 +195,23 @@ impl NamedDFA {
         
     }  
 }
+
+// #[cfg(test)]
+// mod tests {
+//     use super::*;
+//     use crate::dfa::{parse_dfa, NamedDFA};
+
+//     const DFA1: &str = "states: q0 q1 \nalphabet: 0 1\naccepting: q1\ninitial: q0\ntransitions:\nq0,0->q1\nq0,1->q0\nq1,1->q0\nq1,1->q1";
+//     const DFA2: &str = "alphabet: 0 1\naccepting: C\ninitial: A\n
+//     transitions:\nA,0->B\nA, 1->F\nB, 1 -> C\nB,0->G\nC,1->C\nC,0->A\nD,0->C\nD,1->G\nE,0->H\nE,1->F\nF,0->C\nF,1->G\nG,0->G\nG,1->E\nH,0->G\nH,1->C";
+//     const DFA3: &str = "states: q0 q1 q2 q3 q4 q5 q6\ninitial: q0\nalphabet: 1\naccepting: q0\ntransitions:\nq0, 1 -> q4\nq1, 1 -> q2\nq2, 1 -> q0\nq3, 1 -> q3\nq4, 1 -> q3\nq5, 1 -> q5\nq6, 1 -> q3";
+
+// //     #[test]
+// //     fn test1() {
+
+// //         let original = /* build from string */;
+// //         let minimized = original.minimize().unwrap();
+// //         assert_eq!(minimized.dfa.state_count, 3);
+// //         assert!(same_language(&original, &minimized));
+// //     }
+// }

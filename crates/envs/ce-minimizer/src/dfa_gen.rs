@@ -50,6 +50,15 @@ pub fn generate_random_dfa<R: Rng>(rng: &mut R, state_count: usize, allow_nondet
                 let target = transition_map[&("q0".to_string(), *symbol)].clone();
                 transitions.push(format!("{dup}, {symbol} -> {target}"));
             }
+            
+            //After creating a duplicate state, nothing points to it
+            //A transition that points to q0 will be made to point to q0'
+            for transition in transitions.iter_mut() {
+                if transition.ends_with("-> q0") {
+                    *transition = transition.replace("-> q0", "-> q0'");
+                    break;
+                }
+            }
         }
 
         if allow_nondeterminism {
