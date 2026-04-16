@@ -1,5 +1,3 @@
 (declare-fun max (Int Int) Int)
 (assert (forall ((x Int) (y Int))
-    (=> (< x y) (= y (max x y)))))
-(assert (forall ((x Int) (y Int))
-    (=> (>= x y) (= x (max x y)))))
+    (= (max x y) (ite (<= x y) y x))))
