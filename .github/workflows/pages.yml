@@ -49,6 +49,7 @@ jobs:
         id: deployment
         uses: peaceiris/actions-gh-pages@v4
         with:
-          github_token: ${{ secrets.GITHUB_TOKEN }}          external_repository: team-checkr/team-checkr.github.io
+          github_token: ${{ secrets.GITHUB_TOKEN }}
+          external_repository: team-checkr/team-checkr.github.io
           publish_branch: main
           publish_dir: apps/chip/build/
