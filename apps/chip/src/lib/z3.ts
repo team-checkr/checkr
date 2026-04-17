@@ -44,7 +44,7 @@ export const run = (
     result: borrow(async ({ Z3 }) => {
       options.onStart?.();
 
-      const timeout = 5000;
+      const timeout = 15000;
 
       Z3.global_param_set('timeout', String(timeout));
 
