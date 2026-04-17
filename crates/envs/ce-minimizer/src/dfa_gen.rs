@@ -65,7 +65,10 @@ pub fn generate_random_dfa<R: Rng>(rng: &mut R, state_count: usize, allow_nondet
             let state = states.choose(rng).unwrap();
             let symbol = alphabet.choose(rng).unwrap();
             let target = states.choose(rng).unwrap();
-            transitions.push(format!("{state}, {symbol} -> {target}"));
+            let transition = format!("{state}, {symbol} -> {target}"); 
+            if !transitions.contains(&transition) {
+                transitions.push(transition);
+            }
         }
 
         let dfa = format!(

@@ -334,32 +334,15 @@ impl NamedDFA {
     }
 }
 
-#[derive(Debug, Clone, PartialEq, tapi::Tapi, serde::Serialize, serde::Deserialize, thiserror::Error)]
-pub enum SemanticErrorDFA {
-    #[error("incomplete DFA")]
-    Incomplete,
-
-    #[error("not a DFA")]
-    Nondeterministic,
-
-    #[error("invalid initial state")]
-    InvalidInitialState,
-
-    #[error("invalid accepting state")]
-    InvalidAcceptingState,
-}
-
 impl DFA {
-    pub fn validate(&self) -> Vec<SemanticErrorDFA> {
-        let mut errors = Vec::new();
-
+    pub fn check_determinism(&self) -> bool{
         // completeness (check for  missing transitions)
         let incomplete = (0..self.state_count).any(|node| {
             self.alphabet.iter().any(|symbol| {
                 !self.edges.iter().any(|e| e.from == node && e.symbol == *symbol)
             })
         });
-        if incomplete { errors.push(SemanticErrorDFA::Nondeterministic); }
+        if incomplete { return false }
 
         // determinism
         let nondeterministic = (0..self.state_count).any(|node| {
@@ -367,19 +350,9 @@ impl DFA {
                 self.edges.iter().filter(|e| e.from == node && e.symbol == *symbol).count() > 1
             })
         });
-        if nondeterministic { errors.push(SemanticErrorDFA::Nondeterministic); }
+        if nondeterministic { return false }
 
-        // valid initial state
-        if self.initial >= self.state_count {
-            errors.push(SemanticErrorDFA::InvalidInitialState);
-        }
-
-        // valid accepting states
-        if self.accepting.iter().any(|&acc| acc >= self.state_count) {
-            errors.push(SemanticErrorDFA::InvalidAcceptingState);
-        }
-
-        errors
+        true
     }
 
     pub fn delta(&self, node:Node, symbol:char) -> Option<Node> {
