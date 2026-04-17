@@ -30,6 +30,8 @@ export type RunOptions = {
   onStart?: () => void;
 };
 
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const run = (
   query: string,
   options: RunOptions = {},
@@ -42,6 +44,8 @@ export const run = (
   return {
     cancel,
     result: borrow(async ({ Z3 }) => {
+      await wait(10);
+
       options.onStart?.();
 
       const timeout = 15000;
