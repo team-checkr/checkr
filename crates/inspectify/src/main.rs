@@ -1,5 +1,6 @@
 mod checko;
 mod endpoints;
+mod test;
 
 use std::{net::SocketAddr, path::PathBuf, sync::Arc, time::Duration};
 
@@ -72,7 +73,7 @@ async fn run() -> color_eyre::Result<()> {
 
     let dir = dunce::canonicalize(&cli.dir)?;
 
-    let hub = driver::Hub::new()?;
+    let hub: driver::Hub<InspectifyJobMeta> = driver::Hub::new()?;
     let driver = if cli.driver == Some(false) {
         None
     } else {

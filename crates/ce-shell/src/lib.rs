@@ -32,6 +32,20 @@ impl Analysis {
         };
         self.gen_input(&mut rng)
     }
+
+    pub fn gen_input_for_level(self, level: u8, seed: Option<u64>) -> Input {
+        let mut rng = match seed {
+            Some(seed) => rand::rngs::SmallRng::seed_from_u64(seed),
+            None => rand::rngs::SmallRng::from_os_rng(),
+        };
+        match self {
+            Analysis::Compiler => {
+                let input = ce_compiler::gen_input_for_level(level, &mut rng);
+                Input::new::<ce_compiler::CompilerEnv>(&input)
+            }
+            _ => self.gen_input(&mut rng),
+        }
+    }
 }
 
 impl Input {

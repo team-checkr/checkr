@@ -67,14 +67,29 @@
   {/snippet}
   {#snippet outputView({ input: cachedInput, output, meta })}
     <div class="grid min-h-0 grid-cols-[auto_1fr]">
-      <div class="overflow-auto border-r border-t bg-slate-900">
-        <div
-          class="grid gap-x-4 px-4 py-2"
-          style="grid-template-columns: max-content min-content repeat({Math.max(
-            meta.length,
-            1,
-          )}, max-content);"
-        >
+      <div class="flex min-h-0 flex-col border-r border-t bg-slate-900">
+        <div class="flex items-center justify-between border-b border-slate-700 px-4 py-2">
+          <div class="font-mono text-sm font-semibold uppercase tracking-wider text-slate-200">
+            Trace
+          </div>
+          {#if cachedInput.determinism == 'NonDeterministic'}
+            <button
+              type="button"
+              class="rounded border border-slate-500 px-3 py-1 text-xs font-semibold uppercase tracking-wide text-slate-100 transition hover:bg-slate-800 focus-visible:outline focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-slate-200"
+              onclick={() => io.rerun()}
+            >
+              Change path
+            </button>
+          {/if}
+        </div>
+        <div class="overflow-auto">
+          <div
+            class="grid gap-x-4 px-4 py-2"
+            style="grid-template-columns: max-content min-content repeat({Math.max(
+              meta.length,
+              1,
+            )}, max-content);"
+          >
           <div></div>
           <div></div>
           <div
@@ -127,6 +142,7 @@
               <div class="my-1 rounded-sm bg-red-500 px-2 py-1 font-bold text-white">Stuck</div>
             {/if}
           </div>
+        </div>
         </div>
       </div>
 

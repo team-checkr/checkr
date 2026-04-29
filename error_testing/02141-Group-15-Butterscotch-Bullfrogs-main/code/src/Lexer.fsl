@@ -1,0 +1,62 @@
+// The generated lexer module will start with this code
+{
+open FSharp.Text.Lexing
+open System
+// open the module that defines the tokens
+open Grammar
+// Set the language to English such that 4.0 is parsed as 4 and not 40.
+System.Globalization.CultureInfo.CurrentCulture <- new System.Globalization.CultureInfo("en-US")
+}
+
+// We define macros for some regular expressions we will use later
+let digit       = ['0'-'9']
+let num         = digit+
+let whitespace  = [' ' '\t']
+let newline     = "\n\r" | '\n' | '\r'
+let variable    = ['a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9''_']*
+//let array       = ['a'-'z''A'-'Z']['a'-'z''A'-'Z''0'-'9']*
+
+// We define now the rules for recognising and building tokens
+// for each of the tokens of our language we need a rule
+// NOTE: rules are applied in order top-down.
+//       This is important when tokens overlap (not in this example)
+rule tokenize = parse
+// deal with tokens that need to be ignored (skip them)
+| whitespace    { tokenize lexbuf }
+| newline       { lexbuf.EndPos <- lexbuf.EndPos.NextLine; tokenize lexbuf; }
+// deal with tokens that need to be built
+| num           { NUM(int(LexBuffer<_>.LexemeString lexbuf)) }
+| '*'           { TIMES }
+| '/'           { DIV }
+| '+'           { PLUS }
+| '-'           { MINUS }
+| '^'           { POW }
+| '('           { LPAR }
+| ')'           { RPAR }
+| "skip"        { SKIP }
+| ';'           { SEMICOLON }
+| ":="          { ASSIGN }
+| '['           { LBRACK }
+| ']'           { RBRACK }
+| "true"        { TRUE }
+| "false"       { FALSE }
+| '&'           { AND }
+| '|'           { OR }
+| "&&"          { ANDAND }
+| "||"          { OROR }
+| '!'           { NOT }
+| '='           { EQ }
+| "!="          { NEQ }
+| '>'           { GT }
+| ">="          { GTE }
+| '<'           { LT }
+| "<="          { LTE }
+|"if"           { IF }
+|"fi"           { FI }
+|"do"           { DO }
+|"od"           { OD }
+|"->"           { ARROW }
+|"[]"           { BAR }
+| eof           { EOF }
+| variable      { VARIABLE(LexBuffer<_>.LexemeString lexbuf) }
+// | array         { ARRAY(LexBuffer<_>.LexemeString lexbuf) }

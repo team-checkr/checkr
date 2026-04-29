@@ -63,18 +63,30 @@ impl Env for InterpreterEnv {
             );
 
         let mut exe = Execution::new(input.assignment.clone());
+        let mut rng = rand::rng();
 
         for _ in 0..input.trace_length {
-            if let Some(next) = exe.nexts(&pg).first().cloned() {
-                if next.is_stuck(&pg) {
-                    exe = next;
-                    break;
-                }
-                exe = next;
-                continue;
+            let nexts = exe.nexts(&pg);
+            if nexts.is_empty() {
+                break;
             }
 
-            break;
+            let choose_random =
+                matches!(input.determinism, Determinism::NonDeterministic) && nexts.len() > 1;
+
+            let Some(next) = (if choose_random {
+                nexts.choose(&mut rng).cloned()
+            } else {
+                nexts.first().cloned()
+            }) else {
+                break;
+            };
+
+            let stuck = next.is_stuck(&pg);
+            exe = next;
+            if stuck {
+                break;
+            }
         }
 
         Ok(Output {

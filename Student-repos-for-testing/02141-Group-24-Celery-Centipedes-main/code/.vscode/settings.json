@@ -1,0 +1,13 @@
+{
+    "FSharp.autoRevealInExplorer": "disabled",
+    "files.associations": {
+        "*.fs": "fsharp",
+        "*.fsi": "fsharp",
+        "*.fsl": "fsharp",
+        "*.fsy": "fsharp"
+    },
+    "FSharp.formatting.enabled": true,
+    "FSharp.formatting.indentOnPaste": true,
+    "FSharp.lintOnType": true,
+    "FSharp.showProjectExplorerOnStartup": true
+}

@@ -1,0 +1,10 @@
+// Finite summation
+{ n >= 1}
+r := 0 ;
+i := 0 ;
+do[false] // TODO: replace `false` by a suitable invariant
+  i < n ->
+    i := i + 1 ;
+    r := r + i 
+od
+{ r = (n*(n+1))/2}

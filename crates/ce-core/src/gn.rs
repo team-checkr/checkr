@@ -1,4 +1,8 @@
 mod gcl_gen;
+pub mod compiler_gen {
+    pub use super::gcl_compiler_gen::*;
+}
+mod gcl_compiler_gen;
 
 pub use gcl_gen::Context as GclGenContext;
 use rand::Rng;

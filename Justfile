@@ -15,7 +15,9 @@ build-wasm:
 
 inspectify ARGS="":
     RUST_LOG=debug cargo run -p inspectify -- {{ARGS}}
-
+inspectify-test ARGS="":
+    RUST_LOG=debug cargo run -p inspectify -- {{ARGS}} --driver true ./starters/fsharp-starter
+#./starters/Group-24-Pizza-Pigeons/code
 inspectify-app:
     cd apps/inspectify && (npm install && npm run dev)
 

@@ -1,0 +1,7 @@
+compile = "dotnet publish -c Release --self-contained --output bin/run"
+run = { unix = "./bin/run/gcl", win = "bin/run/gcl.exe" }
+watch = ["*.fs", "*.fsl", "*.fsy"]
+ignore = [
+    "src/Grammar.fs",
+    "src/Lexer.fs",
+]

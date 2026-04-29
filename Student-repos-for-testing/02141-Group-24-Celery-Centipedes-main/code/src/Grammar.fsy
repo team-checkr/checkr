@@ -1,0 +1,90 @@
+// Open the file that defines the type "expr" we shall use as AST
+%{
+open AST
+%}
+
+// Declare the tokens (terminal symbols)
+%token <bigint> NUM
+%token <string> VAR
+%token TIMES DIV PLUS MINUS POW LPAR RPAR LBRACK RBRACK EOF SKIP SEMICOLON ASSIGN
+%token TRUE FALSE
+%token AND OR SHORTAND SHORTOR NOT
+%token EQ NEQ GT GTE LT LTE
+%token ARROW CHOICE
+%token IF FI DO OD
+
+// Specify precedence and associativity of operators
+// Precedence is given by the order (from low to high)
+%right SEMICOLON
+%right ASSIGN
+%left CHOICE
+%left SHORTOR
+%left SHORTAND
+%left OR
+%left AND
+%nonassoc NOT
+%nonassoc EQ NEQ GT GTE LT LTE
+%left PLUS MINUS
+%left TIMES DIV
+%right POW
+%right UMINUS
+
+// We declare the initial non-terminal symbol
+%start start_expression
+%start start_command
+
+// We specify the return type of each of the non-terminal symbols
+%type <AST.expr> start_expression
+%type <AST.expr> expression
+%type <AST.command> start_command
+%type <AST.command> command
+%type <AST.boolExpr> boolExpr
+%type <AST.guardedCommand> guardedCommand
+
+// Grammar productions
+%%
+
+start_expression: expression EOF    { $1 }
+start_command:    command EOF       { $1 }
+
+expression:
+  | expression TIMES expression     { TimesExpr($1,$3) }
+  | expression DIV expression       { DivExpr($1,$3) }
+  | expression PLUS expression      { PlusExpr($1,$3) }
+  | expression MINUS expression     { MinusExpr($1,$3) }
+  | expression POW expression       { PowExpr($1,$3) }
+  | MINUS expression %prec UMINUS      { UMinusExpr($2) }
+  | NUM                                 { Num($1) }
+  | VAR                                 { Var($1) }
+  | VAR LBRACK expression RBRACK        { ArrayAccess($1,$3) }
+  | LPAR expression RPAR                { $2 }
+
+boolExpr:
+  | TRUE                            { True }
+  | FALSE                           { False }
+  | boolExpr AND boolExpr           { AndExpr($1,$3) }
+  | boolExpr OR boolExpr            { OrExpr($1,$3) }
+  | boolExpr SHORTAND boolExpr      { ShortAndExpr($1,$3) }
+  | boolExpr SHORTOR boolExpr       { ShortOrExpr($1,$3) }
+  | NOT boolExpr                    { NotExpr($2) }
+  | expression EQ expression        { EqExpr($1,$3) }
+  | expression NEQ expression       { NeqExpr($1,$3) }
+  | expression GT expression        { GtExpr($1,$3) }
+  | expression GTE expression       { GteExpr($1,$3) }
+  | expression LT expression        { LtExpr($1,$3) }
+  | expression LTE expression       { LteExpr($1,$3) }
+  | LPAR boolExpr RPAR              { $2 }
+
+guardedCommand:
+  | boolExpr ARROW command                  { Arrow($1,$3) }
+  | guardedCommand CHOICE guardedCommand    { Choice($1,$3) }
+
+command:
+  | SKIP                                    { Skip }
+  | command SEMICOLON command               { Sequence($1,$3) }
+  | VAR ASSIGN expression                   { Assign(Var($1),$3) }
+  | VAR LBRACK expression RBRACK ASSIGN expression { Assign(ArrayAccess($1,$3),$6) }
+  | IF guardedCommand FI                    { If($2) }
+  | DO guardedCommand OD                    { Do($2) }
+
+%%

@@ -109,7 +109,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
         // analysis jobs.
         let timeout = match &kind {
             JobKind::Analysis(_) => Duration::from_secs(10),
-            JobKind::Compilation => Duration::from_secs(60),
+            JobKind::Compilation => Duration::from_secs(300),
         };
         let max_output = match &kind {
             JobKind::Analysis(_) => 2usize.pow(14),

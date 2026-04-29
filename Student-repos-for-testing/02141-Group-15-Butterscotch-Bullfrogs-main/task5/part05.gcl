@@ -1,0 +1,21 @@
+// Fibonacci numbers *** Done P
+{ 0 <= n }
+r := 0;
+{0 <= n & r = 0}
+s := 1;
+{0 <= n & r = 0 & s = 1}
+i := 0;
+{0 <= n & r = 0 & s = 1 & i = 0}
+do[r = fib(i) & s = fib(i + 1) & 0 <= i & i <= n] // TODO: replace `false` by a suitable invariant
+  i != n -> 
+  {r = fib(i) & s = fib(i + 1) & 0 <= i & i < n}
+    t := s;
+    {r = fib(i) & s = fib(i + 1) & 0 <= i & i < n & t = s}
+    s := r + s;
+    {r = fib(i) & s = fib(i + 1) + fib(i) & t = fib(i+1) & 0 <= i & i < n }
+    r := t;
+    {r = fib(i+1) & s = fib(i+2) & 0 <= (i+1) & (i) < n}
+    i := i + 1
+    {r = fib(i) & s = fib(i + 1) & 0 <= i & i <= n}
+od
+{ r = fib(n) } 

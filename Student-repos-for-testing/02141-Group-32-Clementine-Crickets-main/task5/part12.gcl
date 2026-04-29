@@ -1,0 +1,45 @@
+// Bounded exponential, binified
+
+{ 1 < e }
+r := 1 ;
+{ 1 < e  & r = 1}
+i := 0 ;
+{ 1 < e & r = 1 & i = 0}
+tmp1_ := (r * e) ;
+{ 1 < e & r = 1 & i = 0 & tmp1_ = (r * e)}
+
+if (tmp1_ < 256) -> 
+   {1 < e & r = 1 & i = 0 & tmp1_ = e & (tmp1_ < 256)}
+   tmp0_ := 1
+   {1 < e & r = 1 & i = 0 & tmp1_ = e & (tmp1_ < 256) & tmp0_ = 1}
+[] !(tmp1_ < 256) ->
+   {1 < e & r = 1 & i = 0 & tmp1_ = e & !(tmp1_ < 256)}
+   tmp0_ := 0
+   {1 < e & r = 1 & i = 0 & tmp1_ = e & !(tmp1_ < 256) & tmp0_ = 0}
+fi ;
+
+{r < 256 & r = exp(e,i) & i >= 0 & (tmp0_ = 1 ==> e * r < 256) & (e * r < 256 ==> tmp0_ =1)}
+
+do[(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0] // TODO: replace `false` by a suitable invariant
+   (tmp0_ = 1) -> {(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0 & (tmp0_ = 1)}
+   r := (e * r) ;
+   {r = exp(e,i+1) & i >= 0 & r < 256 }
+   i := (i + 1) ;
+    {r = exp(e,i) & i >= 1 & r < 256 }
+   tmp1_ := (r * e) ;
+   {r = exp(e,i) & i >= 1 & r < 256 & tmp1_ = r*e}
+
+   if (tmp1_ < 256) -> 
+      {(1 = 1 ==> e *r < 256) & (e*r < 256 ==> 1 = 1) & r = exp(e, i) & r < 256 & i >= 0}
+      tmp0_ := 1
+      {(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0}
+   [] !(tmp1_ < 256) -> 
+      {(0 = 1 ==> e *r < 256) & (e*r < 256 ==> 0 = 1) & r = exp(e, i) & r < 256 & i >= 0}
+      tmp0_ := 0
+      {(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0}
+   fi
+
+   {(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0}
+od 
+{(tmp0_ = 1 ==> e *r < 256) & (e*r < 256 ==> tmp0_ = 1) & r = exp(e, i) & r < 256 & i >= 0 & !(tmp0_ = 1)}
+{r = exp(e, i) & r < 256 & r * e >= 256} 

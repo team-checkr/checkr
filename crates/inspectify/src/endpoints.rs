@@ -38,11 +38,16 @@ pub fn endpoints() -> tapi::endpoints::Endpoints<'static, AppState> {
 struct GenerateParams {
     analysis: Analysis,
     seed: Option<u64>,
+    #[serde(default)]
+    level: Option<u8>,
 }
 
 #[tapi::tapi(path = "/generate", method = Post)]
 async fn generate(Json(params): Json<GenerateParams>) -> Json<ce_shell::Input> {
-    let input = params.analysis.gen_input_seeded(params.seed);
+    let input = match params.level {
+        Some(level) => params.analysis.gen_input_for_level(level, params.seed),
+        None => params.analysis.gen_input_seeded(params.seed),
+    };
     Json(input)
 }
 

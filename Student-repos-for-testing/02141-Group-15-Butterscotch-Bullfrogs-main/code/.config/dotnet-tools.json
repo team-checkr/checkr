@@ -1,0 +1,14 @@
+{
+  "version": 1,
+  "isRoot": true,
+  "sdk": {
+    "version": "7.0.101",
+    "rollForward": "minor"
+  },
+  "tools": {
+    "fantomas-tool": {
+      "version": "4.6.5",
+      "commands": ["fantomas"]
+    }
+  }
+}

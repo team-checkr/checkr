@@ -1,0 +1,26 @@
+// Double loop to square *** Done P
+{ 0 <= n }
+x := 0;
+{ 0 <= n & x=0 }
+r := 0;
+{ 0 <= n & x=0 & r=0 }
+do[0 <= x & x <= n & r = x * n & 0 <= n ] // TODO: replace `false` by a suitable invariant for the outer loop
+  x < n ->
+  {x < n & 0 <= x & x <= n & r = x * n & 0 <= n }
+    y := 0;
+    {0<=y & y <= n & r = (x*n)+y & 0 <= n & 0 <= x & x<n}
+    do[0<=y & y <= n & r = (x*n)+y & 0 <= n & 0 <= x & x<n] // TODO: replace `false` by a suitable invariant for the inner loop
+      y < n -> 
+      { y<n & 0<=y & y <= n & r = (x*n)+y & 0 <= n & 0 <= x & x<n}
+        {0<=y+1 & y+1 <= n & r+1 = (x*n)+y+1 & 0 <= n & 0 <= x & x<n }
+        r := r + 1;
+        {0<=y+1 & y+1 <= n & r = (x*n)+y+1 & 0 <= n & 0 <= x & x<n }
+        y := y + 1
+        {0<=y & y <= n & r = (x*n)+y & 0 <= n & 0 <= x & x<n }
+    od;
+    { y = n & 0<=y & y <= n & r = (x*n)+y & 0 <= n & 0 <= x & x<n}   // add your inner loop invariant here
+    {0 <= x+1 & x+1 <= n & r = (x+1) * n & 0 <= n } 
+    x := x + 1 
+    {0 <= x & x <= n & r = x * n & 0 <= n}    
+od
+{ r = n * n }

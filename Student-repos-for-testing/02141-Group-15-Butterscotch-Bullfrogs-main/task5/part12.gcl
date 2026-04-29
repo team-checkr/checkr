@@ -1,0 +1,80 @@
+{ 1 < e }
+
+r := 1;
+{ 1 < e & r = 1 }
+
+i := 0;
+{ 1 < e & r = 1 & i = 0 }
+{ r = exp(e,i) & r < 256 & 0 <= i }
+
+{ r = exp(e,i) & r < 256 & 0 <= i }
+tmp1_ := r * e;
+{ r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e }
+
+{ r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e }
+if tmp1_ < 256 ->
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e & tmp1_ < 256 }
+   { r = exp(e,i) & r < 256 & 0 <= i & r * e < 256 }
+   tmp0_ := 1
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp0_ = 1 & r * e < 256 }
+   { r = exp(e,i) & r < 256 & 0 <= i &
+     ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+
+[] !(tmp1_ < 256) ->
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e & !(tmp1_ < 256) }
+   { r = exp(e,i) & r < 256 & 0 <= i & r * e >= 256 }
+   tmp0_ := 0
+   { r = exp(e,i) & r < 256 & 0 <= i & !(tmp0_ = 1) & r * e >= 256 }
+   { r = exp(e,i) & r < 256 & 0 <= i &
+     ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+fi;
+{ r = exp(e,i) & r < 256 & 0 <= i &
+  ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+
+{ r = exp(e,i) & r < 256 & 0 <= i &
+  ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+do [ r = exp(e,i) & r < 256 & 0 <= i &
+     ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) ]
+   tmp0_ = 1 ->
+   { r = exp(e,i) & r < 256 & 0 <= i &
+     ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) & tmp0_ = 1 }
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp0_ = 1 & r * e < 256 }
+
+   { exp(e,i+1) = e * exp(e,i) & r = exp(e,i) & r * e < 256 & 0 <= i }
+   r := e * r;
+   { r = exp(e,i+1) & r < 256 & 0 <= i }
+
+   { r = exp(e,i+1) & r < 256 & 0 <= i }
+   i := i + 1;
+   { r = exp(e,i) & r < 256 & 0 <= i }
+
+   { r = exp(e,i) & r < 256 & 0 <= i }
+   tmp1_ := r * e;
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e }
+
+   { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e }
+   if tmp1_ < 256 ->
+      { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e & tmp1_ < 256 }
+      { r = exp(e,i) & r < 256 & 0 <= i & r * e < 256 }
+      tmp0_ := 1
+      { r = exp(e,i) & r < 256 & 0 <= i & tmp0_ = 1 & r * e < 256 }
+      { r = exp(e,i) & r < 256 & 0 <= i &
+        ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+
+   [] !(tmp1_ < 256) ->
+      { r = exp(e,i) & r < 256 & 0 <= i & tmp1_ = r * e & !(tmp1_ < 256) }
+      { r = exp(e,i) & r < 256 & 0 <= i & r * e >= 256 }
+      tmp0_ := 0
+      { r = exp(e,i) & r < 256 & 0 <= i & !(tmp0_ = 1) & r * e >= 256 }
+      { r = exp(e,i) & r < 256 & 0 <= i &
+        ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+   fi
+   { r = exp(e,i) & r < 256 & 0 <= i &
+     ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) }
+od
+{ r = exp(e,i) & r < 256 & 0 <= i &
+  ((tmp0_ = 1 & r * e < 256) | (!(tmp0_ = 1) & r * e >= 256)) &
+  !(tmp0_ = 1) }
+
+{ r = exp(e,i) & r < 256 & !(tmp0_ = 1) & r * e >= 256 }
+{ r = exp(e,i) & r < 256 & r * e >= 256 }
