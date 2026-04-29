@@ -2,7 +2,9 @@ mod dot;
 
 use std::collections::{BTreeMap, BTreeSet};
 
-use ce_core::gn::compiler_gen::{CompilerContext, gen_commands_for_level, generate_witness_memories};
+use ce_core::gn::compiler_gen::{
+    CompilerContext, gen_commands_for_level, generate_witness_memories,
+};
 use ce_core::{Env, Generate, ValidationResult, define_env};
 use gcl::{
     ast::{AExpr, Command, Commands, Guard, Target},
@@ -247,7 +249,7 @@ fn commands_have_skip(cmds: &Commands) -> bool {
     cmds.0.iter().any(|c| match c {
         Command::Skip => true,
         Command::If(guards) | Command::Loop(guards) => {
-            guards.iter().any(|Guard(_,body)| commands_have_skip(body))
+            guards.iter().any(|Guard(_, body)| commands_have_skip(body))
         }
         _ => false,
     })
@@ -256,7 +258,7 @@ fn commands_have_skip(cmds: &Commands) -> bool {
 fn commands_have_loop(cmds: &Commands) -> bool {
     cmds.0.iter().any(|c| match c {
         Command::Loop(_) => true,
-        Command::If(guards) => guards.iter().any(|Guard(_,body)| commands_have_loop(body)),
+        Command::If(guards) => guards.iter().any(|Guard(_, body)| commands_have_loop(body)),
         _ => false,
     })
 }
@@ -264,7 +266,7 @@ fn commands_have_loop(cmds: &Commands) -> bool {
 fn commands_have_if(cmds: &Commands) -> bool {
     cmds.0.iter().any(|c| match c {
         Command::If(_) => true,
-        Command::Loop(guards) => guards.iter().any(|Guard(_,body)| commands_have_if(body)),
+        Command::Loop(guards) => guards.iter().any(|Guard(_, body)| commands_have_if(body)),
         _ => false,
     })
 }
@@ -274,9 +276,17 @@ fn max_loop_guards(cmds: &Commands) -> usize {
         .iter()
         .map(|c| match c {
             Command::Loop(guards) => guards.len().max(
-                guards.iter().map(|Guard(_,body)| max_loop_guards(body)).max().unwrap_or(0),
+                guards
+                    .iter()
+                    .map(|Guard(_, body)| max_loop_guards(body))
+                    .max()
+                    .unwrap_or(0),
             ),
-            Command::If(guards) => guards.iter().map(|Guard(_,body)| max_loop_guards(body)).max().unwrap_or(0),
+            Command::If(guards) => guards
+                .iter()
+                .map(|Guard(_, body)| max_loop_guards(body))
+                .max()
+                .unwrap_or(0),
             _ => 0,
         })
         .max()
@@ -288,9 +298,17 @@ fn max_if_guards(cmds: &Commands) -> usize {
         .iter()
         .map(|c| match c {
             Command::If(guards) => guards.len().max(
-                guards.iter().map(|Guard(_,body)| max_if_guards(body)).max().unwrap_or(0),
+                guards
+                    .iter()
+                    .map(|Guard(_, body)| max_if_guards(body))
+                    .max()
+                    .unwrap_or(0),
             ),
-            Command::Loop(guards) => guards.iter().map(|Guard(_,body)| max_if_guards(body)).max().unwrap_or(0),
+            Command::Loop(guards) => guards
+                .iter()
+                .map(|Guard(_, body)| max_if_guards(body))
+                .max()
+                .unwrap_or(0),
             _ => 0,
         })
         .max()
@@ -356,8 +374,8 @@ fn diagnose_mismatch(
     let stu_skips = count_actions(t_g, |a| matches!(a, Action::Skip));
     let ref_conds = count_actions(o_g, |a| matches!(a, Action::Condition(_)));
     let stu_conds = count_actions(t_g, |a| matches!(a, Action::Condition(_)));
-    
-    if commands_have_skip(commands) && ref_skips >0 && stu_skips ==0 {
+
+    if commands_have_skip(commands) && ref_skips > 0 && stu_skips == 0 {
         return "skip not implemented".to_string();
     }
     if commands_have_array_assignment(commands) {
@@ -392,12 +410,12 @@ fn diagnose_mismatch(
 
     if has_loop && ref_conds > stu_conds {
         let n = max_loop_guards(commands);
-        if n>1 {
+        if n > 1 {
             return format!("do-od loop with {n} guards not properly compiled");
         }
-        return "do-od loop not implemented".to_string()
+        return "do-od loop not implemented".to_string();
     }
-    
+
     if has_if && ref_conds > stu_conds {
         let n = max_if_guards(commands);
         if n > 1 {
@@ -424,7 +442,6 @@ fn diagnose_mismatch(
         t_g.graph.edge_count()
     )
 }
-
 
 #[test]
 fn point4_oracle_memory_states() {
@@ -492,7 +509,7 @@ fn validate_uses_witness_mems_not_fixed_seed() {
 
     let output = CompilerEnv::run(&input).unwrap();
     let result = CompilerEnv::validate(&input, &output).unwrap();
-    assert_eq!(result, ce_core::ValidationResult::Correct);
+    assert_eq!(result, (ce_core::ValidationResult::Correct, ()));
 }
 
 #[test]
@@ -538,7 +555,7 @@ fn path_fingerprints_match_for_correct_graph() {
         let result = CompilerEnv::validate(&input, &output).unwrap();
         assert_eq!(
             result,
-            ce_core::ValidationResult::Correct,
+            (ce_core::ValidationResult::Correct, ()),
             "Reference output should validate as correct. Commands: {:?}",
             input.commands
         );

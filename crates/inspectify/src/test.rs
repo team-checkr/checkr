@@ -52,6 +52,52 @@ fn total_lines_in_file(xml: &str, file_filter: &str) -> usize {
     total
 }
 
+fn all_tracked_lines(xml: &str, file_filter: &str) -> HashSet<(String, u32)> {
+    let doc = Document::parse(xml).unwrap();
+    let mut tracked = HashSet::new();
+    for class in doc.descendants().filter(|n| n.has_tag_name("class")) {
+        let filename = class.attribute("filename").unwrap_or("").to_string();
+        if !filename.contains(file_filter) {
+            continue;
+        }
+        for line in class
+            .children()
+            .filter(|n| n.has_tag_name("lines"))
+            .flat_map(|ls| ls.children().filter(|n| n.has_tag_name("line")))
+        {
+            let number: u32 = line.attribute("number").unwrap_or("0").parse().unwrap_or(0);
+            tracked.insert((filename.clone(), number));
+        }
+    }
+    tracked
+}
+
+fn print_uncovered_lines(uncovered: &HashSet<(String, u32)>, cwd: &std::path::Path, label: &str) {
+    if uncovered.is_empty() {
+        println!("  [{label}] All lines covered!");
+        return;
+    }
+    let mut by_file: std::collections::BTreeMap<String, Vec<u32>> =
+        std::collections::BTreeMap::new();
+    for (filename, line_no) in uncovered {
+        by_file.entry(filename.clone()).or_default().push(*line_no);
+    }
+    for (filename, mut line_nos) in by_file {
+        line_nos.sort();
+        let source_lines: Vec<String> = fs::read_to_string(cwd.join(&filename))
+            .map(|s| s.lines().map(|l| l.to_string()).collect())
+            .unwrap_or_default();
+        println!("  [{label}] Uncovered lines in {filename}:");
+        for ln in &line_nos {
+            let content = source_lines
+                .get((*ln as usize).saturating_sub(1))
+                .map(|s| s.trim())
+                .unwrap_or("<unknown>");
+            println!("    line {:>4}: {content}", ln);
+        }
+    }
+}
+
 /// Runs dotnet-coverage for `test_amount` seeds using the provided arg generator.
 /// Returns (unique_lines_hit, total_instrumentable_lines).
 /// Unique lines = union of all lines hit across all seeds.
@@ -63,11 +109,12 @@ async fn coverage_test(
     file_filter: &str,
     test_amount: usize,
     mut get_args: impl FnMut(usize) -> (String, String),
-) -> (usize, usize) {
+) -> (usize, usize, HashSet<(String, u32)>) {
     let run_exe = cwd.join(driver.config().run().split(' ').next().unwrap());
     let run_exe_str = run_exe.to_string_lossy().into_owned();
 
     let mut union_covered: HashSet<(String, u32)> = HashSet::new();
+    let mut all_tracked: HashSet<(String, u32)> = HashSet::new();
     let mut total_possible = 0usize;
 
     for index in 1..=test_amount {
@@ -95,6 +142,10 @@ async fn coverage_test(
         let xml_path = cwd.join("coverage.xml");
         let xml = fs::read_to_string(&xml_path).expect("coverage.xml not found");
 
+        if all_tracked.is_empty() {
+            all_tracked = all_tracked_lines(&xml, file_filter);
+        }
+
         if total_possible == 0 {
             total_possible = total_lines_in_file(&xml, file_filter);
         }
@@ -109,8 +160,9 @@ async fn coverage_test(
         );
     }
     println!();
-
-    (union_covered.len(), total_possible)
+    let uncovered: HashSet<(String, u32)> =
+        all_tracked.difference(&union_covered).cloned().collect();
+    (union_covered.len(), total_possible, uncovered)
 }
 
 /// Serialize only the fields F#'s Io.Compiler.Input expects: { commands, determinism }.
@@ -167,6 +219,8 @@ struct RepoResult {
     old_total: usize,
     new_unique: usize,
     new_total: usize,
+    old_uncovered: HashSet<(String, u32)>,
+    new_uncovered: HashSet<(String, u32)>,
 }
 
 #[tokio::test]
@@ -176,7 +230,7 @@ async fn test_thingy() {
     //   Each repo must already be compiled: dotnet publish -c Release --self-contained --output bin/run
 
     let student_repos_root = "D:/checkr/Student-repos-for-testing";
-    let test_amount = 100;
+    let test_amount = 50;
 
     // Discover all repos: any subdirectory that contains a code/run.toml
     let mut repo_paths: Vec<(String, std::path::PathBuf)> = std::fs::read_dir(student_repos_root)
@@ -220,7 +274,7 @@ async fn test_thingy() {
         }
 
         println!("\n  --- Old gcl_gen ({test_amount} seeds) ---");
-        let (old_unique, old_total) = coverage_test(
+        let (old_unique, old_total, old_uncovered) = coverage_test(
             &hub,
             &cwd,
             &driver,
@@ -232,7 +286,7 @@ async fn test_thingy() {
         .await;
 
         println!("\n  --- New gcl_compiler_gen ({test_amount} seeds) ---");
-        let (new_unique, new_total) = coverage_test(
+        let (new_unique, new_total, new_uncovered) = coverage_test(
             &hub,
             &cwd,
             &driver,
@@ -249,6 +303,8 @@ async fn test_thingy() {
             old_total,
             new_unique,
             new_total,
+            old_uncovered,
+            new_uncovered,
         });
     }
 
@@ -270,4 +326,42 @@ async fn test_thingy() {
         );
     }
     println!("{}", "-".repeat(80));
+
+    // Per-repo uncovered line breakdown
+    println!("\n\n{}", "=".repeat(80));
+    println!("=== UNCOVERED LINES BREAKDOWN ===");
+    for r in &results {
+        let cwd = dunce::canonicalize(
+            std::path::Path::new(student_repos_root)
+                .join(&r.name)
+                .join("code"),
+        )
+        .unwrap_or_else(|_| {
+            std::path::Path::new(student_repos_root)
+                .join(&r.name)
+                .join("code")
+                .to_path_buf()
+        });
+
+        println!("\n--- {} ---", r.name);
+        print_uncovered_lines(&r.old_uncovered, &cwd, "old gcl_gen");
+        print_uncovered_lines(&r.new_uncovered, &cwd, "new gcl_gen");
+
+        let only_old: HashSet<_> = r
+            .new_uncovered
+            .difference(&r.old_uncovered)
+            .cloned()
+            .collect();
+        let only_new: HashSet<_> = r
+            .old_uncovered
+            .difference(&r.new_uncovered)
+            .cloned()
+            .collect();
+        if !only_old.is_empty() {
+            print_uncovered_lines(&only_old, &cwd, "REGRESSION: new gen misses (old hit)");
+        }
+        if !only_new.is_empty() {
+            print_uncovered_lines(&only_new, &cwd, "IMPROVEMENT: new gen hits (old missed)");
+        }
+    }
 }
