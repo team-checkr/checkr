@@ -160,7 +160,11 @@ fn scenario_level(s: Scenario) -> u8 {
     }
 }
 
-fn dispatch_scenario<R: Rng>(scenario: Scenario, cx: &mut CompilerContext, rng: &mut R) -> Commands {
+fn dispatch_scenario<R: Rng>(
+    scenario: Scenario,
+    cx: &mut CompilerContext,
+    rng: &mut R,
+) -> Commands {
     match scenario {
         Scenario::SimpleAssignment => gen_simple_assignment(cx, rng),
         Scenario::UnaryMinus => gen_unary_minus(cx, rng),
@@ -203,13 +207,20 @@ pub fn gen_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
     dispatch_scenario(scenario, cx, rng)
 }
 
-pub fn gen_commands_for_level<R: Rng>(level: u8, cx: &mut CompilerContext, rng: &mut R) -> Commands {
+pub fn gen_commands_for_level<R: Rng>(
+    level: u8,
+    cx: &mut CompilerContext,
+    rng: &mut R,
+) -> Commands {
     cx.level = level;
     gen_commands(cx, rng)
 }
 
 fn gen_simple_assignment<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
-    Commands(vec![Command::Assignment(gen_target(cx, rng), gen_aexpr(cx, rng))])
+    Commands(vec![Command::Assignment(
+        gen_target(cx, rng),
+        gen_aexpr(cx, rng),
+    )])
 }
 
 fn gen_unary_minus<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
@@ -222,7 +233,11 @@ fn gen_unary_minus<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
 
 fn gen_sequential_assignments<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
     let n = rng.random_range(2..=4usize);
-    Commands((0..n).map(|_| Command::Assignment(gen_target(cx, rng), gen_aexpr(cx, rng))).collect())
+    Commands(
+        (0..n)
+            .map(|_| Command::Assignment(gen_target(cx, rng), gen_aexpr(cx, rng)))
+            .collect(),
+    )
 }
 
 fn gen_random_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
