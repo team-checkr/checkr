@@ -232,6 +232,11 @@ async fn test_thingy() {
     let student_repos_root = "D:/checkr/Student-repos-for-testing";
     let test_amount = 50;
 
+    if !std::path::Path::new(student_repos_root).exists() {
+        println!("Skipping test_thingy: {student_repos_root} not found (local-only test)");
+        return;
+    }
+
     // Discover all repos: any subdirectory that contains a code/run.toml
     let mut repo_paths: Vec<(String, std::path::PathBuf)> = std::fs::read_dir(student_repos_root)
         .expect("could not read Student-repos-for-testing")
