@@ -7,6 +7,7 @@ let stored = init(async () => {
   const files = {
     'z3-built.js': await import('z3-solver/build/z3-built?url'),
     'z3-built.wasm': await import('z3-solver/build/z3-built.wasm?url'),
+    'z3-built.worker.js': await import('z3-solver/build/z3-built.worker?url'),
   };
   return initZ3({
     locateFile: (f: string) => {
@@ -48,7 +49,9 @@ export const run = (
 
       options.onStart?.();
 
-      const timeout = 15000;
+      // We can't wait forever, so we set a timeout. 
+      // 5 seconds (per Z3 call) seems like a reasonable amount of time.
+      const timeout = 5000;
 
       Z3.global_param_set('timeout', String(timeout));
 
@@ -57,6 +60,9 @@ export const run = (
       Z3.del_config(cfg);
 
       console.group('smt');
+ 
+      // HACK: We set the theory, because otherwise Z3 will choose one and the performance outcome is less predictable
+      await Z3.eval_smtlib2_string(ctx, "(set-logic LIA)");
 
       if (options.prelude) {
         console.info('prelude:', '\n' + options.prelude);
