@@ -2,19 +2,20 @@ use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
 };
 use rand::{
-    Rng, SeedableRng,
     rngs::SmallRng,
     seq::{IndexedRandom, SliceRandom},
+    Rng, SeedableRng,
 };
 
-use crate::gn::compiler_gen::{CompilerContext, gen_aexpr, gen_bexpr, gen_target};
+use crate::gn::compiler_gen::{gen_aexpr, gen_bexpr, gen_target, CompilerContext};
 type ErasedRng = SmallRng;
 
 type GenFn<G> = Box<dyn Fn(&mut CompilerContext, &mut ErasedRng) -> G>;
 type GenOptions<G> = Vec<(f32, GenFn<G>)>;
 
-type GenFnNested<G> = Box<dyn Fn(&mut CompilerContext, &mut ErasedRng, &GenOptionsNested<G>) -> G>;
-pub struct GenOptionsNested<G>(pub Vec<(f32, GenFnNested<G>)>);
+type GenFnNested<Command> =
+    Box<dyn Fn(&mut CompilerContext, &mut ErasedRng, &GenOptionsNested<Command>) -> Command>;
+pub struct GenOptionsNested<Command>(pub Vec<(f32, GenFnNested<Command>)>);
 
 pub struct InterpreterContext {
     pub level: u32,
@@ -40,11 +41,20 @@ impl InterpreterContext {
     }
 }
 
-impl<G> GenOptionsNested<G> {
-    pub fn generate(&self, cx: &mut CompilerContext, rng: &mut ErasedRng) -> G {
+impl GenOptionsNested<Commands> {
+    pub fn generate(&self, cx: &mut CompilerContext, rng: &mut ErasedRng) -> Commands {
         cx.fuel = cx.fuel.checked_sub(1).unwrap_or_default();
 
         let mut erng = SmallRng::seed_from_u64(rng.random());
+
+        if cx.fuel <= 0 {
+            let end_opt: GenOptionsNested<Commands> = lvl_assignment(cx);
+
+            let (_, f) = end_opt.0.choose_weighted(&mut erng, |item| item.0).unwrap();
+
+            return f(cx, &mut erng, &self);
+        }
+
         let (_i, f) = &self.0.choose_weighted(&mut erng, |item| item.0).unwrap();
 
         let _i = _i + 1.0;
@@ -113,7 +123,6 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
         // ? 4 Stuck: unsolvable programs, guards are all false, or semantics undefined like division by zero
         if cx.level == 4 {
             // as this is before loops they have to be disabled
-            cx.compiler_context.no_loops = false;
 
             let mut erng = SmallRng::seed_from_u64(rng.random());
 
@@ -169,28 +178,28 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
             .append(&mut lvl_nondeterminism(&mut cx.compiler_context).0);
     }
 
-    if cx.level >= 7 {
-        // ? 7 Undefined semantics:
-        if cx.level == 7 {
-            let mut erng = SmallRng::seed_from_u64(rng.random());
+    // if cx.level >= 7 {
+    //     // ? 7 Undefined semantics:
+    //     if cx.level == 7 {
+    //         let mut erng = SmallRng::seed_from_u64(rng.random());
+    //
+    //         let mut gen_options: GenOptionsNested<Commands> =
+    //             lvl_assignment(&mut cx.compiler_context);
+    //         gen_options
+    //             .0
+    //             .append(&mut lvl_undefined(&mut cx.compiler_context).0);
+    //
+    //         cmds.append(&mut gen_options.generate(&mut cx.compiler_context, &mut erng).0);
+    //     }
+    //
+    //     generation_options
+    //         .0
+    //         .append(&mut lvl_undefined(&mut cx.compiler_context).0);
+    // }
 
-            let mut gen_options: GenOptionsNested<Commands> =
-                lvl_assignment(&mut cx.compiler_context);
-            gen_options
-                .0
-                .append(&mut lvl_undefined(&mut cx.compiler_context).0);
-
-            cmds.append(&mut gen_options.generate(&mut cx.compiler_context, &mut erng).0);
-        }
-
-        generation_options
-            .0
-            .append(&mut lvl_undefined(&mut cx.compiler_context).0);
-    }
-
-    if cx.level >= 8 && false {
+    if cx.level >= 7 && false {
         // ? 8 Composition: (all previous levels are guaranteed here)
-        if cx.level == 8 {
+        if cx.level == 7 {
             let mut erng = SmallRng::seed_from_u64(rng.random());
             cmds.append(
                 &mut lvl_assignment(&mut cx.compiler_context)
@@ -222,11 +231,11 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
                     .generate(&mut cx.compiler_context, &mut erng)
                     .0,
             );
-            cmds.append(
-                &mut lvl_undefined(&mut cx.compiler_context)
-                    .generate(&mut cx.compiler_context, &mut erng)
-                    .0,
-            );
+            // cmds.append(
+            //     &mut lvl_undefined(&mut cx.compiler_context)
+            //         .generate(&mut cx.compiler_context, &mut erng)
+            //         .0,
+            // );
         }
 
         //generation_options.0.append(&mut lvl_composition().0);
@@ -257,33 +266,10 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
 }
 
 // ? 1 Assignment: state updates (single assignments)
-fn lvl_assignment(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
-    // as these commands are essentially the stopping points for the generator,
-    // we modify the change for them to generate depending on the current fuel of the generation
-    let point_of_no_return: Box<dyn Fn(&mut CompilerContext) -> f32> =
-        Box::new(|cx: &mut CompilerContext| {
-            if cx.fuel <= 0 {
-                return 1000.0;
-            } else if cx.fuel <= 1 {
-                return 10.0;
-            } else if cx.fuel <= 5 {
-                return 2.0;
-            } else {
-                return 4.0;
-            }
-        });
-
+fn lvl_assignment(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     GenOptionsNested(vec![
         (
-            if cx.fuel <= 0 {
-                1000.0
-            } else if cx.fuel <= 1 {
-                10.0
-            } else if cx.fuel <= 5 {
-                2.0
-            } else {
-                4.0
-            },
+            4.0,
             Box::new(
                 |cx: &mut CompilerContext,
                  rng: &mut ErasedRng,
@@ -293,15 +279,7 @@ fn lvl_assignment(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
             ),
         ),
         (
-            if cx.fuel <= 0 {
-                1000.0
-            } else if cx.fuel <= 1 {
-                10.0
-            } else if cx.fuel <= 5 {
-                2.0
-            } else {
-                4.0
-            },
+            4.0,
             Box::new(
                 |_cx: &mut CompilerContext,
                  _rng: &mut ErasedRng,
@@ -362,7 +340,7 @@ fn lvl_conditionals() -> GenOptionsNested<Commands> {
 }
 
 // ? 4 Stuck: unsolvable programs, guards are all false
-fn lvl_stuck(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
+fn lvl_stuck(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     GenOptionsNested(vec![
         (
             0.5,
@@ -378,15 +356,22 @@ fn lvl_stuck(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
             ),
         ),
         (
-            if cx.no_loops { 0.0 } else { 0.5 },
+            0.5,
             Box::new(
                 |cx: &mut CompilerContext,
                  rng: &mut ErasedRng,
-                 gnopt: &GenOptionsNested<Commands>| {
-                    Commands(vec![Command::Loop(vec![Guard(
-                        gen_bexpr_stuck(cx, rng),
-                        gnopt.generate(cx, rng),
-                    )])])
+                 _gnopt: &GenOptionsNested<Commands>| {
+                    let name = cx
+                        .array_names
+                        .choose(rng)
+                        .cloned()
+                        .unwrap_or_else(|| "A".into());
+                    let arr = Target::Array(
+                        Array(name),
+                        Box::new(AExpr::Number(rng.random_range(-100..=-1))),
+                    );
+
+                    Commands(vec![Command::Assignment(arr, gen_aexpr(cx, rng))])
                 },
             ),
         ),
@@ -396,7 +381,7 @@ fn lvl_stuck(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
 // ? 5 Loops: long execution (execution that may surpass the trace length limit) do GC od introduces iteration, exits when no guards hold. This level will bring potentially infinite execution, and differences between terminated, running, stuck( we have in the code exactly as TerminationState::Running TerminationState::Terminated TerminationState::Stuck
 fn lvl_loops(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     GenOptionsNested(vec![(
-        if cx.no_loops { 0.0 } else { 0.5 },
+        0.5,
         Box::new(
             |cx: &mut CompilerContext, rng: &mut ErasedRng, gnopt: &GenOptionsNested<Commands>| {
                 Commands(vec![Command::Loop(vec![Guard(
@@ -422,7 +407,7 @@ fn lvl_nondeterminism(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
             ),
         ),
         (
-            if cx.no_loops { 0.0 } else { 0.5 },
+            0.5,
             Box::new(
                 |cx: &mut CompilerContext,
                  rng: &mut ErasedRng,
@@ -431,7 +416,6 @@ fn lvl_nondeterminism(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
                 },
             ),
         ),
-        // TODO undefined := for x and [x]
     ])
 }
 
@@ -449,7 +433,7 @@ fn lvl_undefined(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
             ),
         ),
         (
-            if cx.no_loops { 0.0 } else { 0.5 },
+            0.5,
             Box::new(
                 |cx: &mut CompilerContext,
                  rng: &mut ErasedRng,
@@ -461,18 +445,6 @@ fn lvl_undefined(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     ])
 }
 
-// ? 8 Composition: (all previous levels are guaranteed here)
-// fn lvl_composition() -> GenOptionsNested<Commands> {
-//     GenOptionsNested(vec![(
-//         1.0,
-//         Box::new(
-//             |cx: &mut CompilerContext, rng: &mut ErasedRng, gnopt: &GenOptionsNested<Commands>| {
-//                 Commands(vec![Command::Skip])
-//             },
-//         ),
-//     )])
-// }
-
 // ? helper functions
 
 fn gen_assignment<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Command {
@@ -481,23 +453,94 @@ fn gen_assignment<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Command {
 
 pub fn gen_bexpr_stuck<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> BExpr {
     let generation_options: GenOptions<BExpr> = vec![
-        (1.0, Box::new(|_, _| BExpr::Bool(false))),
+        (5.0, Box::new(|_, _| BExpr::Bool(false))),
         (
-            if cx.negation_limit == 0 { 0.0 } else { 0.5 },
+            if cx.negation_limit == 0 { 0.0 } else { 1.0 },
             Box::new(|cx: &mut CompilerContext, _| {
                 cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
                 BExpr::Not(Box::new(BExpr::Bool(true)))
             }),
         ),
         (
-            if cx.negation_limit == 0 { 0.0 } else { 0.5 },
+            if cx.negation_limit == 0 { 0.0 } else { 1.0 },
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
                 BExpr::Not(Box::new(BExpr::Not(Box::new(gen_bexpr_stuck(cx, rng)))))
             }),
         ),
-        // TODO more generation options than true, false and NOT
-        // missing: all LogicOps for BExpr::Logic and all RelOps for BExpr::Rel
+        (
+            0.25,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                    LogicOp::And,
+                    Box::new(gen_bexpr(cx, rng)),
+                )
+            }),
+        ),
+        (
+            0.25,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr(cx, rng)),
+                    LogicOp::And,
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                )
+            }),
+        ),
+        (
+            0.25,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                    LogicOp::Land,
+                    Box::new(gen_bexpr(cx, rng)),
+                )
+            }),
+        ),
+        (
+            0.25,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr(cx, rng)),
+                    LogicOp::Land,
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                )
+            }),
+        ),
+        (
+            0.5,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                    LogicOp::Or,
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                )
+            }),
+        ),
+        (
+            0.5,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Logic(
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                    LogicOp::Lor,
+                    Box::new(gen_bexpr_stuck(cx, rng)),
+                )
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                gen_bexpr_stuck_rel(cx, rng)
+            }),
+        ),
     ];
 
     let mut erng = SmallRng::seed_from_u64(rng.random());
@@ -508,6 +551,114 @@ pub fn gen_bexpr_stuck<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> BExpr {
         .1(cx, &mut erng);
 
     choice
+}
+
+pub fn gen_bexpr_stuck_rel<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> BExpr {
+    let generation_options: GenOptions<BExpr> = vec![
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+                BExpr::Rel(gen_aexpr(cx, rng), RelOp::Eq, gen_aexpr(cx, rng))
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+
+                let aexpr = gen_aexpr(cx, rng);
+
+                BExpr::Rel(aexpr.clone(), RelOp::Ne, aexpr)
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+
+                let (small, large) = sort_aexpr(gen_aexpr(cx, rng), gen_aexpr(cx, rng));
+
+                BExpr::Rel(small, RelOp::Ge, large)
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+
+                let (small, large) = sort_aexpr(gen_aexpr(cx, rng), gen_aexpr(cx, rng));
+
+                BExpr::Rel(small, RelOp::Gt, large)
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+
+                let (small, large) = sort_aexpr(gen_aexpr(cx, rng), gen_aexpr(cx, rng));
+
+                BExpr::Rel(large, RelOp::Le, small)
+            }),
+        ),
+        (
+            1.0,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.negation_limit = cx.negation_limit.checked_sub(1).unwrap_or_default();
+
+                let (small, large) = sort_aexpr(gen_aexpr(cx, rng), gen_aexpr(cx, rng));
+
+                BExpr::Rel(large, RelOp::Lt, small)
+            }),
+        ),
+    ];
+
+    let mut erng = SmallRng::seed_from_u64(rng.random());
+
+    let choice: BExpr = generation_options
+        .choose_weighted(&mut erng, |item| item.0)
+        .unwrap()
+        .1(cx, &mut erng);
+
+    choice
+}
+
+pub fn sort_aexpr(a: AExpr, b: AExpr) -> (AExpr, AExpr) {
+    let a_var = aexpr_resolve(a.clone());
+    let b_var = aexpr_resolve(b.clone());
+
+    if a_var <= b_var {
+        // (smallest, largest)
+        (a, b)
+    } else {
+        (b, a)
+    }
+}
+
+pub fn aexpr_resolve(a: AExpr) -> i32 {
+    match a {
+        AExpr::Number(n) => n,
+        AExpr::Reference(target) => 0,
+        AExpr::Binary(l_aexpr, aop, r_aexpr) => {
+            let l_var = aexpr_resolve(l_aexpr.simplify());
+            let r_var = aexpr_resolve(r_aexpr.simplify());
+
+            match aop {
+                AOp::Plus => l_var + r_var,
+                AOp::Minus => l_var - r_var,
+                AOp::Times => l_var * r_var,
+                AOp::Divide => {
+                    if r_var == 0 {
+                        return -1;
+                    }
+                    l_var / r_var
+                }
+                AOp::Pow => l_var.pow(r_var as u32),
+            }
+        }
+        AExpr::Minus(aexpr) => -aexpr_resolve(aexpr.simplify()),
+    }
 }
 
 pub fn gen_multiple_guards(
@@ -601,7 +752,7 @@ pub fn gen_aexpr_op_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> 
         // undefined value use
         // +
         (
-            0.25,
+            0.20,
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
                 AExpr::binary(
@@ -613,7 +764,7 @@ pub fn gen_aexpr_op_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> 
         ),
         // -
         (
-            0.25,
+            0.20,
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
                 AExpr::binary(
@@ -625,7 +776,7 @@ pub fn gen_aexpr_op_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> 
         ),
         // *
         (
-            0.25,
+            0.20,
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
                 AExpr::binary(
@@ -637,7 +788,7 @@ pub fn gen_aexpr_op_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> 
         ),
         // ^
         (
-            0.25,
+            0.20,
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
                 AExpr::binary(
@@ -647,7 +798,13 @@ pub fn gen_aexpr_op_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> 
                 )
             }),
         ),
-        // TODO add divide?
+        (
+            0.20,
+            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
+                cx.recursion_limit = cx.recursion_limit.checked_sub(1).unwrap_or_default();
+                AExpr::binary(gen_aexpr_undefined(cx, rng), AOp::Divide, AExpr::Number(0))
+            }),
+        ),
     ];
 
     let mut erng = SmallRng::seed_from_u64(rng.random());
@@ -667,6 +824,9 @@ pub fn gen_aexpr_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AEx
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 let mut var_name = cx.names.choose(rng).cloned().unwrap_or_else(|| "a".into());
                 var_name.push_str("0");
+
+                let var_name: String = "test".to_string();
+
                 AExpr::Reference(Target::Variable(Variable(var_name)))
             }),
         ),
@@ -674,6 +834,8 @@ pub fn gen_aexpr_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AEx
             0.5,
             Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                 let var_name = cx.names.choose(rng).cloned().unwrap_or_else(|| "a".into());
+
+                let var_name: String = "test2".to_string();
                 AExpr::Reference(Target::Variable(Variable(var_name)))
             }),
         ),
