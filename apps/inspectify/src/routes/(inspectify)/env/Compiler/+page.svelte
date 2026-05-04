@@ -5,10 +5,13 @@
   import { Io } from '$lib/io.svelte';
   import InputOptions from '$lib/components/InputOptions.svelte';
   import DeterminismInput from '$lib/components/DeterminismInput.svelte';
+  import LevelInput from '$lib/components/LevelInput.svelte';
 
   const io = new Io('Compiler', {
     commands: 'skip',
     determinism: 'Deterministic',
+    witness_mems: [],
+    level: 7,
   });
 </script>
 
@@ -16,6 +19,7 @@
   {#snippet inputView()}
     <StandardInput analysis="Compiler" code="commands" {io}>
       <InputOptions>
+        <LevelInput bind:level={io.level} />
         <DeterminismInput input={io.input} />
       </InputOptions>
     </StandardInput>

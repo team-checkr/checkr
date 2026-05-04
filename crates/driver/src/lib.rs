@@ -71,11 +71,22 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             .collect_vec();
         args.push(input.analysis().code().to_string());
         args.push(input.to_string());
+        // On Windows, CreateProcess resolves relative exe paths against the calling
+        // process's CWD, not the lpCurrentDirectory we pass. Make it absolute so it
+        // always finds the binary regardless of where inspectify was launched from.
+        let program = {
+            let p = std::path::Path::new(&args[0]);
+            if p.is_relative() {
+                self.cwd.join(p).to_string_lossy().into_owned()
+            } else {
+                args[0].clone()
+            }
+        };
         self.hub.exec_command(
             JobKind::Analysis(input.clone()),
             &self.cwd,
             meta,
-            &args[0],
+            &program,
             &args[1..],
         )
     }
@@ -165,7 +176,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                         })
                         .collect_vec();
 
-                    tracing::debug!("a file was saved: {events:?}");
+                    tracing::trace!("a file was saved: {events:?}");
 
                     if matching_events.is_empty() {
                         return;
@@ -194,7 +205,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
                     }
 
                     if changed.is_empty() {
-                        tracing::debug!(
+                        tracing::trace!(
                             ?matching_events,
                             "these changed, but had the same contents"
                         );

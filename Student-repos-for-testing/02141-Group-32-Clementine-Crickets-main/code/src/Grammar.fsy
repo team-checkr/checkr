@@ -1,0 +1,135 @@
+// Open the file that defines the type "expr" we shall use as AST
+%{
+open AST
+#nowarn "3261" 
+%}
+
+// Declare the tokens (terminal symbols)
+%token <int> NUM
+%token
+TIMES
+DIV
+PLUS
+MINUS
+POW
+LPAR
+RPAR
+EOF
+SKIP
+SEMICOLON
+LBRACKET
+RBRACKET
+ASSIGNMENT
+TRUE
+FALSE
+IF
+FI
+DO
+OD
+RARROW
+GUARDBRACKET
+AND
+OR
+SCAND
+SCOR
+NEG
+EQ
+NEQ
+GT
+LT
+GEQ
+LEQ
+
+%token <string> IDENT
+// NOTE: the actual formats of these tokens are defined in the lexer file
+//       as regular expressions
+
+// Specify precedence and associativity of operators
+// Precedence is given by the order (from low to high)
+%left PLUS MINUS
+%left TIMES DIV
+%right POW
+%nonassoc UMINUS  // Precedence marker for unary minus (highest for expressions)
+%left OR SCOR
+%left AND SCAND
+%right NEG
+%right SEMICOLON
+%right GUARDBRACKET
+
+
+// We declare the initial non-terminal symbol
+%start start_expression
+%start start_command
+
+// We specify the return type of each of then non-terminal symbols
+%type <AST.expr> start_expression
+%type <AST.expr> expression
+%type <AST.command> start_command
+%type <AST.command> command
+%type <AST.booleanExpr> booleanExpr
+%type <AST.guard> guard
+
+
+// Grammar productions
+%%
+
+// The first production in "formal" notation is
+// start_expression -> expression
+// here written:
+start_expression: expression EOF             { $1 }
+start_command: command EOF                   { $1 }
+
+// Note that we need to insert an End-Of-File (EOF)
+// The code annotation { $1 } specifies that parsing with this production
+// returns whatever parsing the expression returns: $1 is the result of parsing
+// the first component of the production (i.e. expression)
+
+// The productions for expressions are like in the grammar we saw in class
+// written in the yacc format:
+expression:
+  | expression TIMES expression   { TimesExpr($1,$3) }
+  | expression DIV expression     { DivExpr($1,$3) }
+  | expression PLUS expression    { PlusExpr($1,$3) }
+  | expression MINUS expression   { MinusExpr($1,$3) }
+  | expression POW expression     { PowExpr($1,$3) }
+  | MINUS expression %prec UMINUS { UMinusExpr($2) }
+  | NUM                           { Num($1) }
+  | LPAR expression RPAR          { ParenExpr($2) }
+  | IDENT                         { Variable($1) }
+  | IDENT LBRACKET expression RBRACKET { Array($1, $3) }
+
+command: 
+  | IDENT LBRACKET expression RBRACKET ASSIGNMENT expression { ArrayAssignment($1, $3, $6) }
+  | IDENT ASSIGNMENT expression   { VariableAssignment($1, $3) }
+  | command SEMICOLON command     { SequenceCommand($1, $3) }
+  | SKIP                          { Skip }
+  | IF guard FI                   { IfCommand($2) }
+  | DO guard OD                   { DoCommand($2) }
+
+booleanExpr:
+  | TRUE                          { True }
+  | FALSE                         { False }
+  | NEG booleanExpr               { Neg($2) }
+  | booleanExpr AND booleanExpr   { And($1, $3) }
+  | booleanExpr SCAND booleanExpr { Scand($1, $3) }
+  | booleanExpr OR booleanExpr    { Or($1, $3) }
+  | booleanExpr SCOR booleanExpr  { Scor($1, $3) }
+  | expression EQ expression      { Eq($1, $3) }
+  | expression NEQ expression     { Neq($1, $3) }
+  | expression LT expression      { Lt($1, $3) }
+  | expression GT expression      { Gt($1, $3) }
+  | expression LEQ expression     { Leq($1, $3) }
+  | expression GEQ expression     { Geq($1, $3) }
+  | LPAR booleanExpr RPAR         { ParenBool($2) }
+  
+
+guard:
+  | booleanExpr RARROW command    { Conditional($1, $3) }
+  | guard GUARDBRACKET guard { SequenceGuard($1, $3) }
+
+// Again, the code annotation specifies the result of parsing
+// For example { TimesExpr($1,$3) } specifies that parsing with the production
+// returns the value TimesExpr($1,$3), where $i is the result of parsing
+// component i in the production (in this case the lhs and rhs operands)
+
+%%

@@ -1,0 +1,38 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <OutputType>Exe</OutputType>
+    <TargetFramework>net9.0</TargetFramework>
+    <ImplicitUsings>enable</ImplicitUsings>
+    <Nullable>enable</Nullable>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="FsLexYacc" Version="11.3.0" />
+    <Compile Include="src/State.fs"/>
+    <Compile Include="src/Types.fs" />
+    <Compile Include="src/Io.fs" />
+    <Compile Include="src/AST.fs" />
+    <FsYacc Include="src/Grammar.fsy">
+      <OtherFlags>--module Grammar -o src/Grammar.fs</OtherFlags>
+    </FsYacc>
+    <FsLex Include="src/Lexer.fsl">
+      <OtherFlags>--module Lexer --unicode -o src/Lexer.fs</OtherFlags>
+    </FsLex>
+    <Compile Include="src/Grammar.fsi" />
+    <Compile Include="src/Grammar.fs" />
+    <Compile Include="src/Lexer.fs" />
+
+    <Compile Include="src/Parser.fs" />
+    <Compile Include="src/Calculator.fs" />
+    <Compile Include="src/Compiler.fs" />
+    <Compile Include="src/Interpreter.fs" />
+    <Compile Include="src/BiGCL.fs" />
+    <Compile Include="src/RiscV.fs" />
+    <Compile Include="src/SignAnalysis.fs" />
+    <Compile Include="src/SecurityAnalysis.fs" />
+    <Compile Include="src/Program.fs" />
+    <PackageReference Include="FSharp.SystemTextJson" Version="1.3.13" />
+  </ItemGroup>
+
+</Project>

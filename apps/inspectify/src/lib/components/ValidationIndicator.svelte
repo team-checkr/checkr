@@ -21,13 +21,15 @@
         ? 'bg-red-500'
         : validation?.type == 'Mismatch'
           ? 'bg-orange-500'
-          : 'bg-gray-500'
+          : validation?.type == 'Unknown'
+            ? 'bg-purple-500'
+            : 'bg-gray-500'
     : 'bg-gray-500'}"
 >
   <div class="line-clamp-1 px-1.5 font-mono text-xs italic">
     {validation?.type == 'Failure'
       ? validation.message
-      : validation?.type == 'Mismatch'
+      : (validation?.type == 'Mismatch' || validation?.type == 'Unknown')
         ? validation.reason
         : ''}
   </div>

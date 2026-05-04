@@ -1,0 +1,6 @@
+{
+  "FSharp.inlayHints.typeAnnotations": false,
+  "[fsharp]": {
+    "editor.inlayHints.enabled": "off"
+  }
+}

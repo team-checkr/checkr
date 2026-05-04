@@ -39,21 +39,46 @@
 # git = "git@github.com:team-checkr/fsharp-starter.git"
 
 [[groups]]
-name = "99-ok"
-path = "."
+name = "02141-G15-Butterscotch-Bullfrogs"
+path = "D:\\checkr\\Student-repos-for-testing\\02141-Group-15-Butterscotch-Bullfrogs-main\\code"
 run = "run.toml"
 
 [[groups]]
-name = "99-unknown"
-path = "."
-run = "run-unknown.toml"
+name = "02141-G24-Celery-Centipedes"
+path = "D:\\checkr\\Student-repos-for-testing\\02141-Group-24-Celery-Centipedes-main\\code"
+run = "run.toml"
 
 [[groups]]
-name = "99-spin"
-path = "."
-run = "run-spin.toml"
+name = "02141-G32-Clementine-Crickets"
+path = "D:\\checkr\\Student-repos-for-testing\\02141-Group-32-Clementine-Crickets-main\\code"
+run = "run.toml"
 
 [[groups]]
-name = "99-spam"
-path = "."
-run = "run-spam.toml"
+name = "02343-G39-Orange-Orangutans"
+path = "D:\\checkr\\Student-repos-for-testing\\02343-Group-39-Orange-Orangutans-main\\code"
+run = "run.toml"
+
+[[groups]]
+name = "02343-G46-Peach-Pelicans"
+path = "D:\\checkr\\Student-repos-for-testing\\02343-Group-46-Peach-Pelicans-main\\code"
+run = "run.toml"
+
+# [[groups]]
+# name = "99-ok"
+# path = "."
+# run = "run.toml"
+
+# [[groups]]
+# name = "99-unknown"
+# path = "."
+# run = "run-unknown.toml"
+
+# [[groups]]
+# name = "99-spin"
+# path = "."
+# run = "run-spin.toml"
+
+# [[groups]]
+# name = "99-spam"
+# path = "."
+# run = "run-spam.toml"

@@ -3,7 +3,7 @@
 mod def;
 mod io;
 
-pub use io::{Error, Hash, Input, Meta, Output};
+pub use io::{Annotation, Error, Hash, Input, Meta, Output};
 use rand::SeedableRng;
 
 pub trait EnvExt: Env {
@@ -18,6 +18,8 @@ define_shell!(
     ce_parser::ParserEnv[Parser, "Parser"],
     ce_compiler::CompilerEnv[Compiler, "Compiler"],
     ce_interpreter::InterpreterEnv[Interpreter, "Interpreter"],
+    ce_bigcl::BiGCLEnv[BiGCL, "BiGCL"],
+    ce_riscv::RiscVEnv[RiscV, "RISC-V"],
     ce_security::SecurityEnv[Security, "Security"],
     ce_sign::SignEnv[Sign, "Sign Analysis"],
 );
@@ -30,17 +32,34 @@ impl Analysis {
         };
         self.gen_input(&mut rng)
     }
+
+    pub fn gen_input_for_level(self, level: u8, seed: Option<u64>) -> Input {
+        let mut rng = match seed {
+            Some(seed) => rand::rngs::SmallRng::seed_from_u64(seed),
+            None => rand::rngs::SmallRng::from_os_rng(),
+        };
+        match self {
+            Analysis::Compiler => {
+                let input = ce_compiler::gen_input_for_level(level, &mut rng);
+                Input::new::<ce_compiler::CompilerEnv>(&input)
+            }
+            _ => self.gen_input(&mut rng),
+        }
+    }
 }
 
 impl Input {
     #[tracing::instrument(skip_all, fields(analysis = self.analysis().to_string()))]
-    pub fn validate_output(&self, output: &Output) -> Result<ValidationResult, EnvError> {
+    pub fn validate_output(
+        &self,
+        output: &Output,
+    ) -> Result<(ValidationResult, Annotation), EnvError> {
         assert_eq!(self.analysis(), output.analysis());
 
         static VALIDATION: once_cell::sync::Lazy<
             dashmap::DashMap<
                 (crate::io::Hash, crate::io::Hash),
-                Result<ValidationResult, EnvError>,
+                Result<(ValidationResult, Annotation), EnvError>,
             >,
         > = once_cell::sync::Lazy::new(Default::default);
 

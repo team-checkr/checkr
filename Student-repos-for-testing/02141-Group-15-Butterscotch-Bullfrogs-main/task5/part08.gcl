@@ -1,0 +1,15 @@
+// Finite summation *** Done P
+{ n >= 1}
+r := 0 ;
+{n >= 1 & r = 0}
+i := 0 ;
+{n >= 1 & r = 0 & i = 0}
+do[r = (i*(i+1))/2 & i <= n] // TODO: replace `false` by a suitable invariant
+  i < n ->
+    {r+i+1 = ((i+1)*(i+2))/2 & (i+1) <= n}
+    i := i + 1 ;
+    {r+i = (i*(i+1))/2 & i <= n}
+    r := r + i 
+    {r = (i*(i+1))/2 & i <= n}
+od
+{ r = (n*(n+1))/2} // (n^2 + n)/2

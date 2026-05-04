@@ -1,0 +1,72 @@
+// The generated lexer module will start with this code
+{
+open FSharp.Text.Lexing
+open System
+// open the module that defines the tokens
+open Grammar
+// Set the language to English such that 4.0 is parsed as 4 and not 40.
+System.Globalization.CultureInfo.CurrentCulture <- new System.Globalization.CultureInfo("en-US")
+}
+
+// We define macros for some regular expressions we will use later
+let digit       = ['0'-'9']
+let num         = digit+
+let whitespace  = [' ' '\t']
+let newline     = "\n\r" | '\n' | '\r'
+let letter     = ['a'-'z' 'A'-'Z']
+let ident      = letter (letter | digit | '_')*
+
+// We define now the rules for recognising and building tokens
+// for each of the tokens of our language we need a rule
+// NOTE: rules are applied in order top-down.
+//       This is important when tokens overlap (not in this example)
+rule tokenize = parse
+// deal with tokens that need to be ignored (skip them)
+| whitespace    { tokenize lexbuf }
+| newline       { lexbuf.EndPos <- lexbuf.EndPos.NextLine; tokenize lexbuf; }
+
+// deal with tokens that need to be built (numbers)
+| num           { NUM(bigint.Parse(LexBuffer<_>.LexemeString lexbuf)) }
+
+//Two char operators 
+| ":="          { ASSIGN }
+| "!="          { NEQ }
+| ">="          { GTE }
+| "<="          { LTE }
+| "&&"          { ANDAND }
+| "||"          { OROR }
+| "[]"          { CHOICE }
+| "->"          { ARROW }
+
+//Single char operaters
+| '*'           { TIMES }
+| '/'           { DIV }
+| '+'           { PLUS }
+| '-'           { MINUS }
+| '^'           { POW }
+| '('           { LPAR }
+| ')'           { RPAR }
+| '['           { LBRACKET }
+| ']'           { RBRACKET }
+| '&'           { AND }
+| '|'           { OR }
+| '!'           { NOT }
+| '='           { EQ }
+| '>'           { GT }
+| '<'           { LT }
+| ';'           { SEMI }
+
+
+// Keywords
+| "if"          { IF }
+| "fi"          { FI }
+| "do"          { DO }
+| "od"          { OD }
+| "skip"        { SKIP }
+| "true"        { TRUE }
+| "false"       { FALSE }
+
+// Identifiers / variables (after keywords)
+| ident         { VAR(LexBuffer<_>.LexemeString lexbuf) }
+
+| eof           { EOF }

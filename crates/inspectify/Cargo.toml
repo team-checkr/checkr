@@ -14,8 +14,10 @@ dist = true
 
 [dependencies]
 axum.workspace = true
+ce-compiler.workspace = true
 ce-core.workspace = true
 ce-shell.workspace = true
+gcl.workspace = true
 chrono.workspace = true
 clap.workspace = true
 color-eyre.workspace = true
@@ -32,6 +34,7 @@ mime_guess = "2.0.4"
 once_cell.workspace = true
 open = "5.0.1"
 rand.workspace = true
+roxmltree = "0.21.1"
 rusqlite.workspace = true
 rust-embed = { version = "8.3.0", features = ["axum", "compression"] }
 serde.workspace = true

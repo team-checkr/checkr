@@ -1,0 +1,64 @@
+// Sorting 3 numbers *** Done P
+{ a = A 
+  & b = B 
+  & c = C 
+  & A != B & B != C & A != C }
+if
+   a < b & a < c -> 
+   {a = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C}
+   skip 
+   {a = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C}
+   
+[] b < a & b < c -> 
+    {b = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C}
+    t := a; 
+    {b = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C & t = A}
+    a := b;
+    {b = min(A, min(B,C)) & a = B & b = B & c = C & A != B & B != C & A != C & t = A} 
+    b := t 
+    {a = min(A, min(B,C)) & a = B & b = A & c = C & A != B & B != C & A != C & t = A} 
+[] c < a & c < b -> 
+    {c = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C}
+    t := a; 
+    {c = min(A, min(B,C)) & a = A & b = B & c = C & A != B & B != C & A != C & t=A}
+    a := c; 
+    {a = min(A, min(B,C)) & a = C & b = B & c = C & A != B & B != C & A != C & t=A}
+    c := t
+    {a = min(A, min(B,C)) & a = C & b = B & c = A & A != B & B != C & A != C & t=A}
+fi;
+{ a = min(A, min(B,C)) & a != b & b != c & a != c 
+& (a = A | a = B | a = C)
+& (b = A | b = B | b = C)
+& (c = A | c = B | c = C)}
+if
+   c > a & c > b ->    
+   { a = min(A, min(B,C)) 
+  & c = max(A, max(B,C)) 
+  & (b = A | b = B | b = C) 
+  & b != a & b != c  }    
+    skip     
+    { a = min(A, min(B,C)) 
+  & c = max(A, max(B,C)) 
+  & (b = A | b = B | b = C) 
+  & b != a & b != c  }
+[] b > c & b > a -> 
+    { a = min(A, min(B,C)) & b = max(A, max(B,C)) & (c = A | c = B | c = C) & c != a & c != b  }
+    t := b; 
+    { a = min(A, min(B,C)) & t = max(A, max(B,C)) & (c = A | c = B | c = C) & c != a & c != t  }
+    b := c; 
+    { a = min(A, min(B,C)) & t = max(A, max(B,C)) & (b = A | b = B | b = C) & b != a & b != t  }
+    c := t 
+    { a = min(A, min(B,C)) & c = max(A, max(B,C)) & (b = A | b = B | b = C) & b != a & b != c  }
+[] a > c & a > b -> 
+    { c = min(A, min(B,C)) & a = max(A, max(B,C)) & (b = A | b = B | b = C) & b != c & b != a  }
+    t := a; 
+    { c = min(A, min(B,C)) & t = max(A, max(B,C)) & (b = A | b = B | b = C) & b != c & b != t  }
+    a := c; 
+    { a = min(A, min(B,C)) & t = max(A, max(B,C)) & (b = A | b = B | b = C) & b != a & b != t  }
+    c := t
+    { a = min(A, min(B,C)) & c = max(A, max(B,C)) & (b = A | b = B | b = C) & b != a & b != c  }
+fi
+{ a = min(A, min(B,C)) 
+  & c = max(A, max(B,C)) 
+  & (b = A | b = B | b = C) 
+  & b != a & b != c  }

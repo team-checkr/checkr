@@ -3,6 +3,7 @@ use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
 };
 use rand::{Rng, SeedableRng, rngs::SmallRng, seq::IndexedRandom};
+
 type ErasedRng = SmallRng;
 
 type GenFn<G> = Box<dyn Fn(&mut CompilerContext, &mut ErasedRng) -> G>;
@@ -12,12 +13,10 @@ pub struct CompilerContext {
     pub fuel: u32,
     pub recursion_limit: u32,
     pub negation_limit: u32,
-    pub no_loops: bool,
-    pub no_division: bool,
-    pub no_unary_minus: bool,
     pub no_arrays: bool,
     pub names: Vec<String>,
     pub array_names: Vec<String>,
+    pub level: u8,
 }
 
 impl Default for CompilerContext {
@@ -26,18 +25,16 @@ impl Default for CompilerContext {
             fuel: 10,
             recursion_limit: Default::default(),
             negation_limit: Default::default(),
-            no_loops: Default::default(),
-            no_division: Default::default(),
-            no_unary_minus: Default::default(),
             no_arrays: Default::default(),
             names: ["a", "b", "c", "d"].map(Into::into).to_vec(),
             array_names: ["A", "B", "C"].map(Into::into).to_vec(),
+            level: 7,
         }
     }
 }
 
 impl CompilerContext {
-    pub fn new<R: Rng>(fuel: u32, _rng: &mut R) -> Self {
+    pub fn new(fuel: u32) -> Self {
         CompilerContext {
             fuel,
             recursion_limit: fuel,
@@ -46,18 +43,6 @@ impl CompilerContext {
         }
     }
 
-    pub fn set_no_loop(&mut self, no_loops: bool) -> &mut Self {
-        self.no_loops = no_loops;
-        self
-    }
-    pub fn set_no_division(&mut self, no_division: bool) -> &mut Self {
-        self.no_division = no_division;
-        self
-    }
-    pub fn set_no_unary_minus(&mut self, no_unary_minus: bool) -> &mut Self {
-        self.no_unary_minus = no_unary_minus;
-        self
-    }
     pub fn set_no_arrays(&mut self, no_arrays: bool) -> &mut Self {
         self.no_arrays = no_arrays;
         self
@@ -106,6 +91,8 @@ fn bridge<R: Rng>(rng: &mut R) -> ErasedRng {
 
 #[derive(Clone, Copy)]
 enum Scenario {
+    SimpleAssignment,
+    SequentialAssignments,
     Skip,
     SimpleIf,
     MultiGuardIf2,
@@ -121,10 +108,14 @@ enum Scenario {
     NonDeterministicOverlapping,
     VariableReuse,
     VariableAsIndex,
+    UnaryMinus,
     Random,
 }
 
 const CATALOG: &[(f32, Scenario)] = &[
+    (1.0, Scenario::SimpleAssignment),
+    (1.0, Scenario::UnaryMinus),
+    (1.5, Scenario::SequentialAssignments),
     (1.0, Scenario::Skip),
     (2.0, Scenario::SimpleIf),
     (2.0, Scenario::MultiGuardIf2),
@@ -133,19 +124,49 @@ const CATALOG: &[(f32, Scenario)] = &[
     (1.5, Scenario::DoNGuards2),
     (1.0, Scenario::DoNGuards3),
     (0.5, Scenario::DoNGuards4),
-    (1.5, Scenario::NestedIfInDo),
-    (1.5, Scenario::NestedDoInIf),
+    (2.0, Scenario::NestedIfInDo),
+    (2.0, Scenario::NestedDoInIf),
     (2.0, Scenario::ArrayAssignment),
     (2.0, Scenario::ArrayRead),
-    (1.0, Scenario::NonDeterministicOverlapping),
+    (2.0, Scenario::NonDeterministicOverlapping),
     (1.0, Scenario::VariableReuse),
     (1.0, Scenario::VariableAsIndex),
     (3.0, Scenario::Random),
 ];
 
-pub fn gen_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
-    let scenario = CATALOG.choose_weighted(rng, |item| item.0).unwrap().1;
+fn scenario_level(s: Scenario) -> u8 {
+    match s {
+        Scenario::SimpleAssignment => 1,
+        Scenario::UnaryMinus => 1,
+        Scenario::SequentialAssignments => 2,
+        Scenario::Skip => 2,
+        Scenario::SimpleIf => 3,
+        Scenario::MultiGuardIf2 => 3,
+        Scenario::MultiGuardIf3 => 3,
+        Scenario::SimpleDo => 4,
+        Scenario::DoNGuards2 => 4,
+        Scenario::DoNGuards3 => 4,
+        Scenario::DoNGuards4 => 4,
+        Scenario::NestedIfInDo => 4,
+        Scenario::NestedDoInIf => 4,
+        Scenario::ArrayAssignment => 5,
+        Scenario::ArrayRead => 5,
+        Scenario::VariableAsIndex => 5,
+        Scenario::NonDeterministicOverlapping => 6,
+        Scenario::VariableReuse => 6,
+        Scenario::Random => 7,
+    }
+}
+
+fn dispatch_scenario<R: Rng>(
+    scenario: Scenario,
+    cx: &mut CompilerContext,
+    rng: &mut R,
+) -> Commands {
     match scenario {
+        Scenario::SimpleAssignment => gen_simple_assignment(cx, rng),
+        Scenario::UnaryMinus => gen_unary_minus(cx, rng),
+        Scenario::SequentialAssignments => gen_sequential_assignments(cx, rng),
         Scenario::Skip => gen_skip_program(cx, rng),
         Scenario::SimpleIf => gen_simple_if(cx, rng),
         Scenario::MultiGuardIf2 => gen_multi_guard_if(cx, rng, 2),
@@ -163,6 +184,58 @@ pub fn gen_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
         Scenario::VariableAsIndex => gen_variable_as_index(cx, rng),
         Scenario::Random => gen_random_commands(cx, rng),
     }
+}
+
+pub fn gen_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
+    if cx.level < 5 {
+        cx.no_arrays = true;
+    }
+    let catalog: Vec<(f32, Scenario)> = CATALOG
+        .iter()
+        .filter(|(_, s)| {
+            if cx.level >= 7 {
+                true
+            } else {
+                scenario_level(*s) == cx.level
+            }
+        })
+        .cloned()
+        .collect();
+    let scenario = catalog.choose_weighted(rng, |item| item.0).unwrap().1;
+    dispatch_scenario(scenario, cx, rng)
+}
+
+pub fn gen_commands_for_level<R: Rng>(
+    level: u8,
+    cx: &mut CompilerContext,
+    rng: &mut R,
+) -> Commands {
+    cx.level = level;
+    gen_commands(cx, rng)
+}
+
+fn gen_simple_assignment<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
+    Commands(vec![Command::Assignment(
+        gen_target(cx, rng),
+        gen_aexpr(cx, rng),
+    )])
+}
+
+fn gen_unary_minus<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
+    let var = cx.names.choose(rng).cloned().unwrap_or_else(|| "a".into());
+    let inner = AExpr::Reference(Target::Variable(Variable(var)));
+    let rhs = AExpr::Minus(Box::new(inner));
+    let target = gen_target(cx, rng);
+    Commands(vec![Command::Assignment(target, rhs)])
+}
+
+fn gen_sequential_assignments<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
+    let n = rng.random_range(2..=4usize);
+    Commands(
+        (0..n)
+            .map(|_| Command::Assignment(gen_target(cx, rng), gen_aexpr(cx, rng)))
+            .collect(),
+    )
 }
 
 fn gen_random_commands<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Commands {
@@ -355,7 +428,7 @@ pub fn gen_command<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Command {
                 }),
             ),
             (
-                if cx.no_loops { 0.0 } else { 0.3 },
+                0.3,
                 Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
                     Command::Loop(cx.many_erased(1, 10, rng, gen_guard_erased))
                 }),
@@ -407,7 +480,7 @@ pub fn gen_aexpr<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AExpr {
                 }),
             ),
             (
-                if cx.no_unary_minus || cx.recursion_limit == 0 || cx.fuel == 0 {
+                if cx.recursion_limit == 0 || cx.fuel == 0 {
                     0.0
                 } else {
                     0.4
@@ -443,7 +516,7 @@ pub fn gen_aop<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AOp {
                 Box::new(|_cx: &mut CompilerContext, _rng: &mut ErasedRng| AOp::Pow),
             ),
             (
-                if cx.no_division { 0.0 } else { 0.3 },
+                0.3,
                 Box::new(|_cx: &mut CompilerContext, _rng: &mut ErasedRng| AOp::Divide),
             ),
         ],
@@ -542,9 +615,6 @@ pub fn gen_logicop<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> LogicOp {
             ),
         ],
     )
-}
-fn gen_command_erased(cx: &mut CompilerContext, rng: &mut ErasedRng) -> Command {
-    gen_command(cx, rng)
 }
 
 fn gen_guard_erased(cx: &mut CompilerContext, rng: &mut ErasedRng) -> Guard {

@@ -7,7 +7,6 @@ let stored = init(async () => {
   const files = {
     'z3-built.js': await import('z3-solver/build/z3-built?url'),
     'z3-built.wasm': await import('z3-solver/build/z3-built.wasm?url'),
-    'z3-built.worker.js': await import('z3-solver/build/z3-built.worker?url'),
   };
   return initZ3({
     locateFile: (f: string) => {
@@ -31,6 +30,8 @@ export type RunOptions = {
   onStart?: () => void;
 };
 
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const run = (
   query: string,
   options: RunOptions = {},
@@ -43,9 +44,11 @@ export const run = (
   return {
     cancel,
     result: borrow(async ({ Z3 }) => {
+      await wait(10);
+
       options.onStart?.();
 
-      const timeout = 5000;
+      const timeout = 15000;
 
       Z3.global_param_set('timeout', String(timeout));
 

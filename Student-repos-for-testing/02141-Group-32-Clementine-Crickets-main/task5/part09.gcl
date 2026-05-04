@@ -1,0 +1,12 @@
+// Another finite summation
+{ n >= 1 }
+r := 0 { n >= 1 & r = 0};
+i := 0 { n >= 1 & r = 0 & i = 0 & r = i * (i+1)};
+do[i <= n & r = i * (i+1) & i >= 0] // TODO: replace `false` by a suitable invariant
+  i < n -> {i <= n & r = i * (i+1) & i >= 0 & i < n}
+    i := i + 1;
+    {i <= n & (r + 2*i) = i * (i+1) & i >= 0}
+    r := r + 2*i 
+    {i <= n & r = i * (i+1) & i >= 0}
+od
+{ r = n * (n + 1)}

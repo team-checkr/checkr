@@ -38,11 +38,16 @@ pub fn endpoints() -> tapi::endpoints::Endpoints<'static, AppState> {
 struct GenerateParams {
     analysis: Analysis,
     seed: Option<u64>,
+    #[serde(default)]
+    level: Option<u8>,
 }
 
 #[tapi::tapi(path = "/generate", method = Post)]
 async fn generate(Json(params): Json<GenerateParams>) -> Json<ce_shell::Input> {
-    let input = params.analysis.gen_input_seeded(params.seed);
+    let input = match params.level {
+        Some(level) => params.analysis.gen_input_for_level(level, params.seed),
+        None => params.analysis.gen_input_seeded(params.seed),
+    };
     Json(input)
 }
 
@@ -70,6 +75,7 @@ struct AnalysisData {
     output: Option<ce_shell::Output>,
     reference_output: Option<ce_shell::Output>,
     validation: Option<ce_core::ValidationResult>,
+    annotation: Option<ce_shell::Annotation>,
 }
 
 impl AppState {
@@ -100,25 +106,30 @@ impl AppState {
                     }
                 };
                 let output = input.analysis().output_from_str(&stdout);
-                let validation = match (state, &output) {
-                    (JobState::Succeeded, Ok(output)) => {
-                        Some(match input.validate_output(output) {
-                            Ok(output) => output,
-                            Err(e) => ValidationResult::Mismatch {
+                let (validation, annotation) = match (state, &output) {
+                    (JobState::Succeeded, Ok(output)) => match input.validate_output(output) {
+                        Ok((val, ann)) => (Some(val), Some(ann)),
+                        Err(e) => (
+                            Some(ValidationResult::Mismatch {
                                 reason: format!("failed to validate output: {e:?}"),
-                            },
-                        })
-                    }
-                    (JobState::Succeeded, Err(e)) => Some(ValidationResult::Mismatch {
-                        reason: format!("failed to parse output: {e:?}"),
-                    }),
-                    _ => None,
+                            }),
+                            None,
+                        ),
+                    },
+                    (JobState::Succeeded, Err(e)) => (
+                        Some(ValidationResult::Mismatch {
+                            reason: format!("failed to parse output: {e:?}"),
+                        }),
+                        None,
+                    ),
+                    _ => (None, None),
                 };
                 Some(AnalysisData {
                     meta,
                     output: output.ok(),
                     reference_output,
                     validation,
+                    annotation,
                 })
             }
             _ => None,
@@ -370,6 +381,7 @@ async fn exec_analysis(
 struct ReferenceExecution {
     meta: ce_shell::Meta,
     output: Option<ce_shell::Output>,
+    annotation: Option<ce_shell::Annotation>,
     error: Option<String>,
 }
 
@@ -377,9 +389,15 @@ struct ReferenceExecution {
 async fn exec_reference(Json(input): Json<ce_shell::Input>) -> Json<ReferenceExecution> {
     let output = input.reference_output();
     let error = output.as_ref().err().map(|e| e.to_string());
+    let output = output.ok();
+    let annotation = output
+        .as_ref()
+        .and_then(|o| input.validate_output(o).ok())
+        .map(|(_, ann)| ann);
     Json(ReferenceExecution {
         meta: input.meta(),
-        output: output.ok(),
+        output,
+        annotation,
         error,
     })
 }

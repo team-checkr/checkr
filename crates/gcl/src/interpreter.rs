@@ -6,7 +6,7 @@ use stdx::stringify::Stringify;
 
 use crate::{
     ast::{Array, Int, Variable},
-    pg::{Edge, Node, ProgramGraph},
+    pg::{Action, Edge, Node, ProgramGraph},
     semantics::{SemanticsContext, SemanticsError},
 };
 
@@ -142,9 +142,7 @@ impl Execution {
         self.current_node() == Node::End
     }
     pub fn is_stuck(&self, pg: &ProgramGraph) -> bool {
-        pg.outgoing(self.current_node())
-            .iter()
-            .all(|Edge(_, action, _)| action.semantics(self.current_mem()).is_err())
+        self.current_node().is_stuck(pg, self.current_mem())
     }
     pub fn state(&self, pg: &ProgramGraph) -> TerminationState {
         if self.is_stuck(pg) {
@@ -158,27 +156,49 @@ impl Execution {
         }
     }
     pub fn nexts(&self, pg: &ProgramGraph) -> Vec<Execution> {
-        if self.is_stuck(pg) {
-            return vec![];
-        }
-
-        let mem = self.current_mem();
-        pg.outgoing(self.current_node())
-            .iter()
-            .filter_map(|Edge(_, action, next_node)| {
-                action.semantics(mem).ok().map(|next_mem| {
-                    let mut next = self.clone();
-                    next.trace.push((
-                        Step {
-                            node: next_node.to_string(),
-                            action: Stringify::new(action.clone()),
-                            memory: next_mem,
-                        },
-                        *next_node,
-                    ));
-                    next
-                })
+        self.current_node()
+            .nexts(pg, self.current_mem())
+            .map(|(next_node, action, next_mem)| {
+                let mut next = self.clone();
+                next.trace.push((
+                    Step {
+                        node: next_node.to_string(),
+                        action: Stringify::new(action.clone()),
+                        memory: next_mem,
+                    },
+                    next_node,
+                ));
+                next
             })
             .collect_vec()
+    }
+}
+
+impl Node {
+    pub fn is_stuck(self, pg: &ProgramGraph, mem: &InterpreterMemory) -> bool {
+        pg.outgoing(self)
+            .iter()
+            .all(|Edge(_, action, _)| action.semantics(mem).is_err())
+    }
+    pub fn nexts<'a>(
+        self,
+        pg: &'a ProgramGraph,
+        mem: &InterpreterMemory,
+    ) -> impl Iterator<Item = (Node, &'a Action, InterpreterMemory)> {
+        pg.outgoing(self)
+            .iter()
+            .filter_map(move |Edge(_, action, next_node)| {
+                action
+                    .semantics(mem)
+                    .ok()
+                    .map(|next_mem| (*next_node, action, next_mem))
+            })
+    }
+    pub fn next(
+        self,
+        pg: &ProgramGraph,
+        mem: &InterpreterMemory,
+    ) -> Option<(Node, InterpreterMemory)> {
+        self.nexts(pg, mem).next().map(|(node, _, mem)| (node, mem))
     }
 }
