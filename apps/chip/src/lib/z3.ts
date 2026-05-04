@@ -31,6 +31,8 @@ export type RunOptions = {
   onStart?: () => void;
 };
 
+const wait = (ms: number): Promise<void> => new Promise((resolve) => setTimeout(resolve, ms));
+
 export const run = (
   query: string,
   options: RunOptions = {},
@@ -43,8 +45,12 @@ export const run = (
   return {
     cancel,
     result: borrow(async ({ Z3 }) => {
+      await wait(10);
+
       options.onStart?.();
 
+      // We can't wait forever, so we set a timeout. 
+      // 5 seconds (per Z3 call) seems like a reasonable amount of time.
       const timeout = 5000;
 
       Z3.global_param_set('timeout', String(timeout));
@@ -54,6 +60,9 @@ export const run = (
       Z3.del_config(cfg);
 
       console.group('smt');
+ 
+      // HACK: We set the theory, because otherwise Z3 will choose one and the performance outcome is less predictable
+      await Z3.eval_smtlib2_string(ctx, "(set-logic LIA)");
 
       if (options.prelude) {
         console.info('prelude:', '\n' + options.prelude);

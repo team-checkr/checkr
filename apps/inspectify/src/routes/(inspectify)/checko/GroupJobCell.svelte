@@ -22,7 +22,7 @@
   let jobId = $derived(groupProgramJobAssignedStore.groups?.[group.name]?.[program.hash_str]);
   let job = $derived(jobsStore.jobs[jobId]);
   let validation = $derived(job?.analysis_data?.validation?.type);
-  let state = $derived(validation == 'Mismatch' ? 'Warning' : (job?.state ?? 'Queued'));
+  let state = $derived((validation == 'Mismatch' || validation == 'Unknown') ? 'Warning' : (job?.state ?? 'Queued'));
 
   const icons: Record<driver.job.JobState, [typeof EllipsisHorizontal, string, string]> = {
     Queued: [EllipsisHorizontal, 'animate-pulse', ''],

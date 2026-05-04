@@ -111,10 +111,7 @@ impl<M: Send + Sync + 'static> Hub<M> {
             JobKind::Analysis(_) => Duration::from_secs(10),
             JobKind::Compilation => Duration::from_secs(60),
         };
-        let max_output = match &kind {
-            JobKind::Analysis(_) => 2usize.pow(14),
-            JobKind::Compilation => 2usize.pow(20),
-        };
+        let max_output = 2usize.pow(16);
         let data = Arc::new(RwLock::new(JobData::new(kind, meta)));
 
         enum Exit {

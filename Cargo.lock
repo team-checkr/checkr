@@ -315,8 +315,23 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-bigcl"
+version = "0.3.0"
+dependencies = [
+ "ce-core",
+ "gcl",
+ "indexmap",
+ "itertools 0.14.0",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-calculator"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "gcl",
@@ -330,7 +345,7 @@ dependencies = [
 
 [[package]]
 name = "ce-compiler"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "gcl",
@@ -347,7 +362,7 @@ dependencies = [
 
 [[package]]
 name = "ce-core"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "futures-util",
  "gcl",
@@ -363,7 +378,7 @@ dependencies = [
 
 [[package]]
 name = "ce-interpreter"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "gcl",
@@ -377,7 +392,7 @@ dependencies = [
 
 [[package]]
 name = "ce-parser"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "gcl",
@@ -388,8 +403,25 @@ dependencies = [
 ]
 
 [[package]]
+name = "ce-riscv"
+version = "0.3.0"
+dependencies = [
+ "ce-bigcl",
+ "ce-core",
+ "gcl",
+ "indexmap",
+ "itertools 0.14.0",
+ "riscvy",
+ "serde",
+ "serde_json",
+ "stdx",
+ "tapi",
+ "tracing",
+]
+
+[[package]]
 name = "ce-security"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "gcl",
@@ -403,13 +435,15 @@ dependencies = [
 
 [[package]]
 name = "ce-shell"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
+ "ce-bigcl",
  "ce-calculator",
  "ce-compiler",
  "ce-core",
  "ce-interpreter",
  "ce-parser",
+ "ce-riscv",
  "ce-security",
  "ce-sign",
  "dashmap",
@@ -428,7 +462,7 @@ dependencies = [
 
 [[package]]
 name = "ce-sign"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "bitflags 2.9.1",
  "ce-core",
@@ -456,7 +490,7 @@ checksum = "613afe47fcd5fac7ccf1db93babcb082c5994d996f20b8b159f2ad1658eb5724"
 
 [[package]]
 name = "checkr"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-shell",
  "clap",
@@ -467,7 +501,7 @@ dependencies = [
 
 [[package]]
 name = "chip"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "clap",
  "indexmap",
@@ -485,7 +519,7 @@ dependencies = [
 
 [[package]]
 name = "chip-cli"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "camino",
  "chip",
@@ -506,7 +540,7 @@ dependencies = [
 
 [[package]]
 name = "chip-wasm"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "chip",
  "comfy-table",
@@ -832,7 +866,7 @@ checksum = "498cfcded997a93eb31edd639361fa33fd229a8784e953b37d71035fe3890b7b"
 
 [[package]]
 name = "driver"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "ce-shell",
@@ -1045,7 +1079,7 @@ dependencies = [
 
 [[package]]
 name = "gcl"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "indexmap",
  "itertools 0.14.0",
@@ -1104,7 +1138,7 @@ checksum = "07e28edb80900c19c28f1072f2e8aeca7fa06b23cd4169cefe1af5aa3260783f"
 
 [[package]]
 name = "gitty"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "chrono",
  "color-eyre",
@@ -1541,7 +1575,7 @@ dependencies = [
 
 [[package]]
 name = "inspectify"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "axum",
  "ce-core",
@@ -1732,6 +1766,12 @@ dependencies = [
  "bitflags 1.3.2",
  "libc",
 ]
+
+[[package]]
+name = "la-arena"
+version = "0.3.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "3752f229dcc5a481d60f385fa479ff46818033d881d2d801aa27dffcfb5e8306"
 
 [[package]]
 name = "lalrpop"
@@ -2580,6 +2620,21 @@ dependencies = [
 ]
 
 [[package]]
+name = "riscvy"
+version = "0.3.0"
+dependencies = [
+ "indexmap",
+ "itertools 0.14.0",
+ "la-arena",
+ "lalrpop",
+ "lalrpop-util",
+ "miette 7.6.0",
+ "once_cell",
+ "text-size",
+ "thiserror 2.0.12",
+]
+
+[[package]]
 name = "rle-decode-fast"
 version = "1.0.3"
 source = "registry+https://github.com/rust-lang/crates.io-index"
@@ -2967,7 +3022,7 @@ checksum = "a8f112729512f8e442d81f95a8a7ddf2b7c6b8a1a6f509a95864142b30cab2d3"
 
 [[package]]
 name = "stdx"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "lz4_flex",
  "once_cell",
@@ -3171,6 +3226,12 @@ dependencies = [
  "quote",
  "syn 2.0.104",
 ]
+
+[[package]]
+name = "text-size"
+version = "1.1.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "f18aa187839b2bdb1ad2fa35ead8c4c2976b64e4363c386d45ac0f7ee85c9233"
 
 [[package]]
 name = "textwrap"
@@ -4092,7 +4153,7 @@ checksum = "32ac00cd3f8ec9c1d33fb3e7958a82df6989c42d747bd326c822b1d625283547"
 
 [[package]]
 name = "xtask"
-version = "0.2.14"
+version = "0.3.0"
 dependencies = [
  "ce-core",
  "clap",

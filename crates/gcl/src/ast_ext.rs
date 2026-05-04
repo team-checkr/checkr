@@ -158,6 +158,14 @@ impl Commands {
     pub fn fv(&self) -> IndexSet<Target> {
         self.0.iter().flat_map(|c| c.fv()).collect()
     }
+    pub fn concat(mut self, others: &Commands) -> Commands {
+        self.0.extend(others.0.iter().cloned());
+        self
+    }
+    pub fn extend(mut self, cmd: Command) -> Commands {
+        self.0.push(cmd);
+        self
+    }
 }
 impl Command {
     pub fn fv(&self) -> IndexSet<Target> {
