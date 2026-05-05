@@ -2,12 +2,12 @@ use gcl::ast::{
     AExpr, AOp, Array, BExpr, Command, Commands, Guard, LogicOp, RelOp, Target, Variable,
 };
 use rand::{
+    Rng, SeedableRng,
     rngs::SmallRng,
     seq::{IndexedRandom, SliceRandom},
-    Rng, SeedableRng,
 };
 
-use crate::gn::compiler_gen::{gen_aexpr, gen_bexpr, gen_target, CompilerContext};
+use crate::gn::compiler_gen::{CompilerContext, gen_aexpr, gen_bexpr, gen_target};
 type ErasedRng = SmallRng;
 
 type GenFn<G> = Box<dyn Fn(&mut CompilerContext, &mut ErasedRng) -> G>;
@@ -47,7 +47,7 @@ impl GenOptionsNested<Commands> {
 
         let mut erng = SmallRng::seed_from_u64(rng.random());
 
-        if cx.fuel <= 0 {
+        if cx.fuel == 0 {
             let end_opt: GenOptionsNested<Commands> = lvl_assignment(cx);
 
             let (_, f) = end_opt.0.choose_weighted(&mut erng, |item| item.0).unwrap();
@@ -197,7 +197,7 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
     //         .append(&mut lvl_undefined(&mut cx.compiler_context).0);
     // }
 
-    if cx.level >= 7 && false {
+    if cx.level >= 7 {
         // ? 8 Composition: (all previous levels are guaranteed here)
         if cx.level == 7 {
             let mut erng = SmallRng::seed_from_u64(rng.random());
