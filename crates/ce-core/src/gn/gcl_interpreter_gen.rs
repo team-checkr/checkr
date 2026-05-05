@@ -254,7 +254,7 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
                 .0,
         );
 
-        if cx.compiler_context.fuel <= 0 && i <= min {
+        if cx.compiler_context.fuel == 0 && i <= min {
             break;
         }
     }
@@ -379,7 +379,7 @@ fn lvl_stuck(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
 }
 
 // ? 5 Loops: long execution (execution that may surpass the trace length limit) do GC od introduces iteration, exits when no guards hold. This level will bring potentially infinite execution, and differences between terminated, running, stuck( we have in the code exactly as TerminationState::Running TerminationState::Terminated TerminationState::Stuck
-fn lvl_loops(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
+fn lvl_loops(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     GenOptionsNested(vec![(
         0.5,
         Box::new(
@@ -394,7 +394,7 @@ fn lvl_loops(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
 }
 
 // ? 6 Nondeterminism: multiple valid paths, overlapping guards in if / do (we have also implemented the new nondeterministic path for this one: nexts() choose_random(...)
-fn lvl_nondeterminism(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
+fn lvl_nondeterminism(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
     GenOptionsNested(vec![
         (
             0.5,
@@ -420,30 +420,30 @@ fn lvl_nondeterminism(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
 }
 
 // ? 7 Undefined semantics: division by zero
-fn lvl_undefined(cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
-    GenOptionsNested(vec![
-        (
-            0.5,
-            Box::new(
-                |cx: &mut CompilerContext,
-                 rng: &mut ErasedRng,
-                 gnopt: &GenOptionsNested<Commands>| {
-                    Commands(vec![Command::If(gen_undefined_guards(cx, rng, gnopt))])
-                },
-            ),
-        ),
-        (
-            0.5,
-            Box::new(
-                |cx: &mut CompilerContext,
-                 rng: &mut ErasedRng,
-                 gnopt: &GenOptionsNested<Commands>| {
-                    Commands(vec![Command::Loop(gen_undefined_guards(cx, rng, gnopt))])
-                },
-            ),
-        ),
-    ])
-}
+// fn lvl_undefined(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
+//     GenOptionsNested(vec![
+//         (
+//             0.5,
+//             Box::new(
+//                 |cx: &mut CompilerContext,
+//                  rng: &mut ErasedRng,
+//                  gnopt: &GenOptionsNested<Commands>| {
+//                     Commands(vec![Command::If(gen_undefined_guards(cx, rng, gnopt))])
+//                 },
+//             ),
+//         ),
+//         (
+//             0.5,
+//             Box::new(
+//                 |cx: &mut CompilerContext,
+//                  rng: &mut ErasedRng,
+//                  gnopt: &GenOptionsNested<Commands>| {
+//                     Commands(vec![Command::Loop(gen_undefined_guards(cx, rng, gnopt))])
+//                 },
+//             ),
+//         ),
+//     ])
+// }
 
 // ? helper functions
 
@@ -639,7 +639,7 @@ pub fn sort_aexpr(a: AExpr, b: AExpr) -> (AExpr, AExpr) {
 pub fn aexpr_resolve(a: AExpr) -> i32 {
     match a {
         AExpr::Number(n) => n,
-        AExpr::Reference(target) => 0,
+        AExpr::Reference(_target) => 0,
         AExpr::Binary(l_aexpr, aop, r_aexpr) => {
             let l_var = aexpr_resolve(l_aexpr.simplify());
             let r_var = aexpr_resolve(r_aexpr.simplify());
@@ -832,8 +832,8 @@ pub fn gen_aexpr_undefined<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AEx
         ),
         (
             0.5,
-            Box::new(|cx: &mut CompilerContext, rng: &mut ErasedRng| {
-                let var_name = cx.names.choose(rng).cloned().unwrap_or_else(|| "a".into());
+            Box::new(|_cx: &mut CompilerContext, _rng: &mut ErasedRng| {
+                //let var_name = cx.names.choose(rng).cloned().unwrap_or_else(|| "a".into());
 
                 let var_name: String = "test2".to_string();
                 AExpr::Reference(Target::Variable(Variable(var_name)))
