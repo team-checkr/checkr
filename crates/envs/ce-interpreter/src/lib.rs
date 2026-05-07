@@ -5,6 +5,10 @@ use std::collections::BTreeSet;
 
 use ce_core::{
     Env, Generate, ValidationResult, define_env,
+    gn::{
+        compiler_gen::CompilerContext,
+        interpreter_gen::{InterpreterContext, generate_selective},
+    },
     rand::{self, seq::IndexedRandom},
 };
 use gcl::{
@@ -189,7 +193,12 @@ impl Generate for Input {
     type Context = ();
 
     fn gn<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
-        let commands = gcl::ast::Commands::gn(&mut Default::default(), rng);
+        //let commands = gcl::ast::Commands::gn(&mut Default::default(), rng);
+        let commands = generate_selective(
+            &mut InterpreterContext::new(1, CompilerContext::new(10), rng),
+            rng,
+        );
+
         let initial_memory = gcl::memory::Memory::from_targets_with(
             commands.fv(),
             &mut rng,

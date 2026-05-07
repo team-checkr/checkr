@@ -10,6 +10,7 @@ publish = false
 [[bin]]
 name = "chip"
 path = "src/main.rs"
+doc = false
 
 [package.metadata.dist]
 dist = true

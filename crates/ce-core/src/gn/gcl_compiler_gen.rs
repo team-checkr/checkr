@@ -89,8 +89,6 @@ fn bridge<R: Rng>(rng: &mut R) -> ErasedRng {
     SmallRng::seed_from_u64(rng.random())
 }
 
-// Scenario catalog to weigh random selections
-
 #[derive(Clone, Copy)]
 enum Scenario {
     SimpleAssignment,
@@ -419,7 +417,6 @@ pub fn gen_command<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> Command {
                     Command::Assignment(gen_target(cx, rng), gen_aexpr(cx, rng))
                 }),
             ),
-            // skip is a real compiler edge — include it at a low weight
             (
                 0.3,
                 Box::new(|_cx: &mut CompilerContext, _rng: &mut ErasedRng| Command::Skip),
@@ -482,7 +479,6 @@ pub fn gen_aexpr<R: Rng>(cx: &mut CompilerContext, rng: &mut R) -> AExpr {
                     AExpr::binary(gen_aexpr(cx, rng), gen_aop(cx, rng), gen_aexpr(cx, rng))
                 }),
             ),
-            // Unary minus: -expr
             (
                 if cx.recursion_limit == 0 || cx.fuel == 0 {
                     0.0

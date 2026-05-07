@@ -3,6 +3,10 @@ pub mod compiler_gen {
     pub use super::gcl_compiler_gen::*;
 }
 mod gcl_compiler_gen;
+pub mod interpreter_gen {
+    pub use super::gcl_interpreter_gen::*;
+}
+mod gcl_interpreter_gen;
 
 pub use gcl_gen::Context as GclGenContext;
 use rand::Rng;
