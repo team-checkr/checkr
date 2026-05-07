@@ -86,7 +86,7 @@ impl<M: Debug + Send + Sync + 'static> Driver<M> {
             JobKind::Analysis(input.clone()),
             &self.cwd,
             meta,
-            &program,
+            &args[0],
             &args[1..],
         )
     }

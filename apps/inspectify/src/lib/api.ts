@@ -141,7 +141,8 @@ export namespace Interpreter {
     commands: string,
     determinism: GCL.Determinism,
     assignment: Interpreter.InterpreterMemory,
-    trace_length: number
+    trace_length: number,
+    level: number
   };
   export type Output = {
     initial_node: string,

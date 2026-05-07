@@ -28,6 +28,7 @@ pub struct Input {
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
     pub trace_length: Int,
+    pub level: u8,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -222,6 +223,7 @@ impl Generate for Input {
             determinism,
             assignment,
             trace_length: rng.random_range(10..=15),
+            level: 1,
         }
     }
 }
