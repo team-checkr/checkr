@@ -1,17 +1,16 @@
 <script lang="ts">
   import InputOption from './InputOption.svelte';
 
-  let { level = $bindable() }: { level: number } = $props();
-
-  const LEVELS = [
-    { n: 1, name: 'Assignment' },
-    { n: 2, name: 'Sequencing' },
-    { n: 3, name: 'Conditionals' },
-    { n: 4, name: 'Loops' },
-    { n: 5, name: 'Arrays' },
-    { n: 6, name: 'Nondeterminism' },
-    { n: 7, name: 'Composition' },
-  ];
+  let {
+    level = $bindable(),
+    LEVELS,
+  }: {
+    level: number;
+    LEVELS: {
+      n: number;
+      name: string;
+    }[];
+  } = $props();
 
   const currentName = $derived(LEVELS.find((l) => l.n === level)?.name ?? '');
 </script>

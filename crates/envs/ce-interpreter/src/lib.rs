@@ -28,7 +28,7 @@ pub struct Input {
     pub determinism: Determinism,
     pub assignment: InterpreterMemory,
     pub trace_length: Int,
-    pub level: u8,
+    pub level: u32,
 }
 
 #[derive(tapi::Tapi, Debug, Clone, PartialEq, Serialize, Deserialize)]
@@ -194,36 +194,39 @@ impl Generate for Input {
     type Context = ();
 
     fn gn<R: rand::Rng>(_cx: &mut Self::Context, mut rng: &mut R) -> Self {
-        //let commands = gcl::ast::Commands::gn(&mut Default::default(), rng);
-        let commands = generate_selective(
-            &mut InterpreterContext::new(1, CompilerContext::new(10), rng),
-            rng,
-        );
+        gen_input_for_level(8, rng)
+    }
+}
 
-        let initial_memory = gcl::memory::Memory::from_targets_with(
-            commands.fv(),
-            &mut rng,
-            |rng, _| rng.random_range(-10..=10),
-            |rng, _| {
-                let len = rng.random_range(5..=10);
-                (0..len).map(|_| rng.random_range(-10..=10)).collect()
-            },
-        );
-        let assignment = InterpreterMemory {
-            variables: initial_memory.variables,
-            arrays: initial_memory.arrays,
-        };
+pub fn gen_input_for_level<R: rand::Rng>(level: u32, mut rng: &mut R) -> Input {
+    let commands = generate_selective(
+        &mut InterpreterContext::new(level, CompilerContext::new(10), rng),
+        rng,
+    );
 
-        let determinism = *[Determinism::Deterministic, Determinism::NonDeterministic]
-            .choose(rng)
-            .unwrap();
+    let initial_memory = gcl::memory::Memory::from_targets_with(
+        commands.fv(),
+        &mut rng,
+        |rng, _| rng.random_range(-10..=10),
+        |rng, _| {
+            let len = rng.random_range(5..=10);
+            (0..len).map(|_| rng.random_range(-10..=10)).collect()
+        },
+    );
+    let assignment = InterpreterMemory {
+        variables: initial_memory.variables,
+        arrays: initial_memory.arrays,
+    };
 
-        Input {
-            commands: Stringify::new(commands),
-            determinism,
-            assignment,
-            trace_length: rng.random_range(10..=15),
-            level: 1,
-        }
+    let determinism = *[Determinism::Deterministic, Determinism::NonDeterministic]
+        .choose(rng)
+        .unwrap();
+
+    Input {
+        commands: Stringify::new(commands),
+        determinism,
+        assignment,
+        trace_length: rng.random_range(10..=15),
+        level,
     }
 }

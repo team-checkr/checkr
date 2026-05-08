@@ -13,13 +13,23 @@
     witness_mems: [],
     level: 7,
   });
+
+  const LEVELS = [
+    { n: 1, name: 'Assignment' },
+    { n: 2, name: 'Sequencing' },
+    { n: 3, name: 'Conditionals' },
+    { n: 4, name: 'Loops' },
+    { n: 5, name: 'Arrays' },
+    { n: 6, name: 'Nondeterminism' },
+    { n: 7, name: 'Composition' },
+  ];
 </script>
 
 <Env {io}>
   {#snippet inputView()}
     <StandardInput analysis="Compiler" code="commands" {io}>
       <InputOptions>
-        <LevelInput bind:level={io.level} />
+        <LevelInput bind:level={io.level} {LEVELS} />
         <DeterminismInput input={io.input} />
       </InputOptions>
     </StandardInput>

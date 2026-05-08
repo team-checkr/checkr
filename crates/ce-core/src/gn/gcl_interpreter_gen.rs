@@ -178,28 +178,28 @@ pub fn generate_selective<R: Rng>(cx: &mut InterpreterContext, rng: &mut R) -> C
             .append(&mut lvl_nondeterminism(&mut cx.compiler_context).0);
     }
 
-    // if cx.level >= 7 {
-    //     // ? 7 Undefined semantics:
-    //     if cx.level == 7 {
-    //         let mut erng = SmallRng::seed_from_u64(rng.random());
-    //
-    //         let mut gen_options: GenOptionsNested<Commands> =
-    //             lvl_assignment(&mut cx.compiler_context);
-    //         gen_options
-    //             .0
-    //             .append(&mut lvl_undefined(&mut cx.compiler_context).0);
-    //
-    //         cmds.append(&mut gen_options.generate(&mut cx.compiler_context, &mut erng).0);
-    //     }
-    //
-    //     generation_options
-    //         .0
-    //         .append(&mut lvl_undefined(&mut cx.compiler_context).0);
-    // }
-
     if cx.level >= 7 {
-        // ? 8 Composition: (all previous levels are guaranteed here)
+        // ? 7 Undefined semantics:
         if cx.level == 7 {
+            let mut erng = SmallRng::seed_from_u64(rng.random());
+
+            let mut gen_options: GenOptionsNested<Commands> =
+                lvl_assignment(&mut cx.compiler_context);
+            gen_options
+                .0
+                .append(&mut lvl_undefined(&mut cx.compiler_context).0);
+
+            cmds.append(&mut gen_options.generate(&mut cx.compiler_context, &mut erng).0);
+        }
+
+        generation_options
+            .0
+            .append(&mut lvl_undefined(&mut cx.compiler_context).0);
+    }
+
+    if cx.level >= 8 {
+        // ? 8 Composition: (all previous levels are guaranteed here)
+        if cx.level == 8 {
             let mut erng = SmallRng::seed_from_u64(rng.random());
             cmds.append(
                 &mut lvl_assignment(&mut cx.compiler_context)
@@ -420,30 +420,30 @@ fn lvl_nondeterminism(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
 }
 
 // ? 7 Undefined semantics: division by zero
-// fn lvl_undefined(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
-//     GenOptionsNested(vec![
-//         (
-//             0.5,
-//             Box::new(
-//                 |cx: &mut CompilerContext,
-//                  rng: &mut ErasedRng,
-//                  gnopt: &GenOptionsNested<Commands>| {
-//                     Commands(vec![Command::If(gen_undefined_guards(cx, rng, gnopt))])
-//                 },
-//             ),
-//         ),
-//         (
-//             0.5,
-//             Box::new(
-//                 |cx: &mut CompilerContext,
-//                  rng: &mut ErasedRng,
-//                  gnopt: &GenOptionsNested<Commands>| {
-//                     Commands(vec![Command::Loop(gen_undefined_guards(cx, rng, gnopt))])
-//                 },
-//             ),
-//         ),
-//     ])
-// }
+fn lvl_undefined(_cx: &mut CompilerContext) -> GenOptionsNested<Commands> {
+    GenOptionsNested(vec![
+        (
+            0.5,
+            Box::new(
+                |cx: &mut CompilerContext,
+                 rng: &mut ErasedRng,
+                 gnopt: &GenOptionsNested<Commands>| {
+                    Commands(vec![Command::If(gen_undefined_guards(cx, rng, gnopt))])
+                },
+            ),
+        ),
+        (
+            0.5,
+            Box::new(
+                |cx: &mut CompilerContext,
+                 rng: &mut ErasedRng,
+                 gnopt: &GenOptionsNested<Commands>| {
+                    Commands(vec![Command::Loop(gen_undefined_guards(cx, rng, gnopt))])
+                },
+            ),
+        ),
+    ])
+}
 
 // ? helper functions
 

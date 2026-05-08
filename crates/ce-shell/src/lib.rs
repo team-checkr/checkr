@@ -43,6 +43,10 @@ impl Analysis {
                 let input = ce_compiler::gen_input_for_level(level, &mut rng);
                 Input::new::<ce_compiler::CompilerEnv>(&input)
             }
+            Analysis::Interpreter => {
+                let input = ce_interpreter::gen_input_for_level(level as u32, &mut rng);
+                Input::new::<ce_interpreter::InterpreterEnv>(&input)
+            }
             _ => self.gen_input(&mut rng),
         }
     }

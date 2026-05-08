@@ -10,13 +10,14 @@
   import InputOptions from '$lib/components/InputOptions.svelte';
   import InputOption from '$lib/components/InputOption.svelte';
   import DeterminismInput from '$lib/components/DeterminismInput.svelte';
+  import LevelInput from '$lib/components/LevelInput.svelte';
 
   const io = new Io('Interpreter', {
     commands: 'skip',
     determinism: GCL.DETERMINISM[0],
     assignment: { variables: {}, arrays: {} },
     trace_length: 10,
-    level: 7,
+    level: 8,
   });
   let vars = $derived(io.meta ?? []);
 
@@ -36,10 +37,6 @@
     }
   });
 
-  // TODO move
-
-  let { level = $bindable() }: { level: number } = $props();
-
   const LEVELS = [
     { n: 1, name: 'Assignment' },
     { n: 2, name: 'Sequencing' },
@@ -47,11 +44,9 @@
     { n: 4, name: 'Stuck' },
     { n: 5, name: 'Loops' },
     { n: 6, name: 'Nondeterminism' },
-    { n: 7, name: 'Composition' },
+    { n: 7, name: 'Undefined' },
+    { n: 8, name: 'Composition' },
   ];
-
-  const currentName = $derived(LEVELS.find((l) => l.n === level)?.name ?? '');
-
 </script>
 
 <Env {io}>
@@ -72,33 +67,14 @@
             </div>
           {/each}
         </div>
-      </InputOptions>    
+      </InputOptions>
       <InputOptions>
         <InputOption title="Number of steps">
           <div class="w-full font-mono">
             <ParsedInput type="int" bind:value={io.input.trace_length} />
           </div>
         </InputOption>
-        <InputOption title="Level">
-          <div class="flex flex-col gap-y-1">
-            <div class="grid w-full grid-cols-7 gap-x-1 font-mono">
-              {#each LEVELS as { n }}
-                <button
-                  onclick={() => (
-                    io.input.level = n,
-                    level = n
-                  )}
-                  class="rounded py-1 text-center text-xs transition {n <= level
-                    ? 'bg-slate-500 text-white'
-                    : 'bg-slate-800 text-slate-500'}"
-                >
-                  {n}
-                </button>
-              {/each}
-            </div>
-            <div class="text-xs text-slate-400">{currentName}</div>
-          </div>
-        </InputOption>
+        <LevelInput bind:level={io.level} {LEVELS} />
         <DeterminismInput input={io.input} />
       </InputOptions>
     </StandardInput>
