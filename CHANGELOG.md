@@ -18,6 +18,7 @@ All notable changes to this project will be documented in this file.
 
 - Bump rust and cargo update and check/clippy fixes
 - Update `dist`
+- Release
 
 ### Chip
 
