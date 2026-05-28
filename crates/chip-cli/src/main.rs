@@ -11,6 +11,8 @@ use chip::{
 use chip_check::AssertionResultKind;
 use clap::Parser as _;
 use color_eyre::{Result, eyre::Context as _};
+use itertools::Itertools;
+use serde_json::json;
 use tracing_subscriber::prelude::*;
 
 #[tokio::main]
@@ -167,7 +169,11 @@ async fn run() -> Result<()> {
                     println!("{report:?}");
                     Ok(())
                 }
-                OutputFormat::Json => serde_json::to_writer(std::io::stdout(), &diag),
+                OutputFormat::Json => {
+                    serde_json::to_writer(std::io::stdout(), &diag)?;
+                    println!();
+                    Ok(())
+                }
             };
             match determine_chip_or_moka(chip, moka, &src) {
                 Kind::Chip => {
@@ -259,7 +265,75 @@ async fn run() -> Result<()> {
                         std::process::exit(1);
                     }
                 }
-                Kind::Moka => todo!("implement moka check"),
+                Kind::Moka => {
+                    let p = chip::parse::parse_ltl_program(&src)
+                        .with_context(|| format!("failed to parse {path}"))?;
+                    let mut did_error = false;
+
+                    let Ok(rs) = chip::model_check::ReachableStates::generate(&p, 10_000) else {
+                        report_diag(miette::diagnostic!(
+                            labels = [],
+                            severity = miette::Severity::Error,
+                            "The program state exploded",
+                        ))?;
+
+                        std::process::exit(1);
+                    };
+
+                    let mut holds = Vec::new();
+                    let mut doesnt_hold = Vec::new();
+                    for (span, property) in &p.properties {
+                        let pl = rs.pipeline(property);
+                        if pl.product_ba().find_accepting_cycle().is_some() {
+                            doesnt_hold.push(property);
+                            did_error = true;
+
+                            report_diag(miette::diagnostic!(
+                                labels = [miette::LabeledSpan::at(
+                                    (span.offset(), span.len()),
+                                    "This property doesn't hold",
+                                )],
+                                severity = miette::Severity::Error,
+                                "Property `{property}` doesn't hold",
+                            ))?;
+                        } else {
+                            holds.push(property);
+                        }
+                    }
+
+                    match format {
+                        OutputFormat::Human => {
+                            let n_holds = holds.len();
+                            let n_doesnt_hold = doesnt_hold.len();
+                            let n_all = n_holds + n_doesnt_hold;
+                            let report = miette::Report::new(miette::diagnostic!(
+                                labels = [],
+                                severity = if n_holds == n_all {
+                                    miette::Severity::Advice
+                                } else {
+                                    miette::Severity::Warning
+                                },
+                                "Properties {n_holds}/{n_all} holds",
+                            ))
+                            .with_source_code(miette::NamedSource::new(path, src.to_string()));
+                            println!("{report:?}");
+                        }
+                        OutputFormat::Json => {
+                            serde_json::to_writer(
+                                std::io::stdout(),
+                                &json!({
+                                    "holds": holds.into_iter().map(|p| p.to_string()).collect_vec(),
+                                    "doesntHold": doesnt_hold.into_iter().map(|p| p.to_string()).collect_vec(),
+                                }),
+                            )?;
+                            println!();
+                        }
+                    };
+
+                    if did_error {
+                        std::process::exit(1);
+                    }
+                }
             }
         }
         Cmd::Fmt { path, chip, moka } => {

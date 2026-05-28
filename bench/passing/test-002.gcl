@@ -1,0 +1,6 @@
+> x = 0
+
+x := x + 2
+
+check F x = 3
+check F x = 2
